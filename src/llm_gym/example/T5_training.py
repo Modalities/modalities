@@ -14,6 +14,7 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 from transformers.models.t5.modeling_t5 import T5Block
+from datasets import load_dataset, load_metric
 
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
@@ -28,19 +29,17 @@ from torch.distributed.fsdp import (
 from functools import partial
 from torch.utils.data import DataLoader
 from pathlib import Path
-from summarization_dataset import *
-import policies
-import model_checkpointing
-from configs import fsdp_config, train_config
-from utils import (bfloat_support, setup,
-                   cleanup, get_date_of_run,
-                   format_metrics_to_gb,
-                   train, validation, setup_model)
+from llm_gym.example.summarization_dataset import wikihow
+
+import llm_gym.example.policies as policies
+import llm_gym.example.model_checkpointing as model_checkpointing
+from llm_gym.example.configs import fsdp_config, train_config
+from llm_gym.example.utils import (bfloat_support, setup,
+                           cleanup, get_date_of_run,
+                           format_metrics_to_gb,
+                           train, validation, setup_model)
 from transformers.models.t5.modeling_t5 import T5Block
-from typing import Type
 import time
-import tqdm
-from datetime import datetime
 
 try:
     from torch.distributed.tensor.parallel.fsdp import enable_2d_with_fsdp
@@ -82,9 +81,7 @@ def get_policies(cfg, rank):
                 print(f"FP16 enabled. ")
         else:
             # mixed_precision_policy = policies.fpSixteen
-            print(
-                f"bFloat16 support not present. Will use FP32, and not mixed precision"
-            )
+            print(f"bFloat16 support not present. Will use FP32, and not mixed precision")
 
     wrapping_policy = policies.get_t5_wrapper()
 
@@ -108,18 +105,14 @@ def fsdp_main(args):
     train_dataset = wikihow(tokenizer, 'train', 1500, 512, 150, False)
     val_dataset = wikihow(tokenizer, 'validation', 300, 512, 150, False)
 
-    sampler1 = DistributedSampler(
-        train_dataset, rank=rank, num_replicas=world_size, shuffle=True)
-    sampler2 = DistributedSampler(
-        val_dataset, rank=rank, num_replicas=world_size)
+    sampler1 = DistributedSampler(train_dataset, rank=rank, num_replicas=world_size, shuffle=True)
+    sampler2 = DistributedSampler(val_dataset, rank=rank, num_replicas=world_size)
 
     setup()
 
     train_kwargs = {'batch_size': args.batch_size, 'sampler': sampler1}
     test_kwargs = {'batch_size': args.test_batch_size, 'sampler': sampler2}
-    cuda_kwargs = {'num_workers': 2,
-                   'pin_memory': True,
-                   'shuffle': False}
+    cuda_kwargs = {'num_workers': 2, 'pin_memory': True, 'shuffle': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
 
@@ -186,16 +179,11 @@ def fsdp_main(args):
         return parallelized_block
 
     for i in range(12):
-        block = parallelize_MLP_block(
-            model, f"encoder.block.{i}.layer.{1}.DenseReluDense", twod_mesh)
-        block = parallelize_MLP_block(
-            model, f"decoder.block.{i}.layer.{2}.DenseReluDense", twod_mesh)
-        block = parallelize_Attn_block(
-            model, f"encoder.block.{i}.layer.{0}.SelfAttention", twod_mesh)
-        block = parallelize_Attn_block(
-            model, f"decoder.block.{i}.layer.{0}.SelfAttention", twod_mesh)
-        block = parallelize_Attn_block(
-            model, f"decoder.block.{i}.layer.{1}.EncDecAttention", twod_mesh)
+        block = parallelize_MLP_block(model, f"encoder.block.{i}.layer.{1}.DenseReluDense", twod_mesh)
+        block = parallelize_MLP_block(model, f"decoder.block.{i}.layer.{2}.DenseReluDense", twod_mesh)
+        block = parallelize_Attn_block(model, f"encoder.block.{i}.layer.{0}.SelfAttention", twod_mesh)
+        block = parallelize_Attn_block(model, f"decoder.block.{i}.layer.{0}.SelfAttention", twod_mesh)
+        block = parallelize_Attn_block(model, f"decoder.block.{i}.layer.{1}.EncDecAttention", twod_mesh)
 
     fsdp_pg = twod_mesh.get_dim_groups()[0]
 

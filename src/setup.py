@@ -20,6 +20,8 @@ setup(
         "datasets",
         "protobuf",
         "SentencePiece",
+        "accelerate"
+        "rich"
     ],
     python_requires=">=3.10",
     include_package_data=True,
