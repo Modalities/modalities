@@ -125,3 +125,32 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
 
     def __len__(self) -> int:
         return len(self.predictions)
+
+
+class EvaluationResultBatch(Batch):
+    """Data class for storing the results of a single or multiple batches. Also entire epoch results are stored in here.
+    """
+
+    def __init__(self, split_name: str, losses: Dict[str, torch.Tensor] = None, metrics: Dict[str, torch.Tensor] = None):
+        self._losses = losses if losses is not None else {}
+        self._metrics = metrics if metrics is not None else {}
+        self._split_name = split_name
+
+    @property
+    def losses(self) -> Dict[str, torch.Tensor]:
+        return self._losses
+
+    @property
+    def metrics(self) -> Dict[str, torch.Tensor]:
+        return self._metrics
+
+    @property
+    def split_name(self) -> str:
+        return self._split_name
+
+    def __str__(self) -> str:
+        eval_str = f"Evaluation result on dataset split ({self._dataset_split}):"
+        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v}" for k, v in self._losses.mean().items()])
+        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v}" for k, v in self._metrics.mean().items()])
+        eval_str += "\n==============================================="
+        return eval_str

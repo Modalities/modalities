@@ -1,16 +1,22 @@
 import os
 from typing import Dict
-from llm_gym.env_utils import has_bfloat_support, bfSixteen
-from llm_gym.forward_pass import ModelForwardPass
-from llm_gym.gpt2.gpt2_model import NNModel, GPT2LLM
+from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
+from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.forward_pass import ModelInferenceComponent
+from llm_gym.fsdp.fsdp_runner import FSDPRunner
+from llm_gym.gpt2.gpt2_model import GPT2LLM
 from llm_gym.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
-from llm_gym.gym import ResultsCallback, RichProgressCallback, Trainer
+from llm_gym.gym import Gym
+from llm_gym.trainer import Trainer
+from llm_gym.evaluator import Evaluator
+from llm_gym.callbacks.batch_progress_callbacks import DummyProgressCallback, PrintProgressCallback
+from llm_gym.callbacks.results_callbacks import DummyResultsCallback, ResultsCallback
 from llm_gym.loss_functions import CLMCrossEntropyLoss
+from llm_gym.util import get_date_of_run
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader
 import torch.distributed as dist
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
-import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
@@ -19,6 +25,7 @@ class Main:
 
     def __init__(self, dataset_path: str, num_epochs: int) -> None:
         dist.init_process_group("nccl")
+        self.experiment_id = get_date_of_run()
 
         self.local_rank = int(os.environ['LOCAL_RANK'])
         self.global_rank = int(os.environ['RANK'])
@@ -27,8 +34,8 @@ class Main:
         self.num_epochs = num_epochs
 
         self.model = GPT2LLM(prediction_publication_key="logits")
-        self.wrapped_model = self.wrap_fsdp_model(self.model)
-        self.model_forward_pass = ModelForwardPass(model=self.wrapped_model, post_processors=[])
+        self.wrapped_model = FSDPRunner.wrap_fsdp_model(model=self.model, local_rank=self.local_rank)
+        self.model_inference_component = ModelInferenceComponent(model=self.wrapped_model, post_processors=[])
 
         self.optimizer = optim.AdamW(self.wrapped_model.parameters(), lr=0.0001)
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
@@ -37,38 +44,63 @@ class Main:
 
         # data loaders
         self.data_loaders = self.create_dataloaders(train_batch_size=8, test_batch_size=8)  # TODO make dynamic
-        train_split_length = {split_key: len(split) for split_key, split in self.data_loaders.items() if split_key == "train"}
 
-        batch_processed_callback = RichProgressCallback(subscribing_global_rank=self.global_rank,
-                                                        num_epochs=self.num_epochs, split_lengths=train_split_length)
-        results_callback = ResultsCallback(subscribing_global_rank=self.global_rank)
-        self.trainer = Trainer(local_rank=self.local_rank, global_rank=self.global_rank, batch_processed_callback=batch_processed_callback,
-                               results_callback=results_callback)
+        # Trainer
+        train_split_key = "train"
+        self.train_data_loader = self.data_loaders[train_split_key]
+        train_split_length = {train_split_key: len(self.train_data_loader)}
 
+        if dist.get_rank() == 0:
+            # train_batch_processed_callback = RichProgressCallback(subscribing_global_rank=self.global_rank,
+            #                                                       num_epochs=self.num_epochs, split_lengths=train_split_length)
+            train_batch_processed_callback = PrintProgressCallback(subscribing_global_rank=self.global_rank,
+                                                                   num_epochs=self.num_epochs, split_lengths=train_split_length,
+                                                                   print_frequency=0.1)
+            train_results_callback = ResultsCallback(subscribing_global_rank=self.global_rank)
+
+        else:
+            train_batch_processed_callback = DummyProgressCallback()
+            train_results_callback = DummyResultsCallback()
+
+        # Checkpointing
+        checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
+        checkpointing_execution = FSDPToDiscCheckpointing(checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+                                                          experiment_id=self.experiment_id)
+        checkpointing = Checkpointing(checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy)
+
+        # Trainer
+        self.trainer = Trainer(local_rank=self.local_rank, batch_processed_callback=train_batch_processed_callback,
+                               results_callback=train_results_callback)
+
+        # Evaluator
+        val_split_key = "val"
+        val_data_loader = self.data_loaders[val_split_key]
+        self.eval_data_loaders = [val_data_loader]
+        eval_split_lengths = {val_split_key: len(val_data_loader)}
+
+        if dist.get_rank() == 0:
+            # eval_batch_processed_callback = RichProgressCallback(subscribing_global_rank=self.global_rank,
+            #                                                      num_epochs=self.num_epochs, split_lengths=eval_split_lengths)
+            eval_batch_processed_callback = PrintProgressCallback(subscribing_global_rank=self.global_rank,
+                                                                  num_epochs=self.num_epochs, split_lengths=eval_split_lengths,
+                                                                  print_frequency=0.1)
+            eval_results_callback = ResultsCallback(subscribing_global_rank=self.global_rank)
+        else:
+            eval_batch_processed_callback = DummyProgressCallback()
+            eval_results_callback = DummyResultsCallback()
+
+        self.evaluator = Evaluator(local_rank=self.local_rank, batch_processed_callback=eval_batch_processed_callback,
+                                   results_callback=eval_results_callback)
+
+        # Gym
+        self.gym = Gym(checkpointing=checkpointing, trainer=self.trainer, evaluator=self.evaluator,
+                       model_inference_component=self.model_inference_component, optimizer=self.optimizer, 
+                       loss_fun=self.loss_fun)
 
     def run(self):
-        for current_epoch in range(self.num_epochs):
-            self.trainer.train_epoch(model_forward_pass=self.model_forward_pass, train_loader=self.data_loaders["train"], loss_fun=self.loss_fun,
-                                     optimizer=self.optimizer)
+        self.gym.run(num_epochs=self.num_epochs, train_data_loader=self.train_data_loader, evaluation_data_loaders=self.eval_data_loaders)
 
-    def wrap_fsdp_model(self, model: NNModel) -> FSDP:
-        sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
-        torch.cuda.set_device(self.local_rank)
-
-        if has_bfloat_support():
-            mp_policy = bfSixteen
-        else:
-            mp_policy = None  # defaults to fp32
-
-        # model is on CPU before input to FSDP
-        model = FSDP(model,
-                     auto_wrap_policy=None,
-                     mixed_precision=mp_policy,
-                     sharding_strategy=sharding_strategy,
-                     device_id=torch.cuda.current_device())
-        return model
-
-    def create_dataloaders(self, train_batch_size: int, test_batch_size: int) -> Dict[str, DataLoader]:
+    def create_dataloaders(self, train_batch_size: int, test_batch_size: int) -> Dict[str, LLMDataLoader]:
         # create dataset splits
         dataset_dict = LMWikiBookCorpusDatasetFactory.construct(self.dataset_path)
         train_dataset = dataset_dict["train"]
@@ -86,12 +118,13 @@ class Main:
         tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/src/llm_gym/gpt2/tokenizer.json"
         collate_fn = GPT2LLMCollator(target_publication_key="target_key", tokenizer_file_path=tokenizer_file_path,
                                      pad_to_multiple_of=pad_to_multiple_of)
-        train_loader = DataLoader(train_dataset, batch_size=train_batch_size, sampler=sampler_train, **cuda_kwargs,
-                                  collate_fn=collate_fn)
-        val_loader = DataLoader(val_dataset, batch_size=test_batch_size,
-                                sampler=sampler_val, **cuda_kwargs, collate_fn=collate_fn)
+        train_loader = LLMDataLoader(dataset=train_dataset, dataset_tag="train", batch_size=train_batch_size, sampler=sampler_train,
+                                     **cuda_kwargs,
+                                     collate_fn=collate_fn)
+        val_loader = LLMDataLoader(dataset=val_dataset, dataset_tag="val", batch_size=test_batch_size,
+                                   sampler=sampler_val, **cuda_kwargs, collate_fn=collate_fn)
 
-        return {"train": train_loader, "val": val_loader}
+        return {train_loader.dataset_tag: train_loader, val_loader.dataset_tag: val_loader}
 
 
 if __name__ == '__main__':

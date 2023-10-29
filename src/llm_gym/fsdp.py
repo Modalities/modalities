@@ -1,4 +1,4 @@
-from llm_gym.forward_pass import ModelForwardPass
+from llm_gym.forward_pass import ModelInferenceComponent
 import torch.cuda.nccl as nccl
 from pkg_resources import packaging
 import os
@@ -17,11 +17,8 @@ from torch.distributed.fsdp import (
     FullStateDictConfig,
     StateDictType,
 )
-from typing import Callable
 import time
-import tqdm
 from llm_gym.loss_functions import CLMCrossEntropyLoss
-from llm_gym.batch import InferenceResultBatch
 
 
 # global flag that confirms ampere architecture, cuda version and
@@ -83,11 +80,6 @@ def setup_model() -> NNModel:
 
 
 
-
-
-
-
-
 def fsdp_main(train_batch_size: int, test_batch_size, lr: int, gamma: int, dataset_path: str,
               track_memory: bool, epochs: int, run_validation: bool, save_model: bool):
 
@@ -134,7 +126,7 @@ def fsdp_main(train_batch_size: int, test_batch_size, lr: int, gamma: int, datas
                  sharding_strategy=sharding_strategy,
                  device_id=torch.cuda.current_device())
 
-    model_forward_pass = ModelForwardPass(model=model, post_processors=[])
+    model_inference_component = ModelInferenceComponent(model=model, post_processors=[])
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
@@ -157,9 +149,9 @@ def fsdp_main(train_batch_size: int, test_batch_size, lr: int, gamma: int, datas
 
     for epoch in range(1, epochs + 1):
         t0 = time.time()
-        train_accuracy = train(model_forward_pass, rank, world_size, train_loader, optimizer, epoch, loss_fun)
+        train_accuracy = train(model_inference_component, rank, world_size, train_loader, optimizer, epoch, loss_fun)
         if run_validation:
-            curr_val_loss = validation(model_forward_pass, rank, val_loader, loss_fun)
+            curr_val_loss = validation(model_inference_component, rank, val_loader, loss_fun)
         scheduler.step()
 
         if rank == 0:

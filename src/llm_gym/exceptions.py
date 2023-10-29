@@ -4,3 +4,6 @@ class DatasetNotFoundError(Exception):
 
 class BatchStateError(Exception):
     pass
+
+class CheckpointingError(Exception):
+    pass

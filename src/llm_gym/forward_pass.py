@@ -34,7 +34,7 @@ class PredictPostprocessingComponent:
         return result_batch
 
 
-class ModelForwardPass:
+class ModelInferenceComponent:
     def __init__(self, model: NNModel, post_processors: List[PredictPostProcessingIF] = None):
         self.model = model
         self.post_processors = post_processors if post_processors is not None else []

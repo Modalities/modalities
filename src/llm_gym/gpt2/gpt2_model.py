@@ -3,7 +3,7 @@ from transformers import GPT2LMHeadModel, GPT2Config
 from typing import Dict
 import torch.nn as nn
 from abc import abstractmethod
-
+from torch.nn.modules.module import T
 
 class NNModel(nn.Module):
     def __init__(self, seed: int = None):
@@ -21,6 +21,14 @@ class NNModel(nn.Module):
 
     def get_parameters(self) -> Dict[str, torch.Tensor]:
         return {name: param for name, param in self.named_parameters()}
+    
+
+    # def train(self: T, mode: bool = True) -> T:
+    #     super().train(mode=mode)
+
+    # def eval(self: T) -> T:
+    #     super().train(mode=mode)
+
 
 
 class GPT2LLM(NNModel):
