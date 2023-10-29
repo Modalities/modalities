@@ -10,8 +10,10 @@ class FSDPRunner:
         dist.init_process_group("nccl")
 
     def run():
-
+        
+        dist.barrier()
         dist.destroy_process_group()
+
 
     @staticmethod
     def wrap_fsdp_model(model: NNModel, local_rank: int) -> FSDP:

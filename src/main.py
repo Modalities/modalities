@@ -1,6 +1,6 @@
 import os
 from typing import Dict
-from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.checkpointing.checkpointing import Checkpointing, DummyCheckpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.dataset_loader import LLMDataLoader
@@ -43,7 +43,7 @@ class Main:
         self.loss_fun = CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
 
         # data loaders
-        self.data_loaders = self.create_dataloaders(train_batch_size=8, test_batch_size=8)  # TODO make dynamic
+        self.data_loaders, self.sampler_train = self.create_dataloaders(train_batch_size=8, test_batch_size=8)  # TODO make dynamic
 
         # Trainer
         train_split_key = "train"
@@ -63,10 +63,13 @@ class Main:
             train_results_callback = DummyResultsCallback()
 
         # Checkpointing
-        checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
-        checkpointing_execution = FSDPToDiscCheckpointing(checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
-                                                          experiment_id=self.experiment_id)
-        checkpointing = Checkpointing(checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy)
+        if dist.get_rank() == 0:
+            checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
+            checkpointing_execution = FSDPToDiscCheckpointing(checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+                                                              experiment_id=self.experiment_id)
+            checkpointing = Checkpointing(checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy)
+        else:
+            checkpointing = DummyCheckpointing()
 
         # Trainer
         self.trainer = Trainer(local_rank=self.local_rank, batch_processed_callback=train_batch_processed_callback,
@@ -94,11 +97,12 @@ class Main:
 
         # Gym
         self.gym = Gym(checkpointing=checkpointing, trainer=self.trainer, evaluator=self.evaluator,
-                       model_inference_component=self.model_inference_component, optimizer=self.optimizer, 
+                       model_inference_component=self.model_inference_component, optimizer=self.optimizer,
                        loss_fun=self.loss_fun)
 
     def run(self):
-        self.gym.run(num_epochs=self.num_epochs, train_data_loader=self.train_data_loader, evaluation_data_loaders=self.eval_data_loaders)
+        self.gym.run(num_epochs=self.num_epochs, train_data_loader=self.train_data_loader, evaluation_data_loaders=self.eval_data_loaders,
+                     sampler=self.sampler_train)
 
     def create_dataloaders(self, train_batch_size: int, test_batch_size: int) -> Dict[str, LLMDataLoader]:
         # create dataset splits
@@ -124,7 +128,7 @@ class Main:
         val_loader = LLMDataLoader(dataset=val_dataset, dataset_tag="val", batch_size=test_batch_size,
                                    sampler=sampler_val, **cuda_kwargs, collate_fn=collate_fn)
 
-        return {train_loader.dataset_tag: train_loader, val_loader.dataset_tag: val_loader}
+        return {train_loader.dataset_tag: train_loader, val_loader.dataset_tag: val_loader}, sampler_train
 
 
 if __name__ == '__main__':

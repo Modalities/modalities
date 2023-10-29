@@ -25,7 +25,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT, save_policy):
             cpu_state = model.state_dict()
-        entity_file_name = self.checkpoint_structure.replace("<enitity>", "model").replace("<epoch>", current_epoch)
+        entity_file_name = self.checkpoint_structure.replace("<enitity>", "model").replace("<epoch>", str(current_epoch))
         full_path = os.path.join(self.checkpoint_path, entity_file_name)
         torch.save(cpu_state, full_path)
 

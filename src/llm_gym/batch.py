@@ -149,8 +149,8 @@ class EvaluationResultBatch(Batch):
         return self._split_name
 
     def __str__(self) -> str:
-        eval_str = f"Evaluation result on dataset split ({self._dataset_split}):"
-        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v}" for k, v in self._losses.mean().items()])
-        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v}" for k, v in self._metrics.mean().items()])
+        eval_str = f"Evaluation result on dataset split {self._split_name}:"
+        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self._losses.items()])
+        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self._metrics.items()])
         eval_str += "\n==============================================="
         return eval_str

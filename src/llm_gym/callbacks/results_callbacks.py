@@ -19,5 +19,5 @@ class ResultsCallback(ResultsCallbackIF):
             pass
 
     def __call__(self, evaluation_result: EvaluationResultBatch):
-        if self.ubscribing_global_rank is not None and dist.get_rank() == self.subscribing_global_rank:
+        if self.subscribing_global_rank is not None and dist.get_rank() == self.subscribing_global_rank:
             print(evaluation_result)
