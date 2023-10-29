@@ -39,7 +39,7 @@ class Evaluator:
             total_loss = Reducer.reduce(tensor=cummulated_loss, operation=dist.ReduceOp.SUM,
                                         post_processing_fun=lambda t: t[0] / t[1])
             evaluation_result = EvaluationResultBatch(losses={loss_fun.tag: total_loss}, split_name=data_loader.dataset_tag)
-            self.results_callback(evaluation_result=result_dict)
+            self.results_callback(evaluation_result=evaluation_result)
             result_dict[data_loader.dataset_tag] = evaluation_result
         self.batch_processed_callback(epoch_increment=1)
         return result_dict

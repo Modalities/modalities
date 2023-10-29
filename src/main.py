@@ -43,7 +43,7 @@ class Main:
         self.loss_fun = CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
 
         # data loaders
-        self.data_loaders, self.sampler_train = self.create_dataloaders(train_batch_size=8, test_batch_size=8)  # TODO make dynamic
+        self.data_loaders, self.sampler_train = self.create_dataloaders(train_batch_size=32, test_batch_size=32)  # TODO make dynamic
 
         # Trainer
         train_split_key = "train"
@@ -63,13 +63,11 @@ class Main:
             train_results_callback = DummyResultsCallback()
 
         # Checkpointing
-        if dist.get_rank() == 0:
-            checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
-            checkpointing_execution = FSDPToDiscCheckpointing(checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
-                                                              experiment_id=self.experiment_id)
-            checkpointing = Checkpointing(checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy)
-        else:
-            checkpointing = DummyCheckpointing()
+        checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
+        checkpointing_execution = FSDPToDiscCheckpointing(checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+                                                          experiment_id=self.experiment_id, global_rank=self.global_rank,
+                                                          checkpointing_rank=0)
+        checkpointing = Checkpointing(checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy)
 
         # Trainer
         self.trainer = Trainer(local_rank=self.local_rank, batch_processed_callback=train_batch_processed_callback,
@@ -134,5 +132,5 @@ class Main:
 if __name__ == '__main__':
     dataset_path = "/raid/s3/opengptx/max_lue/LLMgym/src/llm_gym/gpt2/data/wikitext-103-raw-v1-tokenized"
 
-    main = Main(dataset_path=dataset_path, num_epochs=3)
+    main = Main(dataset_path=dataset_path, num_epochs=30)
     main.run()
