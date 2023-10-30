@@ -117,7 +117,7 @@ class Main:
                        'pin_memory': True,
                        'shuffle': False}
         pad_to_multiple_of = 8
-        tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/src/llm_gym/gpt2/tokenizer.json"
+        tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/data/tokenizer/tokenizer.json"
         collate_fn = GPT2LLMCollator(target_publication_key="target_key", tokenizer_file_path=tokenizer_file_path,
                                      pad_to_multiple_of=pad_to_multiple_of)
         train_loader = LLMDataLoader(dataset=train_dataset, dataset_tag="train", batch_size=train_batch_size, sampler=sampler_train,
@@ -130,7 +130,7 @@ class Main:
 
 
 if __name__ == '__main__':
-    dataset_path = "/raid/s3/opengptx/max_lue/LLMgym/src/llm_gym/gpt2/data/wikitext-103-raw-v1-tokenized"
+    dataset_path = "/raid/s3/opengptx/max_lue/LLMgym/data/datasets/wikitext-103-raw-v1-tokenized"
 
     main = Main(dataset_path=dataset_path, num_epochs=30)
     main.run()
