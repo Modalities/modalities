@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 linting = ["pre-commit"]
-test = ["pytest"]
+tests = ["pytest"]
 
 [build-system]
 requires = ["setuptools >= 61.0.0"]
