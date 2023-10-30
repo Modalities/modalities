@@ -20,7 +20,7 @@ To run the gpt2 training
 
 ```
 cd src/gpt2
-torchrun --nnodes 1 --nproc_per_node 4  fsdp.py
+torchrun --nnodes 1 --nproc_per_node 4  main.py
 ```
 
 
