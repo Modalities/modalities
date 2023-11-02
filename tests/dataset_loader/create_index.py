@@ -7,6 +7,8 @@ from pathlib import Path
 from tqdm import tqdm
 
 
+# TODO: move into llm_gym module
+# TODO: benchmark against pyspark
 class IndexGenerator:
     def __init__(self, src: Path, chunksize: int = 4096):
         self.src = Path(src)

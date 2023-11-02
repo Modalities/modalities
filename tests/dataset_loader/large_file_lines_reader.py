@@ -7,6 +7,7 @@ import numpy as np
 from .create_index import IndexGenerator
 
 
+# TODO: benchmark tokenized version vs plain text version (regarding speed and storage consumption)
 class LargeFileLinesReader:
     def __init__(
         self,
@@ -59,31 +60,3 @@ class LargeFileLinesReader:
         for c in string:
             decoded_string.append(safe_decoder(c))
         return "".join(decoded_string)
-
-
-# TODO:: move to test
-# # raw_path = Path("/home/shared/openwebtext/pile_openwebtext2_en.jsonl")
-# raw_path = Path("/home/shared/openwebtext/head20000_openwebtext2_en.jsonl")
-# # raw_path = Path("/home/haag/Documents/projects/mmap/a.jsonl")
-# index_path = Path("map.pickle")
-# # index_path = Path("/home/haag/Documents/projects/mmap/map.pickle")
-
-# reader = LargeFileLinesReader(raw_path, index_path, lazy_init=True)
-# print(len(reader))
-# for i in range(3):
-#     print(reader[i])
-#     print(reader[-i])
-#     print("-"*50)
-
-
-# print(reader[213])
-# print(reader[21])
-# print(reader[2113])
-
-# # from time import time
-# # s_t = time()
-# # for i in range(len(reader)):
-# #     s = reader[i]
-# # e_t = time()
-
-# # print(f"throughput {len(reader)/(e_t-s_t)}s")
