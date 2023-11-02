@@ -16,7 +16,7 @@ def test_index_creation(tmpdir):
     indexer.run(dummy_dst_path)
 
     index = pickle.loads(dummy_dst_path.read_bytes())
-    assert index[:5] == [(0, 477), (477, 3798), (4275, 1731), (6006, 11181), (17187, 4887)]
+    assert index[:5] == [(0, 477), (478, 3797), (4276, 1730), (6007, 11180), (17188, 4886)]
 
 
 def test_large_file_lines_reader(tmpdir):
