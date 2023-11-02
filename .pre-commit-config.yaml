@@ -1,0 +1,36 @@
+default_install_hook_types:
+- pre-commit
+- prepare-commit-msg
+- commit-msg
+repos:
+- repo: https://github.com/pycqa/isort
+  rev: 5.11.5
+  hooks:
+  - id: isort
+    stages: [pre-commit]
+- repo: https://github.com/psf/black-pre-commit-mirror
+  rev: 23.9.1
+  hooks:
+  - id: black
+    language_version: python3.10
+    stages: [pre-commit]
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.0.278
+  hooks:
+  - id: ruff
+    args: [--fix, --exit-non-zero-on-fix]
+    stages: [pre-commit]
+- repo: local
+  hooks:
+  - id: custom-commit-msg
+    stages: [prepare-commit-msg]
+    name: "Apply conventional commit constraints to default revert message"
+    entry: ./scripts/convco_for_reverts.sh
+    language: system
+    types: [text]
+- repo: https://github.com/LuzianHahn/conventional-pre-commit
+  rev: v2.4.1
+  hooks:
+  - id: conventional-pre-commit
+    stages: [commit-msg]
+    args: [feat, fix, ci, chore, test, refactor, debug, docs, perf, revert]
