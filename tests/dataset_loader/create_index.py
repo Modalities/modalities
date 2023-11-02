@@ -43,7 +43,7 @@ class IndexGenerator:
             for char_index, c in enumerate(chunk):
                 curr_index = chunk_idx * self.chunksize + char_index
                 if c == ord("\n"):
-                    self.index_map.append((last_index, curr_index - last_index))
+                    self.index_map.append((last_index, curr_index - last_index - 1))  # remove 1 for trailing "\n"-char
                     last_index = curr_index
 
     def _reader_thread(self):
