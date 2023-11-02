@@ -3,14 +3,15 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
-from create_index import IndexGenerator
+
+from .create_index import IndexGenerator
 
 
 class LargeFileLinesReader:
     def __init__(
         self,
         raw_data_path: Union[str, Path],
-        index_path: Union[str, Path],
+        index_path: Union[str, Path],  # TODO: default pointer to source data path
         lazy_init: bool = False,
         max_lines: int = None,
     ):
@@ -35,8 +36,9 @@ class LargeFileLinesReader:
     def __len__(self) -> int:
         return len(self.index)
 
+    # TODO: implement handling of slices
     def __getitem__(self, key: int) -> str:
-        if key >= len(self) or key < len(self):
+        if key >= len(self) or key < -len(self):
             raise IndexError()
         offset, length_of_bytestream = self.index[key]
         return self.__read_from_raw_file(offset, length_of_bytestream)
@@ -47,7 +49,7 @@ class LargeFileLinesReader:
                 c = byte_char.decode("iso-8859-1")
             except Exception:
                 c = ""
-                print('Encountered invalid char: "{byte_char}"')
+                print(f'Encountered invalid char: "{byte_char}"')
             return c
 
         string = (
