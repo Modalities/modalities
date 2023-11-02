@@ -19,6 +19,7 @@ dependencies = [
     "click",
     "click_pathlib",
     "tiktoken"
+    "jq"
 ]
 
 [project.optional-dependencies]

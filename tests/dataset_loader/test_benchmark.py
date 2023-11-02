@@ -1,11 +1,13 @@
-import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple, Union
 
+import jq
 import tiktoken
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
+
+from llmgym.tests.dataset_loader.large_file_lines_reader import LargeFileLinesReader
 
 # TODO: discuss with team mmap based on plain text
 #  (less memory consumed, more time required for loading during training)
@@ -22,15 +24,17 @@ MAX_SEQ_LEN = 2048
 
 
 class LocalDataset(Dataset):
-    def __init__(self, path: Path):
-        with path.open() as fin:
-            self.content: List[str] = [json.loads(line)["text"] for line in fin.readlines()]
+    def __init__(self, raw_data_path: Union[str, Path], index_path: Union[str, Path], jq_filter: str = ".text"):
+        self.raw_data_path = Path(raw_data_path)
+        self.index_path = Path(index_path)
+        self.reader = LargeFileLinesReader(self.raw_data_path, self.index_path, lazy_init=True)
+        self.jq_filter = jq.compile(jq_filter)
 
     def __len__(self) -> int:
         return len(self.content)
 
     def __getitem__(self, idx: int) -> str:
-        return self._tokenize(self.content[idx])
+        return self._tokenize(self.jq_filter.input_text(self.reader[idx]).first())
 
     def _tokenize(self, line: str) -> torch.Tensor:
         ids = enc.encode_ordinary(line)
