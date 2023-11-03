@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from .create_index import IndexGenerator
-from .large_file_lines_reader import LargeFileLinesReader
+from llm_gym.dataloader.create_index import IndexGenerator
+from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 _ROOT_DIR = Path(__file__).parent.parent.parent
 
@@ -30,6 +30,7 @@ def test_large_file_lines_reader(tmpdir):
     index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
     reader = LargeFileLinesReader(dummy_data_path, index_path, lazy_init=True)
 
+    assert dummy_data_path.read_text().count("\n") == 2
     assert len(reader) == 3
     assert len(reader[0]) >= 0
     assert len(reader[-1]) == 0
