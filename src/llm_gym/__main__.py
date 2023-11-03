@@ -1,12 +1,10 @@
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import click
 import click_pathlib
 import hydra
-from llm_gym.config.config import AppConfig
 import torch.distributed as dist
 import torch.optim as optim
 from omegaconf import OmegaConf
@@ -14,37 +12,26 @@ from pydantic import BaseModel
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data.distributed import DistributedSampler
 
-
-from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import Checkpointing, DummyCheckpointing
-from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import (
-    SaveMostRecentEpochOnlyCheckpointingStrategy,
-)
-from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner
-from llm_gym.models.gpt2.gpt2_model import GPT2LLM
-from llm_gym.models.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
-from llm_gym.gym import Gym
-from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
-    DummyProgressSubscriber,
-    RichProgressSubscriber,
-)
-from llm_gym.logging_broker.subscriber_impl.results_subscriber import (
-    WandBEvaluationResultSubscriber,
-)
-from llm_gym.trainer import Trainer
-from llm_gym.evaluator import Evaluator
-from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
-from llm_gym.util import get_date_of_run
-from torch.utils.data.distributed import DistributedSampler
-import torch.distributed as dist
-import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
-from llm_gym.logging_broker.message_broker import MessageBroker
-from llm_gym.logging_broker.publisher import MessagePublisher
-from llm_gym.logging_broker.messages import BatchProgressUpdate
-from llm_gym.logging_broker.messages import MessageTypes
+from .batch import EvaluationResultBatch
+from .checkpointing.checkpointing import Checkpointing
+from .checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from .checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
+from .config.config import AppConfig
+from .dataloader.dataset import Dataset, MemMapDataset
+from .dataset_loader import LLMDataLoader
+from .evaluator import Evaluator
+from .fsdp.fsdp_runner import Runner
+from .gpt2.collator import GPT2LLMCollator
+from .gpt2.gpt2_model import GPT2LLM
+from .gym import Gym
+from .logging_broker.message_broker import MessageBroker
+from .logging_broker.messages import BatchProgressUpdate, MessageTypes
+from .logging_broker.publisher import MessagePublisher
+from .logging_broker.subscriber_impl.batch_progress_subscriber import DummyProgressSubscriber, RichProgressSubscriber
+from .logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
+from .loss_functions import CLMCrossEntropyLoss, Loss
+from .trainer import Trainer
+from .util import get_date_of_run
 
 
 @click.group()
@@ -204,9 +191,9 @@ class Main:
         self, train_batch_size: int, test_batch_size: int
     ) -> Tuple[List[LLMDataLoader], DistributedSampler]:
         # create dataset splits
-        dataset_dict = LMWikiBookCorpusDatasetFactory.construct(self.dataset_path)
-        train_dataset = dataset_dict["train"]
-        val_dataset = dataset_dict["validation"]
+        dataset_dict = Dataset.from_path(self.dataset_path, target_dataset_cls=MemMapDataset, split_size=(0.9, 0.1, 0))
+        train_dataset = dataset_dict.train
+        val_dataset = dataset_dict.validation
 
         # create samplers
         sampler_train = DistributedSampler(
@@ -225,10 +212,8 @@ class Main:
         # create dataloaders
         cuda_kwargs = {"num_workers": 2, "pin_memory": True, "shuffle": False}
         pad_to_multiple_of = 8
-        tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/data/tokenizer/tokenizer.json"
         collate_fn = GPT2LLMCollator(
             target_publication_key="target_key",
-            tokenizer_file_path=tokenizer_file_path,
             pad_to_multiple_of=pad_to_multiple_of,
         )
         train_loader = LLMDataLoader(
