@@ -47,6 +47,8 @@ class IndexGenerator:
                 if c == ord("\n"):
                     self.index_map.append((last_index, curr_index - last_index))
                     last_index = curr_index + 1
+        # increase length by 1, due to missing "\n" at the EOF
+        self.index_map.append((last_index, curr_index - last_index + 1))
 
     def _reader_thread(self):
         with open(self.src, "rb") as fin:
