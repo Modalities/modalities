@@ -32,7 +32,7 @@ def test_large_file_lines_reader(tmpdir):
 
     assert dummy_data_path.read_text().count("\n") == 2
     assert len(reader) == 3
-    assert len(reader[0]) >= 0
+    assert all(map(len, reader[:-1]))
     assert len(reader[-1]) == 0
 
 

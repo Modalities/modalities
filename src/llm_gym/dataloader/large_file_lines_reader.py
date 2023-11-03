@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Union
+from typing import List, Union
 
 import numpy as np
 
@@ -20,7 +20,6 @@ class LargeFileLinesReader:
         self.index_path = Path(index_path)
         self.max_lines = max_lines
 
-        # do some error checking
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
         if not lazy_init and not self.index_path.is_file():
@@ -37,10 +36,9 @@ class LargeFileLinesReader:
     def __len__(self) -> int:
         return len(self.index)
 
-    # TODO: implement handling of slices
-    def __getitem__(self, key: int) -> str:
-        if key >= len(self) or key < -len(self):
-            raise IndexError()
+    def __getitem__(self, key: Union[int, slice]) -> Union[str, List[str]]:
+        if isinstance(key, slice):
+            return [self.__read_from_raw_file(*idx) for idx in self.index[key]]
         offset, length_of_bytestream = self.index[key]
         return self.__read_from_raw_file(offset, length_of_bytestream)
 
