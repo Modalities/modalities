@@ -27,8 +27,7 @@ def test_large_file_lines_reader(tmpdir):
     source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.txt")
     dummy_data_path = Path(tmpdir, source_dummy_data_path.name)
     dummy_data_path.write_text(source_dummy_data_path.read_text())
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
-    reader = LargeFileLinesReader(dummy_data_path, index_path, lazy_init=True)
+    reader = LargeFileLinesReader(dummy_data_path, lazy_init=True)
 
     assert dummy_data_path.read_text().count("\n") == 2
     assert len(reader) == 3

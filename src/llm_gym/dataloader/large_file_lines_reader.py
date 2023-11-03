@@ -12,12 +12,12 @@ class LargeFileLinesReader:
     def __init__(
         self,
         raw_data_path: Union[str, Path],
-        index_path: Union[str, Path],  # TODO: default pointer to source data path
+        index_path: Union[str, Path] = None,
         lazy_init: bool = False,
         max_lines: int = None,
     ):
         self.raw_data_path = Path(raw_data_path)
-        self.index_path = Path(index_path)
+        self.index_path = self._default_index_path(index_path)
         self.max_lines = max_lines
 
         if not self.raw_data_path.is_file():
@@ -32,6 +32,13 @@ class LargeFileLinesReader:
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
+
+    def _default_index_path(self, index_path: Union[str, Path, None]) -> Path:
+        if index_path is None:
+            default_index_path = Path(self.raw_data_path.parent, f"{self.raw_data_path.stem}.idx.pkl")
+            print(f"No specific Index Path provided. Creating Index next to input data at: {default_index_path}")
+            return default_index_path
+        return Path(index_path)
 
     def __len__(self) -> int:
         return len(self.index)
