@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Union
 
 import jq
+import pytest
 import tiktoken
 import torch
 from torch.utils.data import DataLoader
@@ -65,6 +66,7 @@ def measure_loading_and_iterating(path: Path):
     return loading_time, iteration_time, amount_of_tokens
 
 
+@pytest.mark.slow
 def test_measure_bytes_per_sec():
     loading_time, iteration_time, _ = measure_loading_and_iterating(dummy_path)
     print(f"Loading Time: {loading_time} sec")
@@ -72,35 +74,9 @@ def test_measure_bytes_per_sec():
     assert False
 
 
+@pytest.mark.slow
 def test_measure_tokens_per_sec():
     loading_time, iteration_time, amount_of_tokens = measure_loading_and_iterating(dummy_path)
     average_tokens_per_second = amount_of_tokens / (loading_time + iteration_time)
     print(f"ø-Tokens per Second: {average_tokens_per_second}/s")
-    assert False
-
-
-def test_mmap_plain_text_access(tmpdir):
-    dummy_file = Path(tmpdir, "random_text.txt")
-    dummy_file.write_text("This is some text, some random chars.\nLorem ipsum whatevero\nI like trains!")
-    pagesize = 4096
-
-    def index_generator(path: Path) -> Tuple[int, int]:
-        with path.open() as content_stream:
-            remaining_chunks = content_stream.read(pagesize)
-            while remaining_chunks:
-                fresh_chunk, remaining_chunks = remaining_chunks.split("\n", 1)
-
-    with dummy_file.open() as fin:
-        assert fin.read(pagesize)
-        assert not fin.read(pagesize)
-
-
-def test_learning():
-    import numpy as np
-
-    my_matrix = np.arange(0, 10).reshape((2, 5)).astype(np.float32)
-    filename = Path("/tmp/random_numpy.dat")
-    fp = np.memmap(filename, dtype="float32", mode="w+", shape=my_matrix.shape)
-    print(fp)
-    print(my_matrix)
     assert False
