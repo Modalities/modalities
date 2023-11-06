@@ -13,10 +13,12 @@ dependencies = [
     "SentencePiece",
     "accelerate",
     "rich",
+    "xformers",
     "hydra-core",
     "pydantic",
     "click",
     "click_pathlib",
+    "xformers"
 ]
 
 [project.optional-dependencies]

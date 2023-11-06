@@ -1,10 +1,11 @@
-import traceback
 from enum import Enum
-from typing import Annotated, List
+from typing import Annotated
 
 from hydra._internal.utils import _locate
 from pydantic import BaseModel, DirectoryPath, conint
 from pydantic.functional_validators import AfterValidator
+
+from llm_gym.gpt2.gpt2_model import GPTConfig
 
 
 def validate_class_path(path: str):
@@ -17,7 +18,7 @@ def validate_class_path(path: str):
     return path
 
 
-TargetPath = Annotated[str, AfterValidator(validate_class_path)]
+ClassPath = Annotated[str, AfterValidator(validate_class_path)]
 
 
 class ProcessGroupBackendEnum(str, Enum):
@@ -34,18 +35,19 @@ class TrainingConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    target_class: TargetPath
+    target_class: ClassPath
     prediction_publication_key: str
+    config: GPTConfig
 
 
 class LossConfig(BaseModel):
-    target_class: TargetPath
+    target_class: ClassPath
     target_subscription_key: str
     prediction_subscription_key: str
 
 
 class RunnerConfig(BaseModel):
-    target_class: TargetPath
+    target_class: ClassPath
     process_group_backend: ProcessGroupBackendEnum
 
 
