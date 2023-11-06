@@ -142,7 +142,7 @@ class Main:
         # Checkpointing
         checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
         checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+            checkpoint_path="./checkpoints",
             experiment_id=self.experiment_id,
             global_rank=config.globals.global_rank,
             checkpointing_rank=0,
@@ -242,6 +242,13 @@ class Main:
         )
 
         return [train_loader, val_loader_1, val_loader_2], sampler_train
+
+
+def entrypoint():
+    dataset_path = "/home/shared/openwebtext/head20000_openwebtext2_en.jsonl"
+
+    main = Main(dataset_path=dataset_path, num_epochs=1)
+    main.run()
 
 
 if __name__ == "__main__":

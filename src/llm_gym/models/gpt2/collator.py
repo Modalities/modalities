@@ -8,20 +8,24 @@ from transformers import DataCollatorForLanguageModeling, GPT2TokenizerFast
 from llm_gym.batch import DatasetBatch
 
 
+# TODO: fix pad_token setup
 class Tokenizer(GPT2TokenizerFast):
-    DEFAULT_TOKENIZER_PATH = Path(__file__).parent.parent.parent / Path("data", "tokenizer", "tokenizer.json")
+    DEFAULT_TOKENIZER_PATH = Path(__file__).parent.parent.parent.parent / Path("data", "tokenizer", "tokenizer.json")
 
     # Introducing another abstraction for a tokenizer, in case tiktoken is fast than `transformers.GPT2TokenizerFast`
-    @property
-    def pad_token(self) -> str:
-        return self.eos_token
+    # @property
+    # def pad_token(self) -> str:
+    #     return self.eos_token
 
 
+# TODO: fix pad_token setup
 class GPT2LLMCollator:
     def __init__(self, target_publication_key: str, pad_to_multiple_of: int = 8):
         self.device: torch.device = field(default_factory=lambda: torch.device("cpu"))
         self.target_publication_key = target_publication_key
-        tokenizer = Tokenizer(Tokenizer.DEFAULT_TOKENIZER_PATH)
+        # tokenizer = Tokenizer(Tokenizer.DEFAULT_TOKENIZER_PATH)
+        tokenizer = Tokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
         self.data_collator = DataCollatorForLanguageModeling(
             tokenizer=tokenizer, mlm=False, pad_to_multiple_of=pad_to_multiple_of
         )

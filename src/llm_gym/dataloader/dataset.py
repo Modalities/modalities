@@ -9,6 +9,8 @@ from torch.utils.data import random_split
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
 
+from llm_gym.gpt2.collator import Tokenizer
+
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
@@ -28,6 +30,10 @@ class Dataset(TorchdataSet):
         dataset_path: str, target_dataset_cls: Type[Dataset], split_size: Iterable[float] = (0.9, 0.05, 0.05)
     ) -> DatasetSplit:
         presplit_dataset_folder_paths = [Path(dataset_path, split) for split in ["train", "test", "validation"]]
+
+        def get_subset(ds):
+            return Subset(dataset=ds, indices=range(len(ds)))
+
         if all(p.is_dir() for p in presplit_dataset_folder_paths):
             print(f"Found already existing dataset split at {dataset_path}. Will use this one...")
 
@@ -35,9 +41,6 @@ class Dataset(TorchdataSet):
                 return target_dataset_cls(raw_data_path=path)
 
             loaded_datasets = map(init_dataset, presplit_dataset_folder_paths)
-
-            def get_subset(ds):
-                return Subset(dataset=ds, indices=range(len(ds)))
 
             loaded_subsets = map(get_subset, loaded_datasets)
             dataset_split = tuple(loaded_subsets)
@@ -57,9 +60,15 @@ class MemMapDataset(Dataset):
         super().__init__(raw_data_path=raw_data_path)
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_filter)
+        self.tokenizer = Tokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:
-        return len(self.content)
+        return len(self.reader)
 
+    # TODO: tokenizer singleton?
     def __getitem__(self, idx: int) -> str:
-        return self.jq_filter.input_text(self.reader[idx]).first()
+        obj = self.tokenizer(
+            self.jq_filter.input_text(self.reader[idx]).first(), max_length=1024, padding="max_length", truncation=True
+        )
+        return obj
