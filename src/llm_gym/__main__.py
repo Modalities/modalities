@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data.distributed import DistributedSampler
 
+
 from llm_gym.callbacks.batch_progress_callbacks import DummyProgressCallback, PrintProgressCallback
 from llm_gym.callbacks.results_callbacks import DummyResultsCallback, ResultsCallback
 from llm_gym.checkpointing.checkpointing import Checkpointing
@@ -24,7 +25,7 @@ from llm_gym.evaluator import Evaluator
 from llm_gym.forward_pass import ModelInferenceComponent
 from llm_gym.fsdp.fsdp_runner import Runner
 from llm_gym.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
-from llm_gym.gpt2.gpt2_model import GPT2LLM
+from llm_gym.gpt2.gpt2_model import GPT2LLM, GPTConfig
 from llm_gym.gym import Gym
 from llm_gym.loss_functions import Loss
 from llm_gym.trainer import Trainer
