@@ -12,7 +12,11 @@ dependencies = [
     "protobuf",
     "SentencePiece",
     "accelerate",
-    "rich"
+    "rich",
+    "hydra-core",
+    "pydantic",
+    "click",
+    "click_pathlib",
 ]
 
 [project.optional-dependencies]
