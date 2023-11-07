@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-# copied from fairseq/fairseq/data/indexed_dataset.py
+# copied from fairseq/fairseq/data/mmap_dataset.py
 # Removed IndexedRawTextDataset since it relied on Fairseq dictionary
 # other slight modifications to remove fairseq dependencies
 # Added document index to index file and made it accessible.
