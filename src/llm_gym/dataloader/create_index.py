@@ -1,9 +1,11 @@
+import json
 import os
 import pickle as pkl
 import queue
 import threading
 from pathlib import Path
 
+import numpy as np
 from tqdm import tqdm
 
 
@@ -44,10 +46,19 @@ class IndexGenerator:
             for char_index, c in enumerate(chunk):
                 curr_index = chunk_idx * self.chunksize + char_index
                 if c == ord("\n"):
-                    self.index_map.append((last_index, curr_index - last_index))
+                    segment_len = curr_index - last_index
+                    try:  # check if line is a valid json
+                        string = (
+                            np.memmap(self.src, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
+                        )
+                        string = [c.decode("iso-8859-1") for c in string]
+                        string = "".join(string)
+                        _ = json.loads(string)
+                        self.index_map.append((last_index, segment_len))
+                    except Exception:
+                        print(f"\nfaulty line at {last_index}-{curr_index}, skipping...")
                     last_index = curr_index + 1
-        # increase length by 1, due to missing "\n" at the EOF
-        self.index_map.append((last_index, curr_index - last_index + 1))
+        # TODO: implement proper handling of remaining (not full) segment
 
     def _reader_thread(self):
         with open(self.src, "rb") as fin:
