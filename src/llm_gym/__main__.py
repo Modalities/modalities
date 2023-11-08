@@ -141,8 +141,9 @@ class Main:
 
         # Checkpointing
         checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
+        checkpoint_path = Path(__file__).parents[2] / Path("data", "checkpoints")
         checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path="./checkpoints",
+            checkpoint_path=checkpoint_path,
             experiment_id=self.experiment_id,
             global_rank=config.globals.global_rank,
             checkpointing_rank=0,
