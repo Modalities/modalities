@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 from collections import OrderedDict
 from pathlib import Path
@@ -45,7 +47,7 @@ bot: """
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, help="path to model.bin")
+    parser.add_argument("--model-path", type=str, help="path to model.bin")
     parser.add_argument("--chat", action="store_true", help="activate 'chat' mode")
     parser.add_argument("--gpt", type=str, default="gpt2", help="set architecture")
     args = parser.parse_args()
@@ -61,7 +63,7 @@ if __name__ == "__main__":
         model = GPT2LMHeadModel(config)
         model.load_state_dict(s_d)
     else:
-        print(f"using pretrained {args.gpt} model")
+        print(f"using pretrained {args.gpt} model from huggingface trained by OpenAI...")
         model = GPT2LMHeadModel.from_pretrained(gpt_version, config=config)
     generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
