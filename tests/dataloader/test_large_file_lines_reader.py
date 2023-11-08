@@ -24,7 +24,7 @@ def test_index_creation(tmpdir):
 
 
 def test_large_file_lines_reader(tmpdir):
-    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.txt")
+    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_dummy_data_path.name)
     dummy_data_path.write_text(source_dummy_data_path.read_text())
     reader = LargeFileLinesReader(dummy_data_path, lazy_init=True)
@@ -36,7 +36,7 @@ def test_large_file_lines_reader(tmpdir):
 
 
 def test_large_file_lines_reader_lazy_index_init(tmpdir):
-    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.txt")
+    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_dummy_data_path.name)
     dummy_data_path.write_text(source_dummy_data_path.read_text())
     index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
@@ -48,7 +48,7 @@ def test_large_file_lines_reader_lazy_index_init(tmpdir):
 
 
 def test_large_file_lines_reader_missing_source_data(tmpdir):
-    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.txt")
+    source_dummy_data_path = _ROOT_DIR / Path("data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_dummy_data_path.name)
     assert not dummy_data_path.exists()
     index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")

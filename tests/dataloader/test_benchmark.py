@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 
-from llmgym.tests.dataset_loader.large_file_lines_reader import LargeFileLinesReader
+from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 # TODO: discuss with team mmap based on plain text
 #  (less memory consumed, more time required for loading during training)
