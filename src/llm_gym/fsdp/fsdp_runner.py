@@ -4,7 +4,8 @@ import torch
 import torch.distributed as dist
 from llm_gym.config.config import ProcessGroupBackendEnum
 from llm_gym.env_utils import bfSixteen, has_bfloat_support
-from llm_gym.gpt2.gpt2_model import NNModel, Block
+from llm_gym.models.gpt2.gpt2_model import Block
+from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 import functools
@@ -37,14 +38,20 @@ class FSDPRunner(Runner):
         else:
             mp_policy = None  # defaults to fp32
 
-        transformer_auto_wrapper_policy = functools.partial(transformer_auto_wrap_policy, transformer_layer_cls={Block,})
+        transformer_auto_wrapper_policy = functools.partial(
+            transformer_auto_wrap_policy,
+            transformer_layer_cls={
+                Block,
+            },
+        )
 
         # model is on CPU before input to FSDP
-        model = FSDP(
+
+        fsdp_model = FSDP(
             model,
             auto_wrap_policy=transformer_auto_wrapper_policy,
             mixed_precision=mp_policy,
             sharding_strategy=sharding_strategy,
             device_id=torch.cuda.current_device(),
         )
-        return model
+        return fsdp_model
