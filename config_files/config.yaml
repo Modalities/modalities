@@ -1,22 +1,37 @@
+globals: 
+  local_rank: ${oc.env:LOCAL_RANK}
+  global_rank: ${oc.env:RANK}
+  world_size: ${oc.env:WORLD_SIZE}
+
+  num_training_batches: 7000
+  num_batches_per_training_sequence: 100
+  training_batch_size: 32
+  evaluation_batch_size: 32
+
+
 hydra:
   output_subdir: null
   run:
     dir: .
 
 data:
-  dataset_dir_path: data/datasets/wikitext-103-raw-v1-tokenized
+  dataset_dir_path: /raid/s3/opengptx/max_lue/LLMgym/data/datasets/wikitext-103-raw-v1-tokenized
+
 training:
-  num_epochs: 30
+  num_training_batches: ${globals.num_training_batches}
   process_group_backend: "nccl"
+
 loss:
   target_class: llm_gym.loss_functions.CLMCrossEntropyLoss
   target_subscription_key: target_key
   prediction_subscription_key: logits
+
 runner:
   target_class: llm_gym.fsdp.fsdp_runner.FSDPRunner
   process_group_backend: ${training.process_group_backend}
+
 model:
-  target_class: llm_gym.gpt2.gpt2_model.GPT2LLM
+  target_class: llm_gym.models.gpt2.gpt2_model.GPT2LLM
   prediction_publication_key: logits
   config:
     block_size: 1024

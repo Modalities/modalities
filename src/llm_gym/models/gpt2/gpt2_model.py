@@ -2,36 +2,13 @@ import math
 from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Optional
+from llm_gym.models.model import NNModel
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
 from pydantic import BaseModel, confloat, conint
 from torch.nn import functional as F
-
-
-class NNModel(nn.Module):
-    def __init__(self, seed: int = None):
-        if seed is not None:
-            torch.manual_seed(seed)
-        super(NNModel, self).__init__()
-
-    @abstractmethod
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        raise NotImplementedError
-
-    @abstractmethod
-    def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        raise NotImplementedError
-
-    def get_parameters(self) -> Dict[str, torch.Tensor]:
-        return {name: param for name, param in self.named_parameters()}
-
-    # def train(self: T, mode: bool = True) -> T:
-    #     super().train(mode=mode)
-
-    # def eval(self: T) -> T:
-    #     super().train(mode=mode)
 
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
