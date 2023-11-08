@@ -2,10 +2,10 @@ from enum import Enum
 from typing import Annotated
 
 from hydra._internal.utils import _locate
-from pydantic import BaseModel, DirectoryPath, conint
+from pydantic import BaseModel, DirectoryPath, conint, model_validator, validator
 from pydantic.functional_validators import AfterValidator
 
-from llm_gym.gpt2.gpt2_model import GPTConfig
+from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
 def validate_class_path(path: str):
@@ -30,7 +30,7 @@ class DataConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
-    num_epochs: conint(gt=0)
+    num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendEnum
 
 
@@ -51,9 +51,39 @@ class RunnerConfig(BaseModel):
     process_group_backend: ProcessGroupBackendEnum
 
 
+class GlobalsConfig(BaseModel):
+    local_rank: int
+    global_rank: int
+    world_size: int
+    num_training_batches: int
+    num_batches_per_training_sequence: int
+    training_batch_size: int
+    evaluation_batch_size: int
+
+    @property
+    def num_batches_per_training_sequence_per_rank(self):
+        return self.num_training_batches // self.num_batches_per_training_sequence // self.world_size
+
+    @property
+    def num_batches_per_rank(self):
+        return self.num_training_batches // self.world_size
+
+    @model_validator(mode="after")
+    def validate_multiples(self) -> "GlobalsConfig":
+        computed_num_training_batches = (
+            self.num_batches_per_training_sequence_per_rank * self.world_size * self.num_batches_per_training_sequence
+        )
+        if computed_num_training_batches != self.num_training_batches:
+            raise ValueError(
+                f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
+            )
+        return self
+
+
 class AppConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     loss: LossConfig
     runner: RunnerConfig
     model: ModelConfig
+    globals: GlobalsConfig

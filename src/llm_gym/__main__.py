@@ -1,11 +1,12 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 import click
 import click_pathlib
 import hydra
+from llm_gym.config.config import AppConfig
 import torch.distributed as dist
 import torch.optim as optim
 from omegaconf import OmegaConf
@@ -14,22 +15,36 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data.distributed import DistributedSampler
 
 
-from llm_gym.callbacks.batch_progress_callbacks import DummyProgressCallback, PrintProgressCallback
-from llm_gym.callbacks.results_callbacks import DummyResultsCallback, ResultsCallback
-from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.batch import EvaluationResultBatch
+from llm_gym.checkpointing.checkpointing import Checkpointing, DummyCheckpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
-from llm_gym.config.config import AppConfig
+from llm_gym.checkpointing.checkpointing_strategies import (
+    SaveMostRecentEpochOnlyCheckpointingStrategy,
+)
 from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.evaluator import Evaluator
-from llm_gym.forward_pass import ModelInferenceComponent
-from llm_gym.fsdp.fsdp_runner import Runner
-from llm_gym.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
-from llm_gym.gpt2.gpt2_model import GPT2LLM, GPTConfig
+from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner
+from llm_gym.models.gpt2.gpt2_model import GPT2LLM
+from llm_gym.models.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
 from llm_gym.gym import Gym
-from llm_gym.loss_functions import Loss
+from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
+    DummyProgressSubscriber,
+    RichProgressSubscriber,
+)
+from llm_gym.logging_broker.subscriber_impl.results_subscriber import (
+    WandBEvaluationResultSubscriber,
+)
 from llm_gym.trainer import Trainer
+from llm_gym.evaluator import Evaluator
+from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.util import get_date_of_run
+from torch.utils.data.distributed import DistributedSampler
+import torch.distributed as dist
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
+from llm_gym.logging_broker.message_broker import MessageBroker
+from llm_gym.logging_broker.publisher import MessagePublisher
+from llm_gym.logging_broker.messages import BatchProgressUpdate
+from llm_gym.logging_broker.messages import MessageTypes
 
 
 @click.group()
@@ -70,19 +85,17 @@ def init_by_hydra(config: BaseModel) -> Any:
 
 class Main:
     def __init__(self, config: AppConfig) -> None:
+        dist_launched = dist.is_torchelastic_launched()
+        self.config = config
+
         self.experiment_id = get_date_of_run()
 
-        self.local_rank = int(os.environ["LOCAL_RANK"])
-        self.global_rank = int(os.environ["RANK"])
-        self.world_size = int(os.environ["WORLD_SIZE"])
         self.dataset_path = config.data.dataset_dir_path
-        self.num_epochs = config.training.num_epochs
 
         self.model: GPT2LLM = init_by_hydra(config.model)
         runner: Runner = init_by_hydra(config.runner)
-        self.wrapped_model = runner.wrap(model=self.model, local_rank=self.local_rank)
-        self.model_inference_component = ModelInferenceComponent(model=self.wrapped_model, post_processors=[])
 
+        self.wrapped_model = runner.wrap(model=self.model, local_rank=config.globals.local_rank)
         self.optimizer = optim.AdamW(self.wrapped_model.parameters(), lr=0.0001)
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
@@ -90,75 +103,83 @@ class Main:
         self.loss_fun: Loss = init_by_hydra(config.loss)
 
         # data loaders
-        self.data_loaders, self.sampler_train = self.create_dataloaders(
-            train_batch_size=32, test_batch_size=32
-        )  # TODO make dynamic
+        (
+            self.train_dataloader,
+            self.val_dataloader_1,
+            self.val_dataloader_2,
+        ), self.sampler_train = self.create_dataloaders(
+            train_batch_size=config.globals.training_batch_size, test_batch_size=21
+        )
 
-        # Trainer
-        train_split_key = "train"
-        self.train_data_loader = self.data_loaders[train_split_key]
-        train_split_length = {train_split_key: len(self.train_data_loader)}
+        # Message Broker
+        message_broker = MessageBroker()
+        batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
+            message_broker=message_broker,
+            global_rank=config.globals.global_rank,
+            local_rank=config.globals.local_rank,
+        )
+        evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
+            message_broker=message_broker,
+            global_rank=config.globals.global_rank,
+            local_rank=config.globals.local_rank,
+        )
 
-        if dist.get_rank() == 0:
-            # train_batch_processed_callback = RichProgressCallback(
-            #   subscribing_global_rank=self.global_rank,
-            #   num_epochs=self.num_epochs, split_lengths=train_split_length)
-            train_batch_processed_callback = PrintProgressCallback(
-                subscribing_global_rank=self.global_rank,
-                num_epochs=self.num_epochs,
-                split_lengths=train_split_length,
-                print_frequency=0.1,
+        eval_split_lengths = {
+            self.val_dataloader_1.dataset_tag: len(self.val_dataloader_1) * config.globals.world_size,
+            self.val_dataloader_2.dataset_tag: len(self.val_dataloader_2) * config.globals.world_size,
+        }
+        train_split_lengths = {self.train_dataloader.dataset_tag: config.globals.num_training_batches}
+
+        if not dist_launched or (dist_launched and dist.get_rank() == 0):
+            progress_subscriber = RichProgressSubscriber(
+                num_ranks=config.globals.world_size,
+                train_split_lengths=train_split_lengths,
+                eval_split_lengths=eval_split_lengths,
             )
-            train_results_callback = ResultsCallback(subscribing_global_rank=self.global_rank)
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.globals.world_size, project="llm_gym", experiment_id=self.experiment_id
+            )
+            message_broker.add_subscriber(
+                subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
+            )
 
         else:
-            train_batch_processed_callback = DummyProgressCallback()
-            train_results_callback = DummyResultsCallback()
+            progress_subscriber = DummyProgressSubscriber()
+        message_broker.add_subscriber(
+            subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
+            subscriber=progress_subscriber,
+        )
+
+        self.loss_fun = CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
 
         # Checkpointing
         checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
         checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path="checkpoints",
+            checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
             experiment_id=self.experiment_id,
-            global_rank=self.global_rank,
+            global_rank=config.globals.global_rank,
             checkpointing_rank=0,
         )
         checkpointing = Checkpointing(
-            checkpointing_execution=checkpointing_execution, checkpointing_strategy=checkpointing_strategy
+            checkpointing_execution=checkpointing_execution,
+            checkpointing_strategy=checkpointing_strategy,
+            num_ranks=config.globals.world_size,
         )
 
         # Trainer
         self.trainer = Trainer(
-            local_rank=self.local_rank,
-            batch_processed_callback=train_batch_processed_callback,
-            results_callback=train_results_callback,
+            local_rank=config.globals.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
         )
 
         # Evaluator
-        val_split_key = "val"
-        val_data_loader = self.data_loaders[val_split_key]
-        self.eval_data_loaders = [val_data_loader]
-        eval_split_lengths = {val_split_key: len(val_data_loader)}
-
-        if dist.get_rank() == 0:
-            # eval_batch_processed_callback = RichProgressCallback(
-            #   subscribing_global_rank=self.global_rank,
-            #   num_epochs=self.num_epochs, split_lengths=eval_split_lengths)
-            eval_batch_processed_callback = PrintProgressCallback(
-                subscribing_global_rank=self.global_rank,
-                num_epochs=self.num_epochs,
-                split_lengths=eval_split_lengths,
-                print_frequency=0.1,
-            )
-            eval_results_callback = ResultsCallback(subscribing_global_rank=self.global_rank)
-        else:
-            eval_batch_processed_callback = DummyProgressCallback()
-            eval_results_callback = DummyResultsCallback()
+        self.eval_data_loaders = [self.val_dataloader_1, self.val_dataloader_2]
 
         self.evaluator = Evaluator(
-            local_rank=self.local_rank,
-            batch_processed_callback=eval_batch_processed_callback,
-            results_callback=eval_results_callback,
+            local_rank=config.globals.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
         )
 
         # Gym
@@ -166,20 +187,22 @@ class Main:
             checkpointing=checkpointing,
             trainer=self.trainer,
             evaluator=self.evaluator,
-            model_inference_component=self.model_inference_component,
+            model=self.wrapped_model,
             optimizer=self.optimizer,
             loss_fun=self.loss_fun,
         )
 
     def run(self):
         self.gym.run(
-            num_epochs=self.num_epochs,
-            train_data_loader=self.train_data_loader,
+            num_batches=self.config.globals.num_batches_per_rank,
+            num_batches_per_epoch=self.config.globals.num_batches_per_training_sequence_per_rank,
+            train_data_loader=self.train_dataloader,
             evaluation_data_loaders=self.eval_data_loaders,
-            sampler=self.sampler_train,
         )
 
-    def create_dataloaders(self, train_batch_size: int, test_batch_size: int) -> Dict[str, LLMDataLoader]:
+    def create_dataloaders(
+        self, train_batch_size: int, test_batch_size: int
+    ) -> Tuple[List[LLMDataLoader], DistributedSampler]:
         # create dataset splits
         dataset_dict = LMWikiBookCorpusDatasetFactory.construct(self.dataset_path)
         train_dataset = dataset_dict["train"]
@@ -187,14 +210,22 @@ class Main:
 
         # create samplers
         sampler_train = DistributedSampler(
-            train_dataset, rank=self.global_rank, num_replicas=self.world_size, shuffle=True
+            train_dataset,
+            rank=self.config.globals.global_rank,
+            num_replicas=self.config.globals.world_size,
+            shuffle=True,
         )
-        sampler_val = DistributedSampler(val_dataset, rank=self.global_rank, num_replicas=self.world_size)
+        sampler_val_1 = DistributedSampler(
+            val_dataset, rank=self.config.globals.global_rank, num_replicas=self.config.globals.world_size
+        )
+        sampler_val_2 = DistributedSampler(
+            val_dataset, rank=self.config.globals.global_rank, num_replicas=self.config.globals.world_size
+        )
 
         # create dataloaders
         cuda_kwargs = {"num_workers": 2, "pin_memory": True, "shuffle": False}
         pad_to_multiple_of = 8
-        tokenizer_file_path = "data/tokenizer/tokenizer.json"
+        tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/data/tokenizer/tokenizer.json"
         collate_fn = GPT2LLMCollator(
             target_publication_key="target_key",
             tokenizer_file_path=tokenizer_file_path,
@@ -208,16 +239,24 @@ class Main:
             **cuda_kwargs,
             collate_fn=collate_fn,
         )
-        val_loader = LLMDataLoader(
+        val_loader_1 = LLMDataLoader(
             dataset=val_dataset,
-            dataset_tag="val",
+            dataset_tag="val_1",
             batch_size=test_batch_size,
-            sampler=sampler_val,
+            sampler=sampler_val_1,
+            **cuda_kwargs,
+            collate_fn=collate_fn,
+        )
+        val_loader_2 = LLMDataLoader(
+            dataset=val_dataset,
+            dataset_tag="val_2",
+            batch_size=test_batch_size,
+            sampler=sampler_val_2,
             **cuda_kwargs,
             collate_fn=collate_fn,
         )
 
-        return {train_loader.dataset_tag: train_loader, val_loader.dataset_tag: val_loader}, sampler_train
+        return [train_loader, val_loader_1, val_loader_2], sampler_train
 
 
 if __name__ == "__main__":
