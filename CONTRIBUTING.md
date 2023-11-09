@@ -36,14 +36,14 @@ pre-commit install --install-hooks
 
 We follow the [conventional commit style](https://www.conventionalcommits.org/en/v1.0.0/) for our commit messages.  
 The available commit types vary slightly from the official ones:
-- `feat``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `fix``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `ci``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `docs``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `perf``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `test``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `refactor``: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
-- `debug``: temporary changes, which should in the best case stay reverted. Can also get used to trigger the CI for debugging. 
+- `feat`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `fix`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `ci`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `docs`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `perf`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `test`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `refactor`: [see here](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
+- `debug`: temporary changes, which should in the best case stay reverted. Can also get used to trigger the CI for debugging. 
 - `revert`: technical type, which is rather used when applying `git revert`. Can ofc. also get used manually when "reverting" a previous, typed change. Format should be then `revert: feat: my unstable feature`
 - `chore`: rather flexible type. Some definitions are e.g. "Other changes that don't modify src or test files". People might tend to use this as leftover option for unclassifiable commits. This is not the intention, but instead always trying to categorize the own commits as good as possible into the other types.
 
@@ -52,4 +52,4 @@ The available commit types vary slightly from the official ones:
 
 1. Create a merge request onto the `main` branch.
 
-2. Assign two reviewers, one with the regular reviewer functionality and one by using a comment e.g. `/cc @second-reviewer - second reviewer`. If wished assign more people like this, but consider also marking "optional" reviewers to not block your merge request for too long.
+2. Assign two reviewers, one with the regular reviewer functionality and one by using a comment e.g. `/cc @second-reviewer - reviewer`. If wished assign more people like this, but consider also marking "optional" reviewers to not block your merge request for too long.
