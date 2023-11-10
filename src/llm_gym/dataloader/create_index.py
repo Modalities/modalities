@@ -11,9 +11,10 @@ from tqdm import tqdm
 
 # TODO: benchmark against pyspark
 class IndexGenerator:
-    def __init__(self, src: Path, chunksize: int = 4096):
+    def __init__(self, src: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
         self.src = Path(src)
         self.chunksize = chunksize
+        self.drop_faulty_entries = drop_faulty_entries
         with self.src.open(mode="r", encoding="utf-8") as fin:
             fin.seek(0, os.SEEK_END)
             char_num = fin.tell()
@@ -21,14 +22,18 @@ class IndexGenerator:
         self.reminder = char_num % self.chunksize
         self.chunk_queue = queue.Queue()
         self.index_map = []
+        self.exception_buffer = []
 
     def run(self, dst: Path):
+        self.exception_buffer = []
         reader = threading.Thread(target=self._reader_thread)
         reader.start()
         processor = threading.Thread(target=self._indexer_thread)
         processor.start()
         reader.join()
         processor.join()
+        if self.exception_buffer:
+            raise self.exception_buffer[0]
         print(f"Created index of length {len(self.index_map)}")
         dst.write_bytes(pkl.dumps(self.index_map))
 
@@ -40,30 +45,43 @@ class IndexGenerator:
                     break
                 yield chunk
 
+        def process_line(last_index: int, curr_index: int):
+            segment_len = curr_index - last_index
+            try:  # check if line is a valid json
+                string = np.memmap(self.src, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
+                string = [c.decode("iso-8859-1") for c in string]
+                string = "".join(string)
+                json.loads(string)
+                self.index_map.append((last_index, segment_len))
+            except Exception as low_level_err:
+                if self.drop_faulty_entries:
+                    print(f"faulty line at {last_index}-{curr_index}, skipping...")
+                else:
+                    print(f"{string=}")
+                    err = ValueError(f"faulty line at {last_index}-{curr_index}")
+                    err.__cause__ = low_level_err
+                    self.exception_buffer.append(err)
+
         self.index_map = []
         last_index = 0
         for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.chunks):
             for char_index, c in enumerate(chunk):
                 curr_index = chunk_idx * self.chunksize + char_index
                 if c == ord("\n"):
-                    segment_len = curr_index - last_index
-                    try:  # check if line is a valid json
-                        string = (
-                            np.memmap(self.src, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
-                        )
-                        string = [c.decode("iso-8859-1") for c in string]
-                        string = "".join(string)
-                        _ = json.loads(string)
-                        self.index_map.append((last_index, segment_len))
-                    except Exception:
-                        print(f"\nfaulty line at {last_index}-{curr_index}, skipping...")
+                    process_line(last_index, curr_index)
                     last_index = curr_index + 1
-        # TODO: implement proper handling of remaining (not full) segment
+        # prevents automatically added "\n"-chars at the end of files getting interpreted as own sample
+        if curr_index >= last_index:
+            process_line(last_index, curr_index + 1)
 
     def _reader_thread(self):
         with open(self.src, "rb") as fin:
             while True:
                 chunk = fin.read(self.chunksize)
+                if self.exception_buffer:
+                    raise RuntimeError(
+                        "Exception found in exception buffer. Probably the indexer thread ran into an error..."
+                    )
                 if not chunk:
                     break
                 self.chunk_queue.put(chunk)
