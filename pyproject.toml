@@ -18,7 +18,6 @@ dependencies = [
     "pydantic",
     "click",
     "click_pathlib",
-    "tiktoken",
     "jq"
 ]
 

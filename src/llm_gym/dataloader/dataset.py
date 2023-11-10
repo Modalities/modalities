@@ -60,6 +60,7 @@ class MemMapDataset(Dataset):
         super().__init__(raw_data_path=raw_data_path)
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_filter)
+        # TODO: tokenizer from tiktoken if it is faster?
         self.tokenizer = Tokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
