@@ -330,7 +330,7 @@ class TextInstances(Instances):
         dataset_dir: str,
         doc_idx: NDArray[int],
         dataset_name: str,
-        decoder_sequence_len: int,
+        sequence_len: int,
         num_samples: int,
         seed: int = 47,
     ):
@@ -355,7 +355,7 @@ class TextInstances(Instances):
         self.doc_idx = doc_idx
         self.text_dataset = text_dataset
         # + 1, because we shift sequence in order to get source and target sequence
-        self.sequence_len = decoder_sequence_len + 1
+        self.sequence_len = sequence_len + 1
         self.num_samples = num_samples
 
         logging.info("Compiling dataset index builder.")
