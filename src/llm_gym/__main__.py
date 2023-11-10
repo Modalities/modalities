@@ -16,6 +16,8 @@ from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointin
 from llm_gym.checkpointing.checkpointing_strategies import (
     SaveMostRecentEpochOnlyCheckpointingStrategy,
 )
+from llm_gym.data.instances import TextInstances
+from llm_gym.data.mmap_dataset import make_dataset
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
@@ -86,8 +88,6 @@ class Main:
 
         self.experiment_id = get_date_of_run()
 
-        self.dataset_path = config.data.dataset_dir_path
-
         self.model: GPT2LLM = init_by_hydra(config.model)
         runner: Runner = init_by_hydra(config.runner)
 
@@ -97,7 +97,7 @@ class Main:
 
         self.loss_fun: Loss = init_by_hydra(config.loss)
 
-        # data loaders
+        # Create data loaders
         (
             self.train_dataloader,
             self.val_dataloader_1,
@@ -196,62 +196,78 @@ class Main:
         )
 
     def create_dataloaders(
-        self, train_batch_size: int, test_batch_size: int
+        self,
+        config: Dict[str, Any],
+        train_batch_size: int,
+        test_batch_size: int,
+
     ) -> Tuple[List[LLMDataLoader], DistributedSampler]:
         """Create dataset splits."""
-        dataset_dict = LMWikiBookCorpusDatasetFactory.construct(self.dataset_path)
-        train_dataset = dataset_dict["train"]
-        val_dataset = dataset_dict["validation"]
+        dataset_path = config.data.dataset_dir_path
+        sequence_len = config.data.sequence_len
+        instance_splits = dict()
+
+        for partition in ["train", "val", "test"]:
+            dataset_filename_prefix = list(
+                set([dataset_path.joinpath(filename.stem) for filename in dataset_path.glob(f"*{partition}*.bin")])
+            )[0]
+            text_dataset = make_dataset(path=self.dataset_path)
+            instances = TextInstances(
+                text_dataset=text_dataset,
+                dataset_dir=self.dataset_path,
+                num_samples=len(text_dataset),
+                dataset_name=dataset_filename_prefix,
+                sequence_len=sequence_len,
+            )
+            instance_splits[partition] = instances
 
         # create samplers
         sampler_train = DistributedSampler(
-            train_dataset,
+            dataset=instance_splits["train"],
             rank=self.config.globals.global_rank,
             num_replicas=self.config.globals.world_size,
             shuffle=True,
         )
-        sampler_val_1 = DistributedSampler(
-            val_dataset, rank=self.config.globals.global_rank, num_replicas=self.config.globals.world_size
+        sampler_val = DistributedSampler(
+            dataset=instance_splits["val"],
+            rank=self.config.globals.global_rank,
+            num_replicas=self.config.globals.world_size,
         )
-        sampler_val_2 = DistributedSampler(
-            val_dataset, rank=self.config.globals.global_rank, num_replicas=self.config.globals.world_size
+        sampler_test = DistributedSampler(
+            dataset=instance_splits["test"],
+            rank=self.config.globals.global_rank,
+            num_replicas=self.config.globals.world_size,
         )
 
         # create dataloaders
         cuda_kwargs = {"num_workers": 2, "pin_memory": True, "shuffle": False}
-        pad_to_multiple_of = 8
-        tokenizer_file_path = "/raid/s3/opengptx/max_lue/LLMgym/data/tokenizer/tokenizer.json"
-        collate_fn = GPT2LLMCollator(
-            target_publication_key="target_key",
-            tokenizer_file_path=tokenizer_file_path,
-            pad_to_multiple_of=pad_to_multiple_of,
-        )
+
         train_loader = LLMDataLoader(
-            dataset=train_dataset,
+            dataset=instances["train"],
             dataset_tag="train",
             batch_size=train_batch_size,
             sampler=sampler_train,
             **cuda_kwargs,
-            collate_fn=collate_fn,
+            #collate_fn=collate_fn,
         )
-        val_loader_1 = LLMDataLoader(
-            dataset=val_dataset,
+        val_loader = LLMDataLoader(
+            dataset=instances["val"],
             dataset_tag="val_1",
             batch_size=test_batch_size,
-            sampler=sampler_val_1,
+            sampler=sampler_val,
             **cuda_kwargs,
-            collate_fn=collate_fn,
+            #collate_fn=collate_fn,
         )
-        val_loader_2 = LLMDataLoader(
-            dataset=val_dataset,
+        test_loader = LLMDataLoader(
+            dataset=instances["test"],
             dataset_tag="val_2",
             batch_size=test_batch_size,
-            sampler=sampler_val_2,
+            sampler=sampler_test,
             **cuda_kwargs,
-            collate_fn=collate_fn,
+            #collate_fn=collate_fn,
         )
 
-        return [train_loader, val_loader_1, val_loader_2], sampler_train
+        return [train_loader, val_loader, test_loader], sampler_train
 
 
 if __name__ == "__main__":
