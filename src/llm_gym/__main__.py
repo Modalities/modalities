@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -7,16 +6,12 @@ import click
 import click_pathlib
 import hydra
 from llm_gym.config.config import AppConfig
-import torch.distributed as dist
-import torch.optim as optim
 from omegaconf import OmegaConf
 from pydantic import BaseModel
-from torch.optim.lr_scheduler import StepLR
-from torch.utils.data.distributed import DistributedSampler
 
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import Checkpointing, DummyCheckpointing
+from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import (
     SaveMostRecentEpochOnlyCheckpointingStrategy,
@@ -85,6 +80,7 @@ def init_by_hydra(config: BaseModel) -> Any:
 
 class Main:
     def __init__(self, config: AppConfig) -> None:
+        # Checks whether this process was launched with ``torch.distributed.elastic``
         dist_launched = dist.is_torchelastic_launched()
         self.config = config
 
@@ -99,7 +95,6 @@ class Main:
         self.optimizer = optim.AdamW(self.wrapped_model.parameters(), lr=0.0001)
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
-        # CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
         self.loss_fun: Loss = init_by_hydra(config.loss)
 
         # data loaders
@@ -203,7 +198,7 @@ class Main:
     def create_dataloaders(
         self, train_batch_size: int, test_batch_size: int
     ) -> Tuple[List[LLMDataLoader], DistributedSampler]:
-        # create dataset splits
+        """Create dataset splits."""
         dataset_dict = LMWikiBookCorpusDatasetFactory.construct(self.dataset_path)
         train_dataset = dataset_dict["train"]
         val_dataset = dataset_dict["validation"]
