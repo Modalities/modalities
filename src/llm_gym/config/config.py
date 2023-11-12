@@ -27,10 +27,11 @@ class ProcessGroupBackendEnum(str, Enum):
 
 class DataConfig(BaseModel):
     dataset_dir_path: DirectoryPath
+    sequence_len: int
 
 
 class TrainingConfig(BaseModel):
-    num_training_batches: conint(gt=0)
+    #num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendEnum
 
 
@@ -55,29 +56,29 @@ class GlobalsConfig(BaseModel):
     local_rank: int
     global_rank: int
     world_size: int
-    num_training_batches: int
-    num_batches_per_training_sequence: int
+    #num_training_batches: int
+    #num_batches_per_training_sequence: int
     training_batch_size: int
     evaluation_batch_size: int
 
-    @property
-    def num_batches_per_training_sequence_per_rank(self):
-        return self.num_training_batches // self.num_batches_per_training_sequence // self.world_size
+    #@property
+    #def num_batches_per_training_sequence_per_rank(self):
+     #   return self.num_training_batches // self.num_batches_per_training_sequence // self.world_size
 
-    @property
-    def num_batches_per_rank(self):
-        return self.num_training_batches // self.world_size
+    #@property
+    #def num_batches_per_rank(self):
+     #   return self.num_training_batches // self.world_size
 
-    @model_validator(mode="after")
-    def validate_multiples(self) -> "GlobalsConfig":
-        computed_num_training_batches = (
-            self.num_batches_per_training_sequence_per_rank * self.world_size * self.num_batches_per_training_sequence
-        )
-        if computed_num_training_batches != self.num_training_batches:
-            raise ValueError(
-                f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
-            )
-        return self
+    #@model_validator(mode="after")
+    #def validate_multiples(self) -> "GlobalsConfig":
+     #   computed_num_training_batches = (
+      #      self.num_batches_per_training_sequence_per_rank * self.world_size * self.num_batches_per_training_sequence
+       # )
+        #if computed_num_training_batches != self.num_training_batches:
+         #   raise ValueError(
+          #      f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
+           # )
+        #return self
 
 
 class AppConfig(BaseModel):
