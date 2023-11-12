@@ -1,9 +1,11 @@
-from typing import List
+from typing import List, Tuple
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.optim import Optimizer
+import torch.nn as nn
 
 
 @dataclass
@@ -39,19 +41,29 @@ class CheckpointingExecutionIF(ABC):
         checkpointing_instruction: CheckpointingInstruction,
         global_train_batch_id: int,
         model: NNModel,
+        optimizer: Optimizer,
     ):
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[NNModel, Optimizer]:
         raise NotImplementedError
 
 
 class CheckpointingIF:
-    def run(
+    def save_checkpoint(
         self,
         train_batch_id: int,
         num_batches: int,
         evaluation_result: EvaluationResultBatch,
         model: NNModel,
+        optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[nn.Module, Optimizer]:
         raise NotImplementedError
 
 
@@ -70,12 +82,13 @@ class Checkpointing(CheckpointingIF):
         self.checkpointing_execution = checkpointing_execution
         self.num_ranks = num_ranks
 
-    def run(
+    def save_checkpoint(
         self,
         train_batch_id: int,
         num_batches: int,
         evaluation_result: EvaluationResultBatch,
         model: NNModel,
+        optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
         global_train_batch_id = (train_batch_id + 1) * self.num_ranks - 1
@@ -89,23 +102,9 @@ class Checkpointing(CheckpointingIF):
             checkpointing_instruction=checkpointing_instruction,
             global_train_batch_id=global_train_batch_id,
             model=model,
+            optimizer=optimizer,
         )
 
-
-class DummyCheckpointing(CheckpointingIF):
-    """
-    Checkpoint class to get checkpoint instruction.
-    """
-
-    def __init__(self):
-        pass
-
-    def run(
-        self,
-        train_batch_id: int,
-        num_batches: int,
-        evaluation_result: EvaluationResultBatch,
-        model: NNModel,
-        early_stoppping_criterion_fulfilled: bool = False,
-    ):
-        pass
+    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[nn.Module, Optimizer]:
+        checkpoint = self.checkpointing_execution.load_checkpoint(global_train_batch_id=global_train_batch_id)
+        return checkpoint
