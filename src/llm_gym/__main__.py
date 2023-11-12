@@ -16,7 +16,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import Checkpointing, DummyCheckpointing
+from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import (
     SaveMostRecentEpochOnlyCheckpointingStrategy,
