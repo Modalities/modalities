@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.gym import Gym
 
 import torch
 import torch.distributed as dist
@@ -9,6 +11,7 @@ from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 import functools
+from torch.optim import Optimizer
 
 
 class Runner(ABC):
@@ -17,21 +20,28 @@ class Runner(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def wrap(self, model: NNModel, local_rank: int) -> FSDP:
+    def wrap(self, model: NNModel) -> FSDP:
         raise NotImplementedError()
 
 
 class FSDPRunner(Runner):
-    def __init__(self, process_group_backend: ProcessGroupBackendEnum) -> None:
+    def __init__(self, process_group_backend: ProcessGroupBackendEnum, local_rank: int) -> None:
         dist.init_process_group(process_group_backend.value)
+        torch.cuda.set_device(local_rank)
 
-    def run(self):
+
+    def run(self, model: NNModel, optimizer: Optimizer, gym: Gym, global_train_batch_id: int, checkpointing: Checkpointing):
+        fsdp_model = FSDPRunner.wrap_model(model=model)
+        
+        gym.run(checkpointing=checkpointing)
+        
+        
         dist.barrier()
         dist.destroy_process_group()
 
-    def wrap(self, model: NNModel, local_rank: int) -> FSDP:
+    @staticmethod
+    def wrap_model(model: NNModel) -> FSDP:
         sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
-        torch.cuda.set_device(local_rank)
 
         if has_bfloat_support():
             mp_policy = bfSixteen
