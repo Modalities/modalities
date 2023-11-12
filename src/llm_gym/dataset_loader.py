@@ -77,10 +77,10 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
             batch = next(self.data_iter)
         except StopIteration:
             if self.data_loader.sampler is not None:
-                # In distributed mode, calling the set_epoch() method at the beginning of each epoch before creating the DataLoader
-                # iterator is necessary to make shuffling work properly across multiple epochs. Otherwise, the same ordering will
-                # be always used.
-                # see discussion: https://discuss.pytorch.org/t/why-is-sampler-set-epoch-epoch-needed-for-distributedsampler/149672
+                # In distributed mode, calling the set_epoch() method at the beginning of each epoch before creating
+                # the DataLoader iterator is necessary to make shuffling work properly across multiple epochs.
+                # Otherwise, the same ordering will be always used. See discussion:
+                # https://discuss.pytorch.org/t/why-is-sampler-set-epoch-epoch-needed-for-distributedsampler/149672
                 self.current_epoch += 1
                 self.data_loader.sampler.set_epoch(self.current_epoch)
             self.data_iter = iter(self.data_loader)
