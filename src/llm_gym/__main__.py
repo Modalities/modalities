@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Tuple
 import click
 import click_pathlib
 import hydra
+import numpy as np
+
 from llm_gym.config.config import AppConfig
 from omegaconf import OmegaConf
 from pydantic import BaseModel
@@ -19,9 +21,9 @@ from llm_gym.checkpointing.checkpointing_strategies import (
 from llm_gym.data.instances import TextInstances
 from llm_gym.data.mmap_dataset import make_dataset
 from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner
+from llm_gym.fsdp.fsdp_runner import Runner
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
-from llm_gym.models.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
+
 from llm_gym.gym import Gym
 from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
     DummyProgressSubscriber,
@@ -103,7 +105,9 @@ class Main:
             self.val_dataloader_1,
             self.val_dataloader_2,
         ), self.sampler_train = self.create_dataloaders(
-            train_batch_size=config.globals.training_batch_size, test_batch_size=21
+            config=config,
+            train_batch_size=config.globals.training_batch_size,
+            test_batch_size=21
         )
 
         # Message Broker
@@ -211,12 +215,14 @@ class Main:
             dataset_filename_prefix = list(
                 set([dataset_path.joinpath(filename.stem) for filename in dataset_path.glob(f"*{partition}*.bin")])
             )[0]
-            text_dataset = make_dataset(path=self.dataset_path)
+            text_dataset = make_dataset(path=dataset_filename_prefix)
+            num_samples = len(text_dataset)
             instances = TextInstances(
                 text_dataset=text_dataset,
-                dataset_dir=self.dataset_path,
-                num_samples=len(text_dataset),
-                dataset_name=dataset_filename_prefix,
+                doc_idx=np.arange(0, num_samples),
+                dataset_dir=dataset_path,
+                num_samples=num_samples,
+                dataset_name=partition,
                 sequence_len=sequence_len,
             )
             instance_splits[partition] = instances
