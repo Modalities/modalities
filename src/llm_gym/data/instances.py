@@ -389,7 +389,7 @@ class TextInstances(Instances):
         #    sample i --> [sample_idx[i], sample_idx[i+1])
         return self.sample_idx.shape[0] - 1
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         # Get the shuffled index.
         idx = self.shuffle_idx[idx]
         # Start and end documents and offsets.
