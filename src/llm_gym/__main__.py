@@ -6,11 +6,11 @@ import click
 import click_pathlib
 import hydra
 import numpy as np
+import torch
 
 from llm_gym.config.config import AppConfig
 from omegaconf import OmegaConf
 from pydantic import BaseModel
-
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
@@ -99,16 +99,30 @@ class Main:
 
         self.loss_fun: Loss = init_by_hydra(config.loss)
 
-        # Create data loaders
-        (
-            self.train_dataloader,
-            self.val_dataloader_1,
-            self.val_dataloader_2,
-        ), self.sampler_train = self.create_dataloaders(
-            config=config,
-            train_batch_size=config.globals.training_batch_size,
-            test_batch_size=21
+        # Create instances
+        instance_splits = self.create_instances(config=config)
+
+        # Create samplers
+        sampler_splits = self.create_samplers(
+            train_instances=instance_splits["train"],
+            val_instances=instance_splits["val"],
+            test_instances=instance_splits["test"],
         )
+
+        dataloader_splits = self.create_dataloaders(
+            train_instances=instance_splits["train"],
+            val_instances=instance_splits["val"],
+            test_instances=instance_splits["test"],
+            train_sampler=sampler_splits["train"],
+            val_sampler=sampler_splits["val"],
+            test_sampler=sampler_splits["test"],
+            train_batch_size=config.globals.training_batch_size,
+            test_batch_size=21,
+        )
+
+        self.train_dataloader = dataloader_splits["train"]
+        self.val_dataloader = dataloader_splits["val"]
+        self.test_dataloader = dataloader_splits["test"]
 
         # Message Broker
         message_broker = MessageBroker()
@@ -124,10 +138,10 @@ class Main:
         )
 
         eval_split_lengths = {
-            self.val_dataloader_1.dataset_tag: len(self.val_dataloader_1) * config.globals.world_size,
-            self.val_dataloader_2.dataset_tag: len(self.val_dataloader_2) * config.globals.world_size,
+            self.val_dataloader.dataset_tag: len(self.val_dataloader) * config.globals.world_size,
+            self.test_dataloader.dataset_tag: len(self.test_dataloader) * config.globals.world_size,
         }
-        train_split_lengths = {self.train_dataloader.dataset_tag: config.globals.num_training_batches}
+        train_split_lengths = {self.train_dataloader.dataset_tag: len(self.train_dataloader)}
 
         if not dist_launched or (dist_launched and dist.get_rank() == 0):
             progress_subscriber = RichProgressSubscriber(
@@ -173,7 +187,7 @@ class Main:
         )
 
         # Evaluator
-        self.eval_data_loaders = [self.val_dataloader_1, self.val_dataloader_2]
+        self.eval_data_loaders = [self.val_dataloader, self.test_dataloader]
 
         self.evaluator = Evaluator(
             local_rank=config.globals.local_rank,
@@ -193,20 +207,14 @@ class Main:
 
     def run(self):
         self.gym.run(
-            num_batches=self.config.globals.num_batches_per_rank,
+            # TODO: remove num_batches dependency
+            num_batches=len(self.train_dataloader) / torch.distributed.get_world_size(),
             num_batches_per_epoch=self.config.globals.num_batches_per_training_sequence_per_rank,
             train_data_loader=self.train_dataloader,
             evaluation_data_loaders=self.eval_data_loaders,
         )
 
-    def create_dataloaders(
-        self,
-        config: Dict[str, Any],
-        train_batch_size: int,
-        test_batch_size: int,
-
-    ) -> Tuple[List[LLMDataLoader], DistributedSampler]:
-        """Create dataset splits."""
+    def create_instances(self, config: Dict[str, Any]) -> Dict[str, TextInstances]:
         dataset_path = config.data.dataset_dir_path
         sequence_len = config.data.sequence_len
         instance_splits = dict()
@@ -227,53 +235,83 @@ class Main:
             )
             instance_splits[partition] = instances
 
-        # create samplers
-        sampler_train = DistributedSampler(
-            dataset=instance_splits["train"],
+        return instance_splits
+
+    def create_samplers(
+        self,
+        train_instances: TextInstances,
+        val_instances: TextInstances,
+        test_instances: TextInstances,
+    ) -> Dict[str, DistributedSampler]:
+        sampler_splits = dict()
+
+        sampler_splits["train"] = DistributedSampler(
+            dataset=train_instances,
             rank=self.config.globals.global_rank,
             num_replicas=self.config.globals.world_size,
             shuffle=True,
         )
-        sampler_val = DistributedSampler(
-            dataset=instance_splits["val"],
+
+        sampler_splits["val"] = DistributedSampler(
+            dataset=val_instances,
             rank=self.config.globals.global_rank,
             num_replicas=self.config.globals.world_size,
         )
-        sampler_test = DistributedSampler(
-            dataset=instance_splits["test"],
+
+        sampler_splits["test"] = DistributedSampler(
+            dataset=test_instances,
             rank=self.config.globals.global_rank,
             num_replicas=self.config.globals.world_size,
         )
+
+        return sampler_splits
+
+    def create_dataloaders(
+        self,
+        train_instances: TextInstances,
+        val_instances: TextInstances,
+        test_instances: TextInstances,
+        train_sampler: DistributedSampler,
+        val_sampler: DistributedSampler,
+        test_sampler: DistributedSampler,
+        train_batch_size: int,
+        test_batch_size: int,
+
+    ) -> Dict[str, LLMDataLoader]:
+        """Create dataset splits."""
 
         # create dataloaders
         cuda_kwargs = {"num_workers": 2, "pin_memory": True, "shuffle": False}
+        data_loader_splits = dict()
 
-        train_loader = LLMDataLoader(
-            dataset=instances["train"],
+        data_loader_splits["train"] = LLMDataLoader(
+            dataset=train_instances,
             dataset_tag="train",
             batch_size=train_batch_size,
-            sampler=sampler_train,
+            sampler=train_sampler,
             **cuda_kwargs,
-            #collate_fn=collate_fn,
-        )
-        val_loader = LLMDataLoader(
-            dataset=instances["val"],
-            dataset_tag="val_1",
-            batch_size=test_batch_size,
-            sampler=sampler_val,
-            **cuda_kwargs,
-            #collate_fn=collate_fn,
-        )
-        test_loader = LLMDataLoader(
-            dataset=instances["test"],
-            dataset_tag="val_2",
-            batch_size=test_batch_size,
-            sampler=sampler_test,
-            **cuda_kwargs,
-            #collate_fn=collate_fn,
+            # collate_fn=collate_fn,
         )
 
-        return [train_loader, val_loader, test_loader], sampler_train
+        data_loader_splits["val"] = val_loader = LLMDataLoader(
+            dataset=val_instances,
+            dataset_tag="val_1",
+            batch_size=test_batch_size,
+            sampler=val_sampler,
+            **cuda_kwargs,
+            # collate_fn=collate_fn,
+        )
+
+        data_loader_splits["test"] = test_loader = LLMDataLoader(
+            dataset=test_instances,
+            dataset_tag="val_2",
+            batch_size=test_batch_size,
+            sampler=test_sampler,
+            **cuda_kwargs,
+            # collate_fn=collate_fn,
+        )
+
+        return data_loader_splits
 
 
 if __name__ == "__main__":
