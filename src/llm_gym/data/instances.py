@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import os
-from datetime import time
+import time
 from pathlib import Path
 from typing import Tuple
 
@@ -20,9 +20,11 @@ class Instances(Dataset):
     def __len__(self):
         return self.num_instances
 
+
 def get_num_tokens_per_epoch(documents: NDArray, sizes: NDArray) -> NDArray:
     """Total number of tokens in the dataset."""
     return np.sum(sizes[documents])
+
 
 def get_num_epochs(num_tokens_per_epoch: int, sequence_len: int, num_samples: int) -> int:
     num_epochs = 0
@@ -39,11 +41,12 @@ def get_num_epochs(num_tokens_per_epoch: int, sequence_len: int, num_samples: in
         if ((total_tokens) // sequence_len) >= num_samples:
             return num_epochs
 
+
 def build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
     """Build an array with length = number-of-epochs * number-of-documents.
     Each index is mapped to a corresponding document."""
     if not separate_last_epoch or num_epochs == 1:
-        doc_idx = np.mgrid[0:num_epochs, 0 : len(documents)][1]
+        doc_idx = np.mgrid[0:num_epochs, 0: len(documents)][1]
         doc_idx[:] = documents
         doc_idx = doc_idx.reshape(-1)
         doc_idx = doc_idx.astype(np.int32)
@@ -55,6 +58,7 @@ def build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
     doc_idx_last = build_doc_idx(documents, 1, np_rng, False)
 
     return np.concatenate((doc_idx_first, doc_idx_last))
+
 
 def _build_shuffle_idx(num_samples, total_size, np_rng):
     """Build the range [0, size) and shuffle."""
@@ -76,6 +80,7 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
+
 
 def build_sample_idx(
     sizes: NDArray,
@@ -129,6 +134,7 @@ def build_sample_idx(
         sample_index += 1
 
     return sample_idx
+
 
 def build_index_mappings(
     name: str,
@@ -335,20 +341,21 @@ class TextInstances(Instances):
         seed: int = 47,
     ):
         """
-        :param encoder_sequence_indexed_dataset:
-        :type encoder_sequence_indexed_dataset:
-        :param dataset_dir: path to .bin and to .idx file
+        :param text_dataset:
+        :type text_dataset:
+        :param dataset_dir:
         :type dataset_dir:
         :param doc_idx: document ids. A document can contain several samples.
         :type doc_idx:
         :param dataset_name: train, validation or test.
         :type dataset_name:
-        :param encoder_sequence_len:
-        :type encoder_sequence_len:
+        :param sequence_len:
+        :type sequence_len:
         :param num_samples: number of samples contained in the training/validation/test set.
         :type num_samples:
         :param seed:
         :type seed:
+
         """
 
         # Contains the document inidices
@@ -362,8 +369,8 @@ class TextInstances(Instances):
 
         (
             self.doc_idx,
-            self.encoder_sequence_sample_idx,
-            self.encoder_sequence_shuffle_idx,
+            self.sample_idx,
+            self.shuffle_idx,
         ) = build_index_mappings(
             name=dataset_name,
             sizes=text_dataset.sizes,
@@ -376,3 +383,43 @@ class TextInstances(Instances):
             documents=self.doc_idx,
             seed=seed,
         )
+
+    def __len__(self):
+        # -1 is due to data structure used to retieve the index:
+        #    sample i --> [sample_idx[i], sample_idx[i+1])
+        return self.sample_idx.shape[0] - 1
+
+    def __getitem__(self, idx):
+        # Get the shuffled index.
+        idx = self.shuffle_idx[idx]
+        # Start and end documents and offsets.
+        doc_index_f = self.sample_idx[idx][0]
+        doc_index_l = self.sample_idx[idx + 1][0]
+        offset_f = self.sample_idx[idx][1]
+        offset_l = self.sample_idx[idx + 1][1]
+        # If we are within the same document, just extract the chunk.
+        doc_ids = []
+        if doc_index_f == doc_index_l:
+            doc_ids.append(self.doc_idx[doc_index_f])
+            sample = self.text_dataset.get(
+                self.doc_idx[doc_index_f],
+                offset=offset_f,
+                length=offset_l - offset_f + 1,
+            )
+        else:
+            # Otherwise, get the rest of the initial document.
+            doc_ids.append(self.doc_idx[doc_index_f])
+            sample_list = [self.text_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)]
+
+            # Loop over all in between documents and add the entire document.
+            for i in range(doc_index_f + 1, doc_index_l):
+                doc_ids.append(self.doc_idx[i])
+                sample_list.append(self.text_dataset.get(self.doc_idx[i]))
+
+            # And finally add the relevant portion of last document.
+            doc_ids.append(self.doc_idx[doc_index_l])
+            sample_list.append(self.text_dataset.get(self.doc_idx[doc_index_l],length=offset_l + 1))
+            sample = np.concatenate(sample_list)
+
+
+        return {'text': np.array(sample, dtype=np.int64)}
