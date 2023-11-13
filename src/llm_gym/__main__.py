@@ -12,26 +12,29 @@ from pydantic import BaseModel
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data.distributed import DistributedSampler
 
-from .batch import EvaluationResultBatch
-from .checkpointing.checkpointing import Checkpointing
-from .checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from .checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
-from .config.config import AppConfig
-from .dataloader.dataset import Dataset, MemMapDataset
-from .dataset_loader import LLMDataLoader
-from .evaluator import Evaluator
-from .fsdp.fsdp_runner import Runner
-from .gym import Gym
-from .logging_broker.message_broker import MessageBroker
-from .logging_broker.messages import BatchProgressUpdate, MessageTypes
-from .logging_broker.publisher import MessagePublisher
-from .logging_broker.subscriber_impl.batch_progress_subscriber import DummyProgressSubscriber, RichProgressSubscriber
-from .logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
-from .loss_functions import CLMCrossEntropyLoss, Loss
-from .models.gpt2.collator import GPT2LLMCollator
-from .models.gpt2.gpt2_model import GPT2LLM
-from .trainer import Trainer
-from .util import get_date_of_run
+from llm_gym.batch import EvaluationResultBatch
+from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
+from llm_gym.config.config import AppConfig
+from llm_gym.dataloader.dataset import Dataset, MemMapDataset
+from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.evaluator import Evaluator
+from llm_gym.fsdp.fsdp_runner import Runner
+from llm_gym.gym import Gym
+from llm_gym.logging_broker.message_broker import MessageBroker
+from llm_gym.logging_broker.messages import BatchProgressUpdate, MessageTypes
+from llm_gym.logging_broker.publisher import MessagePublisher
+from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
+    DummyProgressSubscriber,
+    RichProgressSubscriber,
+)
+from llm_gym.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
+from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
+from llm_gym.models.gpt2.collator import GPT2LLMCollator
+from llm_gym.models.gpt2.gpt2_model import GPT2LLM
+from llm_gym.trainer import Trainer
+from llm_gym.util import get_date_of_run
 
 
 @click.group()
