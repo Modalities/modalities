@@ -1,12 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict,  Callable
 
 import click
 import click_pathlib
 import hydra
 import numpy as np
-import torch
+
+from datasets import Dataset
 
 from llm_gym.config.config import AppConfig
 from omegaconf import OmegaConf
@@ -22,6 +23,7 @@ from llm_gym.data.instances import TextInstances
 from llm_gym.data.mmap_dataset import make_dataset
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.fsdp.fsdp_runner import Runner
+from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
 
 from llm_gym.gym import Gym
@@ -109,6 +111,11 @@ class Main:
             test_instances=instance_splits["test"],
         )
 
+        collator = GPT2LLMCollator(
+            sample_key=config.data.sample_key,
+            target_key=config.data.target_key,
+        )
+
         dataloader_splits = self.create_dataloaders(
             train_instances=instance_splits["train"],
             val_instances=instance_splits["val"],
@@ -117,7 +124,8 @@ class Main:
             val_sampler=sampler_splits["val"],
             test_sampler=sampler_splits["test"],
             train_batch_size=config.globals.training_batch_size,
-            test_batch_size=21,
+            test_batch_size=config.globals.evaluation_batch_size,
+            collate_fn=collator,
         )
 
         self.train_dataloader = dataloader_splits["train"]
@@ -163,12 +171,15 @@ class Main:
             subscriber=progress_subscriber,
         )
 
-        self.loss_fun = CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
+        self.loss_fun = CLMCrossEntropyLoss(
+            target_key=config.loss.target_key,
+            prediction_key=config.loss.prediction_key,
+        )
 
         # Checkpointing
         checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
         checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+            checkpoint_path="/raid/s3/opengptx/mehdi/temp/temp_data",
             experiment_id=self.experiment_id,
             global_rank=config.globals.global_rank,
             checkpointing_rank=0,
@@ -208,13 +219,13 @@ class Main:
     def run(self):
         self.gym.run(
             # TODO: remove num_batches dependency
-            num_batches=len(self.train_dataloader) / torch.distributed.get_world_size(),
-            num_batches_per_epoch=self.config.globals.num_batches_per_training_sequence_per_rank,
+            num_batches_per_rank=self.config.globals.num_training_batches // self.config.globals.world_size,
+            eval_interval_in_batches=self.config.globals.eval_interval_per_rank,
             train_data_loader=self.train_dataloader,
             evaluation_data_loaders=self.eval_data_loaders,
         )
 
-    def create_instances(self, config: Dict[str, Any]) -> Dict[str, TextInstances]:
+    def create_instances(self, config: AppConfig) -> Dict[str, TextInstances]:
         dataset_path = config.data.dataset_dir_path
         sequence_len = config.data.sequence_len
         instance_splits = dict()
@@ -224,10 +235,11 @@ class Main:
                 set([dataset_path.joinpath(filename.stem) for filename in dataset_path.glob(f"*{partition}*.bin")])
             )[0]
             text_dataset = make_dataset(path=dataset_filename_prefix)
-            num_samples = len(text_dataset)
+            num_samples = config.globals.num_training_batches * config.globals.training_batch_size
             instances = TextInstances(
+                sample_key=config.data.sample_key,
                 text_dataset=text_dataset,
-                doc_idx=np.arange(0, num_samples),
+                doc_idx=np.arange(0, len(text_dataset)),
                 dataset_dir=dataset_path,
                 num_samples=num_samples,
                 dataset_name=partition,
@@ -268,14 +280,15 @@ class Main:
 
     def create_dataloaders(
         self,
-        train_instances: TextInstances,
-        val_instances: TextInstances,
-        test_instances: TextInstances,
+        train_instances: Dataset,
+        val_instances: Dataset,
+        test_instances: Dataset,
         train_sampler: DistributedSampler,
         val_sampler: DistributedSampler,
         test_sampler: DistributedSampler,
         train_batch_size: int,
         test_batch_size: int,
+        collate_fn: Callable,
 
     ) -> Dict[str, LLMDataLoader]:
         """Create dataset splits."""
@@ -289,26 +302,26 @@ class Main:
             dataset_tag="train",
             batch_size=train_batch_size,
             sampler=train_sampler,
+            collate_fn=collate_fn,
             **cuda_kwargs,
-            # collate_fn=collate_fn,
         )
 
-        data_loader_splits["val"] = val_loader = LLMDataLoader(
+        data_loader_splits["val"] = LLMDataLoader(
             dataset=val_instances,
-            dataset_tag="val_1",
+            dataset_tag="val",
             batch_size=test_batch_size,
             sampler=val_sampler,
+            collate_fn=collate_fn,
             **cuda_kwargs,
-            # collate_fn=collate_fn,
         )
 
-        data_loader_splits["test"] = test_loader = LLMDataLoader(
+        data_loader_splits["test"] = LLMDataLoader(
             dataset=test_instances,
-            dataset_tag="val_2",
+            dataset_tag="test",
             batch_size=test_batch_size,
             sampler=test_sampler,
+            collate_fn=collate_fn,
             **cuda_kwargs,
-            # collate_fn=collate_fn,
         )
 
         return data_loader_splits
