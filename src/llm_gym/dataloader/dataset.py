@@ -9,7 +9,7 @@ from torch.utils.data import random_split
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
 
-from llm_gym.gpt2.collator import Tokenizer
+from llm_gym.models.gpt2.collator import Tokenizer
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 

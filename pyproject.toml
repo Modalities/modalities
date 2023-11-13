@@ -18,7 +18,8 @@ dependencies = [
     "pydantic",
     "click",
     "click_pathlib",
-    "jq"
+    "jq",
+    "wandb"
 ]
 
 [project.optional-dependencies]

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Annotated
 
 from hydra._internal.utils import _locate
-from pydantic import BaseModel, DirectoryPath, conint, model_validator, validator
+from pydantic import BaseModel, DirectoryPath, FilePath, conint, model_validator
 from pydantic.functional_validators import AfterValidator
 
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
@@ -26,7 +26,7 @@ class ProcessGroupBackendEnum(str, Enum):
 
 
 class DataConfig(BaseModel):
-    dataset_dir_path: DirectoryPath
+    dataset_dir_path: DirectoryPath | FilePath
 
 
 class TrainingConfig(BaseModel):
@@ -75,7 +75,7 @@ class GlobalsConfig(BaseModel):
         )
         if computed_num_training_batches != self.num_training_batches:
             raise ValueError(
-                f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
+                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"  # noqa: E501
             )
         return self
 

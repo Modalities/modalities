@@ -21,8 +21,6 @@ from .dataloader.dataset import Dataset, MemMapDataset
 from .dataset_loader import LLMDataLoader
 from .evaluator import Evaluator
 from .fsdp.fsdp_runner import Runner
-from .gpt2.collator import GPT2LLMCollator
-from .gpt2.gpt2_model import GPT2LLM
 from .gym import Gym
 from .logging_broker.message_broker import MessageBroker
 from .logging_broker.messages import BatchProgressUpdate, MessageTypes
@@ -30,6 +28,8 @@ from .logging_broker.publisher import MessagePublisher
 from .logging_broker.subscriber_impl.batch_progress_subscriber import DummyProgressSubscriber, RichProgressSubscriber
 from .logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from .loss_functions import CLMCrossEntropyLoss, Loss
+from .models.gpt2.collator import GPT2LLMCollator
+from .models.gpt2.gpt2_model import GPT2LLM
 from .trainer import Trainer
 from .util import get_date_of_run
 
