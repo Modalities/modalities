@@ -1,3 +1,4 @@
+
 import math
 from enum import Enum
 from typing import Dict, Optional
@@ -13,12 +14,12 @@ from torch.nn import functional as F
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
-class Attention(Enum):
+class Attention(str, Enum):
     DEFAULT_ATTENTION = "default_attention"
     PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
 
 
-class Activation(Enum):
+class Activation(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
 
@@ -160,7 +161,7 @@ class Block(nn.Module):
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
 
-        if config.activation == Activation.GELU:
+        if config.activation.value == "gelu":
             self.mlp = TransformerMLP(config)
         elif config.activation == Activation.FUSED_SWIGLU:
             hidden_dim = 256 * ((int(2 * 4 * config.n_embd / 3) + 256 - 1) // 256)
