@@ -1,0 +1,48 @@
+globals: 
+  local_rank: ${oc.env:LOCAL_RANK}
+  global_rank: ${oc.env:RANK}
+  world_size: ${oc.env:WORLD_SIZE}
+
+  num_training_batches: 7000
+  num_batches_per_training_sequence: 100
+  training_batch_size: 32
+  evaluation_batch_size: 32
+
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+data:
+  dataset_dir_path: /raid/s3/opengptx/max_lue/LLMgym/data/datasets/wikitext-103-raw-v1-tokenized
+
+training:
+  num_training_batches: ${globals.num_training_batches}
+  process_group_backend: "nccl"
+
+loss:
+  target_class: llm_gym.loss_functions.CLMCrossEntropyLoss
+  target_subscription_key: target_key
+  prediction_subscription_key: logits
+
+runner:
+  target_class: llm_gym.fsdp.fsdp_runner.FSDPRunner
+  process_group_backend: ${training.process_group_backend}
+
+model:
+  target_class: llm_gym.models.gpt2.gpt2_model.GPT2LLM
+  prediction_publication_key: logits
+  config:
+    block_size: 1024
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head: 12
+    n_embd: 768
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention:
+      attention_type: "pytorch_flash_attention"
+      scaling_factor: 3
+    activation: "fused_swiglu"
+    epsilon: 1e-5

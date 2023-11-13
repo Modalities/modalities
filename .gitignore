@@ -115,3 +115,6 @@ logs/
 *.whl
 *.arrow
 core.*
+data/datasets
+data/checkpoints
+

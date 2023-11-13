@@ -1,3 +1,5 @@
+from collections import defaultdict
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable, Dict, List, Union
 from llm_gym.exceptions import BatchStateError
@@ -6,26 +8,6 @@ from abc import ABC, abstractmethod
 
 
 class TorchDeviceMixin(ABC):
-
-    @staticmethod
-    def _dict_tensor_to_device(d: Dict[str, Dict | torch.Tensor], device: torch.device) -> Dict[str, Dict | torch.Tensor]:
-        partial_fun = partial(torch.Tensor.to, device=device)
-        return TorchDeviceMixin.traverse_apply(ds=d, apply_fun=partial_fun)
-
-    @staticmethod
-    def _detach_dict_tensor(d: Dict[str, Dict | torch.Tensor]) -> Dict[str, Dict | torch.Tensor]:
-        partial_fun = partial(torch.Tensor.detach)
-        return TorchDeviceMixin.traverse_apply(ds=d, apply_fun=partial_fun)
-
-    @staticmethod
-    def traverse_apply(ds: Union[Dict, List, torch.Tensor],
-                       apply_fun: Callable[[torch.Tensor], torch.Tensor]) -> Union[Dict, List, torch.Tensor]:
-        if isinstance(ds, dict):
-            return {k: TorchDeviceMixin.traverse_apply(d, apply_fun) for k, d in ds.items()}
-        elif isinstance(ds, list):
-            return [TorchDeviceMixin.traverse_apply(d, apply_fun) for d in ds]
-        return apply_fun(ds)
-
     @property
     @abstractmethod
     def device(self) -> torch.device:
@@ -41,116 +23,88 @@ class TorchDeviceMixin(ABC):
 
 
 class Batch(ABC):
-    """Abstract class that defines the necessary methods any `Batch` implementation needs to implement.
-    """
+    """Abstract class that defines the necessary methods any `Batch` implementation needs to implement."""
+
     pass
 
 
+@dataclass
 class DatasetBatch(Batch, TorchDeviceMixin):
     """A batch of samples and its targets. Used to batch train a model."""
 
-    def __init__(self, samples: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor], tags: torch.Tensor = None):
-        self._samples = samples
-        self._targets = targets
+    samples: Dict[str, torch.Tensor]
+    targets: Dict[str, torch.Tensor]
+    batch_dim: int = 0
 
-    @property
-    def samples(self) -> Dict[str, torch.Tensor]:
-        return self._samples
-
-    @property
-    def targets(self) -> Dict[str, torch.Tensor]:
-        return self._targets
-
-    def to(self, device: torch.device | int) -> "DatasetBatch":
-        self._samples = {k: v.to(device) for k, v in self._samples.items()}
-        self._targets = {k: v.to(device) for k, v in self._targets.items()}
-        return self
+    def to(self, device: torch.device):
+        self.samples = {k: v.to(device) for k, v in self.samples.items()}
+        self.targets = {k: v.to(device) for k, v in self.targets.items()}
 
     def detach(self):
-        self._targets = {k: v.detach() for k, v in self._targets.items()}
-        self._tags = self._tags.detach()
-        self._samples = {k: v.detach() for k, v in self._samples.items()}
+        self.targets = {k: v.detach() for k, v in self.targets.items()}
+        self.samples = {k: v.detach() for k, v in self.samples.items()}
 
     @property
     def device(self) -> torch.device:
-        key = list(self._samples.keys())[0]
-        return self._samples[key].device
+        key = list(self.samples.keys())[0]
+        return self.samples[key].device
 
     def __len__(self) -> int:
-        return len(self._samples)
+        key = list(self.samples.keys())[0]
+        return self.samples[key].shape[self.batch_dim]
 
 
+@dataclass
 class InferenceResultBatch(Batch, TorchDeviceMixin):
-    """ Stores targets and predictions of an entire batch.
-    """
+    """Stores targets and predictions of an entire batch."""
 
-    def __init__(self, targets: Dict[str, torch.Tensor] = None, predictions: Dict[str, torch.Tensor] = None):
-        self._targets = targets if targets is not None else {}
-        self._predictions = predictions if predictions is not None else {}
-        self.to(self.device)
+    targets: Dict[str, torch.Tensor]
+    predictions: Dict[str, torch.Tensor]
+    batch_dim: int = 0
 
     def to_cpu(self):
         self.to(device=torch.device("cpu"))
 
     @property
     def device(self) -> torch.device:
-        key = list(self._targets.keys())[0]
-        return self._targets[key].device
+        key = list(self.targets.keys())[0]
+        return self.targets[key].device
 
     def to(self, device: torch.device):
-        self._predictions = TorchDeviceMixin._dict_tensor_to_device(self._predictions, device)
-        self._targets = TorchDeviceMixin._dict_tensor_to_device(self._targets, device)
+        self.predictions = {k: v.to(device) for k, v in self.predictions.items()}
+        self.targets = {k: v.to(device) for k, v in self.targets.items()}
 
     def detach(self):
-        self._targets = TorchDeviceMixin._detach_dict_tensor(self._targets)
-        self._predictions = TorchDeviceMixin._detach_dict_tensor(self._predictions)
-
-    @property
-    def predictions(self) -> Dict[str, torch.Tensor]:
-        return self._predictions
-
-    @property
-    def targets(self) -> Dict[str, torch.Tensor]:
-        return self._targets
+        self.targets = {k: v.detach() for k, v in self.targets.items()}
+        self.predictions = {k: v.detach() for k, v in self.predictions.items()}
 
     def get_predictions(self, key: str) -> torch.Tensor:
-        if key not in self._predictions:
+        if key not in self.predictions:
             raise BatchStateError(f"Key {key} not present in predictions!")
-        return self._predictions[key]
+        return self.predictions[key]
 
     def get_targets(self, key: str) -> torch.Tensor:
-        if key not in self._targets:
+        if key not in self.targets:
             raise BatchStateError(f"Key {key} not present in targets!")
-        return self._targets[key]
+        return self.targets[key]
 
     def __len__(self) -> int:
-        return len(self.predictions)
+        key = list(self.predictions.keys())[0]
+        return self.predictions[key].shape[self.batch_dim]
 
 
+@dataclass
 class EvaluationResultBatch(Batch):
-    """Data class for storing the results of a single or multiple batches. Also entire epoch results are stored in here.
-    """
+    """Data class for storing the results of a single or multiple batches. Also entire epoch results are stored in here."""
 
-    def __init__(self, split_name: str, losses: Dict[str, torch.Tensor] = None, metrics: Dict[str, torch.Tensor] = None):
-        self._losses = losses if losses is not None else {}
-        self._metrics = metrics if metrics is not None else {}
-        self._split_name = split_name
-
-    @property
-    def losses(self) -> Dict[str, torch.Tensor]:
-        return self._losses
-
-    @property
-    def metrics(self) -> Dict[str, torch.Tensor]:
-        return self._metrics
-
-    @property
-    def split_name(self) -> str:
-        return self._split_name
+    dataset_tag: str
+    train_batch_id: int
+    losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
+    metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
 
     def __str__(self) -> str:
-        eval_str = f"Evaluation result on dataset split {self._split_name}:"
-        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self._losses.items()])
-        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self._metrics.items()])
+        eval_str = f"Evaluation result on dataset tag {self.dataset_tag} after {self.train_batch_id+1} batches:"
+        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()])
+        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()])
         eval_str += "\n==============================================="
         return eval_str
