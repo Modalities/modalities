@@ -13,14 +13,6 @@ from torch.utils.data import Dataset
 from llm_gym.data.mmap_dataset import MMapIndexedDataset, print_rank_0
 
 
-class Instances(Dataset):
-    def __init__(self, num_instances: int):
-        self.num_instances = num_instances
-
-    def __len__(self):
-        return self.num_instances
-
-
 def get_num_tokens_per_epoch(documents: NDArray, sizes: NDArray) -> NDArray:
     """Total number of tokens in the dataset."""
     return np.sum(sizes[documents])
@@ -36,9 +28,7 @@ def get_num_epochs(num_tokens_per_epoch: int, sequence_len: int, num_samples: in
         # -1 is because we need to retrieve seq_length + 1 token each time
         # but the last token will overlap with the first token of the next
         # sample except for the last sample.
-        # FIXME: -1
-        # if ((total_tokens - 1) // sequence_len) >= num_samples:
-        if ((total_tokens) // sequence_len) >= num_samples:
+        if ((total_tokens -1) // sequence_len) >= num_samples:
             return num_epochs
 
 
@@ -208,15 +198,13 @@ def build_index_mappings(
 
             else:
                 # Get the number of samples for the last epoch
-                # FIXME: check -1
-                num_samples_from_epochs_minus_one = ((num_epochs - 1) * tokens_per_epoch) // sequence_len
+                num_samples_from_epochs_minus_one = ((num_epochs - 1) * tokens_per_epoch-1) // sequence_len
                 last_epoch_num_samples = num_samples - num_samples_from_epochs_minus_one
 
                 assert (
                     last_epoch_num_samples >= 0
                 ), f"last epoch number of samples {last_epoch_num_samples} should be non-negative."
-                # FIXME: check -1
-                num_samples_per_epoch = (tokens_per_epoch) // sequence_len
+                num_samples_per_epoch = (tokens_per_epoch-1) // sequence_len
                 assert (
                     last_epoch_num_samples <= num_samples_per_epoch
                 ), f"last epoch number of samples {last_epoch_num_samples} exceeded max value {num_samples_per_epoch}."
@@ -281,12 +269,10 @@ def build_index_mappings(
             if separate_last_epoch:
                 num_samples_ = num_samples_from_epochs_minus_one
             else:
-                # TODO: check, whether -1 is required
-                num_samples_ = sample_idx.shape[0]
+                num_samples_ = sample_idx.shape[0] - 1
             shuffle_idx = _build_shuffle_idx(
                 num_samples_,
-                # TODO: check, whether -1 is required
-                sample_idx.shape[0],
+                sample_idx.shape[0] - 1,
                 np_rng,
             )
             np.save(shuffle_idx_filename, shuffle_idx, allow_pickle=True)
@@ -329,9 +315,10 @@ def build_index_mappings(
     return doc_idx, sample_idx, shuffle_idx
 
 
-class TextInstances(Instances):
+class TextInstances(Dataset):
     def __init__(
         self,
+        sample_key:str,
         text_dataset: MMapIndexedDataset,
         dataset_dir: str,
         doc_idx: NDArray[int],
@@ -358,11 +345,12 @@ class TextInstances(Instances):
 
         """
 
+        self.sample_key = sample_key
         # Contains the document inidices
         self.doc_idx = doc_idx
         self.text_dataset = text_dataset
         # + 1, because we shift sequence in order to get source and target sequence
-        self.sequence_len = sequence_len + 1
+        self.sequence_len = sequence_len
         self.num_samples = num_samples
 
         logging.info("Compiling dataset index builder.")
@@ -376,9 +364,8 @@ class TextInstances(Instances):
             sizes=text_dataset.sizes,
             num_samples=num_samples,
             sequence_len=self.sequence_len,
-            # TODO: refactor private variable
+
             data_prefix=Path(dataset_dir).joinpath(text_dataset._path).__str__(),
-            # FIXME: we are overriding self.encoder_sequence_doc_idx with a shuffled version and use the result
             # as input for the next indexed dataset, where it gets shuffled again. Is this correct?
             documents=self.doc_idx,
             seed=seed,
@@ -395,6 +382,7 @@ class TextInstances(Instances):
         # Start and end documents and offsets.
         doc_index_f = self.sample_idx[idx][0]
         doc_index_l = self.sample_idx[idx + 1][0]
+
         offset_f = self.sample_idx[idx][1]
         offset_l = self.sample_idx[idx + 1][1]
         # If we are within the same document, just extract the chunk.
@@ -421,5 +409,5 @@ class TextInstances(Instances):
             sample_list.append(self.text_dataset.get(self.doc_idx[doc_index_l],length=offset_l + 1))
             sample = np.concatenate(sample_list)
 
-
-        return {'text': np.array(sample, dtype=np.int64)}
+        # Sample is of length sequence_len + 1 because target toke is part of the sample
+        return {self.sample_key: np.array(sample, dtype=np.int64)}
