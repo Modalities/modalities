@@ -27,6 +27,8 @@ class ProcessGroupBackendEnum(str, Enum):
 
 class DataConfig(BaseModel):
     dataset_dir_path: DirectoryPath
+    sample_key: str
+    target_key: str
     sequence_len: int
 
 
@@ -37,14 +39,13 @@ class TrainingConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     target_class: ClassPath
-    prediction_publication_key: str
     config: GPTConfig
 
 
 class LossConfig(BaseModel):
     target_class: ClassPath
-    target_subscription_key: str
-    prediction_subscription_key: str
+    target_key: str
+    prediction_key: str
 
 
 class RunnerConfig(BaseModel):
@@ -56,29 +57,29 @@ class GlobalsConfig(BaseModel):
     local_rank: int
     global_rank: int
     world_size: int
-    #num_training_batches: int
-    #num_batches_per_training_sequence: int
+    num_training_batches: int
+    eval_interval_in_batches: int
     training_batch_size: int
     evaluation_batch_size: int
 
-    #@property
-    #def num_batches_per_training_sequence_per_rank(self):
-     #   return self.num_training_batches // self.num_batches_per_training_sequence // self.world_size
+    @property
+    def eval_interval_per_rank(self):
+        return self.num_training_batches // self.eval_interval_in_batches // self.world_size
 
-    #@property
-    #def num_batches_per_rank(self):
-     #   return self.num_training_batches // self.world_size
+    @property
+    def num_batches_per_rank(self):
+        return self.num_training_batches // self.world_size
 
-    #@model_validator(mode="after")
-    #def validate_multiples(self) -> "GlobalsConfig":
-     #   computed_num_training_batches = (
-      #      self.num_batches_per_training_sequence_per_rank * self.world_size * self.num_batches_per_training_sequence
-       # )
-        #if computed_num_training_batches != self.num_training_batches:
-         #   raise ValueError(
-          #      f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
-           # )
-        #return self
+    @model_validator(mode="after")
+    def validate_multiples(self) -> "GlobalsConfig":
+        computed_num_training_batches = (
+            self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
+        )
+        if computed_num_training_batches != self.num_training_batches:
+            raise ValueError(
+                f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
+            )
+        return self
 
 
 class AppConfig(BaseModel):
