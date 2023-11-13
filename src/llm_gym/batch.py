@@ -95,7 +95,8 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
 
 @dataclass
 class EvaluationResultBatch(Batch):
-    """Data class for storing the results of a single or multiple batches. Also entire epoch results are stored in here."""
+    """Data class for storing the results of a single or multiple batches.
+     Also entire epoch results are stored in here."""
 
     dataset_tag: str
     train_batch_id: int
