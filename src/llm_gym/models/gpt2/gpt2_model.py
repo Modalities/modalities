@@ -9,6 +9,7 @@ import torch.nn as nn
 import xformers.ops as xops
 from pydantic import BaseModel, confloat, conint
 from torch.nn import functional as F
+from transformers import PretrainedConfig
 
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -40,6 +41,18 @@ class GPTConfig(BaseModel):
     attention: AttentionConfig
     activation: Activation
     epsilon: confloat(ge=0.0)
+
+
+class PretrainedGPTConfig(PretrainedConfig):
+    model_type = "gpt2"
+
+    def __init__(
+        self,
+        config: GPTConfig,
+        **kwargs
+    ):
+        self.config = config
+        super().__init__(**kwargs)
 
 
 class LayerNorm(nn.Module):
