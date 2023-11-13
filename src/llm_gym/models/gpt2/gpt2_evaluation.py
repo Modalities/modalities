@@ -1,3 +1,5 @@
+
+import json
 from transformers import PretrainedConfig
 from src.llm_gym.models.gpt2.gpt2_model import GPTConfig, GPT2LLM
 from transformers import PreTrainedModel
@@ -10,11 +12,20 @@ class PretrainedGPTConfig(PretrainedConfig):
 
     def __init__(
             self,
-            config: GPTConfig,
+            config: GPTConfig = None,
             **kwargs
     ):
         self.config = config
         super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        json_dict = self.config.__dict__.copy()
+        json_dict["attention"] = {
+            "attention_type": self.config.attention.attention_type.value,
+            "scaling_factor": self.config.attention.scaling_factor
+        }
+        json_dict["model_type"] = self.model_type
+        return json.dumps(json_dict)
 
 
 class PretrainedGPTModel(PreTrainedModel):
