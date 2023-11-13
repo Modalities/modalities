@@ -39,7 +39,6 @@ class Gym:
             evaluation_data_loaders=evaluation_data_loaders,
         )
 
-        # train_repeating_data_loader = RepeatingDataLoader(data_loader=train_data_loader)
         self.trainer.train(
             model=self.model,
             train_loader=train_data_loader,
