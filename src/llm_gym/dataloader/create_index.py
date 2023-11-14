@@ -103,6 +103,9 @@ if __name__ == "__main__":
     else:
         index_path = Path(args.index)
 
+    if index_path.exists():
+        raise ValueError("index already exists. delete it or specify different output folder.")
+
     print(f"reading raw data from {raw_data_path}")
     print(f"writing index to {index_path}")
 
