@@ -55,12 +55,18 @@ class Dataset(TorchdataSet):
 
 
 class MemMapDataset(Dataset):
-    def __init__(self, raw_data_path: Union[str, Path], jq_filter: str = ".text"):
+    def __init__(
+        self,
+        raw_data_path: Union[str, Path],
+        tokenizer_file: Union[str, Path] = "./data/tokenizer/tokenizer.json",
+        jq_filter: str = ".text",
+    ):
         super().__init__(raw_data_path=raw_data_path)
+        tokenizer_file = Path(tokenizer_file)
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_filter)
         # TODO: tokenizer from tiktoken if it is faster?
-        self.tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+        self.tokenizer = GPT2TokenizerFast(tokenizer_file=str(tokenizer_file))
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:
