@@ -6,6 +6,7 @@ from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 import torch.nn as nn
+import torch.distributed as dist
 
 
 @dataclass
@@ -46,7 +47,12 @@ class CheckpointingExecutionIF(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[NNModel, Optimizer]:
+    def load_checkpoint(
+        self,
+        model: nn.Module,
+        optimizer: Optimizer,
+        global_train_batch_id: int,
+    ) -> Tuple[nn.Module, Optimizer]:
         raise NotImplementedError
 
 
@@ -63,7 +69,12 @@ class CheckpointingIF:
         raise NotImplementedError
 
     @abstractmethod
-    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[nn.Module, Optimizer]:
+    def load_checkpoint(
+        self,
+        model: nn.Module,
+        optimizer: Optimizer,
+        global_train_batch_id: int,
+    ) -> Tuple[nn.Module, Optimizer]:
         raise NotImplementedError
 
 
@@ -105,6 +116,13 @@ class Checkpointing(CheckpointingIF):
             optimizer=optimizer,
         )
 
-    def load_checkpoint(self, global_train_batch_id: int) -> Tuple[nn.Module, Optimizer]:
-        checkpoint = self.checkpointing_execution.load_checkpoint(global_train_batch_id=global_train_batch_id)
+    def load_checkpoint(
+        self,
+        model: nn.Module,
+        optimizer: Optimizer,
+        global_train_batch_id: int,
+    ) -> Tuple[nn.Module, Optimizer]:
+        checkpoint = self.checkpointing_execution.load_checkpoint(
+            global_train_batch_id=global_train_batch_id, model=model, optimizer=optimizer
+        )
         return checkpoint

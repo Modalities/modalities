@@ -31,6 +31,8 @@ class Gym:
         checkpointing: Checkpointing,
     ):
         self._run_evaluation_and_checkpointing(
+            model=model,
+            optimizer=optimizer,
             num_batches=num_batches,
             train_batch_id=-1,
             evaluation_data_loaders=evaluation_data_loaders,
@@ -47,6 +49,8 @@ class Gym:
             num_batches=num_batches,
             epoch_done_callback=partial(
                 self._run_evaluation_and_checkpointing,
+                model=model,
+                optimizer=optimizer,
                 evaluation_data_loaders=evaluation_data_loaders,
                 num_batches=num_batches,
                 checkpointing=checkpointing,
@@ -56,6 +60,7 @@ class Gym:
     def _run_evaluation_and_checkpointing(
         self,
         model: NNModel,
+        optimizer: Optimizer,
         num_batches: int,
         train_batch_id: int,
         evaluation_data_loaders: List[LLMDataLoader],
@@ -74,5 +79,6 @@ class Gym:
             num_batches=num_batches,
             evaluation_result=eval_result,
             model=model,
+            optimizer=optimizer,
             early_stoppping_criterion_fulfilled=False,
         )
