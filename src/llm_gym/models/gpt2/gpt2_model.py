@@ -5,10 +5,11 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint
+from pydantic import BaseModel, confloat, conint, model_validator
 from torch.nn import functional as F
 
 from llm_gym.models.model import NNModel
+
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -41,12 +42,25 @@ class GPTConfig(BaseModel):
     n_layer: conint(ge=1)
     n_head: conint(ge=1)
     n_embd: conint(ge=1)
+    ffn_hidden: conint(ge=1)
     dropout: confloat(ge=0.0)
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
     activation: ActivationType
     epsilon: confloat(ge=0.0)
     weight_init: WeightInitailizationConfig
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "GPTConfig":
+        for param, param_name in zip([self.ffn_hidden, self.vocab_size, self.n_embd],
+                                     ["ffn_hidden", "vocab_size", "n_embd"]):
+
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(
+                    f"{param_name} with value {param} should be divisible by 128 for efficient training."
+                )
+        return self
 
 
 class LayerNorm(nn.Module):
@@ -142,12 +156,12 @@ class TransformerMLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=config.n_embd,
-            out_features=4 * config.n_embd,
+            out_features=config.ffn_hidden,  # 4 * config.n_embd,
             bias=config.bias,
         )
         self.gelu = nn.GELU()
         self.c_proj = nn.Linear(
-            in_features=4 * config.n_embd,
+            in_features=config.ffn_hidden,
             out_features=config.n_embd,
             bias=config.bias,
         )
