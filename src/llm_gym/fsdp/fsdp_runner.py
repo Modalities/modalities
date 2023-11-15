@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import List, Tuple
 from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.exceptions import RunningEnvError
 from llm_gym.gym import Gym
 
 import torch
@@ -12,35 +15,48 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStr
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 import functools
 from torch.optim import Optimizer
+import torch.nn as nn
 
 
-class Runner(ABC):
+class RunningEnv(ABC, object):
+    def __enter__(self) -> "RunningEnv":
+        raise NotImplementedError
+
+    def __exit__(self, type, value, traceback):
+        raise NotImplementedError
+
+    @staticmethod
     @abstractmethod
-    def run(self):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def wrap(self, model: NNModel) -> FSDP:
-        raise NotImplementedError()
+    def wrap_model(model: nn.Module, sync_module_states: bool) -> nn.Module:
+        raise NotImplementedError
 
 
-class FSDPRunner(Runner):
-    def __init__(self, process_group_backend: ProcessGroupBackendEnum, local_rank: int) -> None:
-        dist.init_process_group(process_group_backend.value)
-        torch.cuda.set_device(local_rank)
+class FSDPRunningEnv(RunningEnv):
+    def __init__(
+        self,
+        process_group_backend: ProcessGroupBackendEnum,
+        local_rank: int,
+        global_train_batch_id: int = 0,
+    ) -> None:
+        self.global_train_batch_id = global_train_batch_id
+        self.process_group_backend = process_group_backend
+        self.local_rank = local_rank
+        self._fsdp_model = None
+        self._fsdp_optimizer = None
 
+    def __enter__(self) -> "RunningEnv":
+        dist.init_process_group(self.process_group_backend.value)
+        torch.cuda.set_device(self.local_rank)
+        return self
 
-    def run(self, model: NNModel, optimizer: Optimizer, gym: Gym, global_train_batch_id: int, checkpointing: Checkpointing):
-        fsdp_model = FSDPRunner.wrap_model(model=model)
-        
-        gym.run(checkpointing=checkpointing)
-        
-        
+    def __exit__(self, type, value, traceback):
+        self._fsdp_model = None
+        self._fsdp_optimizer = None
         dist.barrier()
         dist.destroy_process_group()
 
     @staticmethod
-    def wrap_model(model: NNModel) -> FSDP:
+    def wrap_model(model: nn.Module, sync_module_states: bool) -> FSDP:
         sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
 
         if has_bfloat_support():
@@ -56,12 +72,12 @@ class FSDPRunner(Runner):
         )
 
         # model is on CPU before input to FSDP
-
         fsdp_model = FSDP(
             model,
             auto_wrap_policy=transformer_auto_wrapper_policy,
             mixed_precision=mp_policy,
             sharding_strategy=sharding_strategy,
             device_id=torch.cuda.current_device(),
+            sync_module_states=sync_module_states,
         )
         return fsdp_model
