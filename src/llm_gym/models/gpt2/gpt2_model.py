@@ -10,6 +10,7 @@ from torch.nn import functional as F
 
 from llm_gym.models.model import NNModel
 
+
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
@@ -50,13 +51,17 @@ class GPTConfig(BaseModel):
     weight_init: WeightInitailizationConfig
 
     @model_validator(mode="after")
-    def validate_ffn_hidden(self) -> "GPTConfig":
-        if self.ffn_hidden % 128 != 0:
-            # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
-            raise ValueError(
-                "Hidden dimension of feed forward network should be divisible by 128 for efficient training."
-            )
+    def validate_sizes(self) -> "GPTConfig":
+        for param, param_name in zip([self.ffn_hidden, self.vocab_size, self.n_embd],
+                                     ["ffn_hidden", "vocab_size", "n_embd"]):
+
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(
+                    f"{param_name} with value {param} should be divisible by 128 for efficient training."
+                )
         return self
+
 
 class LayerNorm(nn.Module):
     """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
@@ -151,7 +156,7 @@ class TransformerMLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=config.n_embd,
-            out_features=config.ffn_hidden,#4 * config.n_embd,
+            out_features=config.ffn_hidden,  # 4 * config.n_embd,
             bias=config.bias,
         )
         self.gelu = nn.GELU()
