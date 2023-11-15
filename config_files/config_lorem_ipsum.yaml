@@ -1,48 +1,77 @@
-globals: 
+data:
+  dataset_dir_path: ./data/lorem_ipsum.jsonl
+  sample_key: "input_ids"
+  target_key: "target_ids"
+  sequence_len: 1024
+  dataloader:
+    train_dataset_tag: "train"
+    val_dataset_tag: "val"
+    test_dataset_tag: "test"
+    cuda_kwargs:
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+
+wandb:
+  project_name: llm_gym
+
+training:
+  process_group_backend: "nccl"
+  num_training_batches: 1
+  num_batches_per_training_sequence: 1
+  eval_interval_in_batches: 1
+  training_batch_size: 1
+  evaluation_batch_size: 1
+  test_batch_size: 1
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
+  main_rank: 0
 
-  num_training_batches: 1
-  num_batches_per_training_sequence: 1
-  training_batch_size: 32
-  evaluation_batch_size: 32
-
-
-hydra:
-  output_subdir: null
-  run:
-    dir: .
-
-data:
-  dataset_dir_path: ./data/lorem_ipsum.jsonl
-
-training:
-  num_training_batches: ${globals.num_training_batches}
-  process_group_backend: "nccl"
+checkpoint:
+  dir_path: data/checkpoints
+  checkpointing_rank: ${training.main_rank}
 
 loss:
-  target_class: llm_gym.loss_functions.CLMCrossEntropyLoss
-  target_subscription_key: target_key
-  prediction_subscription_key: logits
+  type_hint: CLMCrossEntropyLoss
+  config:
+    target_key: ${data.target_key}
+    prediction_key: ${model.config.config.prediction_key}
 
 runner:
-  target_class: llm_gym.fsdp.fsdp_runner.FSDPRunner
-  process_group_backend: ${training.process_group_backend}
+  type_hint: FSDPRunner
+  config:
+    process_group_backend: ${training.process_group_backend}
 
 model:
-  target_class: llm_gym.models.gpt2.gpt2_model.GPT2LLM
-  prediction_publication_key: logits
+  type_hint: GPT2LLM
   config:
-    block_size: 1024
-    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 12
-    n_head: 12
-    n_embd: 768
-    dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention:
-      attention_type: "pytorch_flash_attention"
-      scaling_factor: 3
-    activation: "fused_swiglu"
-    epsilon: 1e-5
+    config:
+      sample_key: ${data.sample_key}
+      prediction_key: "logits"
+      block_size: ${data.sequence_len}
+      vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+      n_layer: 12
+      n_head: 12
+      n_embd: 768
+      dropout: 0.0
+      bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+      attention:
+        attention_type: pytorch_flash_attention
+        scaling_factor: 3
+      activation: fused_swiglu
+      epsilon: 1e-5
+      weight_init:
+        mean: 0.0
+        std: 0.02
+
+scheduler:
+  type_hint: StepLR
+  config:
+    step_size: 1
+    gamma: 0.1
+
+optimizer:
+  type_hint: AdamW
+  config:
+    lr: 0.0001

@@ -7,7 +7,7 @@ _ROOT_DIR = Path(__file__).parents[1]
 
 @pytest.fixture
 def dummy_config_path() -> Path:
-    return Path("../../config_files/config_lorem_ipsum.yaml")
+    return Path("./config_files/config_lorem_ipsum.yaml")
 
 
 @pytest.fixture

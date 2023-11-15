@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from llm_gym.__main__ import Main, hydra_load_app_config_dict
+from llm_gym.__main__ import Main, load_app_config_dict
 from llm_gym.checkpointing.checkpointing import CheckpointingIF
 from llm_gym.config.config import AppConfig
 
@@ -14,7 +14,7 @@ def test_e2e_training_run_wout_ckpt(monkeypatch, dummy_data_path, dummy_config_p
     monkeypatch.setenv("MASTER_PORT", "9948")
 
     # load and run test config
-    config_dict = hydra_load_app_config_dict(dummy_config_path)
+    config_dict = load_app_config_dict(dummy_config_path)
     config_dict["data"]["dataset_dir_path"] = dummy_data_path
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
