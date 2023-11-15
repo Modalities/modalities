@@ -19,6 +19,8 @@ dependencies = [
     "click",
     "click_pathlib",
     "jq",
+    "xformers",
+    "class_resolver",
     "wandb"
 ]
 
