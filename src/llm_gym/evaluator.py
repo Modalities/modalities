@@ -35,7 +35,7 @@ class Evaluator:
         loss = loss_fun(result_batch)
         return loss
 
-    def evaluate_epoch(
+    def evaluate(
         self,
         model: NNModel,
         data_loaders: List[LLMDataLoader],

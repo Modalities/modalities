@@ -8,8 +8,7 @@ import jq
 from torch.utils.data import random_split
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
-
-from llm_gym.models.gpt2.collator import Tokenizer
+from transformers import GPT2TokenizerFast
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
@@ -61,7 +60,7 @@ class MemMapDataset(Dataset):
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_filter)
         # TODO: tokenizer from tiktoken if it is faster?
-        self.tokenizer = Tokenizer.from_pretrained("gpt2")
+        self.tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:

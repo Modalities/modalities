@@ -30,6 +30,8 @@ class AttentionConfig(BaseModel):
 
 
 class GPTConfig(BaseModel):
+    sample_key: str
+    prediction_key: str
     block_size: conint(ge=1)
     vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: conint(ge=1)
@@ -176,13 +178,11 @@ class Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
-    def __init__(self, prediction_publication_key: str, config: Optional[GPTConfig] = None):
+    def __init__(self, config: GPTConfig):
         super().__init__()
 
-        if config is None:
-            config = GPTConfig()
-
-        self.prediction_publication_key = prediction_publication_key
+        self.sample_key = config.sample_key
+        self.prediction_key = config.prediction_key
 
         assert config.vocab_size is not None
         assert config.block_size is not None
@@ -220,7 +220,7 @@ class GPT2LLM(NNModel):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        input_ids = inputs["input_ids"]
+        input_ids = inputs[self.sample_key]
         device = input_ids.device
         b, t = input_ids.size()
         assert (
@@ -236,7 +236,7 @@ class GPT2LLM(NNModel):
             x = block(x)
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-        return {self.prediction_publication_key: logits}
+        return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)

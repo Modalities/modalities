@@ -46,8 +46,8 @@ class Trainer:
         train_loader: LLMDataLoader,
         optimizer,
         loss_fun: Loss,
-        num_batches_per_epoch: int,
-        num_batches: int,
+        eval_interval_in_batches: int,
+        num_batches_per_rank: int,
         epoch_done_callback: Callable[[int], None],
     ):
         model.train()
@@ -55,7 +55,7 @@ class Trainer:
 
         # batch loop
         batch: DatasetBatch
-        for train_batch_id, batch in zip(range(num_batches), train_loader):
+        for train_batch_id, batch in zip(range(num_batches_per_rank), train_loader):
             # train single batch
             batch_loss = self._train_batch(
                 batch=batch,
@@ -74,8 +74,8 @@ class Trainer:
                 dataset_tag=train_loader.dataset_tag,
             )
 
-            # check if epoch is done
-            if (train_batch_id + 1) % num_batches_per_epoch == 0:
+            # Check, if model should be evaluated
+            if (train_batch_id + 1) % eval_interval_in_batches == 0:
                 if train_batch_id > 0:
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(

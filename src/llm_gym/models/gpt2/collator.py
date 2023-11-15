@@ -1,44 +1,24 @@
 from dataclasses import field
-from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import torch
-from transformers import DataCollatorForLanguageModeling, GPT2TokenizerFast
 
 from llm_gym.batch import DatasetBatch
 
 
-# TODO: fix pad_token setup
-class Tokenizer(GPT2TokenizerFast):
-    DEFAULT_TOKENIZER_PATH = Path(__file__).parent.parent.parent.parent / Path("data", "tokenizer", "tokenizer.json")
-
-    # Introducing another abstraction for a tokenizer, in case tiktoken is fast than `transformers.GPT2TokenizerFast`
-    # @property
-    # def pad_token(self) -> str:
-    #     return self.eos_token
-
-
-# TODO: fix pad_token setup
 class GPT2LLMCollator:
-    def __init__(self, target_publication_key: str, pad_to_multiple_of: int = 8):
+    def __init__(self, sample_key: str, target_key: str):
         self.device: torch.device = field(default_factory=lambda: torch.device("cpu"))
-        self.target_publication_key = target_publication_key
-        # tokenizer = Tokenizer(Tokenizer.DEFAULT_TOKENIZER_PATH)
-        tokenizer = Tokenizer.from_pretrained("gpt2")
-        tokenizer.pad_token = tokenizer.eos_token
-        self.data_collator = DataCollatorForLanguageModeling(
-            tokenizer=tokenizer, mlm=False, pad_to_multiple_of=pad_to_multiple_of
-        )
+        self.sample_key = sample_key
+        self.target_key = target_key
 
-    def __call__(self, batch: List[torch.Tensor]) -> DatasetBatch:
+    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
         """
         :param batch: batch format [no_samples, height, width, channels]
         :return:
         """
-        collated_batch = self.data_collator(batch)
-        samples = {"input_ids": collated_batch["input_ids"], "attention_mask": collated_batch["attention_mask"]}
-        targets = {
-            self.target_publication_key: collated_batch["labels"],
-            "attention_mask": collated_batch["attention_mask"],
-        }
+        sample_tensor = torch.stack([torch.tensor(d[self.sample_key]) for d in batch])
+        samples = {self.sample_key: sample_tensor[:, :-1]}
+        targets = {self.target_key: sample_tensor[:, 1:]}
+
         return DatasetBatch(targets=targets, samples=samples)

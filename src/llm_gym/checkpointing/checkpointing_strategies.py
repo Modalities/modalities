@@ -6,9 +6,7 @@ from llm_gym.batch import EvaluationResultBatch
 
 
 class SaveMostRecentEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
-    """
-    Class for Save Last Epoch only Checkpointing Strategy.
-    """
+    """Class for Save Last Epoch only Checkpointing Strategy."""
 
     def __init__(self):
         self.saved_batch_id_checkpoints = []

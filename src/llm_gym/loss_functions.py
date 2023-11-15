@@ -22,15 +22,15 @@ class Loss(ABC):
 
 
 class CLMCrossEntropyLoss(Loss):
-    def __init__(self, target_subscription_key: str, prediction_subscription_key: str, tag: str = "CLMCrossEntropyLoss"):
+    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
         super().__init__(tag)
-        self.target_subscription_key = target_subscription_key
-        self.prediction_subscription_key = prediction_subscription_key
+        self.target_key = target_key
+        self.prediction_key = prediction_key
         self.loss_fun = CrossEntropyLoss()
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
-        labels = forward_batch.get_targets(self.target_subscription_key)
-        lm_logits = forward_batch.get_predictions(self.prediction_subscription_key)
+        labels = forward_batch.get_targets(self.target_key)
+        lm_logits = forward_batch.get_predictions(self.prediction_key)
 
         # move labels to correct device to enable model parallelism
         labels = labels.to(lm_logits.device)

@@ -1,5 +1,4 @@
-from abc import abstractmethod
-from typing import Any, Dict
+from typing import Dict
 from llm_gym.logging_broker.messages import (
     BatchProgressUpdate,
     Message,
@@ -12,7 +11,6 @@ from rich.progress import (
     BarColumn,
     TextColumn,
     TimeRemainingColumn,
-    TransferSpeedColumn,
 )
 from rich.live import Live
 from rich.console import Group
@@ -26,6 +24,7 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
 
 
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
+    """A subscriber object for the RichProgress observable."""
     def __init__(
         self,
         num_ranks: int,
@@ -72,6 +71,7 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
         live.start()
 
     def consume_message(self, message: Message[BatchProgressUpdate]):
+        """Consumes a message from a message broker."""
         batch_progress = message.payload
 
         if batch_progress.experiment_status == ExperimentStatus.TRAIN:
