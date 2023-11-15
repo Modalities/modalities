@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Tuple
+from typing import Callable, Tuple
 from llm_gym.checkpointing.checkpointing import (
     CheckpointingExecutionIF,
     CheckpointingInstruction,
@@ -17,6 +17,7 @@ import os
 from torch.optim import Optimizer
 import torch.distributed as dist
 import torch.nn as nn
+import glob
 
 
 class CheckpointingEntityType(Enum):
@@ -31,11 +32,13 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         experiment_id: str,
         global_rank: int,
         checkpointing_rank: int,
+        model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
     ):
         self.checkpoint_path = checkpoint_path
         self.checkpoint_structure = f"{experiment_id}-<enitity>-<step>.bin"
         self.global_rank = global_rank
         self.checkpointing_rank = checkpointing_rank
+        self.model_wrapping_fn = model_wrapping_fn
 
     def run_checkpoint_instructions(
         self,
@@ -89,15 +92,22 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         if self.global_rank != 0:
             return
         # TODO we need more logic to also delete optimizers and lr schedulers
-        entity_file_name = self.checkpoint_structure.replace("<enitity>", "model").replace("<step>", str(batch_id + 1))
-        full_path = os.path.join(self.checkpoint_path, entity_file_name)
-        if os.path.exists(full_path):
-            os.remove(full_path)
-        else:
-            raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
+        entity_file_name_regex = self.checkpoint_structure.replace("<enitity>", "*").replace(
+            "<step>", str(batch_id + 1)
+        )
+        full_path_regex = os.path.join(self.checkpoint_path, entity_file_name_regex)
+        files_paths_to_delete = glob.glob(full_path_regex)
+        for full_path in files_paths_to_delete:
+            if os.path.exists(full_path):
+                os.remove(full_path)
+            else:
+                raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 
     def load_checkpoint(
-        self, model: NNModel, optimizer: Optimizer, global_train_batch_id: int, process_group: dist.ProcessGroup = None
+        self,
+        model: nn.Module,
+        optimizer: Optimizer,
+        global_train_batch_id: int,
     ) -> Tuple[nn.Module, Optimizer]:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
         # NOTE: The model and optimizer need to be sharded after calling this function!
@@ -129,14 +139,12 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
 
             # distribute the optimizer state dict from rank 0 to all the other ranks
             sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-                full_optim_state_dict=full_optimizer_state_dict, model=model, group=process_group
+                full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
             )
             optimizer.load_state_dict(sharded_optimizer_state_dict)
 
         # All ranks initialize FSDP module as usual. `sync_module_states` argument
         # communicates loaded checkpoint states from rank 0 to rest of the world.
-        fsdp_model = FSDP(
-            module=model, device_id=torch.cuda.current_device(), auto_wrap_policy=..., sync_module_states=True
-        )
+        fsdp_model = self.model_wrapping_fn(module=model, sync_module_states=True)
 
         return fsdp_model, optimizer
