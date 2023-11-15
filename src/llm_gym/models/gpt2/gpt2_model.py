@@ -5,7 +5,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint
+from pydantic import BaseModel, confloat, conint, model_validator
 from torch.nn import functional as F
 
 from llm_gym.models.model import NNModel
@@ -41,6 +41,7 @@ class GPTConfig(BaseModel):
     n_layer: conint(ge=1)
     n_head: conint(ge=1)
     n_embd: conint(ge=1)
+    ffn_hidden: conint(ge=1)
     dropout: confloat(ge=0.0)
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
@@ -48,6 +49,14 @@ class GPTConfig(BaseModel):
     epsilon: confloat(ge=0.0)
     weight_init: WeightInitailizationConfig
 
+    @model_validator(mode="after")
+    def validate_ffn_hidden(self) -> "GPTConfig":
+        if self.ffn_hidden % 128 != 0:
+            # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+            raise ValueError(
+                "Hidden dimension of feed forward network should be divisible by 128 for efficient training."
+            )
+        return self
 
 class LayerNorm(nn.Module):
     """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
@@ -142,12 +151,12 @@ class TransformerMLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=config.n_embd,
-            out_features=4 * config.n_embd,
+            out_features=config.ffn_hidden,#4 * config.n_embd,
             bias=config.bias,
         )
         self.gelu = nn.GELU()
         self.c_proj = nn.Linear(
-            in_features=4 * config.n_embd,
+            in_features=config.ffn_hidden,
             out_features=config.n_embd,
             bias=config.bias,
         )
