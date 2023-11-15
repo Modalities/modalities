@@ -138,3 +138,13 @@ scheduler = resolvers.build_component_by_config(config=config.scheduler, extra_k
 ```
 
 To add a new resolver use `add_resolver`, and the corresponding added resolver will be accessible by the register_key given during adding. For access use the `build_component_by_key_query` function of the `ResolverRegistry`.
+
+# MemMapDataset Index Generator
+
+The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazyly, however, it is adviced to create it beforhand. This can be done by running
+
+```sh
+python src/llm_gym/dataloader/create_index.py <path/to/jsonl/file>
+```
+
+The index will be created in the same directory as the raw data file.
