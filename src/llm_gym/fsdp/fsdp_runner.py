@@ -1,14 +1,18 @@
+import functools
 from abc import ABC, abstractmethod
 
 import torch
 import torch.distributed as dist
-from llm_gym.config.config import ProcessGroupBackendEnum
+from pydantic import BaseModel
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+from llm_gym.config.lookup_types import LookupEnum
+from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.env_utils import bfSixteen, has_bfloat_support
 from llm_gym.models.gpt2.gpt2_model import Block
 from llm_gym.models.model import NNModel
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
-from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
-import functools
 
 
 class Runner(ABC):
@@ -22,7 +26,7 @@ class Runner(ABC):
 
 
 class FSDPRunner(Runner):
-    def __init__(self, process_group_backend: ProcessGroupBackendEnum) -> None:
+    def __init__(self, process_group_backend: ProcessGroupBackendType) -> None:
         dist.init_process_group(process_group_backend.value)
 
     def run(self):
@@ -46,7 +50,6 @@ class FSDPRunner(Runner):
         )
 
         # model is on CPU before input to FSDP
-
         fsdp_model = FSDP(
             model,
             auto_wrap_policy=transformer_auto_wrapper_policy,
@@ -55,3 +58,16 @@ class FSDPRunner(Runner):
             device_id=torch.cuda.current_device(),
         )
         return fsdp_model
+
+
+class RunnerTypes(LookupEnum):
+    FSDPRunner = FSDPRunner
+
+
+class FSDPRunnerConfig(BaseModel):
+    process_group_backend: ProcessGroupBackendType
+
+
+class RunnerConfig(BaseModel):
+    type_hint: RunnerTypes
+    config: FSDPRunnerConfig

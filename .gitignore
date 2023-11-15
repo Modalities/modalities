@@ -117,4 +117,5 @@ logs/
 core.*
 data/datasets
 data/checkpoints
-
+checkpoint
+wandb

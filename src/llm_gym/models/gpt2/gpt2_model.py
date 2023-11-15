@@ -1,8 +1,6 @@
 import math
-from abc import abstractmethod
 from enum import Enum
-from typing import Dict, Optional
-from llm_gym.models.model import NNModel
+from typing import Dict
 
 import torch
 import torch.nn as nn
@@ -10,23 +8,29 @@ import xformers.ops as xops
 from pydantic import BaseModel, confloat, conint
 from torch.nn import functional as F
 
+from llm_gym.models.model import NNModel
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
-class Attention(Enum):
+class AttentionType(Enum):
     DEFAULT_ATTENTION = "default_attention"
     PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
 
 
-class Activation(Enum):
+class ActivationType(Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
 
 
 class AttentionConfig(BaseModel):
-    attention_type: Attention
+    attention_type: AttentionType
     scaling_factor: conint(ge=1)
+
+
+class WeightInitailizationConfig(BaseModel):
+    mean: confloat(ge=0.0)
+    std: confloat(ge=0.0)
 
 
 class GPTConfig(BaseModel):
@@ -40,8 +44,9 @@ class GPTConfig(BaseModel):
     dropout: confloat(ge=0.0)
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
-    activation: Activation
+    activation: ActivationType
     epsilon: confloat(ge=0.0)
+    weight_init: WeightInitailizationConfig
 
 
 class LayerNorm(nn.Module):
@@ -87,7 +92,7 @@ class CausalSelfAttention(nn.Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
-        self.flash = config.attention.attention_type == Attention.PYTORCH_FLASH_ATTENTION
+        self.flash = config.attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -163,9 +168,9 @@ class Block(nn.Module):
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
 
-        if config.activation == Activation.GELU:
+        if config.activation == ActivationType.GELU:
             self.mlp = TransformerMLP(config)
-        elif config.activation == Activation.FUSED_SWIGLU:
+        elif config.activation == ActivationType.FUSED_SWIGLU:
             hidden_dim = 256 * ((int(2 * 4 * config.n_embd / 3) + 256 - 1) // 256)
             self.mlp = xops.SwiGLU(config.n_embd, hidden_dim, config.n_embd, bias=False)
         else:
@@ -209,15 +214,17 @@ class GPT2LLM(NNModel):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
+                torch.nn.init.normal_(
+                    p, mean=config.weight_init.mean, std=config.weight_init.std / math.sqrt(2 * config.n_layer)
+                )
 
     def _init_weights(self, module: nn.Module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
