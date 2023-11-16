@@ -1,11 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, List, Tuple
 import click
 import click_pathlib
 from llm_gym.config.config import AppConfig
+from llm_gym.logging_broker.subscriber import MessageSubscriberIF
 from llm_gym.optimizers.optimizer_factory import OptimizerFactory, OptimizerTypes
 import numpy as np
+from pydantic import DirectoryPath
 import torch
 import torch.distributed as dist
 from datasets import Dataset
@@ -43,6 +45,8 @@ from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
+import torch.nn as nn
+from torch.optim import Optimizer
 
 
 @click.group()
@@ -76,20 +80,20 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 class Main:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
+
         # warmstart
-        self.global_train_batch_id = 209
+        self.global_train_batch_id = 0
         self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
 
         self.experiment_id = get_date_of_run()
-
         self.dataset_path = config.data.dataset_dir_path
 
         self.resolvers = ResolverRegister(config=config)
+        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
-        self.model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
-
-        running_env: RunningEnv = self.resolvers.build_component_by_config(config=config.running_env)
-
+    def construct_components(
+        self, config: AppConfig, running_env: RunningEnv
+    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], Checkpointing, nn.Module, Optimizer]:
         # TODO move to run function, despite mixing concerns here ...
         # self.wrapped_model = running_env.wrap(model=self.model, local_rank=config.training.local_rank)
 
@@ -101,21 +105,94 @@ class Main:
         #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
         # )
 
-        self.loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
+        # Dataloaders
+        collator = GPT2LLMCollator(
+            sample_key=config.data.sample_key,
+            target_key=config.data.target_key,
+        )
+        train_dataloader, val_dataloader, test_dataloader = self.get_dataloaders(config=config, collator=collator)
 
+        # Checkpointing
+        checkpointing = self.get_checkpointing(config=config, running_env=running_env)
+
+        wrapped_model, optimizer = self.get_model_and_optimizer(
+            config=config, running_env=running_env, checkpointing=checkpointing
+        )
+
+        # Loss function
+        loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
+
+
+
+        # Logging
+        eval_split_lengths = {
+            val_dataloader.dataset_tag: len(val_dataloader) * config.training.world_size,
+            test_dataloader.dataset_tag: len(test_dataloader) * config.training.world_size,
+        }
+        train_split_lengths = {train_dataloader.dataset_tag: len(train_dataloader)}
+
+        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+            config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
+        )
+
+        # Trainer
+        trainer = Trainer(
+            local_rank=config.training.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+        )
+
+        # Evaluator
+        evaluator = Evaluator(
+            local_rank=config.training.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+        )
+
+        # Gym
+        gym = Gym(
+            trainer=trainer,
+            evaluator=evaluator,
+            loss_fun=loss_fun,
+        )
+        return gym, train_dataloader, [val_dataloader, test_dataloader], checkpointing, wrapped_model, optimizer
+
+    def run(self):
+        with self.running_env as running_env:
+            (
+                gym,
+                train_dataloader,
+                eval_data_loaders,
+                checkpointing,
+                wrapped_model,
+                optimizer,
+            ) = self.construct_components(self.config, running_env=running_env)
+
+            gym.run(
+                num_batches_per_rank=self.config.training.num_batches_per_rank,
+                eval_interval_in_batches=self.config.training.eval_interval_in_batches,
+                train_data_loader=train_dataloader,
+                evaluation_data_loaders=eval_data_loaders,
+                checkpointing=checkpointing,
+                model=wrapped_model,
+                optimizer=optimizer,
+            )
+
+    def get_dataloaders(self, config: AppConfig, collator: Callable) -> Tuple[LLMDataLoader, LLMDataLoader, LLMDataLoader]:
         # Create instances
-        instance_splits = self.create_instances(config=config)
+        instance_splits = self.create_instances(
+            dataset_dir_path=config.data.dataset_dir_path,
+            sequence_len=config.data.sequence_len,
+            num_training_batches=config.training.num_training_batches,
+            training_batch_size=config.training.training_batch_size,
+            sample_key=config.data.sample_key,
+        )
 
         # Create samplers
         sampler_splits = self.create_samplers(
             train_instances=instance_splits["train"],
             val_instances=instance_splits["val"],
             test_instances=instance_splits["test"],
-        )
-
-        collator = GPT2LLMCollator(
-            sample_key=config.data.sample_key,
-            target_key=config.data.target_key,
         )
 
         dataloader_splits = self.create_dataloaders(
@@ -127,168 +204,82 @@ class Main:
             test_sampler=sampler_splits["test"],
             collate_fn=collator,
         )
+        return dataloader_splits["train"], dataloader_splits["val"], dataloader_splits["test"]
 
-        self.train_dataloader = dataloader_splits["train"]
-        self.val_dataloader = dataloader_splits["val"]
-        self.test_dataloader = dataloader_splits["test"]
+    def get_model_and_optimizer(
+        self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
+    ) -> Tuple[nn.Module, Optimizer]:
+        model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
-        # Message Broker
-        message_broker = MessageBroker()
-        batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
-            message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
-        )
-        evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
-            message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
-        )
-
-        eval_split_lengths = {
-            self.val_dataloader.dataset_tag: len(self.val_dataloader) * config.training.world_size,
-            self.test_dataloader.dataset_tag: len(self.test_dataloader) * config.training.world_size,
-        }
-        train_split_lengths = {self.train_dataloader.dataset_tag: len(self.train_dataloader)}
-
-        if config.training.global_rank == 0:
-            progress_subscriber = RichProgressSubscriber(
-                num_ranks=config.training.world_size,
-                train_split_lengths=train_split_lengths,
-                eval_split_lengths=eval_split_lengths,
+        if self.global_train_batch_id > 0:  # warm start
+            wrapped_model = checkpointing.load_model_checkpoint(
+                experiment_id=self.warmstart_experiment_id,
+                global_train_batch_id=self.global_train_batch_id,
+                model=model,
             )
-            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
-                num_ranks=config.training.world_size,
-                project=config.wandb.project_name,
-                experiment_id=self.experiment_id,
+
+            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
+                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
             )
-            message_broker.add_subscriber(
-                subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
+
+            optimizer = checkpointing.load_optimizer_checkpoint(
+                optimizer=optimizer,
+                model=wrapped_model,
+                experiment_id=self.warmstart_experiment_id,
+                global_train_batch_id=self.global_train_batch_id,
             )
 
         else:
-            progress_subscriber = DummyProgressSubscriber()
-        message_broker.add_subscriber(
-            subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
-            subscriber=progress_subscriber,
-        )
+            wrapped_model = running_env.wrap_model(model=model, sync_module_states=False)
+            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
+                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
+            )
 
-        # # Checkpointing
-        # config.checkpoint.dir_path.mkdir(parents=True, exist_ok=True)
-        # checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
-        # checkpointing_execution = FSDPToDiscCheckpointing(
-        #     checkpoint_path=config.checkpoint.dir_path,
-        #     experiment_id=self.experiment_id,
-        #     global_rank=config.training.global_rank,
-        #     checkpointing_rank=config.checkpoint.checkpointing_rank,
-        # )
-        # checkpointing = Checkpointing(
-        #     checkpointing_execution=checkpointing_execution,
-        #     checkpointing_strategy=checkpointing_strategy,
-        #     num_ranks=config.training.world_size,
-        # )
+        # lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.1)  # TODO use lr_scheduler
 
-        # Trainer
-        self.trainer = Trainer(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-        )
+        return wrapped_model, optimizer
 
-        # Evaluator
-        self.eval_data_loaders = [self.val_dataloader, self.test_dataloader]
-
-        self.evaluator = Evaluator(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-        )
-
-        # Gym
-        self.gym = Gym(
-            trainer=self.trainer,
-            evaluator=self.evaluator,
-            loss_fun=self.loss_fun,
-        )
-
-        # Running Environment
-        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=config.running_env)
-
-        # self.running_env: RunningEnv = FSDPRunningEnv(
-        #     process_group_backend=config.running_env,
-        #     local_rank=config.globals.local_rank,
-        #     global_train_batch_id=self.global_train_batch_id,
-        # )
-
-        # Checkpointing
+    def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
         checkpointing_strategy = SaveAllCheckpointingStrategy()
         checkpointing_execution = FSDPToDiscCheckpointing(
             checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
             experiment_id=self.experiment_id,
             global_rank=config.training.global_rank,
             checkpointing_rank=0,
-            model_wrapping_fn=self.running_env.wrap_model,
+            model_wrapping_fn=running_env.wrap_model,
         )
-        self.checkpointing = Checkpointing(
+        checkpointing = Checkpointing(
             checkpointing_execution=checkpointing_execution,
             checkpointing_strategy=checkpointing_strategy,
             num_ranks=config.training.world_size,
         )
+        return checkpointing
 
-    def run(self):
-        with self.running_env as running_env:
-            if self.global_train_batch_id > 0:  # warm start
-                wrapped_model = self.checkpointing.load_model_checkpoint(
-                    experiment_id=self.warmstart_experiment_id,
-                    global_train_batch_id=self.global_train_batch_id,
-                    model=self.model,
-                )
-
-                optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                    config=self.config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-                )
-
-                optimizer = self.checkpointing.load_optimizer_checkpoint(
-                    optimizer=optimizer,
-                    model=wrapped_model,
-                    experiment_id=self.warmstart_experiment_id,
-                    global_train_batch_id=self.global_train_batch_id,
-                )
-
-            else:
-                wrapped_model = running_env.wrap_model(model=self.model, sync_module_states=False)
-                optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                    config=self.config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-                )
-
-            # lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.1)  # TODO use lr_scheduler
-
-            self.gym.run(
-                num_batches_per_rank=self.config.training.num_batches_per_rank,
-                eval_interval_in_batches=self.config.training.eval_interval_in_batches,
-                train_data_loader=self.train_dataloader,
-                evaluation_data_loaders=self.eval_data_loaders,
-                checkpointing=self.checkpointing,
-                model=wrapped_model,
-                optimizer=optimizer,
-            )
-
-    def create_instances(self, config: AppConfig) -> Dict[str, TextInstances]:
-        dataset_path = config.data.dataset_dir_path
-        sequence_len = config.data.sequence_len
+    def create_instances(
+        self,
+        dataset_dir_path: DirectoryPath,
+        sequence_len: int,
+        num_training_batches: int,
+        training_batch_size: int,
+        sample_key: str,
+    ) -> Dict[str, TextInstances]:
         instance_splits = dict()
-
         for partition in ["train", "val", "test"]:
             dataset_filename_prefix = list(
-                set([dataset_path.joinpath(filename.stem) for filename in dataset_path.glob(f"*{partition}*.bin")])
+                set(
+                    [
+                        dataset_dir_path.joinpath(filename.stem)
+                        for filename in dataset_dir_path.glob(f"*{partition}*.bin")
+                    ]
+                )
             )[0]
             text_dataset = make_dataset(path=dataset_filename_prefix)
-            num_samples = config.training.num_training_batches * config.training.training_batch_size
+            num_samples = num_training_batches * training_batch_size
             instances = TextInstances(
-                sample_key=config.data.sample_key,
+                sample_key=sample_key,
                 text_dataset=text_dataset,
                 doc_idx=np.arange(0, len(text_dataset)),
-                dataset_dir=dataset_path,
+                dataset_dir=dataset_dir_path,
                 num_samples=num_samples,
                 dataset_name=partition,
                 sequence_len=sequence_len,
@@ -371,6 +362,46 @@ class Main:
         )
 
         return data_loader_splits
+
+    def get_logging_publishers(
+        self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
+    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+        # Message Broker
+        message_broker = MessageBroker()
+        batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
+            message_broker=message_broker,
+            global_rank=config.training.global_rank,
+            local_rank=config.training.local_rank,
+        )
+        evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
+            message_broker=message_broker,
+            global_rank=config.training.global_rank,
+            local_rank=config.training.local_rank,
+        )
+
+        if config.training.global_rank == 0:
+            progress_subscriber = RichProgressSubscriber(
+                num_ranks=config.training.world_size,
+                train_split_lengths=train_split_lengths,
+                eval_split_lengths=eval_split_lengths,
+            )
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.training.world_size,
+                project=config.wandb.project_name,
+                experiment_id=self.experiment_id,
+            )
+            message_broker.add_subscriber(
+                subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
+            )
+
+        else:
+            progress_subscriber = DummyProgressSubscriber()
+        message_broker.add_subscriber(
+            subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
+            subscriber=progress_subscriber,
+        )
+
+        return evaluation_result_publisher, batch_processed_publisher
 
 
 if __name__ == "__main__":
