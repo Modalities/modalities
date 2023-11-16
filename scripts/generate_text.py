@@ -3,7 +3,6 @@
 import argparse
 import os
 import sys
-from collections import OrderedDict
 from pathlib import Path
 
 import torch
@@ -99,7 +98,6 @@ if __name__ == "__main__":
     tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
     path = Path(args.model_path)
     state_dict = torch.load(path)
-    s_d = OrderedDict({(k[6:], v) for k, v in state_dict.items()})
     print(f"using {args.model_path}")
 
     config_dict = load_app_config_dict(args.config_path)
@@ -114,9 +112,11 @@ if __name__ == "__main__":
             print("-" * 50)
             if args.chat is True:
                 prompt = input("enter question> ")
+                prompt = prompt.strip()
                 ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
+                prompt = prompt.strip()
                 ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             print("\n")
         except KeyboardInterrupt:
