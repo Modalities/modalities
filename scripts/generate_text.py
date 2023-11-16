@@ -113,7 +113,8 @@ if __name__ == "__main__":
         try:
             print("-" * 50)
             if args.chat is True:
-                prompt = input("enter question> ")
+                prompt = input("enter question> ").strip()
+                prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
                 ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
