@@ -7,7 +7,7 @@ from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confl
 
 from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_running_env import RunningEnv
+from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
@@ -39,29 +39,6 @@ class DataConfig(BaseModel):
 class TrainingConfig(BaseModel):
     num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
-
-
-class ModelConfig(BaseModel):
-    target_class: ClassPath
-    prediction_publication_key: str
-    config: GPTConfig
-
-
-class LossConfig(BaseModel):
-    target_class: ClassPath
-    target_subscription_key: str
-    prediction_subscription_key: str
-
-
-class RunningEnvConfig(BaseModel):
-    target_class: ClassPath
-    process_group_backend: ProcessGroupBackendType
-    local_rank: int
-
-
-class GlobalsConfig(BaseModel):
-    num_training_batches: int
-    num_batches_per_training_sequence: int
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
@@ -80,11 +57,11 @@ class GlobalsConfig(BaseModel):
         return self.num_training_batches // self.world_size
 
     @model_validator(mode="after")
-    def validate_multiples(self) -> "GlobalsConfig":
+    def validate_multiples(self) -> "TrainingConfig":
         computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
         if computed_num_training_batches != self.num_training_batches:
             raise ValueError(
-                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"
+                "eval_interval_per_rank * world_size * eval_interval_in_batches"
                 " != num_training_batches"
             )
         return self
@@ -94,9 +71,19 @@ class GPT2Config(BaseModel):
     config: GPTConfig
 
 
+class ModelConfig(BaseModel):
+    type_hint: ModelTypes
+    config: GPT2Config
+
+
 class CLMCrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
+
+
+class LossConfig(BaseModel):
+    type_hint: LossTypes
+    config: CLMCrossEntropyLossConfig
 
 
 class AdamWConfig(BaseModel):
@@ -107,11 +94,10 @@ class OptimizerConfig(BaseModel):
     type_hint: OptimizerTypes
     config: AdamWConfig
 
-
 class OneCycleLRConfig(BaseModel):
     max_lr: PositiveFloat
     total_steps: conint(ge=1)
-    pct_start: confloat(ge=0.0)
+    pct_start: confloat(ge=0.)
     anneal_strategy: str
     cycle_momentum: bool
     base_momentum: float | List
@@ -121,7 +107,6 @@ class OneCycleLRConfig(BaseModel):
     three_phase: bool
     last_epochs: int
     verbose: bool
-
 
 class StepLRConfig(BaseModel):
     step_size: conint(ge=1)
@@ -147,7 +132,7 @@ class AppConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     loss: LossConfig
-    runner: RunningEnvConfig
+    running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
