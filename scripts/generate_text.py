@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import readline  # noqa: F401
 import sys
 from pathlib import Path
 
@@ -73,12 +74,13 @@ def generate(
         idx_next = torch.multinomial(probs, num_samples=1)
         idx_next_str = tokenizer.decode(idx_next[0])
         if idx_next_str == tokenizer.eos_token:
-            print("\n<reached eos token>")
+            print("\n<reached eos token>", end="")
             break
         else:
             print(idx_next_str, end="")
             sys.stdout.flush()
             in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
+    print("")
 
     return in_batch["input_ids"]
 
