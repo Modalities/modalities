@@ -73,7 +73,7 @@ def generate(
         idx_next = torch.multinomial(probs, num_samples=1)
         idx_next_str = tokenizer.decode(idx_next[0])
         if idx_next_str == tokenizer.eos_token:
-            print("\n<reached eos token>\n")
+            print("\n<reached eos token>")
             break
         else:
             print(idx_next_str, end="")
@@ -112,13 +112,11 @@ if __name__ == "__main__":
             print("-" * 50)
             if args.chat is True:
                 prompt = input("enter question> ")
-                prompt = prompt.strip()
                 ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
-                prompt = prompt.strip()
+                print(prompt, end="")
                 ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
-            print("\n")
         except KeyboardInterrupt:
             print("closing app...")
             break
