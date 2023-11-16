@@ -47,12 +47,11 @@ class CheckpointingExecutionIF(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def load_checkpoint(
-        self,
-        model: nn.Module,
-        optimizer: Optimizer,
-        global_train_batch_id: int,
-    ) -> Tuple[nn.Module, Optimizer]:
+    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
         raise NotImplementedError
 
 
@@ -69,12 +68,11 @@ class CheckpointingIF:
         raise NotImplementedError
 
     @abstractmethod
-    def load_checkpoint(
-        self,
-        model: nn.Module,
-        optimizer: Optimizer,
-        global_train_batch_id: int,
-    ) -> Tuple[nn.Module, Optimizer]:
+    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
         raise NotImplementedError
 
 
@@ -116,13 +114,14 @@ class Checkpointing(CheckpointingIF):
             optimizer=optimizer,
         )
 
-    def load_checkpoint(
-        self,
-        model: nn.Module,
-        optimizer: Optimizer,
-        global_train_batch_id: int,
-    ) -> Tuple[nn.Module, Optimizer]:
-        checkpoint = self.checkpointing_execution.load_checkpoint(
-            global_train_batch_id=global_train_batch_id, model=model, optimizer=optimizer
+    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+        model = self.checkpointing_execution.load_model_checkpoint(
+            model=model, global_train_batch_id=global_train_batch_id
         )
-        return checkpoint
+        return model
+
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
+        optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
+            optimizer=optimizer, model=model, global_train_batch_id=global_train_batch_id
+        )
+        return optimizer

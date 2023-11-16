@@ -46,9 +46,10 @@ class LossConfig(BaseModel):
     prediction_subscription_key: str
 
 
-class RunnerConfig(BaseModel):
+class RunningEnvConfig(BaseModel):
     target_class: ClassPath
     process_group_backend: ProcessGroupBackendEnum
+    local_rank: int
 
 
 class GlobalsConfig(BaseModel):
@@ -84,6 +85,6 @@ class AppConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     loss: LossConfig
-    runner: RunnerConfig
+    runner: RunningEnvConfig
     model: ModelConfig
     globals: GlobalsConfig

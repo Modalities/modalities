@@ -7,6 +7,7 @@ import click
 import click_pathlib
 import hydra
 from llm_gym.config.config import AppConfig
+from llm_gym.optimizers.optimizer_factory import OptimizerFactory, OptimizerTypes
 import torch.distributed as dist
 import torch.optim as optim
 from omegaconf import OmegaConf
@@ -19,10 +20,11 @@ from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import (
-    SaveMostRecentEpochOnlyCheckpointingStrategy,
+    SaveAllCheckpointingStrategy,
+    SaveEveryKStepsCheckpointingStrategy,
 )
 from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner
+from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
 from llm_gym.models.gpt2.collator import GPT2LLMCollator, LMWikiBookCorpusDatasetFactory
 from llm_gym.gym import Gym
@@ -85,19 +87,18 @@ def init_by_hydra(config: BaseModel) -> Any:
 
 class Main:
     def __init__(self, config: AppConfig) -> None:
-        dist_launched = dist.is_torchelastic_launched()
         self.config = config
+        # warmstart
+        self.global_train_batch_id = 209
+        self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
 
         self.experiment_id = get_date_of_run()
 
         self.dataset_path = config.data.dataset_dir_path
 
         self.model: GPT2LLM = init_by_hydra(config.model)
-        runner: Runner = init_by_hydra(config.runner)
 
-        self.wrapped_model = runner.wrap(model=self.model, local_rank=config.globals.local_rank)
-        self.optimizer = optim.AdamW(self.wrapped_model.parameters(), lr=0.0001)
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+        # self.wrapped_model = runner.wrap(model=self.model, x=config.globals.local_rank)
 
         # CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
         self.loss_fun: Loss = init_by_hydra(config.loss)
@@ -130,7 +131,7 @@ class Main:
         }
         train_split_lengths = {self.train_dataloader.dataset_tag: config.globals.num_training_batches}
 
-        if not dist_launched or (dist_launched and dist.get_rank() == 0):
+        if config.globals.global_rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.globals.world_size,
                 train_split_lengths=train_split_lengths,
@@ -152,20 +153,6 @@ class Main:
 
         self.loss_fun = CLMCrossEntropyLoss(target_subscription_key="target_key", prediction_subscription_key="logits")
 
-        # Checkpointing
-        checkpointing_strategy = SaveMostRecentEpochOnlyCheckpointingStrategy()
-        checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
-            experiment_id=self.experiment_id,
-            global_rank=config.globals.global_rank,
-            checkpointing_rank=0,
-        )
-        checkpointing = Checkpointing(
-            checkpointing_execution=checkpointing_execution,
-            checkpointing_strategy=checkpointing_strategy,
-            num_ranks=config.globals.world_size,
-        )
-
         # Trainer
         self.trainer = Trainer(
             local_rank=config.globals.local_rank,
@@ -184,21 +171,61 @@ class Main:
 
         # Gym
         self.gym = Gym(
-            checkpointing=checkpointing,
             trainer=self.trainer,
             evaluator=self.evaluator,
-            model=self.wrapped_model,
-            optimizer=self.optimizer,
             loss_fun=self.loss_fun,
         )
 
-    def run(self):
-        self.gym.run(
-            num_batches=self.config.globals.num_batches_per_rank,
-            num_batches_per_epoch=self.config.globals.num_batches_per_training_sequence_per_rank,
-            train_data_loader=self.train_dataloader,
-            evaluation_data_loaders=self.eval_data_loaders,
+        # Running Environment
+
+        self.running_env: RunningEnv = FSDPRunningEnv(
+            process_group_backend=config.runner.process_group_backend,
+            local_rank=config.globals.local_rank,
+            global_train_batch_id=self.global_train_batch_id,
         )
+
+        # Checkpointing
+        checkpointing_strategy = SaveAllCheckpointingStrategy()
+        checkpointing_execution = FSDPToDiscCheckpointing(
+            checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
+            experiment_id=self.experiment_id,
+            global_rank=config.globals.global_rank,
+            checkpointing_rank=0,
+            model_wrapping_fn=self.running_env.wrap_model,
+            warmstart_experiment_id=self.warmstart_experiment_id
+        )
+        self.checkpointing = Checkpointing(
+            checkpointing_execution=checkpointing_execution,
+            checkpointing_strategy=checkpointing_strategy,
+            num_ranks=config.globals.world_size,
+        )
+
+    def run(self):
+        with self.running_env as running_env:
+            if self.global_train_batch_id > 0:  # warm start
+                wrapped_model = self.checkpointing.load_model_checkpoint(
+                    global_train_batch_id=self.global_train_batch_id, model=self.model
+                )
+                optimizer = optim.AdamW(wrapped_model.parameters(), lr=0.0001)
+                optimizer = self.checkpointing.load_optimizer_checkpoint(
+                    optimizer=optimizer, model=wrapped_model, global_train_batch_id=self.global_train_batch_id
+                )
+
+            else:
+                wrapped_model = running_env.wrap_model(model=self.model, sync_module_states=False)
+                optimizer = optim.AdamW(wrapped_model.parameters(), lr=0.0001)
+
+            lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.1)  # TODO use lr_scheduler
+
+            self.gym.run(
+                num_batches=self.config.globals.num_batches_per_rank,
+                num_batches_per_epoch=self.config.globals.num_batches_per_training_sequence_per_rank,
+                train_data_loader=self.train_dataloader,
+                evaluation_data_loaders=self.eval_data_loaders,
+                checkpointing=self.checkpointing,
+                model=wrapped_model,
+                optimizer=optimizer,
+            )
 
     def create_dataloaders(
         self, train_batch_size: int, test_batch_size: int

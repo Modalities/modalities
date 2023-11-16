@@ -27,8 +27,9 @@ loss:
   prediction_subscription_key: logits
 
 runner:
-  target_class: llm_gym.fsdp.fsdp_runner.FSDPRunner
+  target_class: llm_gym.fsdp.fsdp_runner.FSDPRunningEnv
   process_group_backend: ${training.process_group_backend}
+  local_rank: ${globals.local_rank}
 
 model:
   target_class: llm_gym.models.gpt2.gpt2_model.GPT2LLM

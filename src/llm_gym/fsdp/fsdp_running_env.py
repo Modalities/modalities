@@ -41,8 +41,6 @@ class FSDPRunningEnv(RunningEnv):
         self.global_train_batch_id = global_train_batch_id
         self.process_group_backend = process_group_backend
         self.local_rank = local_rank
-        self._fsdp_model = None
-        self._fsdp_optimizer = None
 
     def __enter__(self) -> "RunningEnv":
         dist.init_process_group(self.process_group_backend.value)
@@ -50,10 +48,9 @@ class FSDPRunningEnv(RunningEnv):
         return self
 
     def __exit__(self, type, value, traceback):
-        self._fsdp_model = None
-        self._fsdp_optimizer = None
-        dist.barrier()
-        dist.destroy_process_group()
+        pass # TODO uncomment part below
+        # dist.barrier()
+        # dist.destroy_process_group()
 
     @staticmethod
     def wrap_model(model: nn.Module, sync_module_states: bool) -> FSDP:

@@ -33,12 +33,14 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         global_rank: int,
         checkpointing_rank: int,
         model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
+        warmstart_experiment_id=None,
     ):
         self.checkpoint_path = checkpoint_path
-        self.checkpoint_structure = f"{experiment_id}-<enitity>-<step>.bin"
         self.global_rank = global_rank
         self.checkpointing_rank = checkpointing_rank
         self.model_wrapping_fn = model_wrapping_fn
+        self.experiment_id = experiment_id
+        self.warmstart_experiment_id = warmstart_experiment_id
 
     def run_checkpoint_instructions(
         self,
@@ -53,8 +55,23 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         for batch_id in checkpointing_instruction.checkpoints_to_delete:
             self._delete_checkpoint(batch_id=batch_id)
 
-    def _get_checkpointing_path(self, global_train_batch_id: int, entity_type: CheckpointingEntityType):
-        entity_file_name = self.checkpoint_structure.replace("<enitity>", entity_type.value).replace(
+    def _get_checkpointing_path(
+        self, global_train_batch_id: int, entity_type: CheckpointingEntityType, for_saving: bool = True
+    ):
+        if for_saving:
+            checkpoint_structure = f"{self.experiment_id}-<enitity>-<step>.bin"
+
+        else:
+            if self.warmstart_experiment_id is not None:
+                # this case is used when we want to continue training from a previously stored checkpoint.
+                # (e.g., fine-tuning or server / unhandled LLMgym crash)
+                checkpoint_structure = f"{self.warmstart_experiment_id}-<enitity>-<step>.bin"
+            else:
+                # this case is when the training crashed and we want to resume by recovering during run-time
+                # without having to restart LLMgym
+                checkpoint_structure = f"{self.experiment_id}-<enitity>-<step>.bin"
+
+        entity_file_name = checkpoint_structure.replace("<enitity>", entity_type.value).replace(
             "<step>", str(global_train_batch_id + 1)
         )
         full_path = os.path.join(self.checkpoint_path, entity_file_name)
@@ -103,48 +120,48 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
             else:
                 raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 
-    def load_checkpoint(
-        self,
-        model: nn.Module,
-        optimizer: Optimizer,
-        global_train_batch_id: int,
-    ) -> Tuple[nn.Module, Optimizer]:
+    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
         # NOTE: The model and optimizer need to be sharded after calling this function!
 
-        model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        with FSDP.state_dict_type(
-            module=model,
-            state_dict_type=StateDictType.FULL_STATE_DICT,
-            state_dict_config=model_save_policy,
-            optim_state_dict_config=optim_save_policy,
-        ):
-            # we only load the model and optimizer on a single rank. The calling function must then
-            # distribute the optimizer state and model parmeters to the other ranks.
-            full_optimizer_state_dict = None
-            if self.global_rank == self.checkpointing_rank:
-                # load model on rank 0 into CPU RAM
-                model_checkpoint_path = self._get_checkpointing_path(
-                    global_train_batch_id=global_train_batch_id, entity_type=CheckpointingEntityType.MODEL
-                )
-                model_state = torch.load(model_checkpoint_path)
-                model.load_state_dict(model_state)
+        # model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
+        # optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
+        # with FSDP.state_dict_type(
+        #     module=model,
+        #     state_dict_type=StateDictType.FULL_STATE_DICT,
+        #     state_dict_config=model_save_policy,
+        #     optim_state_dict_config=optim_save_policy,
+        # ):
+        # we only load the model and optimizer on a single rank. The calling function must then
+        # distribute the optimizer state and model parmeters to the other ranks.
 
-                # load full optimizer state dict to rank 0 (CPU RAM)
-                optimizer_checkpoint_path = self._get_checkpointing_path(
-                    global_train_batch_id=global_train_batch_id, entity_type=CheckpointingEntityType.OPTIMIZER
-                )
-                full_optimizer_state_dict = torch.load(optimizer_checkpoint_path)
-
-            # distribute the optimizer state dict from rank 0 to all the other ranks
-            sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-                full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
+        # load model
+        if self.global_rank == self.checkpointing_rank:
+            # load model on rank 0 into CPU RAM
+            model_checkpoint_path = self._get_checkpointing_path(
+                global_train_batch_id=global_train_batch_id, entity_type=CheckpointingEntityType.MODEL, for_saving=False
             )
-            optimizer.load_state_dict(sharded_optimizer_state_dict)
+            model_state = torch.load(model_checkpoint_path)
+            model.load_state_dict(model_state)
+        fsdp_model = self.model_wrapping_fn(model=model, sync_module_states=True)
+        return fsdp_model
 
-        # All ranks initialize FSDP module as usual. `sync_module_states` argument
-        # communicates loaded checkpoint states from rank 0 to rest of the world.
-        fsdp_model = self.model_wrapping_fn(module=model, sync_module_states=True)
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
+        # load optimizer
+        full_optimizer_state_dict = None
+        if self.global_rank == self.checkpointing_rank:
+            # load full optimizer state dict to rank 0 (CPU RAM)
+            optimizer_checkpoint_path = self._get_checkpointing_path(
+                global_train_batch_id=global_train_batch_id,
+                entity_type=CheckpointingEntityType.OPTIMIZER,
+                for_saving=False,
+            )
+            full_optimizer_state_dict = torch.load(optimizer_checkpoint_path)
 
-        return fsdp_model, optimizer
+        # distribute the optimizer state dict from rank 0 to all the other ranks
+        sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
+            full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
+        )
+        optimizer.load_state_dict(sharded_optimizer_state_dict)
+
+        return optimizer
