@@ -1,3 +1,4 @@
+from typing import Dict
 from llm_gym.checkpointing.checkpointing import (
     CheckpointingStrategyIF,
     CheckpointingInstruction,
@@ -15,7 +16,7 @@ class SaveMostRecentEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         checkpoints_to_delete = self.saved_batch_id_checkpoints.copy()
@@ -35,7 +36,7 @@ class SaveLastEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         checkpoints_to_delete = []
@@ -55,7 +56,7 @@ class SaveAllCheckpointingStrategy(CheckpointingStrategyIF):
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         return CheckpointingInstruction(save_current=True, checkpoints_to_delete=[])
@@ -69,7 +70,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         save_current = (global_train_batch_id + 1) % self.k == 0 and (global_train_batch_id + 1) > 0
