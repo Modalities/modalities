@@ -72,9 +72,14 @@ def generate(
         logits = logits[:, -1, :] / temperature
         probs = F.softmax(logits, dim=-1)
         idx_next = torch.multinomial(probs, num_samples=1)
-        in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
-        print(tokenizer.decode(idx_next[0]), end="")
-        sys.stdout.flush()
+        idx_next_str = tokenizer.decode(idx_next[0])
+        if idx_next_str == tokenizer.eos_token:
+            print("\n<reached eos token>\n")
+            break
+        else:
+            print(idx_next_str, end="")
+            sys.stdout.flush()
+            in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
 
     return in_batch["input_ids"]
 
@@ -87,6 +92,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", type=str, help="path to model.bin")
     parser.add_argument("config_path", type=str, help="path to config.yaml")
+    parser.add_argument("--max_new_tokens", type=int, default=200, help="maximum amount of tokens to generate")
     parser.add_argument("--chat", action="store_true", help="activate 'chat' mode")
     args = parser.parse_args()
 
@@ -108,10 +114,10 @@ if __name__ == "__main__":
             print("-" * 50)
             if args.chat is True:
                 prompt = input("enter question> ")
-                ret = generate(model, tokenizer, prompt, config.data.sequence_len, 100)
+                ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
-                ret = generate(model, tokenizer, prompt, config.data.sequence_len, 100)
+                ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             print("\n")
         except KeyboardInterrupt:
             print("closing app...")
