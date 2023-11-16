@@ -24,8 +24,8 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
-        num_batches: int,
-        num_batches_per_epoch: int,
+        num_batches_per_rank: int,
+        eval_interval_in_batches: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
@@ -33,26 +33,25 @@ class Gym:
         self._run_evaluation_and_checkpointing(
             model=model,
             optimizer=optimizer,
-            num_batches=num_batches,
             train_batch_id=-1,
             evaluation_data_loaders=evaluation_data_loaders,
             checkpointing=checkpointing,
+            num_batches_per_rank=num_batches_per_rank,
         )
 
-        train_repeating_data_loader = RepeatingDataLoader(data_loader=train_data_loader)
         self.trainer.train(
             model=model,
-            train_loader=train_repeating_data_loader,
+            train_loader=train_data_loader,
             loss_fun=self.loss_fun,
             optimizer=optimizer,
-            num_batches_per_epoch=num_batches_per_epoch,
-            num_batches=num_batches,
+            eval_interval_in_batches=eval_interval_in_batches,
+            num_batches_per_rank=num_batches_per_rank,
             epoch_done_callback=partial(
                 self._run_evaluation_and_checkpointing,
                 model=model,
                 optimizer=optimizer,
                 evaluation_data_loaders=evaluation_data_loaders,
-                num_batches=num_batches,
+                num_batches_per_rank=num_batches_per_rank,
                 checkpointing=checkpointing,
             ),
         )
@@ -61,12 +60,12 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
-        num_batches: int,
+        num_batches_per_rank: int,
         train_batch_id: int,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
     ):
-        eval_result = self.evaluator.evaluate_epoch(
+        eval_result = self.evaluator.evaluate(
             model=model,
             data_loaders=evaluation_data_loaders,
             loss_fun=self.loss_fun,
@@ -76,7 +75,7 @@ class Gym:
         # TODO: implement early stopping
         checkpointing.save_checkpoint(
             train_batch_id=train_batch_id,
-            num_batches=num_batches,
+            num_batches=num_batches_per_rank,
             evaluation_result=eval_result,
             model=model,
             optimizer=optimizer,

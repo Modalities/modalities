@@ -118,3 +118,5 @@ core.*
 data/datasets
 data/checkpoints
 checkpoints
+checkpoint
+wandb

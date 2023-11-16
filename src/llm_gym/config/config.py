@@ -1,37 +1,44 @@
-from enum import Enum
-from typing import Annotated
+import os
+from pathlib import Path
+from typing import List
+from llm_gym.config.config_utils import ClassPath
 
-from hydra._internal.utils import _locate
-from pydantic import BaseModel, DirectoryPath, conint, model_validator, validator
-from pydantic.functional_validators import AfterValidator
+from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 
+from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
+from llm_gym.config.types import ProcessGroupBackendType
+from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
-def validate_class_path(path: str):
-    try:
-        _locate(path)
-    except Exception as hydra_error:
-        raise ValueError(
-            f"Could not resolve path to class {path}.",
-        ) from hydra_error
-    return path
+class WandbConfig(BaseModel):
+    project_name: str
 
 
-ClassPath = Annotated[str, AfterValidator(validate_class_path)]
+class CudaKwargsConfig(BaseModel):
+    num_workers: conint(ge=1)
+    pin_memory: bool
+    shuffle: bool
 
 
-class ProcessGroupBackendEnum(str, Enum):
-    nccl = "nccl"
+class DataLoaderConfig(BaseModel):
+    train_dataset_tag: str
+    val_dataset_tag: str
+    test_dataset_tag: str
+    cuda_kwargs: CudaKwargsConfig
 
 
 class DataConfig(BaseModel):
     dataset_dir_path: DirectoryPath
+    sample_key: str
+    target_key: str
+    sequence_len: PositiveInt
+    dataloader: DataLoaderConfig
 
 
 class TrainingConfig(BaseModel):
     num_training_batches: conint(gt=0)
-    process_group_backend: ProcessGroupBackendEnum
+    process_group_backend: ProcessGroupBackendType
 
 
 class ModelConfig(BaseModel):
@@ -48,22 +55,25 @@ class LossConfig(BaseModel):
 
 class RunningEnvConfig(BaseModel):
     target_class: ClassPath
-    process_group_backend: ProcessGroupBackendEnum
+    process_group_backend: ProcessGroupBackendType
     local_rank: int
 
 
 class GlobalsConfig(BaseModel):
-    local_rank: int
-    global_rank: int
-    world_size: int
     num_training_batches: int
     num_batches_per_training_sequence: int
+    local_rank: conint(ge=0)
+    global_rank: conint(ge=0)
+    world_size: conint(ge=0)
+    main_rank: conint(ge=0)
+    eval_interval_in_batches: conint(ge=1)
     training_batch_size: int
     evaluation_batch_size: int
+    test_batch_size: int
 
     @property
-    def num_batches_per_training_sequence_per_rank(self):
-        return self.num_training_batches // self.num_batches_per_training_sequence // self.world_size
+    def eval_interval_per_rank(self):
+        return self.num_training_batches // self.eval_interval_in_batches // self.world_size
 
     @property
     def num_batches_per_rank(self):
@@ -71,14 +81,66 @@ class GlobalsConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_multiples(self) -> "GlobalsConfig":
-        computed_num_training_batches = (
-            self.num_batches_per_training_sequence_per_rank * self.world_size * self.num_batches_per_training_sequence
-        )
+        computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
         if computed_num_training_batches != self.num_training_batches:
             raise ValueError(
-                f"num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence != num_training_batches"
+                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"
+                " != num_training_batches"
             )
         return self
+
+
+class GPT2Config(BaseModel):
+    config: GPTConfig
+
+
+class CLMCrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+
+
+class AdamWConfig(BaseModel):
+    lr: confloat(ge=0.0)
+
+
+class OptimizerConfig(BaseModel):
+    type_hint: OptimizerTypes
+    config: AdamWConfig
+
+
+class OneCycleLRConfig(BaseModel):
+    max_lr: PositiveFloat
+    total_steps: conint(ge=1)
+    pct_start: confloat(ge=0.0)
+    anneal_strategy: str
+    cycle_momentum: bool
+    base_momentum: float | List
+    max_momentum: float | List
+    div_factor: PositiveFloat
+    final_div_factor: PositiveFloat
+    three_phase: bool
+    last_epochs: int
+    verbose: bool
+
+
+class StepLRConfig(BaseModel):
+    step_size: conint(ge=1)
+    gamma: confloat(ge=0.0)
+
+
+class ConstantLRConfig(BaseModel):
+    factor: PositiveFloat
+    total_iters: PositiveInt
+
+
+class SchedulerConfig(BaseModel):
+    type_hint: SchedulerTypes
+    config: StepLRConfig | ConstantLRConfig | OneCycleLRConfig
+
+
+class CheckpointConfig(BaseModel):
+    checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
+    dir_path: Path
 
 
 class AppConfig(BaseModel):
@@ -87,4 +149,7 @@ class AppConfig(BaseModel):
     loss: LossConfig
     runner: RunningEnvConfig
     model: ModelConfig
-    globals: GlobalsConfig
+    optimizer: OptimizerConfig
+    scheduler: SchedulerConfig
+    checkpoint: CheckpointConfig
+    wandb: WandbConfig

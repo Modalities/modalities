@@ -1,45 +1,66 @@
 import math
-from abc import abstractmethod
 from enum import Enum
-from typing import Dict, Optional
-from llm_gym.models.model import NNModel
+from typing import Dict
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint
+from pydantic import BaseModel, confloat, conint, model_validator
 from torch.nn import functional as F
+
+from llm_gym.models.model import NNModel
 
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
-class Attention(Enum):
+class AttentionType(Enum):
     DEFAULT_ATTENTION = "default_attention"
     PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
 
 
-class Activation(Enum):
+class ActivationType(Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
 
 
 class AttentionConfig(BaseModel):
-    attention_type: Attention
+    attention_type: AttentionType
     scaling_factor: conint(ge=1)
 
 
+class WeightInitailizationConfig(BaseModel):
+    mean: confloat(ge=0.0)
+    std: confloat(ge=0.0)
+
+
 class GPTConfig(BaseModel):
+    sample_key: str
+    prediction_key: str
     block_size: conint(ge=1)
     vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: conint(ge=1)
     n_head: conint(ge=1)
     n_embd: conint(ge=1)
+    ffn_hidden: conint(ge=1)
     dropout: confloat(ge=0.0)
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
-    activation: Activation
+    activation: ActivationType
     epsilon: confloat(ge=0.0)
+    weight_init: WeightInitailizationConfig
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "GPTConfig":
+        for param, param_name in zip([self.ffn_hidden, self.vocab_size, self.n_embd],
+                                     ["ffn_hidden", "vocab_size", "n_embd"]):
+
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(
+                    f"{param_name} with value {param} should be divisible by 128 for efficient training."
+                )
+        return self
 
 
 class LayerNorm(nn.Module):
@@ -85,7 +106,7 @@ class CausalSelfAttention(nn.Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
-        self.flash = config.attention.attention_type == Attention.PYTORCH_FLASH_ATTENTION
+        self.flash = config.attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -135,12 +156,12 @@ class TransformerMLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=config.n_embd,
-            out_features=4 * config.n_embd,
+            out_features=config.ffn_hidden,  # 4 * config.n_embd,
             bias=config.bias,
         )
         self.gelu = nn.GELU()
         self.c_proj = nn.Linear(
-            in_features=4 * config.n_embd,
+            in_features=config.ffn_hidden,
             out_features=config.n_embd,
             bias=config.bias,
         )
@@ -161,9 +182,9 @@ class Block(nn.Module):
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
 
-        if config.activation == Activation.GELU:
+        if config.activation == ActivationType.GELU:
             self.mlp = TransformerMLP(config)
-        elif config.activation == Activation.FUSED_SWIGLU:
+        elif config.activation == ActivationType.FUSED_SWIGLU:
             hidden_dim = 256 * ((int(2 * 4 * config.n_embd / 3) + 256 - 1) // 256)
             self.mlp = xops.SwiGLU(config.n_embd, hidden_dim, config.n_embd, bias=False)
         else:
@@ -176,13 +197,11 @@ class Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
-    def __init__(self, prediction_publication_key: str, config: Optional[GPTConfig] = None):
+    def __init__(self, config: GPTConfig):
         super().__init__()
 
-        if config is None:
-            config = GPTConfig()
-
-        self.prediction_publication_key = prediction_publication_key
+        self.sample_key = config.sample_key
+        self.prediction_key = config.prediction_key
 
         assert config.vocab_size is not None
         assert config.block_size is not None
@@ -209,18 +228,20 @@ class GPT2LLM(NNModel):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
+                torch.nn.init.normal_(
+                    p, mean=config.weight_init.mean, std=config.weight_init.std / math.sqrt(2 * config.n_layer)
+                )
 
     def _init_weights(self, module: nn.Module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        input_ids = inputs["input_ids"]
+        input_ids = inputs[self.sample_key]
         device = input_ids.device
         b, t = input_ids.size()
         assert (
@@ -236,7 +257,7 @@ class GPT2LLM(NNModel):
             x = block(x)
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-        return {self.prediction_publication_key: logits}
+        return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
