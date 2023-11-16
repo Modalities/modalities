@@ -1,20 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
-from llm_gym.checkpointing.checkpointing import Checkpointing
-from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.exceptions import RunningEnvError
-from llm_gym.gym import Gym
-
+from llm_gym.config.lookup_types import LookupEnum
+from llm_gym.config.types import ProcessGroupBackendType
+from pydantic import BaseModel
 import torch
 import torch.distributed as dist
-from llm_gym.config.config import ProcessGroupBackendEnum
 from llm_gym.env_utils import bfSixteen, has_bfloat_support
 from llm_gym.models.gpt2.gpt2_model import Block
-from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 import functools
-from torch.optim import Optimizer
 import torch.nn as nn
 
 
@@ -34,7 +28,7 @@ class RunningEnv(ABC, object):
 class FSDPRunningEnv(RunningEnv):
     def __init__(
         self,
-        process_group_backend: ProcessGroupBackendEnum,
+        process_group_backend: ProcessGroupBackendType,
         local_rank: int,
         global_train_batch_id: int = 0,
     ) -> None:
@@ -48,7 +42,7 @@ class FSDPRunningEnv(RunningEnv):
         return self
 
     def __exit__(self, type, value, traceback):
-        pass # TODO uncomment part below
+        pass  # TODO uncomment part below
         # dist.barrier()
         # dist.destroy_process_group()
 
@@ -78,3 +72,17 @@ class FSDPRunningEnv(RunningEnv):
             sync_module_states=sync_module_states,
         )
         return fsdp_model
+
+
+class RunningEnvTypes(LookupEnum):
+    FSDPRunningEnv = FSDPRunningEnv
+
+
+class FSDPRunningEnvConfig(BaseModel):
+    process_group_backend: ProcessGroupBackendType
+    local_rank: int
+
+
+class RunningEnvConfig(BaseModel):
+    type_hint: RunningEnvTypes
+    config: FSDPRunningEnvConfig
