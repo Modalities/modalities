@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from llm_gym.batch import EvaluationResultBatch
@@ -29,7 +29,7 @@ class CheckpointingStrategyIF(ABC):
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         raise NotImplementedError
@@ -47,11 +47,13 @@ class CheckpointingExecutionIF(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
         raise NotImplementedError
 
     @abstractmethod
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: FSDP, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
         raise NotImplementedError
 
 
@@ -60,7 +62,7 @@ class CheckpointingIF:
         self,
         train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         model: NNModel,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
@@ -68,11 +70,13 @@ class CheckpointingIF:
         raise NotImplementedError
 
     @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
         raise NotImplementedError
 
     @abstractmethod
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
         raise NotImplementedError
 
 
@@ -95,7 +99,7 @@ class Checkpointing(CheckpointingIF):
         self,
         train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        evaluation_result: Dict[str, EvaluationResultBatch],
         model: NNModel,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
@@ -114,14 +118,16 @@ class Checkpointing(CheckpointingIF):
             optimizer=optimizer,
         )
 
-    def load_model_checkpoint(self, model: nn.Module, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
         model = self.checkpointing_execution.load_model_checkpoint(
-            model=model, global_train_batch_id=global_train_batch_id
+            model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
         )
         return model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, global_train_batch_id: int) -> Optimizer:
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
         optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
-            optimizer=optimizer, model=model, global_train_batch_id=global_train_batch_id
+            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
         )
         return optimizer
