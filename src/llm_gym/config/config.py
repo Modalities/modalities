@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List
 
 from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 
@@ -94,6 +95,21 @@ class OptimizerConfig(BaseModel):
     config: AdamWConfig
 
 
+class OneCycleLRConfig(BaseModel):
+    max_lr: PositiveFloat
+    total_steps: conint(ge=1)
+    pct_start: confloat(ge=0.0)
+    anneal_strategy: str
+    cycle_momentum: bool
+    base_momentum: float | List
+    max_momentum: float | List
+    div_factor: PositiveFloat
+    final_div_factor: PositiveFloat
+    three_phase: bool
+    last_epochs: int
+    verbose: bool
+
+
 class StepLRConfig(BaseModel):
     step_size: conint(ge=1)
     gamma: confloat(ge=0.0)
@@ -106,7 +122,7 @@ class ConstantLRConfig(BaseModel):
 
 class SchedulerConfig(BaseModel):
     type_hint: SchedulerTypes
-    config: StepLRConfig | ConstantLRConfig
+    config: StepLRConfig | ConstantLRConfig | OneCycleLRConfig
 
 
 class CheckpointConfig(BaseModel):
