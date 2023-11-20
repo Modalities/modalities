@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 # TODO: benchmark against pyspark
 class IndexGenerator:
-    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
+    def __init__(self, src_file: Path | str, chunksize: int = 4096, drop_faulty_entries: bool = False):
         self.src_file = Path(src_file)
         self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
@@ -89,7 +89,7 @@ class IndexGenerator:
         self.chunk_queue.put(None)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Generate mmap index.")
     parser.add_argument("src", type=str, default=None, help="path to raw file")
     parser.add_argument("--index", type=str, default=None, help="output path for index")
@@ -111,3 +111,7 @@ if __name__ == "__main__":
 
     generator = IndexGenerator(raw_data_path)
     generator.run(index_path)
+
+
+if __name__ == "__main__":
+    main()

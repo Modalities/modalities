@@ -86,10 +86,8 @@ def generate(
             in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
     print("")
 
-    return in_batch["input_ids"]
 
-
-if __name__ == "__main__":
+def main():
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
@@ -119,11 +117,15 @@ if __name__ == "__main__":
             if args.chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
+                generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                ret = generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
+                generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
         except KeyboardInterrupt:
             print("closing app...")
             break
+
+
+if __name__ == "__main__":
+    main()
