@@ -24,8 +24,8 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
-        num_batches_per_rank: int,
-        eval_interval_in_batches: int,
+        num_training_batches_per_rank: int,
+        eval_interval_per_rank: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
@@ -36,7 +36,7 @@ class Gym:
             train_batch_id=-1,
             evaluation_data_loaders=evaluation_data_loaders,
             checkpointing=checkpointing,
-            num_batches_per_rank=num_batches_per_rank,
+            num_batches_per_rank=num_training_batches_per_rank,
         )
 
         self.trainer.train(
@@ -44,14 +44,14 @@ class Gym:
             train_loader=train_data_loader,
             loss_fun=self.loss_fun,
             optimizer=optimizer,
-            eval_interval_in_batches=eval_interval_in_batches,
-            num_batches_per_rank=num_batches_per_rank,
+            eval_interval_in_batches=eval_interval_per_rank,
+            num_batches_per_rank=num_training_batches_per_rank,
             epoch_done_callback=partial(
                 self._run_evaluation_and_checkpointing,
                 model=model,
                 optimizer=optimizer,
                 evaluation_data_loaders=evaluation_data_loaders,
-                num_batches_per_rank=num_batches_per_rank,
+                num_batches_per_rank=num_training_batches_per_rank,
                 checkpointing=checkpointing,
             ),
         )

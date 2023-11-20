@@ -3,16 +3,14 @@ from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 import click
 import click_pathlib
-from llm_gym.config.config import AppConfig
-from llm_gym.logging_broker.subscriber import MessageSubscriberIF
-from llm_gym.optimizers.optimizer_factory import OptimizerFactory, OptimizerTypes
+from llm_gym.config.config import AppConfig, DataLoaderConfig
 import numpy as np
 from pydantic import DirectoryPath
 import torch
-import torch.distributed as dist
 from datasets import Dataset
 from omegaconf import OmegaConf
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import Sampler
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
@@ -20,17 +18,14 @@ from llm_gym.checkpointing.checkpointing_strategies import (
     SaveAllCheckpointingStrategy,
 )
 from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv
-from llm_gym.models.gpt2.gpt2_model import GPT2LLM
+from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 
-from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig
 from llm_gym.data.instances import TextInstances
 from llm_gym.data.mmap_dataset import make_dataset
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
-from llm_gym.fsdp.fsdp_running_env import RunningEnv, FSDPRunningEnv
 from llm_gym.gym import Gym
 from llm_gym.logging_broker.message_broker import MessageBroker
 from llm_gym.logging_broker.messages import BatchProgressUpdate, MessageTypes
@@ -82,8 +77,8 @@ class Main:
         self.config = config
 
         # warmstart
-        self.global_train_batch_id = 0
-        self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
+        self.global_train_batch_id = 139999
+        self.warmstart_experiment_id = "2023-11-16-07:42:45_PM"
 
         self.experiment_id = get_date_of_run()
         self.dataset_path = config.data.dataset_dir_path
@@ -121,8 +116,6 @@ class Main:
 
         # Loss function
         loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
-
-
 
         # Logging
         eval_split_lengths = {
@@ -169,8 +162,8 @@ class Main:
             ) = self.construct_components(self.config, running_env=running_env)
 
             gym.run(
-                num_batches_per_rank=self.config.training.num_batches_per_rank,
-                eval_interval_in_batches=self.config.training.eval_interval_in_batches,
+                num_training_batches_per_rank=self.config.training.num_training_batches_per_rank,
+                eval_interval_per_rank=self.config.training.eval_interval_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
                 checkpointing=checkpointing,
@@ -178,33 +171,34 @@ class Main:
                 optimizer=optimizer,
             )
 
-    def get_dataloaders(self, config: AppConfig, collator: Callable) -> Tuple[LLMDataLoader, LLMDataLoader, LLMDataLoader]:
-        # Create instances
-        instance_splits = self.create_instances(
-            dataset_dir_path=config.data.dataset_dir_path,
-            sequence_len=config.data.sequence_len,
-            num_training_batches=config.training.num_training_batches,
-            training_batch_size=config.training.training_batch_size,
-            sample_key=config.data.sample_key,
-        )
+    def get_dataloaders(self, config: AppConfig, collator: Callable) -> List[LLMDataLoader]:
+        train_dataloader_config = config.data.train_dataloader
+        eval_dataloader_configs = config.data.eval_dataloaders
+        data_loaders = []
 
-        # Create samplers
-        sampler_splits = self.create_samplers(
-            train_instances=instance_splits["train"],
-            val_instances=instance_splits["val"],
-            test_instances=instance_splits["test"],
-        )
+        for dataloader_config in [train_dataloader_config, *eval_dataloader_configs]:
+            # Create instances
+            instances = self.create_instances(
+                dataset_dir_path=config.data.dataset_dir_path,
+                sequence_len=config.data.sequence_len,
+                sample_key=config.data.sample_key,
+                dataloader_config=dataloader_config,
+            )
 
-        dataloader_splits = self.create_dataloaders(
-            train_instances=instance_splits["train"],
-            val_instances=instance_splits["val"],
-            test_instances=instance_splits["test"],
-            train_sampler=sampler_splits["train"],
-            val_sampler=sampler_splits["val"],
-            test_sampler=sampler_splits["test"],
-            collate_fn=collator,
-        )
-        return dataloader_splits["train"], dataloader_splits["val"], dataloader_splits["test"]
+            # Create samplers
+            sampler_splits = self.create_sampler(instances=instances)
+
+            # create dataloaders
+            dataloader_splits = self.create_dataloaders(
+                train_instances=instance_splits["train"],
+                val_instances=instance_splits["val"],
+                test_instances=instance_splits["test"],
+                train_sampler=sampler_splits["train"],
+                val_sampler=sampler_splits["val"],
+                test_sampler=sampler_splits["test"],
+                collate_fn=collator,
+            )
+        return data_loaders
 
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
@@ -256,66 +250,43 @@ class Main:
         return checkpointing
 
     def create_instances(
-        self,
-        dataset_dir_path: DirectoryPath,
-        sequence_len: int,
-        num_training_batches: int,
-        training_batch_size: int,
-        sample_key: str,
-    ) -> Dict[str, TextInstances]:
-        instance_splits = dict()
-        for partition in ["train", "val", "test"]:
-            dataset_filename_prefix = list(
-                set(
-                    [
-                        dataset_dir_path.joinpath(filename.stem)
-                        for filename in dataset_dir_path.glob(f"*{partition}*.bin")
-                    ]
-                )
-            )[0]
-            text_dataset = make_dataset(path=dataset_filename_prefix)
-            num_samples = num_training_batches * training_batch_size
-            instances = TextInstances(
-                sample_key=sample_key,
-                text_dataset=text_dataset,
-                doc_idx=np.arange(0, len(text_dataset)),
-                dataset_dir=dataset_dir_path,
-                num_samples=num_samples,
-                dataset_name=partition,
-                sequence_len=sequence_len,
+        self, dataset_dir_path: DirectoryPath, sequence_len: int, sample_key: str, dataloader_config: DataLoaderConfig
+    ) -> TextInstances:
+        dataset_filename_prefix = list(
+            set(
+                [
+                    dataset_dir_path.joinpath(filename.stem)
+                    for filename in dataset_dir_path.glob(f"*{dataloader_config.dataset_tag}*.bin")
+                ]
             )
-            instance_splits[partition] = instances
+        )[0]
+        text_dataset = make_dataset(path=dataset_filename_prefix)
+        num_samples = dataloader_config.num_batches * dataloader_config.batch_size
+        instances = TextInstances(
+            sample_key=sample_key,
+            text_dataset=text_dataset,
+            doc_idx=np.arange(0, len(text_dataset)),
+            dataset_dir=dataset_dir_path,
+            num_samples=num_samples,
+            dataset_name=dataloader_config.dataset_tag,
+            sequence_len=sequence_len,
+        )
+        return instances
 
-        return instance_splits
-
-    def create_samplers(
-        self,
-        train_instances: TextInstances,
-        val_instances: TextInstances,
-        test_instances: TextInstances,
-    ) -> Dict[str, DistributedSampler]:
-        sampler_splits = dict()
-
-        sampler_splits["train"] = DistributedSampler(
-            dataset=train_instances,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-            shuffle=True,
+    def create_sampler(self, dataloader_config: DataLoaderConfig, instances: TextInstances) -> DistributedSampler:
+        sampler: Sampler = self.resolvers.build_component_by_config(
+            config=dataloader_config, extra_kwargs=dict(dataset=instances)
         )
 
-        sampler_splits["val"] = DistributedSampler(
-            dataset=val_instances,
+
+        sampler = DistributedSampler(
+            dataset=instances,
             rank=self.config.training.global_rank,
             num_replicas=self.config.training.world_size,
+            shuffle=shuffle,
         )
 
-        sampler_splits["test"] = DistributedSampler(
-            dataset=test_instances,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-        )
-
-        return sampler_splits
+        return sampler
 
     def create_dataloaders(
         self,
