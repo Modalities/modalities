@@ -3,25 +3,41 @@ data:
   sample_key: "input_ids"
   target_key: "target_ids"
   sequence_len: 1024
-  dataloader:
-    train_dataset_tag: "train"
-    val_dataset_tag: "val"
-    test_dataset_tag: "test"
+  train_dataloader:
+    dataset_tag: "train"
+    num_batches: 1000 # total summed over all ranks
+    batch_size: 8 # per rank
+    shuffle: true
     cuda_kwargs:
       num_workers: 2
       pin_memory: true
       shuffle: false
+  eval_dataloaders:
+    - dataset_tag: "val"
+      num_batches: 100 # total summed over all ranks
+      batch_size: 8 # per rank
+      shuffle: false
+      cuda_kwargs:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+    - dataset_tag: "test"
+      num_batches: 100 # total summed over all ranks
+      batch_size: 8 # per rank
+      sampler:
+        type_hint:
+
+      cuda_kwargs:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
 
 wandb:
   project_name: llm_gym
 
 training:
   process_group_backend: "nccl"
-  num_training_batches: 700000
-  eval_interval_in_batches: 1000 # per rank! 
-  training_batch_size: 64
-  evaluation_batch_size: 64
-  test_batch_size: 32
+  eval_interval_in_batches: 100 # total summed over all ranks
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}

@@ -5,10 +5,12 @@ from class_resolver import ClassResolver
 from pydantic import BaseModel
 
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
-from llm_gym.config.lookup_types import LossTypes, ModelTypes
+from llm_gym.config.lookup_types import LossTypes, ModelTypes, SamplerTypes
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
+from torch.utils.data import Sampler
+from torch.utils.data.distributed import DistributedSampler
 
 
 class ResolverRegister:
@@ -71,6 +73,11 @@ class ResolverRegister:
                 [t.value for t in LossTypes],
                 base=Loss,
                 default=CLMCrossEntropyLoss,
+            ),
+            SamplerTypes: ClassResolver(
+                [t.value for t in SamplerTypes],
+                base=Sampler,
+                default=DistributedSampler,
             ),
         }
         assert set(expected_resolvers) == set(

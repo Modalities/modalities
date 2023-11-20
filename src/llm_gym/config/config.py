@@ -5,7 +5,7 @@ from llm_gym.config.config_utils import ClassPath
 
 from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 
-from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
+from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SamplerTypes, SchedulerTypes
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
@@ -21,10 +21,22 @@ class CudaKwargsConfig(BaseModel):
     shuffle: bool
 
 
+class DistributedSamplerConfig(BaseModel):
+    rank: conint(ge=0)
+    num_replicas: conint(ge=0)
+    shuffle: bool
+
+
+class SamplerConfig(BaseModel):
+    type_hint: SamplerTypes
+    config: DistributedSamplerConfig
+
+
 class DataLoaderConfig(BaseModel):
-    train_dataset_tag: str
-    val_dataset_tag: str
-    test_dataset_tag: str
+    dataset_tag: str
+    num_batches: conint(ge=0)
+    batch_size: conint(ge=1)
+    sampler: SamplerConfig
     cuda_kwargs: CudaKwargsConfig
 
 
@@ -33,38 +45,35 @@ class DataConfig(BaseModel):
     sample_key: str
     target_key: str
     sequence_len: PositiveInt
-    dataloader: DataLoaderConfig
+    train_dataloader: DataLoaderConfig
+    eval_dataloaders: List[DataLoaderConfig]
 
 
 class TrainingConfig(BaseModel):
-    num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
     eval_interval_in_batches: conint(ge=1)
-    training_batch_size: int
-    evaluation_batch_size: int
-    test_batch_size: int
 
     @property
     def eval_interval_per_rank(self):
-        return self.num_training_batches // self.eval_interval_in_batches // self.world_size
+        return self.eval_interval_in_batches // self.world_size
 
     @property
-    def num_batches_per_rank(self):
+    def num_training_batches_per_rank(self):
         return self.num_training_batches // self.world_size
 
-    @model_validator(mode="after")
-    def validate_multiples(self) -> "TrainingConfig":
-        computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
-        if computed_num_training_batches != self.num_training_batches:
-            raise ValueError(
-                "eval_interval_per_rank * world_size * eval_interval_in_batches"
-                " != num_training_batches"
-            )
-        return self
+    # @model_validator(mode="after")
+    # def validate_multiples(self) -> "TrainingConfig":
+    #     computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
+    #     if computed_num_training_batches != self.num_training_batches:
+    #         raise ValueError(
+    #             f"eval_interval_per_rank * world_size * eval_interval_in_batches ({computed_num_training_batches})"
+    #             f" != num_training_batches ({self.num_training_batches})"
+    #         )
+    #     return self
 
 
 class GPT2Config(BaseModel):
@@ -94,10 +103,11 @@ class OptimizerConfig(BaseModel):
     type_hint: OptimizerTypes
     config: AdamWConfig
 
+
 class OneCycleLRConfig(BaseModel):
     max_lr: PositiveFloat
     total_steps: conint(ge=1)
-    pct_start: confloat(ge=0.)
+    pct_start: confloat(ge=0.0)
     anneal_strategy: str
     cycle_momentum: bool
     base_momentum: float | List
@@ -107,6 +117,7 @@ class OneCycleLRConfig(BaseModel):
     three_phase: bool
     last_epochs: int
     verbose: bool
+
 
 class StepLRConfig(BaseModel):
     step_size: conint(ge=1)
