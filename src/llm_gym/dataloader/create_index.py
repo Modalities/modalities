@@ -12,11 +12,11 @@ from tqdm import tqdm
 
 # TODO: benchmark against pyspark
 class IndexGenerator:
-    def __init__(self, src: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
-        self.src = Path(src)
+    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
+        self.src_file = Path(src_file)
         self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
-        with self.src.open(mode="r", encoding="utf-8") as fin:
+        with self.src_file.open(mode="r", encoding="utf-8") as fin:
             fin.seek(0, os.SEEK_END)
             char_num = fin.tell()
         self.chunks = char_num // self.chunksize
@@ -25,7 +25,7 @@ class IndexGenerator:
         self.index_map = []
         self.exception_buffer = []
 
-    def run(self, dst: Path):
+    def run(self, dst_file: Path):
         self.exception_buffer = []
         reader = threading.Thread(target=self._reader_thread)
         reader.start()
@@ -36,7 +36,7 @@ class IndexGenerator:
         if self.exception_buffer:
             raise self.exception_buffer[0]
         print(f"Created index of length {len(self.index_map)}")
-        dst.write_bytes(pkl.dumps(self.index_map))
+        dst_file.write_bytes(pkl.dumps(self.index_map))
 
     def _indexer_thread(self):
         def queue_generator():
@@ -49,7 +49,7 @@ class IndexGenerator:
         def process_line(last_index: int, curr_index: int):
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
-                string = np.memmap(self.src, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
+                string = np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
                 string = [c.decode("iso-8859-1") for c in string]
                 string = "".join(string)
                 json.loads(string)
@@ -76,7 +76,7 @@ class IndexGenerator:
             process_line(last_index, curr_index + 1)
 
     def _reader_thread(self):
-        with open(self.src, "rb") as fin:
+        with open(self.src_file, "rb") as fin:
             while True:
                 chunk = fin.read(self.chunksize)
                 if self.exception_buffer:

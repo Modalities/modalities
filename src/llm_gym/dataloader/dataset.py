@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
-from typing import Iterable, Type, Union
+from typing import Iterable, List, Type, Union
 
 import jq
 from torch.utils.data import random_split
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
-from transformers import GPT2TokenizerFast
+from transformers import GPT2TokenizerFast, PreTrainedTokenizerFast
 
-from ..dataloader.large_file_lines_reader import LargeFileLinesReader
+from ..dataloader.large_file_lines_reader import BaseReader
 
 
 @dataclasses.dataclass
@@ -21,31 +20,31 @@ class DatasetSplit:
 
 
 class Dataset(TorchdataSet):
-    def __init__(self, raw_data_path: Union[str, Path]):
-        self.raw_data_path = Path(raw_data_path)
+    def __init__(self, reader: BaseReader):
+        self.reader = reader
 
     @staticmethod
-    def from_path(
-        dataset_path: str, target_dataset_cls: Type[Dataset], split_size: Iterable[float] = (0.9, 0.05, 0.05)
+    def from_reader(
+        reader: Union[BaseReader, List[BaseReader]],
+        target_dataset_cls: Type[Dataset],
+        split_size: Iterable[float] = (0.9, 0.05, 0.05),
+        **kwargs,
     ) -> DatasetSplit:
-        presplit_dataset_folder_paths = [Path(dataset_path, split) for split in ["train", "test", "validation"]]
-
         def get_subset(ds):
             return Subset(dataset=ds, indices=range(len(ds)))
 
-        if all(p.is_dir() for p in presplit_dataset_folder_paths):
-            print(f"Found already existing dataset split at {dataset_path}. Will use this one...")
+        if isinstance(reader, list):
+            if len(reader) != 3:
+                raise ValueError(f"Lenght of list of readers needs to be 3 (is {len(reader)}).")
+            print("Different readers for train, test and eval were passed. Will use this split...")
 
-            def init_dataset(path):
-                return target_dataset_cls(raw_data_path=path)
+            def init_dataset(reader, **kwargs):
+                return target_dataset_cls(reader=reader, **kwargs)
 
-            loaded_datasets = map(init_dataset, presplit_dataset_folder_paths)
-
-            loaded_subsets = map(get_subset, loaded_datasets)
-            dataset_split = tuple(loaded_subsets)
+            dataset_split = [init_dataset(r, **kwargs) for r in reader]
         else:
-            print(f"No existing dataset split found at {dataset_path}. Loading dataset directly and apply split")
-            dataset = target_dataset_cls(raw_data_path=dataset_path)
+            print("No existing dataset split passed. Loading dataset directly and applying split...")
+            dataset = target_dataset_cls(reader=reader, **kwargs)
             dataset_split = random_split(dataset, split_size)
         return DatasetSplit(
             train=get_subset(dataset_split[0]),
@@ -57,16 +56,14 @@ class Dataset(TorchdataSet):
 class MemMapDataset(Dataset):
     def __init__(
         self,
-        raw_data_path: Union[str, Path],
-        tokenizer_file: Union[str, Path] = "./data/tokenizer/tokenizer.json",
-        jq_filter: str = ".text",
+        reader: BaseReader,
+        tokenizer: PreTrainedTokenizerFast = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json"),
+        jq_pattern: str = ".text",
     ):
-        super().__init__(raw_data_path=raw_data_path)
-        tokenizer_file = Path(tokenizer_file)
-        self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
-        self.jq_filter = jq.compile(jq_filter)
+        super().__init__(reader=reader)
+        self.jq_filter = jq.compile(jq_pattern)
         # TODO: tokenizer from tiktoken if it is faster?
-        self.tokenizer = GPT2TokenizerFast(tokenizer_file=str(tokenizer_file))
+        self.tokenizer = tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:

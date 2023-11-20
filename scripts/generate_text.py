@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# TODO: points for further discussion
+# 1) Instead of command line arguments, use a (scecond) config file?
+# 2) How do we make the inference script robust against (architecture) changes? Maybe save the commit hash in the model state dict? # noqa: E501
+# 3) Register script in the pyproject toml?
 
 import argparse
 import os

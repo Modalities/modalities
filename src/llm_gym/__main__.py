@@ -216,7 +216,14 @@ class Main:
         # on the fly tokenization
         # from llm_gym.dataloader.dataset import Dataset as Dataset_Wrapper
         # from llm_gym.dataloader.dataset import MemMapDataset
-        # dataset_dict = Dataset_Wrapper.from_path(config.data.dataset_dir_path, target_dataset_cls=MemMapDataset, split_size=(0.8, 0.1, 0.1)) # noqa: E501
+        # from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
+        # from transformers import GPT2TokenizerFast
+
+        # reader = LargeFileLinesReader(config.data.dataset_dir_path, lazy_init=True)
+        # tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
+        # dataset_dict = Dataset_Wrapper.from_reader(
+        #     reader, target_dataset_cls=MemMapDataset, split_size=(0.999, 0.0005, 0.0005), tokenizer=tokenizer
+        # )  # noqa: E501
         # instance_splits = dict()
         # instance_splits["train"] = dataset_dict.train
         # instance_splits["val"] = dataset_dict.validation

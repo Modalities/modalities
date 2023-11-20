@@ -1,4 +1,5 @@
 import pickle
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Union
 
@@ -7,8 +8,18 @@ import numpy as np
 from .create_index import IndexGenerator
 
 
+class BaseReader(ABC):
+    @abstractmethod
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def __getitem__(self, key: Union[int, slice]) -> Union[str, List[str]]:
+        raise NotImplementedError
+
+
 # TODO: benchmark tokenized version vs plain text version (regarding speed and storage consumption)
-class LargeFileLinesReader:
+class LargeFileLinesReader(BaseReader):
     def __init__(
         self,
         raw_data_path: Union[str, Path],

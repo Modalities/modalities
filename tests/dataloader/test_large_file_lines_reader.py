@@ -43,27 +43,27 @@ def test_index_creation(tmpdir):
     ] == dummy_content_text.split("\n")
 
 
-def test_large_file_lines_reader(lorem_ipsum_data):
-    reader = LargeFileLinesReader(lorem_ipsum_data, lazy_init=True)
-    assert lorem_ipsum_data.read_text().count("\n") == 2
-    assert lorem_ipsum_data.read_text().rsplit("\n")[-1] == ""
+def test_large_file_lines_reader(dummy_data_path):
+    reader = LargeFileLinesReader(dummy_data_path, lazy_init=True)
+    assert dummy_data_path.read_text().count("\n") == 2
+    assert dummy_data_path.read_text().rsplit("\n")[-1] == ""
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
     assert len(reader) == 2
     assert all(map(len, reader))
 
 
-def test_large_file_lines_reader_lazy_index_init(tmpdir, lorem_ipsum_data):
-    index_path = Path(tmpdir, f"{lorem_ipsum_data.stem}.idx.pkl")
+def test_large_file_lines_reader_lazy_index_init(tmpdir, dummy_data_path):
+    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
     with pytest.raises(FileNotFoundError):
-        LargeFileLinesReader(lorem_ipsum_data, index_path, lazy_init=False)
+        LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
 
-    LargeFileLinesReader(lorem_ipsum_data, index_path, lazy_init=True)
-    LargeFileLinesReader(lorem_ipsum_data, index_path, lazy_init=False)
+    LargeFileLinesReader(dummy_data_path, index_path, lazy_init=True)
+    LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
 
 
-def test_large_file_lines_reader_missing_source_data(tmpdir, lorem_ipsum_data):
-    lorem_ipsum_data.unlink(missing_ok=True)
-    assert not lorem_ipsum_data.exists()
-    index_path = Path(tmpdir, f"{lorem_ipsum_data.stem}.idx.pkl")
+def test_large_file_lines_reader_missing_source_data(tmpdir, dummy_data_path):
+    dummy_data_path.unlink(missing_ok=True)
+    assert not dummy_data_path.exists()
+    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
     with pytest.raises(FileNotFoundError):
-        LargeFileLinesReader(lorem_ipsum_data, index_path, lazy_init=False)
+        LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
