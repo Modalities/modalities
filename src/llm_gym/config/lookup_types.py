@@ -29,3 +29,6 @@ class SchedulerTypes(LookupEnum):
     StepLR = torch.optim.lr_scheduler.StepLR
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
     OneCycleLR = torch.optim.lr_scheduler.OneCycleLR
+
+class SamplerTypes(LookupEnum):
+    DistributedSampler = torch.utils.data.distributed.DistributedSampler
