@@ -1,4 +1,3 @@
-import argparse
 import json
 import os
 import pickle as pkl
@@ -89,19 +88,13 @@ class IndexGenerator:
         self.chunk_queue.put(None)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate mmap index.")
-    parser.add_argument("src", type=str, default=None, help="path to raw file")
-    parser.add_argument("--index", type=str, default=None, help="output path for index")
+def main(src_path: str | Path, index_path: str | Path):
+    raw_data_path = Path(src_path)
 
-    args = parser.parse_args()
-
-    raw_data_path = Path(args.src)
-
-    if args.index is None:
+    if index_path is None:
         index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx.pkl")
     else:
-        index_path = Path(args.index)
+        index_path = Path(index_path)
 
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
@@ -111,7 +104,3 @@ def main():
 
     generator = IndexGenerator(raw_data_path)
     generator.run(index_path)
-
-
-if __name__ == "__main__":
-    main()

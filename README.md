@@ -144,7 +144,7 @@ To add a new resolver use `add_resolver`, and the corresponding added resolver w
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazyly, however, it is adviced to create it beforhand. This can be done by running
 
 ```sh
-python src/llm_gym/dataloader/create_index.py <path/to/jsonl/file>
+llm_gym create_mmap_index <path/to/jsonl/file>
 ```
 
 The index will be created in the same directory as the raw data file.

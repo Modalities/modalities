@@ -4,17 +4,16 @@
 # 2) How do we make the inference script robust against (architecture) changes? Maybe save the commit hash in the model state dict? # noqa: E501
 # 3) Register script in the pyproject toml?
 
-import argparse
 import os
 import readline  # noqa: F401
 import sys
 from pathlib import Path
 
 import torch
+from omegaconf import OmegaConf
 from torch.nn import functional as F
 from transformers import GPT2TokenizerFast
 
-from llm_gym.__main__ import load_app_config_dict
 from llm_gym.config.config import AppConfig
 from llm_gym.resolver_register import ResolverRegister
 
@@ -87,24 +86,18 @@ def generate(
     print("")
 
 
-def main():
+def main(model_path: str | Path, config_path: str | Path, tokenizer_file: str, max_new_tokens: int, chat: bool):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("model_path", type=str, help="path to model.bin")
-    parser.add_argument("config_path", type=str, help="path to config.yaml")
-    parser.add_argument("--max_new_tokens", type=int, default=200, help="maximum amount of tokens to generate")
-    parser.add_argument("--chat", action="store_true", help="activate 'chat' mode")
-    args = parser.parse_args()
-
-    tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
-    path = Path(args.model_path)
+    tokenizer = GPT2TokenizerFast(tokenizer_file=tokenizer_file)
+    path = Path(model_path)
     state_dict = torch.load(path)
-    print(f"using {args.model_path}")
+    print(f"using {model_path}")
 
-    config_dict = load_app_config_dict(args.config_path)
+    config_dict = OmegaConf.load(config_path)
+    config_dict = OmegaConf.to_container(config_dict, resolve=True)
     config = AppConfig.model_validate(config_dict)
     resolvers = ResolverRegister(config=config)
     model: torch.nn.Module = resolvers.build_component_by_config(config=config.model)
@@ -114,18 +107,14 @@ def main():
     while True:
         try:
             print("-" * 50)
-            if args.chat is True:
+            if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
+                generate(model, tokenizer, prompt, config.data.sequence_len, max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, config.data.sequence_len, args.max_new_tokens)
+                generate(model, tokenizer, prompt, config.data.sequence_len, max_new_tokens)
         except KeyboardInterrupt:
             print("closing app...")
             break
-
-
-if __name__ == "__main__":
-    main()

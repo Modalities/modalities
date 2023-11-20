@@ -18,6 +18,7 @@ from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOn
 from llm_gym.config.config import AppConfig
 from llm_gym.data.instances import TextInstances
 from llm_gym.data.mmap_dataset import make_dataset
+from llm_gym.dataloader.create_index import main as create_mmap_index
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
@@ -35,6 +36,7 @@ from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
+from llm_gym.utils.generate_text import main as generate_text_main
 
 
 @click.group()
@@ -57,6 +59,34 @@ def entry_point_run_llmgym(config_file_path: Path):
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
     main.run()
+
+
+@main.command(name="generate_text")
+@click.argument("model_path", type=str)
+@click.argument("config_path", type=str)
+@click.option(
+    "--tokenizer_file",
+    type=str,
+    show_default=True,
+    default="./data/tokenizer/tokenizer.json",
+    help="path to tokenizer json",
+)
+@click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
+@click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
+def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_tokens, chat):
+    generate_text_main(model_path, config_path, tokenizer_file, max_new_tokens, chat)
+
+
+@main.command(name="create_mmap_index")
+@click.argument("src_path", type=str)
+@click.option(
+    "--index_path",
+    type=str,
+    default=None,
+    help="output path for index. will use parent directory of src_path if none.",
+)
+def entry_point_create_mmap_index(src_path, index_path):
+    create_mmap_index(src_path, index_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
