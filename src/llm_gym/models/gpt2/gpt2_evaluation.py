@@ -28,6 +28,10 @@ class PretrainedGPTConfig(PretrainedConfig):
                 "attention_type": self.config.attention.attention_type.value,
                 "scaling_factor": self.config.attention.scaling_factor
             }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std
+            }
             json_dict["model_type"] = self.model_type
         else:
             json_dict = {}
@@ -38,20 +42,15 @@ class PretrainedGPTModel(PreTrainedModel):
     config_class = PretrainedGPTConfig
 
     def __init__(self,
-                 config: PretrainedGPTConfig,
-                 prediction_publication_key: str = "logits",
+                 config: PretrainedGPTConfig
                  ):
         super().__init__(config)
-        self.prediction_publication_key = prediction_publication_key
-        self.model: GPT2LLM = GPT2LLM(
-            prediction_publication_key=self.prediction_publication_key,
-            config=config.config,
-        )
+        self.model: GPT2LLM = GPT2LLM(config=config.config)
 
     def forward(self, tensor):
         model_input = {"input_ids": tensor}
         model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
-        return model_forward_output[self.prediction_publication_key]
+        return model_forward_output[self.config.config.prediction_key]
 
 
 if __name__ == '__main__':
