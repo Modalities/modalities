@@ -6,6 +6,7 @@ T = TypeVar("T")
 
 
 class MessageSubscriberIF(ABC, Generic[T]):
+    """Interface for message subscribers."""
 
     @abstractmethod
     def consume_message(self, message: Message[T]):

@@ -18,7 +18,9 @@ dependencies = [
     "pydantic",
     "click",
     "click_pathlib",
-    "xformers"
+    "xformers",
+    "class_resolver",
+    "wandb"
 ]
 
 [project.optional-dependencies]
