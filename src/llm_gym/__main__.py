@@ -30,7 +30,7 @@ from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
-from llm_gym.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
+from llm_gym.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
 from llm_gym.loss_functions import Loss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.resolver_register import ResolverRegister
@@ -171,17 +171,14 @@ class Main:
         }
         train_split_lengths = {self.train_dataloader.dataset_tag: len(self.train_dataloader)}
 
+        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
         if not dist_launched or (dist_launched and dist.get_rank() == 0):
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,
                 train_split_lengths=train_split_lengths,
                 eval_split_lengths=eval_split_lengths,
             )
-            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
-                num_ranks=config.training.world_size,
-                project=config.wandb.project_name,
-                experiment_id=self.experiment_id,
-            )
+            evaluation_result_subscriber = RichResultSubscriber(num_ranks=config.training.world_size)
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
