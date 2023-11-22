@@ -4,10 +4,8 @@ from typing import Callable, Dict
 
 import click
 import click_pathlib
-import numpy as np
 import torch
 import torch.distributed as dist
-from datasets import Dataset
 from omegaconf import OmegaConf
 from torch.utils.data.distributed import DistributedSampler
 
@@ -16,9 +14,8 @@ from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig
-from llm_gym.data.instances import TextInstances
-from llm_gym.data.mmap_dataset import make_dataset
-from llm_gym.dataloader.create_index import main as create_mmap_index
+from llm_gym.dataloader.create_index import create_memmap_index
+from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
@@ -77,7 +74,7 @@ def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_t
     generate_text_main(model_path, config_path, tokenizer_file, max_new_tokens, chat)
 
 
-@main.command(name="create_mmap_index")
+@main.command(name="create_memmap_index")
 @click.argument("src_path", type=str)
 @click.option(
     "--index_path",
@@ -85,8 +82,8 @@ def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_t
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_create_mmap_index(src_path, index_path):
-    create_mmap_index(src_path, index_path)
+def entry_point_create_memmap_index(src_path, index_path):
+    create_memmap_index(src_path, index_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -124,14 +121,10 @@ class Main:
         self.loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 
         # Create instances
-        instance_splits = self.create_instances(config=config)
+        dataset_split = self.create_datasplit(config=config)
 
         # Create samplers
-        sampler_splits = self.create_samplers(
-            train_instances=instance_splits["train"],
-            val_instances=instance_splits["val"],
-            test_instances=instance_splits["test"],
-        )
+        sampler_splits = self.create_samplers(dataset_split)
 
         collator = GPT2LLMCollator(
             sample_key=config.data.sample_key,
@@ -139,9 +132,7 @@ class Main:
         )
 
         dataloader_splits = self.create_dataloaders(
-            train_instances=instance_splits["train"],
-            val_instances=instance_splits["val"],
-            test_instances=instance_splits["test"],
+            dataset_split,
             train_sampler=sampler_splits["train"],
             val_sampler=sampler_splits["val"],
             test_sampler=sampler_splits["test"],
@@ -239,70 +230,38 @@ class Main:
             evaluation_data_loaders=self.eval_data_loaders,
         )
 
-    def create_instances(self, config: AppConfig) -> Dict[str, TextInstances]:
+    def create_datasplit(self, config: AppConfig) -> DatasetSplit:
         # on the fly tokenization
-        # from llm_gym.dataloader.dataset import Dataset as Dataset_Wrapper
-        # from llm_gym.dataloader.dataset import MemMapDataset
-        # from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-        # from transformers import GPT2TokenizerFast
+        # TODO: centralize this used Tokenizer
+        # TODO: consider using instantiation from config and unify this with the parallel llm_gym.data implementation
+        from transformers import GPT2TokenizerFast
 
-        # reader = LargeFileLinesReader(config.data.dataset_dir_path, lazy_init=True)
-        # tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
-        # dataset_dict = Dataset_Wrapper.from_reader(
-        #     reader, target_dataset_cls=MemMapDataset, split_size=(0.999, 0.0005, 0.0005), tokenizer=tokenizer
-        # )  # noqa: E501
-        # instance_splits = dict()
-        # instance_splits["train"] = dataset_dict.train
-        # instance_splits["val"] = dataset_dict.validation
-        # instance_splits["test"] = dataset_dict.test
-        # return instance_splits
+        from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 
-        dataset_path = config.data.dataset_dir_path
-        sequence_len = config.data.sequence_len
-        instance_splits = dict()
+        reader = LargeFileLinesReader(config.data.dataset_dir_path, lazy_init=True)
+        tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
+        return Dataset.from_reader(
+            reader, target_dataset_cls=MemMapDataset, split_size=(0.999, 0.0005, 0.0005), tokenizer=tokenizer
+        )  # noqa: E501
 
-        for partition in ["train", "val", "test"]:
-            dataset_filename_prefix = list(
-                set([dataset_path.joinpath(filename.stem) for filename in dataset_path.glob(f"*{partition}*.bin")])
-            )[0]
-            text_dataset = make_dataset(path=dataset_filename_prefix)
-            num_samples = config.training.num_training_batches * config.training.training_batch_size
-            instances = TextInstances(
-                sample_key=config.data.sample_key,
-                text_dataset=text_dataset,
-                doc_idx=np.arange(0, len(text_dataset)),
-                dataset_dir=dataset_path,
-                num_samples=num_samples,
-                dataset_name=partition,
-                sequence_len=sequence_len,
-            )
-            instance_splits[partition] = instances
-
-        return instance_splits
-
-    def create_samplers(
-        self,
-        train_instances: TextInstances,
-        val_instances: TextInstances,
-        test_instances: TextInstances,
-    ) -> Dict[str, DistributedSampler]:
+    def create_samplers(self, dataset_split: DatasetSplit) -> Dict[str, DistributedSampler]:
         sampler_splits = dict()
 
         sampler_splits["train"] = DistributedSampler(
-            dataset=train_instances,
+            dataset=dataset_split.train,
             rank=self.config.training.global_rank,
             num_replicas=self.config.training.world_size,
             shuffle=True,
         )
 
         sampler_splits["val"] = DistributedSampler(
-            dataset=val_instances,
+            dataset=dataset_split.validation,
             rank=self.config.training.global_rank,
             num_replicas=self.config.training.world_size,
         )
 
         sampler_splits["test"] = DistributedSampler(
-            dataset=test_instances,
+            dataset=dataset_split.test,
             rank=self.config.training.global_rank,
             num_replicas=self.config.training.world_size,
         )
@@ -311,9 +270,7 @@ class Main:
 
     def create_dataloaders(
         self,
-        train_instances: Dataset,
-        val_instances: Dataset,
-        test_instances: Dataset,
+        dataset_split: DatasetSplit,
         train_sampler: DistributedSampler,
         val_sampler: DistributedSampler,
         test_sampler: DistributedSampler,
@@ -329,7 +286,7 @@ class Main:
             target_key=self.config.data.target_key,
         )
         data_loader_splits["train"] = LLMDataLoader(
-            dataset=train_instances,
+            dataset=dataset_split.train,
             dataset_tag=self.config.data.dataloader.train_dataset_tag,
             batch_size=self.config.training.training_batch_size,
             sampler=train_sampler,
@@ -337,7 +294,7 @@ class Main:
             collate_fn=collate_fn,
         )
         data_loader_splits["val"] = LLMDataLoader(
-            dataset=val_instances,
+            dataset=dataset_split.validation,
             dataset_tag=self.config.data.dataloader.val_dataset_tag,
             batch_size=self.config.training.evaluation_batch_size,
             sampler=val_sampler,
@@ -345,7 +302,7 @@ class Main:
             collate_fn=collate_fn,
         )
         data_loader_splits["test"] = LLMDataLoader(
-            dataset=test_instances,
+            dataset=dataset_split.test,
             dataset_tag=self.config.data.dataloader.test_dataset_tag,
             batch_size=self.config.training.test_batch_size,
             sampler=test_sampler,

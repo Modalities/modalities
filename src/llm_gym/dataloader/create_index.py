@@ -88,7 +88,7 @@ class IndexGenerator:
         self.chunk_queue.put(None)
 
 
-def main(src_path: str | Path, index_path: str | Path):
+def create_memmap_index(src_path: str | Path, index_path: str | Path):
     raw_data_path = Path(src_path)
 
     if index_path is None:
