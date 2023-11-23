@@ -66,7 +66,7 @@ class PackedDataGenerator:
 
 def create_packed_data(
     src_path: str | Path,
-    dst_path: str | Path,
+    dst_path: str | Path = None,
     index_path: str | Path = None,
     tokenizer_file: str = "./data/tokenizer/tokenizer.json",
     jq_pattern=".text",
@@ -74,6 +74,18 @@ def create_packed_data(
     max_length: int = None,
     size_in_bytes: int = 4,
 ):
+    raw_data_path = Path(src_path)
+
+    if index_path is None:
+        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx.pkl")
+    else:
+        index_path = Path(index_path)
+
+    if dst_path is None:
+        dst_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.packed.bin")
+    else:
+        dst_path = Path(dst_path)
+
     generator = PackedDataGenerator(
         src_path,
         index_path=index_path,

@@ -89,12 +89,17 @@ def entry_point_create_memmap_index(src_path, index_path):
 
 @main.command(name="create_packed_data")
 @click.argument("src_path", type=str)
-@click.argument("dst_path", type=str)
+@click.option(
+    "--dst_path",
+    type=str,
+    default=None,
+    help="output path for packed data file. will use parent directory of src_path if none.",
+)
 @click.option(
     "--index_path",
     type=str,
     default=None,
-    help="output path for index. will use parent directory of src_path if none.",
+    help="input path for index. will search in parent directory of src_path if none.",
 )
 def entry_point_create_packed_data(src_path, dst_path, index_path):
     create_packed_data(src_path, dst_path, index_path=index_path)
