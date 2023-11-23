@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import dataclasses
+import os
+from pathlib import Path
 from typing import Iterable, List, Type, Union
 
 import jq
+import numpy as np
 from torch.utils.data import random_split
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
@@ -75,3 +78,35 @@ class MemMapDataset(Dataset):
             self.jq_filter.input_text(self.reader[idx]).first(), max_length=1024, padding="max_length", truncation=True
         )
         return obj
+
+
+class PackedDataset(TorchdataSet):
+    def __init__(
+        self, file_path: str | Path, block_size: int = 1024, int_size_in_bytes: int = 4, max_samples: int = None
+    ):
+        self.file_path = Path(file_path)
+        self.block_size = block_size
+        self.int_size_in_bytes = int_size_in_bytes
+
+        # get number of total tokens in file
+        with self.file_path.open("r+b") as f:
+            f.seek(0, os.SEEK_END)
+            total_tokens = f.tell() // self.int_size_in_bytes
+            f.seek(0)
+        self.num_samples = total_tokens // self.block_size
+        if max_samples:
+            self.num_samples = min(self.num_samples, max_samples)
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, idx: int) -> dict:
+        tokens_as_byte_strings = np.memmap(
+            self.file_path,
+            mode="r",
+            offset=idx * self.int_size_in_bytes * self.block_size,
+            shape=(self.int_size_in_bytes * self.block_size,),
+        ).view(f"S{self.int_size_in_bytes}")
+        tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
+        attention_mask = [1] * len(tokens)
+        return {"input_ids": tokens, "attention_mask": attention_mask}

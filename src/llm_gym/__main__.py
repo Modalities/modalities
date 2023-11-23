@@ -15,6 +15,7 @@ from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointin
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig
 from llm_gym.dataloader.create_index import create_memmap_index
+from llm_gym.dataloader.create_packed_data import create_packed_data
 from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
@@ -84,6 +85,19 @@ def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_t
 )
 def entry_point_create_memmap_index(src_path, index_path):
     create_memmap_index(src_path, index_path)
+
+
+@main.command(name="create_packed_data")
+@click.argument("src_path", type=str)
+@click.argument("dst_path", type=str)
+@click.option(
+    "--index_path",
+    type=str,
+    default=None,
+    help="output path for index. will use parent directory of src_path if none.",
+)
+def entry_point_create_packed_data(src_path, dst_path, index_path):
+    create_packed_data(src_path, dst_path, index_path=index_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
