@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import os
 from pathlib import Path
-from typing import Iterable, List, Type, Union
+from typing import Iterable, Type, Union
 
 import jq
 import numpy as np
@@ -12,7 +12,7 @@ from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
 from transformers import GPT2TokenizerFast, PreTrainedTokenizerFast
 
-from ..dataloader.large_file_lines_reader import BaseReader
+from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
 @dataclasses.dataclass
@@ -23,31 +23,28 @@ class DatasetSplit:
 
 
 class Dataset(TorchdataSet):
-    def __init__(self, reader: BaseReader):
-        self.reader = reader
+    def __init__(self, raw_data_path: Union[str, Path]):
+        self.raw_data_path = Path(raw_data_path)
 
     @staticmethod
-    def from_reader(
-        reader: Union[BaseReader, List[BaseReader]],
-        target_dataset_cls: Type[Dataset],
-        split_size: Iterable[float] = (0.9, 0.05, 0.05),
-        **kwargs,
+    def from_path(
+        dataset_path: str, target_dataset_cls: Type[Dataset], split_size: Iterable[float] = (0.9, 0.05, 0.05), **kwargs
     ) -> DatasetSplit:
+        presplit_dataset_folder_paths = [Path(dataset_path, split) for split in ["train", "test", "validation"]]
+
         def get_subset(ds):
             return Subset(dataset=ds, indices=range(len(ds)))
 
-        if isinstance(reader, list):
-            if len(reader) != 3:
-                raise ValueError(f"Lenght of list of readers needs to be 3 (is {len(reader)}).")
-            print("Different readers for train, test and eval were passed. Will use this split...")
+        if all(p.is_dir() for p in presplit_dataset_folder_paths):
+            print(f"Found already existing dataset split at {dataset_path}. Will use this one...")
 
-            def init_dataset(reader, **kwargs):
-                return target_dataset_cls(reader=reader, **kwargs)
+            def init_dataset(path, **kwargs):
+                return target_dataset_cls(raw_data_path=path)
 
-            dataset_split = [init_dataset(r, **kwargs) for r in reader]
+            dataset_split = [init_dataset(p, **kwargs) for p in presplit_dataset_folder_paths]
         else:
-            print("No existing dataset split passed. Loading dataset directly and applying split...")
-            dataset = target_dataset_cls(reader=reader, **kwargs)
+            print(f"No existing dataset split found at {dataset_path}. Loading dataset directly and apply split")
+            dataset = target_dataset_cls(raw_data_path=dataset_path, **kwargs)
             dataset_split = random_split(dataset, split_size)
         return DatasetSplit(
             train=get_subset(dataset_split[0]),
@@ -59,11 +56,12 @@ class Dataset(TorchdataSet):
 class MemMapDataset(Dataset):
     def __init__(
         self,
-        reader: BaseReader,
+        raw_data_path: Union[str, Path],
         tokenizer: PreTrainedTokenizerFast = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json"),
         jq_pattern: str = ".text",
     ):
-        super().__init__(reader=reader)
+        super().__init__(raw_data_path=raw_data_path)
+        self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_pattern)
         # TODO: tokenizer from tiktoken if it is faster?
         self.tokenizer = tokenizer
@@ -80,16 +78,17 @@ class MemMapDataset(Dataset):
         return obj
 
 
-class PackedDataset(TorchdataSet):
+class PackedDataset(Dataset):
     def __init__(
-        self, file_path: str | Path, block_size: int = 1024, int_size_in_bytes: int = 4, max_samples: int = None
+        self, raw_data_path: str | Path, block_size: int = 1024, int_size_in_bytes: int = 4, max_samples: int = None
     ):
-        self.file_path = Path(file_path)
+        super().__init__(raw_data_path=raw_data_path)
+        self.raw_data_path = Path(self.raw_data_path)
         self.block_size = block_size
         self.int_size_in_bytes = int_size_in_bytes
 
         # get number of total tokens in file
-        with self.file_path.open("r+b") as f:
+        with self.raw_data_path.open("r+b") as f:
             f.seek(0, os.SEEK_END)
             total_tokens = f.tell() // self.int_size_in_bytes
             f.seek(0)
@@ -102,7 +101,7 @@ class PackedDataset(TorchdataSet):
 
     def __getitem__(self, idx: int) -> dict:
         tokens_as_byte_strings = np.memmap(
-            self.file_path,
+            self.raw_data_path,
             mode="r",
             offset=idx * self.int_size_in_bytes * self.block_size,
             shape=(self.int_size_in_bytes * self.block_size,),

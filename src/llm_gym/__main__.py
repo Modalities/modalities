@@ -16,7 +16,7 @@ from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOn
 from llm_gym.config.config import AppConfig
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
-from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset
+from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset, PackedDataset  # noqa: F401
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
@@ -101,8 +101,15 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path):
-    create_packed_data(src_path, dst_path, index_path=index_path)
+@click.option(
+    "--jq_pattern",
+    type=str,
+    show_default=True,
+    default=".text",
+    help="jq pattern to extract the data from the json line.",
+)
+def entry_point_create_packed_data(src_path, dst_path, index_path, jq_pattern):
+    create_packed_data(src_path, dst_path, index_path=index_path, jq_pattern=jq_pattern)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -253,15 +260,11 @@ class Main:
         # on the fly tokenization
         # TODO: centralize this used Tokenizer
         # TODO: consider using instantiation from config and unify this with the parallel llm_gym.data implementation
-        from transformers import GPT2TokenizerFast
-
-        from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-
-        reader = LargeFileLinesReader(config.data.dataset_dir_path, lazy_init=True)
-        tokenizer = GPT2TokenizerFast(tokenizer_file="./data/tokenizer/tokenizer.json")
-        return Dataset.from_reader(
-            reader, target_dataset_cls=MemMapDataset, split_size=(0.999, 0.0005, 0.0005), tokenizer=tokenizer
-        )  # noqa: E501
+        return Dataset.from_path(
+            config.data.dataset_dir_path,
+            target_dataset_cls=PackedDataset,
+            split_size=(0.999, 0.0005, 0.0005),  # PackedDataset, MemMapDataset
+        )
 
     def create_samplers(self, dataset_split: DatasetSplit) -> Dict[str, DistributedSampler]:
         sampler_splits = dict()
