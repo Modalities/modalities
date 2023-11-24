@@ -39,7 +39,7 @@ class Dataset(TorchdataSet):
             print(f"Found already existing dataset split at {dataset_path}. Will use this one...")
 
             def init_dataset(path, **kwargs):
-                return target_dataset_cls(raw_data_path=path)
+                return target_dataset_cls(raw_data_path=path, **kwargs)
 
             dataset_split = [init_dataset(p, **kwargs) for p in presplit_dataset_folder_paths]
         else:
@@ -61,6 +61,18 @@ class MemMapDataset(Dataset):
         jq_pattern: str = ".text",
     ):
         super().__init__(raw_data_path=raw_data_path)
+
+        # if path is a dir, look for jsonl file
+        if self.raw_data_path.is_dir():
+            print(f"Data path '{self.raw_data_path}' is a directory, searching for .jsonl files...")
+            files = list(self.raw_data_path.iterdir())
+            files = [f for f in files if f.is_file()]
+            files = [f for f in files if str(f).endswith(".jsonl")]
+            if len(files) != 0:
+                self.raw_data_path = files[0]
+            else:
+                raise ValueError(f"Could not detect any jsonl files in '{self.raw_data_path}'.")
+
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_pattern)
         # TODO: tokenizer from tiktoken if it is faster?
@@ -83,7 +95,17 @@ class PackedDataset(Dataset):
         self, raw_data_path: str | Path, block_size: int = 1024, int_size_in_bytes: int = 4, max_samples: int = None
     ):
         super().__init__(raw_data_path=raw_data_path)
-        self.raw_data_path = Path(self.raw_data_path)
+        # if path is a dir, look for .packed.bin file
+        if self.raw_data_path.is_dir():
+            print(f"Data path '{self.raw_data_path}' is a directory, searching for .packed.bin files...")
+            files = list(self.raw_data_path.iterdir())
+            files = [f for f in files if f.is_file()]
+            files = [f for f in files if str(f).endswith(".packed.bin")]
+            if len(files) != 0:
+                self.raw_data_path = files[0]
+            else:
+                raise ValueError(f"Could not detect any .packed.bin files in '{self.raw_data_path}'.")
+
         self.block_size = block_size
         self.int_size_in_bytes = int_size_in_bytes
 
