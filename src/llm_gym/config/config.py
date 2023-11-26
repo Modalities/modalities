@@ -1,11 +1,17 @@
 import os
 from pathlib import Path
 from typing import List
-from llm_gym.config.config_utils import ClassPath
 
-from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator, FilePath
 
-from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SamplerTypes, SchedulerTypes
+from llm_gym.config.lookup_types import (
+    DataLoaderTypes,
+    LossTypes,
+    ModelTypes,
+    OptimizerTypes,
+    SamplerTypes,
+    SchedulerTypes,
+)
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
@@ -13,12 +19,6 @@ from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 class WandbConfig(BaseModel):
     project_name: str
-
-
-class CudaKwargsConfig(BaseModel):
-    num_workers: conint(ge=1)
-    pin_memory: bool
-    shuffle: bool
 
 
 class DistributedSamplerConfig(BaseModel):
@@ -32,12 +32,26 @@ class SamplerConfig(BaseModel):
     config: DistributedSamplerConfig
 
 
-class DataLoaderConfig(BaseModel):
+class DatasetConfig(BaseModel):
+    num_samples: conint(ge=1)
+    path: FilePath
+    sample_key: str
+    sequence_len: PositiveInt
+
+
+class LLMDataLoaderConfig(BaseModel):
     dataset_tag: str
-    num_batches: conint(ge=0)
     batch_size: conint(ge=1)
+    num_workers: conint(ge=1)
+    pin_memory: bool
+    shuffle: bool
     sampler: SamplerConfig
-    cuda_kwargs: CudaKwargsConfig
+    dataset: DatasetConfig
+
+
+class DataLoaderConfig(BaseModel):
+    type_hint: DataLoaderTypes
+    config: LLMDataLoaderConfig
 
 
 class DataConfig(BaseModel):

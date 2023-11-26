@@ -2,35 +2,62 @@ data:
   dataset_dir_path: /raid/s3/opengptx/mehdi/temp/temp_data
   sample_key: "input_ids"
   target_key: "target_ids"
-  sequence_len: 1024
   train_dataloader:
-    dataset_tag: "train"
-    num_batches: 1000 # total summed over all ranks
-    batch_size: 8 # per rank
-    shuffle: true
-    cuda_kwargs:
+    type_hint: LLMDataLoader
+    config:
+      dataset_tag: "train"
+      batch_size: 8 # per rank
       num_workers: 2
       pin_memory: true
       shuffle: false
-  eval_dataloaders:
-    - dataset_tag: "val"
-      num_batches: 100 # total summed over all ranks
-      batch_size: 8 # per rank
-      shuffle: false
-      cuda_kwargs:
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-    - dataset_tag: "test"
-      num_batches: 100 # total summed over all ranks
-      batch_size: 8 # per rank
       sampler:
-        type_hint:
-
-      cuda_kwargs:
+        type_hint: DistributedSampler
+        config:
+          rank: ${training.local_rank}
+          num_replicas: ${training.world_size}
+          shuffle: true
+        dataset:
+          num_samples: 800 # total summed over all ranks
+          path: /raid/s3/opengptx/mehdi/temp/temp_data/train_text_document.bin
+          sequence_len: 1024
+          sample_key: "input_ids"
+  eval_dataloaders:
+    - type_hint: LLMDataLoader
+      config:
+        dataset_tag: "val"
+        batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
         shuffle: false
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.local_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        dataset:
+          num_samples: 800 # total summed over all ranks
+          path: /raid/s3/opengptx/mehdi/temp/temp_data/val_text_document.bin
+          sequence_len: 1024
+          sample_key: "input_ids"
+    - type_hint: LLMDataLoader
+      config:
+        dataset_tag: "test"
+        batch_size: 8 # per rank
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.local_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        dataset:
+          num_samples: 800 # total summed over all ranks
+          path: /raid/s3/opengptx/mehdi/temp/temp_data/test_text_document.bin
+          sequence_len: 1024
+          sample_key: "input_ids"
 
 wandb:
   project_name: llm_gym
