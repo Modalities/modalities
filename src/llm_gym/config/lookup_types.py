@@ -4,7 +4,7 @@ import torch
 
 from llm_gym.loss_functions import CLMCrossEntropyLoss
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
-
+from llm_gym.dataset_loader import LLMDataLoader
 
 class LookupEnum(Enum):
     @classmethod
@@ -32,3 +32,6 @@ class SchedulerTypes(LookupEnum):
 
 class SamplerTypes(LookupEnum):
     DistributedSampler = torch.utils.data.distributed.DistributedSampler
+
+class DataLoaderTypes(LookupEnum):
+    LLMDataLoader = LLMDataLoader
