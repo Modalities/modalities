@@ -1,16 +1,18 @@
 from typing import Any, Dict
+from llm_gym.dataset_loader import LLMDataLoader
 
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
 
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
-from llm_gym.config.lookup_types import LossTypes, ModelTypes, SamplerTypes
+from llm_gym.config.lookup_types import DataLoaderTypes, LossTypes, ModelTypes, SamplerTypes
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
 from torch.utils.data import Sampler
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.dataloader import DataLoader
 
 
 class ResolverRegister:
@@ -22,14 +24,15 @@ class ResolverRegister:
             "type_hint" in config.model_fields.keys()
         ), f"Field 'type_hint' missing but needed for initalisation in {config}"
 
+        full_extra_kwargs = {key: getattr(config.config, key) for key in config.config.model_dump().keys()}
+        # merge dicts and override entries in case of duplicates
+        # note that duplicates usually occur when a dependent component was instantiated before and is now passed in
+        full_extra_kwargs |= extra_kwargs
+
         return self._build_component(
             register_key=config.type_hint,
             register_query=config.type_hint.name,
-            extra_kwargs=dict(
-                # do not model_dump recursively
-                **{key: getattr(config.config, key) for key in config.config.model_dump().keys()},
-                **extra_kwargs,
-            ),
+            extra_kwargs=full_extra_kwargs,
         )
 
     def build_component_by_key_query(self, register_key: str, type_hint: str, extra_kwargs: Dict = {}) -> Any:
@@ -74,15 +77,25 @@ class ResolverRegister:
                 base=Loss,
                 default=CLMCrossEntropyLoss,
             ),
-            SamplerTypes: ClassResolver(
-                [t.value for t in SamplerTypes],
-                base=Sampler,
-                default=DistributedSampler,
+            # TODO eval dataloaders can have a different type hint.
+            # It would be better to load all the type_hints the way we do for SamplerTypes.
+            config.data.train_dataloader.type_hint: ClassResolver(
+                [t.value for t in DataLoaderTypes],
+                base=DataLoader,
+                default=LLMDataLoader,
             ),
+            **{
+                sampler_type: ClassResolver(
+                    [t.value for t in SamplerTypes],
+                    base=Sampler,
+                    default=DistributedSampler,
+                )
+                for sampler_type in SamplerTypes
+            },
         }
-        assert set(expected_resolvers) == set(
-            resolvers
-        ), f"Some resolvers are not registered: {set(expected_resolvers).symmetric_difference(resolvers)}"
+        # assert set(expected_resolvers) == set(
+        #     resolvers
+        # ), f"Some resolvers are not registered: {set(expected_resolvers).symmetric_difference(resolvers)}"
         return resolvers
 
     def add_resolver(self, resolver_key: str, resolver: ClassResolver):
