@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 import click
 import click_pathlib
-from llm_gym.config.config import AppConfig, DataLoaderConfig
+from llm_gym.config.config import AppConfig, DataLoaderConfig, DatasetConfig, LLMDataLoaderConfig, SamplerConfig
 import numpy as np
 from pydantic import DirectoryPath
 import torch
@@ -178,26 +178,24 @@ class Main:
 
         for dataloader_config in [train_dataloader_config, *eval_dataloader_configs]:
             # Create instances
-            instances = self.create_instances(
-                dataset_dir_path=config.data.dataset_dir_path,
-                sequence_len=config.data.sequence_len,
-                sample_key=config.data.sample_key,
-                dataloader_config=dataloader_config,
+            split_instances = self.create_instances(
+                dataset_config=dataloader_config.config.dataset,  # TODO dataset config should not be passed like this
             )
 
             # Create samplers
-            sampler_splits = self.create_sampler(instances=instances)
+            # TODO this should be instantiated automatically in the registry by traversing the dependency tree
+            split_sampler = self.create_sampler(
+                sampler_config=dataloader_config.config.sampler, instances=split_instances
+            )
 
             # create dataloaders
-            dataloader_splits = self.create_dataloaders(
-                train_instances=instance_splits["train"],
-                val_instances=instance_splits["val"],
-                test_instances=instance_splits["test"],
-                train_sampler=sampler_splits["train"],
-                val_sampler=sampler_splits["val"],
-                test_sampler=sampler_splits["test"],
+            dataloader_split = self.create_dataloader(
+                dataloader_config=dataloader_config,
+                instances=split_instances,
+                sampler=split_sampler,
                 collate_fn=collator,
             )
+            data_loaders.append(dataloader_split)
         return data_loaders
 
     def get_model_and_optimizer(
@@ -250,89 +248,54 @@ class Main:
         return checkpointing
 
     def create_instances(
-        self, dataset_dir_path: DirectoryPath, sequence_len: int, sample_key: str, dataloader_config: DataLoaderConfig
+        self,
+        dataset_config: DatasetConfig,
     ) -> TextInstances:
-        dataset_filename_prefix = list(
-            set(
-                [
-                    dataset_dir_path.joinpath(filename.stem)
-                    for filename in dataset_dir_path.glob(f"*{dataloader_config.dataset_tag}*.bin")
-                ]
-            )
-        )[0]
+        dataset_directory = dataset_config.path.parents[0]
+        dataset_filename_prefix = dataset_directory.joinpath(dataset_config.path.stem)
         text_dataset = make_dataset(path=dataset_filename_prefix)
-        num_samples = dataloader_config.num_batches * dataloader_config.batch_size
         instances = TextInstances(
-            sample_key=sample_key,
+            sample_key=dataset_config.sample_key,
             text_dataset=text_dataset,
             doc_idx=np.arange(0, len(text_dataset)),
-            dataset_dir=dataset_dir_path,
-            num_samples=num_samples,
-            dataset_name=dataloader_config.dataset_tag,
-            sequence_len=sequence_len,
+            dataset_dir=dataset_directory,
+            num_samples=dataset_config.num_samples,
+            dataset_name=dataset_config.dataset_tag,
+            sequence_len=dataset_config.sequence_len,
         )
         return instances
 
-    def create_sampler(self, dataloader_config: DataLoaderConfig, instances: TextInstances) -> DistributedSampler:
+    def create_sampler(self, sampler_config: SamplerConfig, instances: TextInstances) -> DistributedSampler:
         sampler: Sampler = self.resolvers.build_component_by_config(
-            config=dataloader_config, extra_kwargs=dict(dataset=instances)
+            config=sampler_config, extra_kwargs=dict(dataset=instances)
         )
-
-
-        sampler = DistributedSampler(
-            dataset=instances,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-            shuffle=shuffle,
-        )
-
         return sampler
 
-    def create_dataloaders(
+    def create_dataloader(
         self,
-        train_instances: Dataset,
-        val_instances: Dataset,
-        test_instances: Dataset,
-        train_sampler: DistributedSampler,
-        val_sampler: DistributedSampler,
-        test_sampler: DistributedSampler,
+        dataloader_config: DataLoaderConfig,
+        instances: Dataset,
+        sampler: DistributedSampler,
         collate_fn: Callable,
-    ) -> Dict[str, LLMDataLoader]:
-        """Create dataset splits."""
-
-        data_loader_splits = {}
-
-        # create dataloaders
+        **dataloader_kwargs,
+    ) -> LLMDataLoader:
         collate_fn = GPT2LLMCollator(
             sample_key=self.config.data.sample_key,
             target_key=self.config.data.target_key,
         )
-        data_loader_splits["train"] = LLMDataLoader(
-            dataset=train_instances,
-            dataset_tag=self.config.data.dataloader.train_dataset_tag,
-            batch_size=self.config.training.training_batch_size,
-            sampler=train_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
-        data_loader_splits["val"] = LLMDataLoader(
-            dataset=val_instances,
-            dataset_tag=self.config.data.dataloader.val_dataset_tag,
-            batch_size=self.config.training.evaluation_batch_size,
-            sampler=val_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
-        data_loader_splits["test"] = LLMDataLoader(
-            dataset=test_instances,
-            dataset_tag=self.config.data.dataloader.test_dataset_tag,
-            batch_size=self.config.training.test_batch_size,
-            sampler=test_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
 
-        return data_loader_splits
+        data_loader: LLMDataLoader = self.resolvers.build_component_by_config(
+            config=dataloader_config, extra_kwargs=dict(dataset=instances, sampler=sampler, collate_fn=collate_fn)
+        )
+        # data_loader = LLMDataLoader(
+        #     dataset=instances,
+        #     dataset_tag=dataset_tag,
+        #     batch_size=batch_size,
+        #     sampler=sampler,
+        #     collate_fn=collate_fn,
+        #     **dataloader_kwargs,
+        # )
+        return data_loader
 
     def get_logging_publishers(
         self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
