@@ -36,6 +36,7 @@ class DataConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
+    callback_interval_in_samples: conint(gt=0)
     num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
     num_batches_per_training_sequence: int
@@ -43,14 +44,14 @@ class TrainingConfig(BaseModel):
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
-    eval_interval_in_batches: conint(ge=1)
     training_batch_size: int
     evaluation_batch_size: int
     test_batch_size: int
 
+    # TODO: rename this and all affected code pieces accordingly to "callback_interval_in_samples"
     @property
     def eval_interval_per_rank(self):
-        return self.num_training_batches // self.eval_interval_in_batches // self.world_size
+        return self.num_training_batches // self.callback_interval_in_samples // self.world_size
 
     @property
     def num_batches_per_rank(self):
@@ -58,7 +59,9 @@ class TrainingConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_multiples(self) -> "TrainingConfig":
-        computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
+        computed_num_training_batches = (
+            self.eval_interval_per_rank * self.world_size * self.callback_interval_in_samples
+        )
         if computed_num_training_batches != self.num_training_batches:
             raise ValueError(
                 "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"

@@ -19,7 +19,7 @@ training:
   process_group_backend: "nccl"
   num_training_batches: 7000
   num_batches_per_training_sequence: 100
-  eval_interval_in_batches: 2
+  callback_interval_in_samples: 2
   training_batch_size: 32
   evaluation_batch_size: 21
   test_batch_size: 21
