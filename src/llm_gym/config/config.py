@@ -70,6 +70,7 @@ class TrainingConfig(BaseModel):
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
     eval_interval_in_batches: conint(ge=1)
+    num_training_samples: int
 
     @property
     def eval_interval_per_rank(self):

@@ -68,7 +68,7 @@ class Trainer:
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
 
-            Trainer._publish_progress(
+            self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_batch_id=train_batch_id,
                 dataset_tag=train_loader.dataset_tag,
@@ -88,7 +88,7 @@ class Trainer:
                         dataset_tag=train_loader.dataset_tag,
                         train_batch_id=train_batch_id,
                     )
-                    Trainer._publish_evaluation_result(
+                    self._publish_evaluation_result(
                         evaluation_result_publisher=self.evaluation_result_publisher,
                         evaluation_result=evaluation_result,
                     )
