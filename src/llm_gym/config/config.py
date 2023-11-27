@@ -36,10 +36,10 @@ class DataConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
+    # TODO: use this in Progress Logging
+    num_training_samples: conint(gt=0)
     callback_interval_in_samples: conint(gt=0)
-    num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
-    num_batches_per_training_sequence: int
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
@@ -47,6 +47,10 @@ class TrainingConfig(BaseModel):
     training_batch_size: int
     evaluation_batch_size: int
     test_batch_size: int
+
+    @property
+    def num_training_batches(self) -> int:
+        return self.num_training_samples // self.training_batch_size
 
     # TODO: rename this and all affected code pieces accordingly to "callback_interval_in_samples"
     @property
