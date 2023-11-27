@@ -262,7 +262,7 @@ class Main:
         # TODO: consider using instantiation from config and unify this with the parallel llm_gym.data implementation
         return Dataset.from_path(
             config.data.dataset_dir_path,
-            target_dataset_cls=PackedDataset,
+            target_dataset_cls=MemMapDataset,
             split_size=(0.999, 0.0005, 0.0005),  # PackedDataset, MemMapDataset
         )
 
