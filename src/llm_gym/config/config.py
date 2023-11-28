@@ -1,10 +1,19 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Text
 
 from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 
-from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
+from llm_gym.config.lookup_types import (
+    CollatorTypes,
+    DataloaderTypes,
+    DatasetTypes,
+    LossTypes,
+    ModelTypes,
+    OptimizerTypes,
+    SamplerTypes,
+    SchedulerTypes,
+)
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_runner import RunnerConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
@@ -20,22 +29,51 @@ class CudaKwargsConfig(BaseModel):
     shuffle: bool
 
 
+class DatasetConfig(BaseModel):
+    # TODO: extend this with packed MemMapDataset / MegatronLMs-based packed version
+    class MemMapDatasetConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        tokenizer_path: FilePath
+        jq_pattern: str
+
+    type_hint: DatasetTypes
+    config: MemMapDatasetConfig
+
+
+class SamplerConfig(BaseModel):
+    class DistributedSamplerConfig(BaseModel):
+        rank: conint(ge=0)
+        num_replicas: conint(ge=0)
+        shuffle: bool
+
+    type_hint: SamplerTypes
+    config: DistributedSamplerConfig
+
+
+class CollatorConfig(BaseModel):
+    class GPT2LLMCollatorConfig(BaseModel):
+        sample_key: str
+        target_key: str
+
+    type_hint: CollatorTypes
+    config: GPT2LLMCollatorConfig
+
+
 class DataLoaderConfig(BaseModel):
-    train_dataset_tag: str
-    val_dataset_tag: str
-    test_dataset_tag: str
-    cuda_kwargs: CudaKwargsConfig
+    class LLMDataLoaderConfig(CudaKwargsConfig):
+        batch_size: conint(gt=0)
+        dataset_tag: str
+        dataset: DatasetConfig
+        sampler: SamplerConfig
+        collate_fn: CollatorConfig
 
-
-class DataConfig(BaseModel):
-    dataset_dir_path: DirectoryPath | FilePath
-    sample_key: str
-    target_key: str
-    sequence_len: PositiveInt
-    dataloader: DataLoaderConfig
+    type_hint: DataloaderTypes
+    config: LLMDataLoaderConfig
 
 
 class TrainingConfig(BaseModel):
+    train_dataloader: DataLoaderConfig
+    evaluation_dataloaders: Dict[Text, DataLoaderConfig]
     # TODO: use this in Progress Logging
     num_training_samples: conint(gt=0)
     callback_interval_in_samples: conint(gt=0)
@@ -44,13 +82,10 @@ class TrainingConfig(BaseModel):
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
-    training_batch_size: int
-    evaluation_batch_size: int
-    test_batch_size: int
 
     @property
     def num_training_batches(self) -> int:
-        return self.num_training_samples // self.training_batch_size
+        return self.num_training_samples // self.train_dataloader.config.batch_size
 
     # TODO: rename this and all affected code pieces accordingly to "callback_interval_in_samples"
     @property
@@ -61,6 +96,9 @@ class TrainingConfig(BaseModel):
     def num_batches_per_rank(self):
         return self.num_training_batches // self.world_size
 
+    # TODO: improve communication with the user for correct choices
+    #  (num_training_samples needs to be dividable by (batchsize x worldsize x callback_interval)
+    #  or consider just casting stuff here and adding a warning
     @model_validator(mode="after")
     def validate_multiples(self) -> "TrainingConfig":
         computed_num_training_batches = (
@@ -74,6 +112,7 @@ class TrainingConfig(BaseModel):
         return self
 
 
+# TODO: remove this?? Seems unnecessary to add another composition layer here
 class GPT2Config(BaseModel):
     config: GPTConfig
 
@@ -138,7 +177,6 @@ class CheckpointConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    data: DataConfig
     training: TrainingConfig
     loss: LossConfig
     runner: RunnerConfig

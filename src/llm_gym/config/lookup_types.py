@@ -1,8 +1,12 @@
 from enum import Enum
 
 import torch
+from torch.utils.data import DistributedSampler
 
+from llm_gym.dataloader.dataset import MemMapDataset
+from llm_gym.dataset_loader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.loss_functions import CLMCrossEntropyLoss
+from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
 
 
@@ -29,3 +33,20 @@ class SchedulerTypes(LookupEnum):
     StepLR = torch.optim.lr_scheduler.StepLR
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
     OneCycleLR = torch.optim.lr_scheduler.OneCycleLR
+
+
+class DatasetTypes(LookupEnum):
+    MemMapDataset = MemMapDataset
+
+
+class SamplerTypes(LookupEnum):
+    DistributedSampler = DistributedSampler
+
+
+class CollatorTypes(LookupEnum):
+    GPT2LLMCollator = GPT2LLMCollator
+
+
+class DataloaderTypes(LookupEnum):
+    RepeatingDataLoader = RepeatingDataLoader
+    LLMDataLoader = LLMDataLoader

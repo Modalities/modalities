@@ -15,8 +15,8 @@ def test_e2e_training_run_wout_ckpt(monkeypatch, dummy_data_path, dummy_config_p
 
     # load and run test config
     config_dict = load_app_config_dict(dummy_config_path)
-    config_dict["data"]["dataset_dir_path"] = dummy_data_path
     config = AppConfig.model_validate(config_dict)
+    config.training.train_dataloader.config.dataset.config.raw_data_path = dummy_data_path
     main = Main(config)
     mocked_checkpointing = MagicMock(spec=CheckpointingIF)
     main.gym.checkpointing = mocked_checkpointing

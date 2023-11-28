@@ -1,23 +1,22 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Dict
 
 import click
 import click_pathlib
 import torch
 import torch.distributed as dist
 from omegaconf import OmegaConf
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
-from llm_gym.config.config import AppConfig
+from llm_gym.config.config import AppConfig, DataLoaderConfig
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
 from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset, PackedDataset  # noqa: F401
-from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
 from llm_gym.gym import Gym
@@ -30,7 +29,6 @@ from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
 )
 from llm_gym.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
 from llm_gym.loss_functions import Loss
-from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
@@ -126,48 +124,31 @@ class Main:
 
         self.experiment_id = get_date_of_run()
 
-        self.dataset_path = config.data.dataset_dir_path
+        self.resolvers = ResolverRegister(config=config)
 
-        resolvers = ResolverRegister(config=config)
+        self.model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
-        self.model: torch.nn.Module = resolvers.build_component_by_config(config=config.model)
-
-        runner: Runner = resolvers.build_component_by_config(config=config.runner)
+        runner: Runner = self.resolvers.build_component_by_config(config=config.runner)
 
         self.wrapped_model = runner.wrap(model=self.model, local_rank=config.training.local_rank)
 
-        self.optimizer: torch.optim.Optimizer = resolvers.build_component_by_config(
+        self.optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
             config=config.optimizer, extra_kwargs=dict(params=self.wrapped_model.parameters())
         )
 
-        self.scheduler = resolvers.build_component_by_config(
+        self.scheduler = self.resolvers.build_component_by_config(
             config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
         )
 
-        self.loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
+        self.loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
 
-        # Create instances
-        dataset_split = self.create_datasplit(config=config)
-
-        # Create samplers
-        sampler_splits = self.create_samplers(dataset_split)
-
-        collator = GPT2LLMCollator(
-            sample_key=config.data.sample_key,
-            target_key=config.data.target_key,
-        )
-
-        dataloader_splits = self.create_dataloaders(
-            dataset_split,
-            train_sampler=sampler_splits["train"],
-            val_sampler=sampler_splits["val"],
-            test_sampler=sampler_splits["test"],
-            collate_fn=collator,
-        )
-
-        self.train_dataloader = dataloader_splits["train"]
-        self.val_dataloader = dataloader_splits["val"]
-        self.test_dataloader = dataloader_splits["test"]
+        self.train_dataloader = self._create_dataloader(config=config.training.train_dataloader)
+        validation_dataloader_lookup = {
+            dataset_tag: self._create_dataloader(config=config)
+            for dataset_tag, config in config.training.evaluation_dataloaders.items()
+        }
+        self.val_dataloader = validation_dataloader_lookup["val"]
+        self.test_dataloader = validation_dataloader_lookup["test"]
 
         # Message Broker
         message_broker = MessageBroker()
@@ -256,83 +237,20 @@ class Main:
             evaluation_data_loaders=self.eval_data_loaders,
         )
 
-    def create_datasplit(self, config: AppConfig) -> DatasetSplit:
-        # on the fly tokenization
-        # TODO: centralize this used Tokenizer
-        # TODO: consider using instantiation from config and unify this with the parallel llm_gym.data implementation
-        return Dataset.from_path(
-            config.data.dataset_dir_path,
-            target_dataset_cls=MemMapDataset,
-            split_size=(0.999, 0.0005, 0.0005),  # PackedDataset, MemMapDataset
+    def _create_dataloader(self, config: DataLoaderConfig) -> DataLoader:
+        dataset = self.resolvers.build_component_by_config(config=config.config.dataset)
+        collator = self.resolvers.build_component_by_config(config=config.config.collate_fn)
+        sampler = self.resolvers.build_component_by_config(
+            config=config.config.sampler, extra_kwargs=dict(dataset=dataset)
         )
-
-    def create_samplers(self, dataset_split: DatasetSplit) -> Dict[str, DistributedSampler]:
-        sampler_splits = dict()
-
-        sampler_splits["train"] = DistributedSampler(
-            dataset=dataset_split.train,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-            shuffle=True,
+        return self.resolvers.build_component_by_config(
+            config=config,
+            extra_kwargs=dict(
+                dataset=dataset,
+                sampler=sampler,
+                collate_fn=collator,
+            ),
         )
-
-        sampler_splits["val"] = DistributedSampler(
-            dataset=dataset_split.validation,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-        )
-
-        sampler_splits["test"] = DistributedSampler(
-            dataset=dataset_split.test,
-            rank=self.config.training.global_rank,
-            num_replicas=self.config.training.world_size,
-        )
-
-        return sampler_splits
-
-    def create_dataloaders(
-        self,
-        dataset_split: DatasetSplit,
-        train_sampler: DistributedSampler,
-        val_sampler: DistributedSampler,
-        test_sampler: DistributedSampler,
-        collate_fn: Callable,
-    ) -> Dict[str, LLMDataLoader]:
-        """Create dataset splits."""
-
-        data_loader_splits = {}
-
-        # create dataloaders
-        collate_fn = GPT2LLMCollator(
-            sample_key=self.config.data.sample_key,
-            target_key=self.config.data.target_key,
-        )
-        data_loader_splits["train"] = LLMDataLoader(
-            dataset=dataset_split.train,
-            dataset_tag=self.config.data.dataloader.train_dataset_tag,
-            batch_size=self.config.training.training_batch_size,
-            sampler=train_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
-        data_loader_splits["val"] = LLMDataLoader(
-            dataset=dataset_split.validation,
-            dataset_tag=self.config.data.dataloader.val_dataset_tag,
-            batch_size=self.config.training.evaluation_batch_size,
-            sampler=val_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
-        data_loader_splits["test"] = LLMDataLoader(
-            dataset=dataset_split.test,
-            dataset_tag=self.config.data.dataloader.test_dataset_tag,
-            batch_size=self.config.training.test_batch_size,
-            sampler=test_sampler,
-            **self.config.data.dataloader.cuda_kwargs.model_dump(),
-            collate_fn=collate_fn,
-        )
-
-        return data_loader_splits
 
 
 if __name__ == "__main__":
