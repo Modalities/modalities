@@ -33,6 +33,7 @@ class DatasetConfig(BaseModel):
     # TODO: extend this with packed MemMapDataset / MegatronLMs-based packed version
     class MemMapDatasetConfig(BaseModel):
         raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
         tokenizer_path: FilePath
         jq_pattern: str
 

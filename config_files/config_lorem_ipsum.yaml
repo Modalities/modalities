@@ -14,6 +14,7 @@ training:
         type_hint: MemMapDataset
         config:
           raw_data_path: ./data/lorem_ipsum.jsonl
+          block_size: ${model.config.config.block_size}
           tokenizer_path: ./data/tokenizer/tokenizer.json
           jq_pattern: ".text"
       sampler:
@@ -40,6 +41,7 @@ training:
           type_hint: MemMapDataset
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
+            block_size: ${model.config.config.block_size}
             tokenizer_path: ./data/tokenizer/tokenizer.json
             jq_pattern: ".text"
         sampler:
@@ -61,6 +63,7 @@ training:
           type_hint: MemMapDataset
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
+            block_size: ${model.config.config.block_size}
             tokenizer_path: ./data/tokenizer/tokenizer.json
             jq_pattern: ".text"
         sampler:
