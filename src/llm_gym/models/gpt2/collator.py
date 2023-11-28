@@ -22,6 +22,7 @@ class GPT2LLMCollator:
         :param batch: batch format [no_samples, height, width, channels]
         :return:
         """
+        # Shift so that tokens < n predict n
         sample_tensor = torch.stack([torch.tensor(d[self.sample_key]) for d in batch])
         samples = {self.sample_key: sample_tensor[:, :-1]}
         targets = {self.target_key: sample_tensor[:, 1:]}
