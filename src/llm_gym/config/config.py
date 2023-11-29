@@ -37,8 +37,12 @@ class DatasetConfig(BaseModel):
         tokenizer_path: FilePath
         jq_pattern: str
 
+    class PackedMemMapDatasetConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
+
     type_hint: DatasetTypes
-    config: MemMapDatasetConfig
+    config: MemMapDatasetConfig | PackedMemMapDatasetConfig
 
 
 class SamplerConfig(BaseModel):

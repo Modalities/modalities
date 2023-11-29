@@ -16,7 +16,6 @@ from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOn
 from llm_gym.config.config import AppConfig, DataLoaderConfig
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
-from llm_gym.dataloader.dataset import Dataset, DatasetSplit, MemMapDataset, PackedDataset  # noqa: F401
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
 from llm_gym.gym import Gym

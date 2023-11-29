@@ -3,7 +3,7 @@ from enum import Enum
 import torch
 from torch.utils.data import DistributedSampler
 
-from llm_gym.dataloader.dataset import MemMapDataset
+from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDataset
 from llm_gym.dataset_loader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.loss_functions import CLMCrossEntropyLoss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
@@ -37,6 +37,7 @@ class SchedulerTypes(LookupEnum):
 
 class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset
+    PackedMemMapDataset = PackedMemMapDataset
 
 
 class SamplerTypes(LookupEnum):
