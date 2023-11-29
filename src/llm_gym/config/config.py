@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Text
 
-from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint
 
 from llm_gym.config.lookup_types import (
     CollatorTypes,
@@ -90,31 +90,27 @@ class TrainingConfig(BaseModel):
 
     @property
     def num_training_batches(self) -> int:
-        return self.num_training_samples // self.train_dataloader.config.batch_size
+        exact = self.num_training_samples / self.train_dataloader.config.batch_size
+        ret = self.num_training_samples // self.train_dataloader.config.batch_size
+        if exact != ret:
+            print(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
-    # TODO: rename this and all affected code pieces accordingly to "callback_interval_in_samples"
     @property
-    def eval_interval_per_rank(self):
-        return self.num_training_batches // self.callback_interval_in_samples // self.world_size
+    def eval_interval_in_batches_per_rank(self):
+        exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
+        ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
+        if exact != ret:
+            print(f"Calculated eval_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
     @property
     def num_batches_per_rank(self):
-        return self.num_training_batches // self.world_size
-
-    # TODO: improve communication with the user for correct choices
-    #  (num_training_samples needs to be dividable by (batchsize x worldsize x callback_interval)
-    #  or consider just casting stuff here and adding a warning
-    @model_validator(mode="after")
-    def validate_multiples(self) -> "TrainingConfig":
-        computed_num_training_batches = (
-            self.eval_interval_per_rank * self.world_size * self.callback_interval_in_samples
-        )
-        if computed_num_training_batches != self.num_training_batches:
-            raise ValueError(
-                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"
-                " != num_training_batches"
-            )
-        return self
+        exact = self.num_training_batches / self.world_size
+        ret = self.num_training_batches // self.world_size
+        if exact != ret:
+            print(f"Calculated eval_interval_in_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
 
 # TODO: remove this?? Seems unnecessary to add another composition layer here
