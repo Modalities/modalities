@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,19 @@ from llm_gym.__main__ import load_app_config_dict
 from llm_gym.config.config import AppConfig
 
 _ROOT_DIR = Path(__file__).parents[1]
+
+
+@pytest.fixture
+def dummy_packed_data_path(tmpdir) -> Path:
+    data = b""
+    tokens = list(range(20))
+    data += (len(tokens) * 4).to_bytes(4, byteorder="big")
+    data += b"".join([t.to_bytes(4, byteorder="big") for t in tokens])
+    index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
+    data += pickle.dumps(index)
+    dummy_packed_data_path = Path(tmpdir, "dummy.packed.bin")
+    dummy_packed_data_path.write_bytes(data)
+    return dummy_packed_data_path
 
 
 @pytest.fixture
