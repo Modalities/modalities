@@ -41,7 +41,7 @@ class PackedDataGenerator:
         tokenizer = GPT2TokenizerFast(tokenizer_file=self.tokenizer_file)
 
         num_tokens = 0
-        curr_offset = 1
+        curr_offset = 4
         index_list = []
         eos_token_as_bytes = tokenizer(tokenizer.eos_token)["input_ids"][0].to_bytes(
             self.size_in_bytes, byteorder="big"
