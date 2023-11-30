@@ -41,8 +41,12 @@ class DatasetConfig(BaseModel):
         raw_data_path: DirectoryPath | FilePath
         block_size: conint(gt=0)
 
+    class PackedMemMapDatasetMegatronConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
+
     type_hint: DatasetTypes
-    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig
+    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
 
 
 class SamplerConfig(BaseModel):

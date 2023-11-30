@@ -9,6 +9,7 @@ import jq
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torch.utils.data.dataset import Subset
+from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -64,6 +65,8 @@ class MemMapDataset(Dataset):
         return obj
 
 
+# TODO: implement lazy data generation
+# TODO: implement lazy index to file saving
 class PackedMemMapDatasetBase(Dataset):
     INT_SIZE_IN_BYTES = 4
 
@@ -124,6 +127,57 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             offset=self.INT_SIZE_IN_BYTES + idx * self.INT_SIZE_IN_BYTES * self.block_size,
             shape=(self.INT_SIZE_IN_BYTES * self.block_size,),
         ).view(f"S{self.INT_SIZE_IN_BYTES}")
+        tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
+        attention_mask = [1] * len(tokens)
+        return {"input_ids": tokens, "attention_mask": attention_mask}
+
+
+class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
+    def generate_megatron_index(self):
+        # index_output_path = Path(index_output_path)
+
+        self.index = []
+        curr_offset = 4
+        curr_len = 0
+        block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
+        for segment_offset, segment_len in tqdm(self.index_base):
+            print(f"{self.index}")
+
+            if curr_len + segment_len < block_size_in_bytes:
+                curr_len += segment_len
+            elif curr_len + segment_len == block_size_in_bytes:
+                self.index.append((curr_offset, block_size_in_bytes))
+                curr_len = 0
+                curr_offset += block_size_in_bytes
+            else:
+                self.index.append((curr_offset, block_size_in_bytes))
+                if segment_len > block_size_in_bytes:
+                    curr_offset += block_size_in_bytes
+                    curr_len = 0
+                else:
+                    curr_offset = segment_offset
+                    curr_len = segment_len
+
+    def __init__(self, raw_data_path: str | Path, block_size: int):
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+
+        # get number of total tokens in file
+        total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
+        self.num_samples = total_tokens // self.block_size
+
+        self.generate_megatron_index()
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __getitem__(self, idx: int) -> dict:
+        offset, length = self.index[idx]
+        tokens_as_byte_strings = np.memmap(
+            self.raw_data_path,
+            mode="r",
+            offset=offset,
+            shape=(length,),
+        ).view(f"S{length}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         attention_mask = [1] * len(tokens)
         return {"input_ids": tokens, "attention_mask": attention_mask}
