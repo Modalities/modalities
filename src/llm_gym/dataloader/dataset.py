@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import pickle
 from pathlib import Path
 
 import jq
@@ -63,11 +64,12 @@ class MemMapDataset(Dataset):
         return obj
 
 
-class PackedMemMapDataset(Dataset):
+class PackedMemMapDatasetBase(Dataset):
     INT_SIZE_IN_BYTES = 4
 
     def __init__(self, raw_data_path: str | Path, block_size: int):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+
         # if path is a dir, look for .packed.bin file
         if self.raw_data_path.is_dir():
             print(f"Data path '{self.raw_data_path}' is a directory, searching for .packed.bin files...")
@@ -79,11 +81,37 @@ class PackedMemMapDataset(Dataset):
             else:
                 raise ValueError(f"Could not detect any .packed.bin files in '{self.raw_data_path}'.")
 
-        # get number of total tokens in file
-        with self.raw_data_path.open("r+b") as f:
+        # get number of total bytes in file
+        with self.raw_data_path.open("rb") as f:
             f.seek(0, os.SEEK_END)
-            total_tokens = f.tell() // self.INT_SIZE_IN_BYTES
+            self.total_bytes = f.tell()
             f.seek(0)
+
+        # get number of bytes in data section
+        self.data_len = np.memmap(
+            self.raw_data_path,
+            mode="r",
+            offset=0,
+            shape=(self.INT_SIZE_IN_BYTES,),
+        ).view(f"S{self.INT_SIZE_IN_BYTES}")
+        self.data_len = int.from_bytes(self.data_len, byteorder="big")
+
+        # get index
+        self.index_base = np.memmap(
+            self.raw_data_path,
+            mode="r",
+            offset=self.INT_SIZE_IN_BYTES + self.data_len,
+            shape=(self.total_bytes - self.data_len - self.INT_SIZE_IN_BYTES,),
+        ).view(f"S{self.total_bytes-self.data_len-self.INT_SIZE_IN_BYTES}")
+        self.index_base = pickle.loads(self.index_base)
+
+
+class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
+    def __init__(self, raw_data_path: str | Path, block_size: int):
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+
+        # get number of total tokens in file
+        total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
         self.num_samples = total_tokens // self.block_size
 
     def __len__(self) -> int:
@@ -93,7 +121,7 @@ class PackedMemMapDataset(Dataset):
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
             mode="r",
-            offset=idx * self.INT_SIZE_IN_BYTES * self.block_size,
+            offset=self.INT_SIZE_IN_BYTES + idx * self.INT_SIZE_IN_BYTES * self.block_size,
             shape=(self.INT_SIZE_IN_BYTES * self.block_size,),
         ).view(f"S{self.INT_SIZE_IN_BYTES}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]

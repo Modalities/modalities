@@ -1,6 +1,8 @@
+import pickle
 from pathlib import Path
 
 import jq
+import numpy as np
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
@@ -39,29 +41,51 @@ class PackedDataGenerator:
         tokenizer = GPT2TokenizerFast(tokenizer_file=self.tokenizer_file)
 
         num_tokens = 0
+        curr_offset = 1
+        index_list = []
         eos_token_as_bytes = tokenizer(tokenizer.eos_token)["input_ids"][0].to_bytes(
             self.size_in_bytes, byteorder="big"
         )
         with dst_path.open("wb") as f:
+            # allocate first 4 bytes for header (encodes length of data section)
+            f.write((0).to_bytes(self.size_in_bytes, byteorder="big"))
+
+            # write data section (tokens)
             for line in tqdm(reader):
                 try:
                     if self.max_length:
                         tokens = tokenizer(
                             self.jq_filter.input_text(line).first(), max_length=self.max_length, truncation=True
-                        )["input_ids"]
+                        )["input_ids"][: self.max_length]
                     else:
                         tokens = tokenizer(self.jq_filter.input_text(line).first())["input_ids"]
-                    for token in tokens:
-                        token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
-                        f.write(token_as_bytes)
-                        num_tokens += 1
-                        if num_tokens == self.max_tokens:
-                            raise StopIteration
-                    f.write(eos_token_as_bytes)
+                    if len(tokens) != 0:
+                        for token_idx, token in enumerate(tokens):
+                            token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
+                            f.write(token_as_bytes)
+                            num_tokens += 1
+                            if num_tokens == self.max_tokens:
+                                segment_length = (token_idx + 1) * self.size_in_bytes
+                                index_list.append((curr_offset, segment_length))
+                                curr_offset += segment_length
+                                raise StopIteration
+                        f.write(eos_token_as_bytes)
+                        segment_length = (token_idx + 2) * self.size_in_bytes
+                        index_list.append((curr_offset, segment_length))
+                        curr_offset += segment_length
                 except StopIteration:
                     break
                 except Exception as e:
                     print(f"could not process line: {e=}")
+
+            # write index
+            f.write(pickle.dumps(index_list))
+
+        # update header
+        header_data = (index_list[-1][0] + index_list[-1][1] - 1).to_bytes(self.size_in_bytes, byteorder="big")
+        header_data = np.frombuffer(header_data, dtype="uint8")
+        m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.size_in_bytes,))
+        m[:] = header_data[:]
 
 
 def create_packed_data(
