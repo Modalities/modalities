@@ -41,7 +41,7 @@ class PackedDataGenerator:
         tokenizer = GPT2TokenizerFast(tokenizer_file=self.tokenizer_file)
 
         num_tokens = 0
-        curr_offset = 4
+        curr_offset = self.size_in_bytes
         index_list = []
         eos_token_as_bytes = tokenizer(tokenizer.eos_token)["input_ids"][0].to_bytes(
             self.size_in_bytes, byteorder="big"
@@ -82,7 +82,9 @@ class PackedDataGenerator:
             f.write(pickle.dumps(index_list))
 
         # update header
-        header_data = (index_list[-1][0] + index_list[-1][1] - 1).to_bytes(self.size_in_bytes, byteorder="big")
+        header_data = (index_list[-1][0] + index_list[-1][1] - self.size_in_bytes).to_bytes(
+            self.size_in_bytes, byteorder="big"
+        )
         header_data = np.frombuffer(header_data, dtype="uint8")
         m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.size_in_bytes,))
         m[:] = header_data[:]
