@@ -141,8 +141,6 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
         for segment_offset, segment_len in tqdm(self.index_base):
-            print(f"{self.index}")
-
             if curr_len + segment_len < block_size_in_bytes:
                 curr_len += segment_len
             elif curr_len + segment_len == block_size_in_bytes:
@@ -177,7 +175,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
             mode="r",
             offset=offset,
             shape=(length,),
-        ).view(f"S{length}")
+        ).view(f"S{self.INT_SIZE_IN_BYTES}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         attention_mask = [1] * len(tokens)
         return {"input_ids": tokens, "attention_mask": attention_mask}
