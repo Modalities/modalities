@@ -46,7 +46,7 @@ class Gym:
             optimizer=optimizer,
             eval_interval_in_batches=eval_interval_per_rank,
             num_batches_per_rank=num_training_batches_per_rank,
-            epoch_done_callback=partial(
+            epoch_done_callback=partial( # TODO rename to something more meaningful
                 self._run_evaluation_and_checkpointing,
                 model=model,
                 optimizer=optimizer,
