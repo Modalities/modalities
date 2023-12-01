@@ -1,3 +1,17 @@
+# Project specific
+.env*
+data/datasets
+data/checkpoints
+logs/
+.DS_Store
+*.whl
+*.arrow
+core.*
+data/datasets
+data/checkpoints
+checkpoint
+wandb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -109,8 +123,31 @@ venv.bak/
 .vscode/
 .history/
 
-logs/
-.DS_Store
+# Created by https://www.toptal.com/developers/gitignore/api/vim
+# Edit at https://www.toptal.com/developers/gitignore?templates=vim
+
+### Vim ###
+# Swap
+[._]*.s[a-v][a-z]
+!*.svg  # comment out if you don't need vector files
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Session
+Session.vim
+Sessionx.vim
+
+# Temporary
+.netrwhist
+*~
+# Auto-generated tag files
+tags
+# Persistent undo
+[._]*.un~
+
+# End of https://www.toptal.com/developers/gitignore/api/vim
 
 *.whl
 *.arrow
@@ -120,3 +157,4 @@ data/checkpoints
 checkpoints
 checkpoint
 wandb
+

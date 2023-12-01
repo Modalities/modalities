@@ -1,11 +1,13 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Text
 
 from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator, FilePath
 
 from llm_gym.config.lookup_types import (
-    DataLoaderTypes,
+    CollatorTypes,
+    DataloaderTypes,
+    DatasetTypes,
     LossTypes,
     ModelTypes,
     OptimizerTypes,
@@ -21,56 +23,75 @@ class WandbConfig(BaseModel):
     project_name: str
 
 
-class DistributedSamplerConfig(BaseModel):
-    rank: conint(ge=0)
-    num_replicas: conint(ge=0)
-    shuffle: bool
+class DatasetConfig(BaseModel):
+    # TODO: extend this with packed MemMapDataset / MegatronLMs-based packed version
+    class MemMapDatasetConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
+        tokenizer_path: FilePath
+        jq_pattern: str
+
+    class PackedMemMapDatasetContinuousConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
+
+    class PackedMemMapDatasetMegatronConfig(BaseModel):
+        raw_data_path: DirectoryPath | FilePath
+        block_size: conint(gt=0)
+
+    class OpenGPTXMMapDatasetConfig(BaseModel):
+        num_samples: conint(ge=1)
+        path: FilePath
+        sample_key: str
+        sequence_len: PositiveInt
+
+    type_hint: DatasetTypes
+    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
 
 
 class SamplerConfig(BaseModel):
-    type_hint: SamplerTypes
-    config: DistributedSamplerConfig
+    class DistributedSamplerConfig(BaseModel):
+        rank: conint(ge=0)
+        num_replicas: conint(ge=0)
+        shuffle: bool
 
 
-class DatasetConfig(BaseModel):
-    num_samples: conint(ge=1)
-    path: FilePath
-    sample_key: str
-    sequence_len: PositiveInt
+class CollatorConfig(BaseModel):
+    class GPT2LLMCollatorConfig(BaseModel):
+        sample_key: str
+        target_key: str
 
-
-class LLMDataLoaderConfig(BaseModel):
-    dataset_tag: str
-    batch_size: conint(ge=1)
-    num_workers: conint(ge=1)
-    pin_memory: bool
-    shuffle: bool
-    sampler: SamplerConfig
-    dataset: DatasetConfig
+    type_hint: CollatorTypes
+    config: GPT2LLMCollatorConfig
 
 
 class DataLoaderConfig(BaseModel):
-    type_hint: DataLoaderTypes
+    class LLMDataLoaderConfig(CudaKwargsConfig):
+        dataset_tag: str
+        batch_size: conint(gt=0)
+        num_workers: conint(ge=1)
+        pin_memory: bool
+        shuffle: bool
+        dataset: DatasetConfig
+        sampler: SamplerConfig
+        collate_fn: CollatorConfig
+
+    type_hint: DataloaderTypes
     config: LLMDataLoaderConfig
 
 
-class DataConfig(BaseModel):
-    dataset_dir_path: DirectoryPath
-    sample_key: str
-    target_key: str
-    sequence_len: PositiveInt
-    train_dataloader: DataLoaderConfig
-    eval_dataloaders: List[DataLoaderConfig]
-
-
 class TrainingConfig(BaseModel):
+    train_dataloader: DataLoaderConfig
+    evaluation_dataloaders: Dict[Text, DataLoaderConfig]
+    # TODO: use this in Progress Logging
+    num_training_samples: conint(gt=0)
+    callback_interval_in_samples: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
     eval_interval_in_batches: conint(ge=1)
-    num_training_samples: int
 
     @property
     def eval_interval_per_rank(self):
@@ -78,19 +99,38 @@ class TrainingConfig(BaseModel):
 
     @property
     def num_training_batches_per_rank(self):
-        return self.num_training_batches // self.world_size
+        exact = self.num_training_batches / self.world_size
+        ret = self.num_training_batches // self.world_size
+        if exact != ret:
+            print(f"Calculated num_training_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
-    # @model_validator(mode="after")
-    # def validate_multiples(self) -> "TrainingConfig":
-    #     computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
-    #     if computed_num_training_batches != self.num_training_batches:
-    #         raise ValueError(
-    #             f"eval_interval_per_rank * world_size * eval_interval_in_batches ({computed_num_training_batches})"
-    #             f" != num_training_batches ({self.num_training_batches})"
-    #         )
-    #     return self
+    @property
+    def num_training_batches(self) -> int:
+        exact = self.num_training_samples / self.train_dataloader.config.batch_size
+        ret = self.num_training_samples // self.train_dataloader.config.batch_size
+        if exact != ret:
+            print(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def eval_interval_in_batches_per_rank(self):
+        exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
+        ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
+        if exact != ret:
+            print(f"Calculated eval_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def num_batches_per_rank(self):
+        exact = self.num_training_batches / self.world_size
+        ret = self.num_training_batches // self.world_size
+        if exact != ret:
+            print(f"Calculated eval_interval_in_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
 
+# TODO: remove this?? Seems unnecessary to add another composition layer here
 class GPT2Config(BaseModel):
     config: GPTConfig
 
@@ -155,7 +195,6 @@ class CheckpointConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    data: DataConfig
     training: TrainingConfig
     loss: LossConfig
     running_env: RunningEnvConfig

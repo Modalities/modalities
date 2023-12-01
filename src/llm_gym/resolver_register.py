@@ -1,14 +1,22 @@
-from typing import Any, Dict
 from llm_gym.dataset_loader import LLMDataLoader
-
+from typing import Any, Dict, List
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
-
+from torch.utils.data import DataLoader, Sampler
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
-from llm_gym.config.lookup_types import DataLoaderTypes, LossTypes, ModelTypes, SamplerTypes
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
+from llm_gym.config.lookup_types import (
+    CollatorTypes,
+    DataloaderTypes,
+    DatasetTypes,
+    LossTypes,
+    ModelTypes,
+    SamplerTypes,
+)
+from llm_gym.dataloader.dataset import Dataset
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
+from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
 from torch.utils.data import Sampler
 from torch.utils.data.distributed import DistributedSampler
@@ -17,22 +25,19 @@ from torch.utils.data.dataloader import DataLoader
 
 class ResolverRegister:
     def __init__(self, config: AppConfig) -> None:
-        self._resolver_register: Dict[str, ClassResolver] = ResolverRegister._create_resolver_register(config=config)
+        self._resolver_register: Dict[str, ClassResolver] = self._create_resolver_register(config=config)
 
     def build_component_by_config(self, config: BaseModel, extra_kwargs: Dict = {}) -> Any:
         assert (
             "type_hint" in config.model_fields.keys()
         ), f"Field 'type_hint' missing but needed for initalisation in {config}"
 
-        full_extra_kwargs = {key: getattr(config.config, key) for key in config.config.model_dump().keys()}
-        # merge dicts and override entries in case of duplicates
-        # note that duplicates usually occur when a dependent component was instantiated before and is now passed in
-        full_extra_kwargs |= extra_kwargs
-
+        kwargs = {key: getattr(config.config, key) for key in config.config.model_dump().keys()}
+        kwargs.update(extra_kwargs)  # allow override via extra_kwargs, to add nested objects
         return self._build_component(
             register_key=config.type_hint,
             register_query=config.type_hint.name,
-            extra_kwargs=full_extra_kwargs,
+            extra_kwargs=kwargs,
         )
 
     def build_component_by_key_query(self, register_key: str, type_hint: str, extra_kwargs: Dict = {}) -> Any:
@@ -44,13 +49,19 @@ class ResolverRegister:
             pos_kwargs=extra_kwargs,
         )
 
-    @staticmethod
-    def _create_resolver_register(config: AppConfig) -> Dict[str, ClassResolver]:
-        expected_resolvers = [
-            value["type_hint"]
-            for value in config.model_dump().values()
-            if isinstance(value, Dict) and "type_hint" in value.keys()
-        ]
+    def _find_values_with_key_in_nested_structure(self, nested_structure: Dict, key: str) -> List[Any]:
+        found_values = []
+        for k, v in nested_structure.items():
+            if k == key:
+                found_values.append(v)
+            elif isinstance(v, dict):
+                found_values.extend(self._find_values_with_key_in_nested_structure(v, key))
+        return found_values
+
+    def _create_resolver_register(self, config: AppConfig) -> Dict[str, ClassResolver]:
+        expected_resolvers = set(
+            self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint")
+        )
         resolvers = {
             config.running_env.type_hint: ClassResolver(
                 [t.value for t in RunningEnvTypes],
@@ -77,25 +88,31 @@ class ResolverRegister:
                 base=Loss,
                 default=CLMCrossEntropyLoss,
             ),
-            # TODO eval dataloaders can have a different type hint.
-            # It would be better to load all the type_hints the way we do for SamplerTypes.
-            config.data.train_dataloader.type_hint: ClassResolver(
-                [t.value for t in DataLoaderTypes],
-                base=DataLoader,
-                default=LLMDataLoader,
-            ),
             **{
                 sampler_type: ClassResolver(
-                    [t.value for t in SamplerTypes],
+                    classes=[t.value for t in SamplerTypes],
                     base=Sampler,
                     default=DistributedSampler,
                 )
                 for sampler_type in SamplerTypes
             },
+            **{
+                dataloader_type: ClassResolver(
+                    [t.value for t in DataloaderTypes],
+                    base=DataLoader,
+                    default=LLMDataLoader,
+                )
+                for dataloader_type in DataloaderTypes
+            },
+            **{
+                dataset_type: ClassResolver([t.value for t in DatasetTypes], base=Dataset)
+                for dataset_type in DatasetTypes
+            },
+            **{
+                collator_type: ClassResolver([t.value for t in CollatorTypes], base=GPT2LLMCollator)
+                for collator_type in CollatorTypes
+            },
         }
-        # assert set(expected_resolvers) == set(
-        #     resolvers
-        # ), f"Some resolvers are not registered: {set(expected_resolvers).symmetric_difference(resolvers)}"
         return resolvers
 
     def add_resolver(self, resolver_key: str, resolver: ClassResolver):

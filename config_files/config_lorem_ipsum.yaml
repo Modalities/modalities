@@ -1,102 +1,108 @@
-data:
-  dataset_dir_path: /raid/s3/opengptx/mehdi/temp/temp_data
-  sample_key: "input_ids"
-  target_key: "target_ids"
-  train_dataloader:
-    type_hint: LLMDataLoader
-    config:
-      dataset_tag: "train"
-      batch_size: 8 # per rank
-      num_workers: 2
-      pin_memory: true
-      shuffle: false
-      sampler:
-        type_hint: DistributedSampler
-        config:
-          rank: ${training.local_rank}
-          num_replicas: ${training.world_size}
-          shuffle: true
-      dataset:
-        path: /raid/s3/opengptx/mehdi/temp/temp_data/train_text_document.bin
-        sequence_len: 1024
-        sample_key: "input_ids"
-        num_samples: ${training.num_training_samples}
-  eval_dataloaders:
-    - type_hint: LLMDataLoader
-      config:
-        dataset_tag: "val"
-        batch_size: 8 # per rank
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        sampler:
-          type_hint: DistributedSampler
-          config:
-            rank: ${training.local_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
-        dataset:
-          num_samples: 800 # total summed over all ranks
-          path: /raid/s3/opengptx/mehdi/temp/temp_data/val_text_document.bin
-          sequence_len: 1024
-          sample_key: "input_ids"
-    - type_hint: LLMDataLoader
-      config:
-        dataset_tag: "test"
-        batch_size: 8 # per rank
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        sampler:
-          type_hint: DistributedSampler
-          config:
-            rank: ${training.local_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
-        dataset:
-          num_samples: 800 # total summed over all ranks
-          path: /raid/s3/opengptx/mehdi/temp/temp_data/test_text_document.bin
-          sequence_len: 1024
-          sample_key: "input_ids"
-
 wandb:
   project_name: llm_gym
 
 training:
+  train_dataloader:
+    type_hint: LLMDataLoader
+    config:
+      batch_size: 32
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+      dataset_tag: "train"
+      dataset:
+        type_hint: MemMapDataset
+        config:
+          raw_data_path: ./data/lorem_ipsum.jsonl
+          block_size: ${model.config.config.block_size}
+          tokenizer_path: ./data/tokenizer/tokenizer.json
+          jq_pattern: ".text"
+      sampler:
+        type_hint: DistributedSampler
+        config:
+          rank: ${training.global_rank}
+          num_replicas: ${training.world_size}
+          shuffle: true
+      collate_fn:
+        type_hint: GPT2LLMCollator
+        config:
+          sample_key: "input_ids"
+          target_key: "target_ids"
+  evaluation_dataloaders:
+    val:
+      type_hint: LLMDataLoader
+      config:
+        batch_size: 21
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataset_tag: "val"
+        dataset:
+          type_hint: MemMapDataset
+          config:
+            raw_data_path: ./data/lorem_ipsum.jsonl
+            block_size: ${model.config.config.block_size}
+            tokenizer_path: ./data/tokenizer/tokenizer.json
+            jq_pattern: ".text"
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.global_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        collate_fn: ${training.train_dataloader.config.collate_fn}
+    test:
+      type_hint: LLMDataLoader
+      config:
+        batch_size: 21
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataset_tag: "test"
+        dataset:
+          type_hint: MemMapDataset
+          config:
+            raw_data_path: ./data/lorem_ipsum.jsonl
+            block_size: ${model.config.config.block_size}
+            tokenizer_path: ./data/tokenizer/tokenizer.json
+            jq_pattern: ".text"
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.global_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        collate_fn: ${training.train_dataloader.config.collate_fn}
   process_group_backend: "nccl"
-  num_training_samples: 224000
-  callback_interval_in_samples: 2  # TODO check if multiple of global batch size
-  training_batch_size: 32
-  evaluation_batch_size: 21
-  test_batch_size: 21
+  num_training_samples: 5
+  callback_interval_in_samples: 1
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
 
 checkpoint:
-  dir_path: checkpoint
+  dir_path: data/checkpoints
   checkpointing_rank: ${training.main_rank}
 
 loss:
   type_hint: CLMCrossEntropyLoss
   config:
-    target_key: ${data.target_key}
+    target_key: ${training.train_dataloader.config.collate_fn.config.target_key}
     prediction_key: ${model.config.config.prediction_key}
 
-running_env:
-  type_hint: FSDPRunningEnv
+runner:
+  type_hint: FSDPRunner
   config:
     process_group_backend: ${training.process_group_backend}
-    local_rank: ${training.local_rank}
 
 model:
   type_hint: GPT2LLM
   config:
     config:
-      sample_key: ${data.sample_key}
+      sample_key: ${training.train_dataloader.config.collate_fn.config.sample_key}
       prediction_key: "logits"
-      block_size: ${data.sequence_len}
+      block_size: 1024
       vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
       n_layer: 12
       n_head: 12
