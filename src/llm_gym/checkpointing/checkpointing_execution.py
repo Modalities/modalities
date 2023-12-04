@@ -90,7 +90,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         ):
             model_state = model.state_dict()
             optimizer_state = optimizer.state_dict() # this gets the optimizer state dict object for each rank
-            optim_state_dict = FSDP.optim_state_dict(model=model, optim=optimizer, optim_state_dict=optimizer_state)
+            optim_state_dict = FSDP.optim_state_dict(model=model, optim=optimizer, optim_state_dict=optimizer_state) # all the state dicts of the different ranks are synchronized 
 
         if self.checkpointing_rank == self.global_rank:
             # save model
