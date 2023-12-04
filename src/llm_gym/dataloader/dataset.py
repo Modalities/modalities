@@ -4,7 +4,6 @@ import dataclasses
 import os
 import pickle
 from pathlib import Path
-
 import jq
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchdataSet
@@ -179,3 +178,4 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         attention_mask = [1] * len(tokens)
         return {"input_ids": tokens, "attention_mask": attention_mask}
+

@@ -12,7 +12,7 @@ import torch.distributed as dist
 import torch
 from llm_gym.batch import DatasetBatch, EvaluationResultBatch
 from torch.optim import Optimizer
-from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.dataloader.dataloader import LLMDataLoader
 
 
 class Trainer:

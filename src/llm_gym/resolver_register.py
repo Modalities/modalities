@@ -1,4 +1,4 @@
-from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from typing import Any, Dict, List
 import torch.optim as optim
 from class_resolver import ClassResolver

@@ -4,7 +4,7 @@ from llm_gym.models.model import NNModel, model_predict_batch
 import torch.distributed as dist
 import torch
 from llm_gym.batch import DatasetBatch, InferenceResultBatch, EvaluationResultBatch
-from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.logging_broker.messages import (
     BatchProgressUpdate,
     ExperimentStatus,
