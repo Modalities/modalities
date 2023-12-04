@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 from llm_gym.checkpointing.checkpointing import (
     CheckpointingExecutionIF,
     CheckpointingInstruction,
@@ -109,6 +109,16 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
 
+
+    def _get_paths_to_delete(self, batch_id: int)-> List[str]:
+        entity_file_name_regex = self.checkpoint_structure.replace("<enitity>", "*").replace(
+            "<step>", str(batch_id + 1)
+        )
+        full_path_regex = os.path.join(self.checkpoint_path, entity_file_name_regex)
+        files_paths_to_delete = glob.glob(full_path_regex)
+        return files_paths_to_delete
+
+
     def _delete_checkpoint(self, batch_id: int):
         if self.global_rank != 0:
             return
@@ -120,11 +130,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         else:
             raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 
-        entity_file_name_regex = self.checkpoint_structure.replace("<enitity>", "*").replace(
-            "<step>", str(batch_id + 1)
-        )
-        full_path_regex = os.path.join(self.checkpoint_path, entity_file_name_regex)
-        files_paths_to_delete = glob.glob(full_path_regex)
+        files_paths_to_delete = self._get_paths_to_delete(batch_id)
         for full_path in files_paths_to_delete:
             if os.path.exists(full_path):
                 os.remove(full_path)
