@@ -53,7 +53,7 @@ def bin_file_path_and_data_file_path_exists(path: str) -> bool:
 
 def make_dataset(path: Union[str, Path], skip_warmup=False) -> Dataset:
     """Creates MMapIndexedDataset.
-    :param path: path to .idx and .bin fules
+    :param path: path to .idx and .bin files
     :type path:
     :param skip_warmup:
     :type skip_warmup:
