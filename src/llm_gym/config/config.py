@@ -44,6 +44,8 @@ class DatasetConfig(BaseModel):
         path: FilePath
         sample_key: str
         sequence_len: PositiveInt
+        dataset_tag: str
+    
 
     type_hint: DatasetTypes
     config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
@@ -82,7 +84,7 @@ class DataLoaderConfig(BaseModel):
 
 class TrainingConfig(BaseModel):
     train_dataloader: DataLoaderConfig
-    evaluation_dataloaders: Dict[Text, DataLoaderConfig]
+    evaluation_dataloaders: List[DataLoaderConfig]
     # TODO: use this in Progress Logging
     num_training_samples: conint(gt=0)
     callback_interval_in_samples: conint(gt=0)
