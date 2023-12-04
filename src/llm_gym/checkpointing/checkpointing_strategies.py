@@ -12,7 +12,7 @@ class SaveMostRecentEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
     def __init__(self):
         self.saved_batch_id_checkpoints = []
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,
@@ -32,7 +32,7 @@ class SaveLastEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
     def __init__(self):
         pass
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,
@@ -52,7 +52,7 @@ class SaveAllCheckpointingStrategy(CheckpointingStrategyIF):
     def __init__(self):
         pass
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,
@@ -66,7 +66,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
     def __init__(self, k: int):
         self.k = k
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,

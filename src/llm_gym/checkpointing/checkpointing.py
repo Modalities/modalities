@@ -25,7 +25,7 @@ class CheckpointingStrategyIF(ABC):
     """
 
     @abstractmethod
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,
@@ -35,40 +35,7 @@ class CheckpointingStrategyIF(ABC):
         raise NotImplementedError
 
 
-class CheckpointingExecutionIF(ABC):
-    @abstractmethod
-    def run_checkpoint_instructions(
-        self,
-        checkpointing_instruction: CheckpointingInstruction,
-        global_train_batch_id: int,
-        model: NNModel,
-        optimizer: Optimizer,
-    ):
-        raise NotImplementedError
-
-    @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
-        raise NotImplementedError
-
-    @abstractmethod
-    def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: FSDP, experiment_id: str, global_train_batch_id: int
-    ) -> Optimizer:
-        raise NotImplementedError
-
-
-class CheckpointingIF:
-    def save_checkpoint(
-        self,
-        train_batch_id: int,
-        num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
-        model: NNModel,
-        optimizer: Optimizer,
-        early_stoppping_criterion_fulfilled: bool = False,
-    ):
-        raise NotImplementedError
-
+class CheckpointingIF(ABC):
     @abstractmethod
     def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
         raise NotImplementedError
@@ -77,6 +44,18 @@ class CheckpointingIF:
     def load_optimizer_checkpoint(
         self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
     ) -> Optimizer:
+        raise NotImplementedError
+
+
+class CheckpointingExecutionIF(CheckpointingIF):
+    @abstractmethod
+    def run_checkpoint_instructions(
+        self,
+        checkpointing_instruction: CheckpointingInstruction,
+        global_train_batch_id: int,
+        model: NNModel,
+        optimizer: Optimizer,
+    ):
         raise NotImplementedError
 
 
@@ -105,7 +84,7 @@ class Checkpointing(CheckpointingIF):
         early_stoppping_criterion_fulfilled: bool = False,
     ):
         global_train_batch_id = (train_batch_id + 1) * self.num_ranks - 1
-        checkpointing_instruction = self.checkpointing_strategy.get_model_checkpoint_instruction(
+        checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
             global_train_batch_id=global_train_batch_id,
             num_batches=num_batches,
             evaluation_result=evaluation_result,
