@@ -1,16 +1,14 @@
-import hashlib
 import logging
 import os
 import time
-from pathlib import Path
 from typing import Tuple
-
+from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDataset, make_dataset, print_rank_0
 import numpy as np
+from pydantic import FilePath
 import torch
 from numpy._typing import NDArray
-from torch.utils.data import Dataset
-
-from llm_gym.data.mmap_dataset import MMapIndexedDataset, print_rank_0
+from torch.utils.data.dataset import Dataset
+from pathlib import Path
 
 
 def get_num_tokens_per_epoch(documents: NDArray, sizes: NDArray) -> NDArray:
@@ -28,7 +26,7 @@ def get_num_epochs(num_tokens_per_epoch: int, sequence_len: int, num_samples: in
         # -1 is because we need to retrieve seq_length + 1 token each time
         # but the last token will overlap with the first token of the next
         # sample except for the last sample.
-        if ((total_tokens -1) // sequence_len) >= num_samples:
+        if ((total_tokens - 1) // sequence_len) >= num_samples:
             return num_epochs
 
 
@@ -36,7 +34,7 @@ def build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
     """Build an array with length = number-of-epochs * number-of-documents.
     Each index is mapped to a corresponding document."""
     if not separate_last_epoch or num_epochs == 1:
-        doc_idx = np.mgrid[0:num_epochs, 0: len(documents)][1]
+        doc_idx = np.mgrid[0:num_epochs, 0 : len(documents)][1]
         doc_idx[:] = documents
         doc_idx = doc_idx.reshape(-1)
         doc_idx = doc_idx.astype(np.int32)
@@ -52,21 +50,21 @@ def build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
 
 def _build_shuffle_idx(num_samples, total_size, np_rng):
     """Build the range [0, size) and shuffle."""
-    print(' > building shuffle index with split [0, {}) and [{}, {}) '
-          '...'.format(num_samples, num_samples, total_size), flush=True)
+    print(
+        " > building shuffle index with split [0, {}) and [{}, {}) " "...".format(num_samples, num_samples, total_size),
+        flush=True,
+    )
 
     dtype_ = np.uint32
     if total_size >= (np.iinfo(np.uint32).max - 1):
         dtype_ = np.int64
 
-    shuffle_idx_first = np.arange(start=0, stop=num_samples,
-                                  step=1, dtype=dtype_)
+    shuffle_idx_first = np.arange(start=0, stop=num_samples, step=1, dtype=dtype_)
     np_rng.shuffle(shuffle_idx_first)
     if num_samples == total_size:
         return shuffle_idx_first
 
-    shuffle_idx_last = np.arange(start=num_samples, stop=total_size,
-                                 step=1, dtype=dtype_)
+    shuffle_idx_last = np.arange(start=num_samples, stop=total_size, step=1, dtype=dtype_)
     np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
@@ -112,7 +110,7 @@ def build_sample_idx(
             # Note that -1 here is for the same reason we have -1 in
             # `_num_epochs` calculations.
             if remaining_seq_length <= 0:
-                doc_offset += (remaining_seq_length + doc_length - 1)
+                doc_offset += remaining_seq_length + doc_length - 1
                 remaining_seq_length = 0
             else:
                 # Otherwise, start from the begining of the next document.
@@ -198,13 +196,13 @@ def build_index_mappings(
 
             else:
                 # Get the number of samples for the last epoch
-                num_samples_from_epochs_minus_one = ((num_epochs - 1) * tokens_per_epoch-1) // sequence_len
+                num_samples_from_epochs_minus_one = ((num_epochs - 1) * tokens_per_epoch - 1) // sequence_len
                 last_epoch_num_samples = num_samples - num_samples_from_epochs_minus_one
 
                 assert (
                     last_epoch_num_samples >= 0
                 ), f"last epoch number of samples {last_epoch_num_samples} should be non-negative."
-                num_samples_per_epoch = (tokens_per_epoch-1) // sequence_len
+                num_samples_per_epoch = (tokens_per_epoch - 1) // sequence_len
                 assert (
                     last_epoch_num_samples <= num_samples_per_epoch
                 ), f"last epoch number of samples {last_epoch_num_samples} exceeded max value {num_samples_per_epoch}."
@@ -315,10 +313,10 @@ def build_index_mappings(
     return doc_idx, sample_idx, shuffle_idx
 
 
-class TextInstances(Dataset):
+class OpenGPTXDataset(Dataset):
     def __init__(
         self,
-        sample_key:str,
+        sample_key: str,
         text_dataset: MMapIndexedDataset,
         dataset_dir: str,
         doc_idx: NDArray[int],
@@ -364,7 +362,6 @@ class TextInstances(Dataset):
             sizes=text_dataset.sizes,
             num_samples=num_samples,
             sequence_len=self.sequence_len,
-
             data_prefix=Path(dataset_dir).joinpath(text_dataset._path).__str__(),
             # as input for the next indexed dataset, where it gets shuffled again. Is this correct?
             documents=self.doc_idx,
@@ -406,8 +403,27 @@ class TextInstances(Dataset):
 
             # And finally add the relevant portion of last document.
             doc_ids.append(self.doc_idx[doc_index_l])
-            sample_list.append(self.text_dataset.get(self.doc_idx[doc_index_l],length=offset_l + 1))
+            sample_list.append(self.text_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1))
             sample = np.concatenate(sample_list)
 
         # Sample is of length sequence_len + 1 because target toke is part of the sample
         return {self.sample_key: np.array(sample, dtype=np.int64)}
+
+
+class OpenGPTXDatasetFactory:
+    @staticmethod
+    def create_dataset(num_samples: int, path: FilePath, sample_key: str, sequence_len: int) -> OpenGPTXDataset:
+        dataset_directory = path.parents[0]
+        dataset_filename_prefix = path.stem
+        text_dataset = make_dataset(path=dataset_directory.joinpath(dataset_filename_prefix))
+
+        instances = OpenGPTXDataset(
+            sample_key=sample_key,
+            text_dataset=text_dataset,
+            doc_idx=np.arange(0, len(text_dataset)),
+            dataset_dir=dataset_directory,
+            num_samples=num_samples,
+            dataset_name=dataset_filename_prefix,
+            sequence_len=sequence_len,
+        )
+        return instances
