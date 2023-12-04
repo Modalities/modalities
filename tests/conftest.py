@@ -1,4 +1,4 @@
-from pathlib import Path
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -52,7 +52,7 @@ def progress_publisher_mock():
 @pytest.fixture
 def trainer(progress_publisher_mock):
     return Trainer(
-        local_rank=0,
+        local_rank=os.getenv("LOCAL_RANK"),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
