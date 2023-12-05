@@ -2,20 +2,21 @@
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 from llm_gym.config.config import PretrainedGPTConfig
-from llm_gym.models.gpt2.gpt2_model import GPTConfig, AttentionConfig, AttentionType, ActivationType, WeightInitailizationConfig
+from llm_gym.models.gpt2.gpt2_model import GPTConfig, AttentionConfig, AttentionType, ActivationType, \
+    WeightInitailizationConfig
 from llm_gym.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
 
-def test_evaluation(tmp_path):
+def test_pretrained_gpt_model(tmp_path):
     # setup config and model
     attention_config = AttentionConfig(attention_type=AttentionType("default_attention"), scaling_factor=3)
     config = GPTConfig(
-        block_size=1024,
-        vocab_size=50_304,
-        n_layer=4,
-        n_head=16,
-        n_embd=1024,
-        ffn_hidden=4096,
+        block_size=12,
+        vocab_size=128,
+        n_layer=2,
+        n_head=2,
+        n_embd=128,
+        ffn_hidden=128,
         dropout=0.01,
         bias=True,
         attention=attention_config,
@@ -41,7 +42,7 @@ def test_evaluation(tmp_path):
     loaded_model = AutoModelForCausalLM.from_pretrained(tmp_path)
     loaded_model = loaded_model.eval()
 
-    # check that model before and after loading are equal
+    # check that model before and after loading return the same output
     test_tensor = torch.randint(10, size=(5, 10))
     output_before_loading = model.forward(test_tensor)
     output_after_loading = loaded_model.forward(test_tensor)
