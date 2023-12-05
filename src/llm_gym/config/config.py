@@ -1,8 +1,10 @@
+import json
 import os
 from pathlib import Path
 from typing import List
 
 from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
 from llm_gym.config.types import ProcessGroupBackendType
@@ -138,3 +140,36 @@ class AppConfig(BaseModel):
     scheduler: SchedulerConfig
     checkpoint: CheckpointConfig
     wandb: WandbConfig
+
+
+class PretrainedGPTConfig(PretrainedConfig):
+    model_type = "llm_gym_gpt2"
+
+    def __init__(
+            self,
+            config: GPTConfig = None,
+            **kwargs
+    ):
+        if type(config) == dict:
+            config = GPTConfig(**config)
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        if self.config:
+            json_dict = {
+                "config": self.config.__dict__.copy(),
+                "model_type": self.model_type
+            }
+            json_dict["config"]["attention"] = {
+                "attention_type": self.config.attention.attention_type.value,
+                "scaling_factor": self.config.attention.scaling_factor
+            }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std
+            }
+        else:
+            json_dict = {}
+        return json.dumps(json_dict)

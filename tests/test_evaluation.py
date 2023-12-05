@@ -1,8 +1,9 @@
 
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM
+from llm_gym.config.config import PretrainedGPTConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig, AttentionConfig, AttentionType, ActivationType, WeightInitailizationConfig
-from llm_gym.models.gpt2.gpt2_evaluation import PretrainedGPTModel, PretrainedGPTConfig
+from llm_gym.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
 
 def test_evaluation(tmp_path):
@@ -10,7 +11,6 @@ def test_evaluation(tmp_path):
     attention_config = AttentionConfig(attention_type=AttentionType("default_attention"), scaling_factor=3)
     config = GPTConfig(
         block_size=1024,
-        # vocab_size=50257,
         vocab_size=50_304,
         n_layer=4,
         n_head=16,
