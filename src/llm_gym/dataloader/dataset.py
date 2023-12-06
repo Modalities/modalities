@@ -69,6 +69,7 @@ class MemMapDataset(Dataset):
 # TODO: implement lazy index to file saving
 class PackedMemMapDatasetBase(Dataset):
     INT_SIZE_IN_BYTES = 4
+    HEADER_SIZE_IN_BYTES = 8
 
     def __init__(self, raw_data_path: str | Path, block_size: int):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
@@ -95,17 +96,17 @@ class PackedMemMapDatasetBase(Dataset):
             self.raw_data_path,
             mode="r",
             offset=0,
-            shape=(self.INT_SIZE_IN_BYTES,),
-        ).view(f"S{self.INT_SIZE_IN_BYTES}")
+            shape=(self.HEADER_SIZE_IN_BYTES,),
+        ).view(f"S{self.HEADER_SIZE_IN_BYTES}")
         self.data_len = int.from_bytes(self.data_len, byteorder="big")
 
         # get index
         self.index_base = np.memmap(
             self.raw_data_path,
             mode="r",
-            offset=self.INT_SIZE_IN_BYTES + self.data_len,
-            shape=(self.total_bytes - self.data_len - self.INT_SIZE_IN_BYTES,),
-        ).view(f"S{self.total_bytes-self.data_len-self.INT_SIZE_IN_BYTES}")
+            offset=self.HEADER_SIZE_IN_BYTES + self.data_len,
+            shape=(self.total_bytes - self.data_len - self.HEADER_SIZE_IN_BYTES,),
+        ).view(f"S{self.total_bytes-self.data_len-self.HEADER_SIZE_IN_BYTES}")
         self.index_base = pickle.loads(self.index_base)
 
 
@@ -124,7 +125,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
             mode="r",
-            offset=self.INT_SIZE_IN_BYTES + idx * self.INT_SIZE_IN_BYTES * self.block_size,
+            offset=self.HEADER_SIZE_IN_BYTES + idx * self.INT_SIZE_IN_BYTES * self.block_size,
             shape=(self.INT_SIZE_IN_BYTES * self.block_size,),
         ).view(f"S{self.INT_SIZE_IN_BYTES}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
@@ -137,7 +138,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         # index_output_path = Path(index_output_path)
 
         self.index = []
-        curr_offset = 4
+        curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
         for segment_offset, segment_len in tqdm(self.index_base):

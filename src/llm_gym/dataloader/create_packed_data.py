@@ -19,6 +19,7 @@ class PackedDataGenerator:
         max_tokens: int = None,
         max_length: int = None,
         size_in_bytes: int = 4,
+        header_size_in_bytes: int = 8,
     ):
         self.src_path = Path(src_path)
         self.index_path = Path(index_path) if index_path is not None else None
@@ -27,6 +28,7 @@ class PackedDataGenerator:
         self.max_tokens = max_tokens
         self.max_length = max_length
         self.size_in_bytes = size_in_bytes
+        self.header_size_in_bytes = header_size_in_bytes
 
         reader = LargeFileLinesReader(src_path, index_path=index_path, lazy_init=False)
         self.num_samples = len(reader)
@@ -41,14 +43,14 @@ class PackedDataGenerator:
         tokenizer = GPT2TokenizerFast(tokenizer_file=self.tokenizer_file)
 
         num_tokens = 0
-        curr_offset = self.size_in_bytes
+        curr_offset = self.header_size_in_bytes
         index_list = []
         eos_token_as_bytes = tokenizer(tokenizer.eos_token)["input_ids"][0].to_bytes(
             self.size_in_bytes, byteorder="big"
         )
         with dst_path.open("wb") as f:
-            # allocate first 4 bytes for header (encodes length of data section)
-            f.write((0).to_bytes(self.size_in_bytes, byteorder="big"))
+            # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
+            f.write((0).to_bytes(self.header_size_in_bytes, byteorder="big"))
 
             # write data section (tokens)
             for line in tqdm(reader):
@@ -82,11 +84,11 @@ class PackedDataGenerator:
             f.write(pickle.dumps(index_list))
 
         # update header
-        header_data = (index_list[-1][0] + index_list[-1][1] - self.size_in_bytes).to_bytes(
-            self.size_in_bytes, byteorder="big"
+        header_data = (index_list[-1][0] + index_list[-1][1] - self.header_size_in_bytes).to_bytes(
+            self.header_size_in_bytes, byteorder="big"
         )
         header_data = np.frombuffer(header_data, dtype="uint8")
-        m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.size_in_bytes,))
+        m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.header_size_in_bytes,))
         m[:] = header_data[:]
 
 
