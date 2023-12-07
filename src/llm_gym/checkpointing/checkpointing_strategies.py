@@ -37,8 +37,6 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
         elif self.k==-1:
             self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
 
-
-
         return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=checkpoints_to_delete)
 
 
