@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import os
 import pickle
 from pathlib import Path
@@ -8,18 +7,10 @@ from pathlib import Path
 import jq
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchdataSet
-from torch.utils.data.dataset import Subset
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-
-
-@dataclasses.dataclass
-class DatasetSplit:
-    train: Subset
-    validation: Subset
-    test: Subset
 
 
 class Dataset(TorchdataSet):
