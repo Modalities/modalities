@@ -1,22 +1,9 @@
-from typing import Dict, List, Tuple
+from typing import Dict
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.models.model import NNModel
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from torch.optim import Optimizer
 import torch.nn as nn
-import torch.distributed as dist
-
-
-@dataclass
-class CheckpointingInstruction:
-    """
-    Instruction to save and delete checkpoints.
-    """
-
-    save_current: bool = False
-    checkpoints_to_delete: List[int] = field(default_factory=list)
 
 
 class CheckpointingStrategyIF(ABC):
@@ -53,7 +40,7 @@ class CheckpointingExecutionIF(CheckpointingIF):
         self,
         checkpointing_instruction: CheckpointingInstruction,
         global_train_batch_id: int,
-        model: NNModel,
+        model: nn.Module,
         optimizer: Optimizer,
     ):
         raise NotImplementedError
@@ -79,7 +66,7 @@ class Checkpointing(CheckpointingIF):
         train_batch_id: int,
         num_batches: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
-        model: NNModel,
+        model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
