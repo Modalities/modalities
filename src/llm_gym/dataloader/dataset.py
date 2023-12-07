@@ -25,17 +25,6 @@ class MemMapDataset(Dataset):
     ):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
 
-        # if path is a dir, look for jsonl file
-        if self.raw_data_path.is_dir():
-            print(f"Data path '{self.raw_data_path}' is a directory, searching for .jsonl files...")
-            files = list(self.raw_data_path.iterdir())
-            files = [f for f in files if f.is_file()]
-            files = [f for f in files if str(f).endswith(".jsonl")]
-            if len(files) != 0:
-                self.raw_data_path = files[0]
-            else:
-                raise ValueError(f"Could not detect any jsonl files in '{self.raw_data_path}'.")
-
         self.reader = LargeFileLinesReader(self.raw_data_path, lazy_init=True)
         self.jq_filter = jq.compile(jq_pattern)
         # TODO: tokenizer from tiktoken if it is faster?
@@ -64,17 +53,6 @@ class PackedMemMapDatasetBase(Dataset):
 
     def __init__(self, raw_data_path: str | Path, block_size: int):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
-
-        # if path is a dir, look for .packed.bin file
-        if self.raw_data_path.is_dir():
-            print(f"Data path '{self.raw_data_path}' is a directory, searching for .packed.bin files...")
-            files = list(self.raw_data_path.iterdir())
-            files = [f for f in files if f.is_file()]
-            files = [f for f in files if str(f).endswith(".packed.bin")]
-            if len(files) != 0:
-                self.raw_data_path = files[0]
-            else:
-                raise ValueError(f"Could not detect any .packed.bin files in '{self.raw_data_path}'.")
 
         # get number of total bytes in file
         with self.raw_data_path.open("rb") as f:
