@@ -7,7 +7,6 @@ import click_pathlib
 import torch
 import torch.distributed as dist
 from omegaconf import OmegaConf
-from torch.utils.data import DataLoader
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
@@ -16,6 +15,7 @@ from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOn
 from llm_gym.config.config import AppConfig, DataLoaderConfig
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
+from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
 from llm_gym.gym import Gym
@@ -143,8 +143,8 @@ class Main:
 
         self.train_dataloader = self._create_dataloader(config=config.training.train_dataloader)
         validation_dataloader_lookup = {
-            dataset_tag: self._create_dataloader(config=config)
-            for dataset_tag, config in config.training.evaluation_dataloaders.items()
+            dataloader_tag: self._create_dataloader(config=config)
+            for dataloader_tag, config in config.training.evaluation_dataloaders.items()
         }
         self.val_dataloader = validation_dataloader_lookup["val"]
         self.test_dataloader = validation_dataloader_lookup["test"]
@@ -163,10 +163,10 @@ class Main:
         )
 
         eval_split_lengths = {
-            self.val_dataloader.dataset_tag: len(self.val_dataloader) * config.training.world_size,
-            self.test_dataloader.dataset_tag: len(self.test_dataloader) * config.training.world_size,
+            self.val_dataloader.dataloader_tag: len(self.val_dataloader) * config.training.world_size,
+            self.test_dataloader.dataloader_tag: len(self.test_dataloader) * config.training.world_size,
         }
-        train_split_lengths = {self.train_dataloader.dataset_tag: len(self.train_dataloader)}
+        train_split_lengths = {self.train_dataloader.dataloader_tag: len(self.train_dataloader)}
 
         # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
         if not dist_launched or (dist_launched and dist.get_rank() == 0):
@@ -236,13 +236,13 @@ class Main:
             evaluation_data_loaders=self.eval_data_loaders,
         )
 
-    def _create_dataloader(self, config: DataLoaderConfig) -> DataLoader:
+    def _create_dataloader(self, config: DataLoaderConfig) -> LLMDataLoader:
         dataset = self.resolvers.build_component_by_config(config=config.config.dataset)
         collator = self.resolvers.build_component_by_config(config=config.config.collate_fn)
         sampler = self.resolvers.build_component_by_config(
             config=config.config.sampler, extra_kwargs=dict(dataset=dataset)
         )
-        return self.resolvers.build_component_by_config(
+        created_dataloader = self.resolvers.build_component_by_config(
             config=config,
             extra_kwargs=dict(
                 dataset=dataset,
@@ -250,6 +250,10 @@ class Main:
                 collate_fn=collator,
             ),
         )
+        assert isinstance(
+            created_dataloader, LLMDataLoader
+        ), f"Dataloader Class must use the {LLMDataLoader.__name__}-Interface"
+        return created_dataloader
 
 
 if __name__ == "__main__":

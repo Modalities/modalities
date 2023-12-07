@@ -71,7 +71,7 @@ class CollatorConfig(BaseModel):
 class DataLoaderConfig(BaseModel):
     class LLMDataLoaderConfig(CudaKwargsConfig):
         batch_size: conint(gt=0)
-        dataset_tag: str
+        dataloader_tag: str
         dataset: DatasetConfig
         sampler: SamplerConfig
         collate_fn: CollatorConfig

@@ -9,7 +9,7 @@ training:
       num_workers: 2
       pin_memory: true
       shuffle: false
-      dataset_tag: "train"
+      dataloader_tag: "train"
       dataset:
         type_hint: MemMapDataset
         config:
@@ -36,7 +36,7 @@ training:
         num_workers: 2
         pin_memory: true
         shuffle: false
-        dataset_tag: "val"
+        dataloader_tag: "val"
         dataset:
           type_hint: MemMapDataset
           config:
@@ -58,7 +58,7 @@ training:
         num_workers: 2
         pin_memory: true
         shuffle: false
-        dataset_tag: "test"
+        dataloader_tag: "test"
         dataset:
           type_hint: MemMapDataset
           config:
