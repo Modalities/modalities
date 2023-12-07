@@ -8,7 +8,8 @@ from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruc
 class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
     def __init__(self, k: int = -1):
         """Strategy for saving the k most recent checkpoints only.
-        k=None: keep all checkpoints
+        k=-1: keep all checkpoints
+        k=0: don't keep any checkpoint
         k>0: keep k checkpoints
         """
         self.saved_batch_id_checkpoints = []
@@ -24,13 +25,21 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
 
         self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
         checkpoints_to_delete = []
+        save_current = True
 
         if self.k > 0 and len(self.saved_batch_id_checkpoints) > self.k:
+            self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
             # Delete oldest checkpoint
             checkpoints_to_delete = [self.saved_batch_id_checkpoints[-1]]
             self.saved_batch_id_checkpoints = self.saved_batch_id_checkpoints[:-1]
+        elif self.k==0:
+            save_current=False
+        elif self.k==-1:
+            self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
 
-        return CheckpointingInstruction(save_current=True, checkpoints_to_delete=checkpoints_to_delete)
+
+
+        return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=checkpoints_to_delete)
 
 
 class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
