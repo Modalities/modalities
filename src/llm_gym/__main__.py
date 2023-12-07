@@ -5,7 +5,6 @@ import click
 import click_pathlib
 from llm_gym.config.config import AppConfig
 from llm_gym.logging_broker.subscriber import MessageSubscriberIF
-from llm_gym.optimizers.optimizer_factory import OptimizerFactory, OptimizerTypes
 import numpy as np
 from pydantic import DirectoryPath
 import torch
@@ -16,15 +15,11 @@ from torch.utils.data.distributed import DistributedSampler
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import (
-    SaveAllCheckpointingStrategy,
-)
+from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
-
-from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig
 from llm_gym.data.instances import TextInstances
 from llm_gym.data.mmap_dataset import make_dataset
@@ -122,8 +117,6 @@ class Main:
         # Loss function
         loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
 
-
-
         # Logging
         eval_split_lengths = {
             val_dataloader.dataset_tag: len(val_dataloader) * config.training.world_size,
@@ -178,7 +171,9 @@ class Main:
                 optimizer=optimizer,
             )
 
-    def get_dataloaders(self, config: AppConfig, collator: Callable) -> Tuple[LLMDataLoader, LLMDataLoader, LLMDataLoader]:
+    def get_dataloaders(
+        self, config: AppConfig, collator: Callable
+    ) -> Tuple[LLMDataLoader, LLMDataLoader, LLMDataLoader]:
         # Create instances
         instance_splits = self.create_instances(
             dataset_dir_path=config.data.dataset_dir_path,
