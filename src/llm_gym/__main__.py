@@ -231,7 +231,7 @@ class Main:
     def run(self):
         self.gym.run(
             num_batches_per_rank=self.config.training.num_batches_per_rank,
-            eval_interval_in_batches=self.config.training.eval_interval_in_batches_per_rank,
+            callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
             train_data_loader=self.train_dataloader,
             evaluation_data_loaders=self.eval_data_loaders,
         )

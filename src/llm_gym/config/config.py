@@ -101,11 +101,11 @@ class TrainingConfig(BaseModel):
         return ret
 
     @property
-    def eval_interval_in_batches_per_rank(self):
+    def callback_interval_in_batches_per_rank(self):
         exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
         ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
         if exact != ret:
-            print(f"Calculated eval_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+            print(f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
         return ret
 
     @property
@@ -113,7 +113,7 @@ class TrainingConfig(BaseModel):
         exact = self.num_training_batches / self.world_size
         ret = self.num_training_batches // self.world_size
         if exact != ret:
-            print(f"Calculated eval_interval_in_batches is not an integer. Clipping {exact} to {ret} ")
+            print(f"Calculated callback_interval_in_batches is not an integer. Clipping {exact} to {ret} ")
         return ret
 
 

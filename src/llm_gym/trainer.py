@@ -44,7 +44,7 @@ class Trainer:
         train_loader: LLMDataLoader,
         optimizer,
         loss_fun: Loss,
-        eval_interval_in_batches: int,
+        callback_interval_in_batches: int,
         num_batches_per_rank: int,
         epoch_done_callback: Callable[[int], None],
     ):
@@ -73,7 +73,7 @@ class Trainer:
             )
 
             # Check, if model should be evaluated
-            if (train_batch_id + 1) % eval_interval_in_batches == 0:
+            if (train_batch_id + 1) % callback_interval_in_batches == 0:
                 if train_batch_id > 0:
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
