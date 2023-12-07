@@ -5,7 +5,6 @@ from typing import Dict
 import click
 import click_pathlib
 import torch
-import torch.distributed as dist
 from omegaconf import OmegaConf
 
 from llm_gym.batch import EvaluationResultBatch
@@ -30,7 +29,7 @@ from llm_gym.logging_broker.subscriber_impl.results_subscriber import RichResult
 from llm_gym.loss_functions import Loss
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
-from llm_gym.util import get_date_of_run
+from llm_gym.util import dist_setup_info, get_date_of_run
 from llm_gym.utils.generate_text import main as generate_text_main
 
 
@@ -118,7 +117,6 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 class Main:
     def __init__(self, config: AppConfig) -> None:
         # Checks whether this process was launched with ``torch.distributed.elastic``
-        dist_launched = dist.is_torchelastic_launched()
         self.config = config
 
         self.experiment_id = get_date_of_run()
@@ -169,7 +167,7 @@ class Main:
         train_split_lengths = {self.train_dataloader.dataloader_tag: len(self.train_dataloader)}
 
         # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
-        if not dist_launched or (dist_launched and dist.get_rank() == 0):
+        if dist_setup_info.rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,
                 train_split_lengths=train_split_lengths,

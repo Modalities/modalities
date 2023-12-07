@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import List, Union
 
 import numpy as np
+import torch.distributed
 
+from ..util import dist_setup_info
 from .create_index import IndexGenerator
 
 
@@ -36,13 +38,22 @@ class LargeFileLinesReader(BaseReader):
         if not lazy_init and not self.index_path.is_file():
             raise FileNotFoundError("Index file must exist when lazy init is turned off")
 
-        if lazy_init and not self.index_path.is_file():
-            print("No Index File provided. Will generate one...")
-            generator = IndexGenerator(self.raw_data_path)
-            generator.run(self.index_path)
+        if lazy_init:
+            if dist_setup_info.rank == 0:
+                self.lazy_index_initialization()
+            else:
+                print(f"Waiting for index creation of Rank 0. My Rank is {dist_setup_info.rank}")
+            if dist_setup_info.dist_launched:
+                torch.distributed.barrier()  # index creation is not threadsafe among ddp-processes
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
+
+    def lazy_index_initialization(self):
+        if not self.index_path.is_file():
+            print("No Index File provided. Will generate one...")
+            generator = IndexGenerator(self.raw_data_path)
+            generator.run(self.index_path)
 
     def _default_index_path(self, index_path: Union[str, Path, None]) -> Path:
         if index_path is None:
