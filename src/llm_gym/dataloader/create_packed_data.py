@@ -15,7 +15,7 @@ class PackedDataGenerator:
         src_path: str | Path,
         index_path: str | Path = None,
         tokenizer_file: str = "./data/tokenizer/tokenizer.json",
-        jq_pattern=".text",
+        jq_pattern: str = ".text",
         max_tokens: int = None,
         max_length: int = None,
         size_in_bytes: int = 4,
