@@ -19,7 +19,7 @@ def dummy_packed_data_path(tmpdir) -> Path:
     data += b"".join([t.to_bytes(int_size_in_bytes, byteorder="big") for t in tokens])
     index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
-    dummy_packed_data_path = Path(tmpdir, "dummy.packed.bin")
+    dummy_packed_data_path = Path(tmpdir, "dummy.pbin")
     dummy_packed_data_path.write_bytes(data)
     return dummy_packed_data_path
 
@@ -39,6 +39,6 @@ def dummy_data_path(tmpdir) -> Path:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
+    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
     index_path.unlink(missing_ok=True)
     return dummy_data_path

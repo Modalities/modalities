@@ -53,7 +53,7 @@ def test_large_file_lines_reader(dummy_data_path):
 
 
 def test_large_file_lines_reader_lazy_index_init(tmpdir, dummy_data_path):
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
+    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
     with pytest.raises(FileNotFoundError):
         LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
 
@@ -64,6 +64,6 @@ def test_large_file_lines_reader_lazy_index_init(tmpdir, dummy_data_path):
 def test_large_file_lines_reader_missing_source_data(tmpdir, dummy_data_path):
     dummy_data_path.unlink(missing_ok=True)
     assert not dummy_data_path.exists()
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx.pkl")
+    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
     with pytest.raises(FileNotFoundError):
         LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)

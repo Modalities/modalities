@@ -105,12 +105,12 @@ def create_packed_data(
     raw_data_path = Path(src_path)
 
     if index_path is None:
-        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx.pkl")
+        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
     else:
         index_path = Path(index_path)
 
     if dst_path is None:
-        dst_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.packed.bin")
+        dst_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.pbin")
     else:
         dst_path = Path(dst_path)
 

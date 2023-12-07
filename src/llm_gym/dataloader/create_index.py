@@ -92,7 +92,7 @@ def create_memmap_index(src_path: str | Path, index_path: str | Path):
     raw_data_path = Path(src_path)
 
     if index_path is None:
-        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx.pkl")
+        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
     else:
         index_path = Path(index_path)
 

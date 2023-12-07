@@ -57,7 +57,7 @@ class LargeFileLinesReader(BaseReader):
 
     def _default_index_path(self, index_path: Union[str, Path, None]) -> Path:
         if index_path is None:
-            default_index_path = Path(self.raw_data_path.parent, f"{self.raw_data_path.stem}.idx.pkl")
+            default_index_path = Path(self.raw_data_path.parent, f"{self.raw_data_path.stem}.idx")
             print(f"No specific Index Path provided. Creating Index next to input data at: {default_index_path}")
             return default_index_path
         return Path(index_path)
