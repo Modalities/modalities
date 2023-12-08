@@ -6,12 +6,14 @@ import click
 import click_pathlib
 import torch
 from omegaconf import OmegaConf
+from transformers import GPT2TokenizerFast
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig, DataLoaderConfig
+from llm_gym.config.lookup_types import TokenizerTypes
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
 from llm_gym.dataset_loader import LLMDataLoader
@@ -59,10 +61,17 @@ def entry_point_run_llmgym(config_file_path: Path):
 @click.argument("model_path", type=str)
 @click.argument("config_path", type=str)
 @click.option(
-    "--tokenizer_file",
-    type=str,
+    "--tokenizer_type",
+    type=TokenizerTypes,
     show_default=True,
-    default="./data/tokenizer/tokenizer.json",
+    default=GPT2TokenizerFast,
+    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+)
+@click.option(
+    "--tokenizer_file",
+    type=Path,
+    show_default=True,
+    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
@@ -98,13 +107,29 @@ def entry_point_create_memmap_index(src_path, index_path):
     help="input path for index. will search in parent directory of src_path if none.",
 )
 @click.option(
+    "--tokenizer_type",
+    type=TokenizerTypes,
+    show_default=True,
+    default=GPT2TokenizerFast,
+    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+)
+@click.option(
+    "--tokenizer_file",
+    type=Path,
+    show_default=True,
+    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
+    help="path to tokenizer json",
+)
+@click.option(
     "--jq_pattern",
     type=str,
     show_default=True,
     default=".text",
     help="jq pattern to extract the data from the json line.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path, jq_pattern):
+def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
+    # TODO: creation of tokenizer not straight forward since we either require a whole APpConfig
+    #  or need create resolver = ClassResolver([A, B], base=Base) by collecting all possible classes, which is ugly
     create_packed_data(src_path, dst_path, index_path=index_path, jq_pattern=jq_pattern)
 
 
