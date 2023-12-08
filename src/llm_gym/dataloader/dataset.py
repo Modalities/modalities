@@ -8,7 +8,7 @@ import jq
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
-from transformers import GPT2TokenizerFast
+from transformers import PreTrainedTokenizer
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
@@ -21,12 +21,12 @@ class Dataset(TorchdataSet):
 
 class MemMapDataset(Dataset):
     def __init__(
-        self, raw_data_path: str | Path, block_size: int, tokenizer_path: str | Path, jq_pattern: str = ".text"
+        self, raw_data_path: str | Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"
     ):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param tokenizer_file: TODO
+        :param tokenizer: TODO
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
@@ -34,7 +34,7 @@ class MemMapDataset(Dataset):
         self.reader = LargeFileLinesReader(self.raw_data_path)
         self.jq_filter = jq.compile(jq_pattern)
         # TODO: tokenizer from tiktoken if it is faster?
-        self.tokenizer = GPT2TokenizerFast(tokenizer_file=str(tokenizer_path))
+        self.tokenizer = tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:

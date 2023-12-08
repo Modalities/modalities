@@ -15,8 +15,11 @@ training:
         config:
           raw_data_path: ./data/lorem_ipsum.jsonl
           block_size: ${model.config.config.block_size}
-          tokenizer_path: ./data/tokenizer/tokenizer.json
           jq_pattern: ".text"
+          tokenizer:
+            type_hint: GPT2TokenizerFast
+            config:
+              tokenizer_file: ./data/tokenizer/tokenizer.json
       sampler:
         type_hint: DistributedSampler
         config:
@@ -42,7 +45,7 @@ training:
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
             block_size: ${model.config.config.block_size}
-            tokenizer_path: ./data/tokenizer/tokenizer.json
+            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
             jq_pattern: ".text"
         sampler:
           type_hint: DistributedSampler
@@ -64,7 +67,7 @@ training:
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
             block_size: ${model.config.config.block_size}
-            tokenizer_path: ./data/tokenizer/tokenizer.json
+            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
             jq_pattern: ".text"
         sampler:
           type_hint: DistributedSampler

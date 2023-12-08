@@ -2,6 +2,7 @@ from enum import Enum
 
 import torch
 from torch.utils.data import DistributedSampler
+from transformers import GPT2TokenizerFast
 
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataset_loader import LLMDataLoader, RepeatingDataLoader
@@ -33,6 +34,10 @@ class SchedulerTypes(LookupEnum):
     StepLR = torch.optim.lr_scheduler.StepLR
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
     OneCycleLR = torch.optim.lr_scheduler.OneCycleLR
+
+
+class TokenizerTypes(LookupEnum):
+    GPT2TokenizerFast = GPT2TokenizerFast
 
 
 class DatasetTypes(LookupEnum):

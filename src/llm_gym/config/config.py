@@ -13,6 +13,7 @@ from llm_gym.config.lookup_types import (
     OptimizerTypes,
     SamplerTypes,
     SchedulerTypes,
+    TokenizerTypes,
 )
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_runner import RunnerConfig
@@ -29,12 +30,19 @@ class CudaKwargsConfig(BaseModel):
     shuffle: bool
 
 
+class TokenizerConfig(BaseModel):
+    class GPT2TokenizerFastConfig(BaseModel):
+        tokenizer_file: str  # FilePath not possible, since transformers.PretrainedTokenizers can only handle strings
+
+    type_hint: TokenizerTypes
+    config: GPT2TokenizerFastConfig
+
+
 class DatasetConfig(BaseModel):
-    # TODO: extend this with packed MemMapDataset / MegatronLMs-based packed version
     class MemMapDatasetConfig(BaseModel):
         raw_data_path: DirectoryPath | FilePath
         block_size: conint(gt=0)
-        tokenizer_path: FilePath
+        tokenizer: TokenizerConfig
         jq_pattern: str
 
     class PackedMemMapDatasetContinuousConfig(BaseModel):

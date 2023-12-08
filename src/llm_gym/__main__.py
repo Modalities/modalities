@@ -144,6 +144,7 @@ class Main:
             dataloader_tag: self._create_dataloader(config=config)
             for dataloader_tag, config in config.training.evaluation_dataloaders.items()
         }
+        # TODO: should get replaced with dynamic handling of multiple validation dataloaders
         self.val_dataloader = validation_dataloader_lookup["val"]
         self.test_dataloader = validation_dataloader_lookup["test"]
 
@@ -235,7 +236,10 @@ class Main:
         )
 
     def _create_dataloader(self, config: DataLoaderConfig) -> LLMDataLoader:
-        dataset = self.resolvers.build_component_by_config(config=config.config.dataset)
+        tokenizer = self.resolvers.build_component_by_config(config=config.config.dataset.config.tokenizer)
+        dataset = self.resolvers.build_component_by_config(
+            config=config.config.dataset, extra_kwargs=dict(tokenizer=tokenizer)
+        )
         collator = self.resolvers.build_component_by_config(config=config.config.collate_fn)
         sampler = self.resolvers.build_component_by_config(
             config=config.config.sampler, extra_kwargs=dict(dataset=dataset)
