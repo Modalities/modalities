@@ -21,8 +21,22 @@ class PackedDataGenerator:
         size_in_bytes: int = 4,
         header_size_in_bytes: int = 8,
     ):
+        """
+        :param raw_data_path: Path to a jsonl file, which holds text data
+        :param index_path: Path to an index file, which is supposed to indicate the start character position
+                           and length of samples given in `raw_data_path`.
+                           If not defined, an index next to `raw_data_path` is picked,
+                           by replacing its suffix with ".idx".
+        :param tokenizer_file: TODO
+        :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
+        :param max_tokens: TODO - necessary?
+        :param max_length: TODO - necessary?
+        :param size_in_bytes: amount of bytes to represent tokens as integers.
+                              If the vocabulary exceeds 2^`size_in_bytes`, this requires adaptation.
+        :param header_size_in_bytes: amount of bytes to represent number of all tokens in dataset.
+                                     If the amount exceeds 2^`header_size_in_bytes`, this requires adaptation.
+        """
         self.src_path = Path(src_path)
-        self.index_path = Path(index_path) if index_path is not None else None
         self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer_file = tokenizer_file
         self.max_tokens = max_tokens
@@ -100,9 +114,7 @@ def create_packed_data(
     index_path: str | Path = None,
     tokenizer_file: str = "./data/tokenizer/tokenizer.json",
     jq_pattern=".text",
-    max_tokens: int = None,
-    max_length: int = None,
-    size_in_bytes: int = 4,
+    **kwargs,
 ):
     raw_data_path = Path(src_path)
 
@@ -117,12 +129,6 @@ def create_packed_data(
         dst_path = Path(dst_path)
 
     generator = PackedDataGenerator(
-        src_path,
-        index_path=index_path,
-        tokenizer_file=tokenizer_file,
-        jq_pattern=jq_pattern,
-        max_tokens=max_tokens,
-        max_length=max_length,
-        size_in_bytes=size_in_bytes,
+        src_path, index_path=index_path, tokenizer_file=tokenizer_file, jq_pattern=jq_pattern, **kwargs
     )
     generator.run(dst_path)

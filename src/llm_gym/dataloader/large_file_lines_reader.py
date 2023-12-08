@@ -20,7 +20,7 @@ class BaseReader(ABC):
 class LargeFileLinesReader(BaseReader):
     def __init__(self, raw_data_path: str | Path, index_path: str | Path = None):
         """
-        :param raw_data_path: Path a jsonl file, which holds text data
+        :param raw_data_path: Path to a jsonl file, which holds text data
         :param index_path: Path to an index file, which is supposed to indicate the start character position
                            and length of samples given in `raw_data_path`.
                            If not defined, an index next to `raw_data_path` is picked,
