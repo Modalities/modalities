@@ -51,6 +51,11 @@ class PackedMemMapDatasetBase(Dataset):
 
     def __init__(self, raw_data_path: str | Path, block_size: int):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+        if not self.raw_data_path.is_file():
+            raise FileNotFoundError(
+                f"Packed Data was not found at {self.raw_data_path}."
+                f"Create on in advance by using `llm_gym create_packed_data`."
+            )
 
         # get number of total bytes in file
         with self.raw_data_path.open("rb") as f:

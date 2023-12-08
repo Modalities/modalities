@@ -32,7 +32,7 @@ class LargeFileLinesReader(BaseReader):
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
         if not self.index_path.is_file():
-            raise FileNotFoundError("Index file does not exist")
+            raise FileNotFoundError("Index file does not exist. Use `llm_gym create_memmap_index` to create one.")
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
@@ -41,7 +41,7 @@ class LargeFileLinesReader(BaseReader):
     def default_index_path(raw_data_path: str | Path, index_path: str | Path | None) -> Path:
         if index_path is None:
             default_index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
-            print(f"No specific Index Path provided. Creating Index next to input data at: {default_index_path}")
+            print(f"No specific Index Path provided. Pointing to index next to input data at: {default_index_path}")
             return default_index_path
         return Path(index_path)
 
