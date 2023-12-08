@@ -86,12 +86,11 @@ class PackedDataGenerator:
         m[:] = header_data[:]
 
     def _process_line(self, curr_offset, eos_token_as_bytes, f, index_list, line, num_tokens, tokenizer):
+        jq_retrieved_text = self.jq_filter.input_text(line).first()
         if self.max_length:
-            tokens = tokenizer(self.jq_filter.input_text(line).first(), max_length=self.max_length, truncation=True)[
-                "input_ids"
-            ][: self.max_length]
+            tokens = tokenizer(jq_retrieved_text, max_length=self.max_length, truncation=True)["input_ids"]
         else:
-            tokens = tokenizer(self.jq_filter.input_text(line).first())["input_ids"]
+            tokens = tokenizer(jq_retrieved_text)["input_ids"]
         if len(tokens) != 0:
             for token_idx, token in enumerate(tokens):
                 token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
