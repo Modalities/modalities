@@ -30,8 +30,8 @@ class PackedDataGenerator:
         self.size_in_bytes = size_in_bytes
         self.header_size_in_bytes = header_size_in_bytes
 
-        reader = LargeFileLinesReader(src_path, index_path=index_path, lazy_init=False)
-        self.num_samples = len(reader)
+        self._reader = LargeFileLinesReader(src_path, index_path=index_path, lazy_init=True, synced_init=False)
+        self.num_samples = len(self._reader)
 
     def run(self, dst_path: str | Path):
         dst_path = Path(dst_path)
@@ -39,7 +39,6 @@ class PackedDataGenerator:
         if dst_path.exists():
             raise ValueError(f"file already exists at destination path '{dst_path}'.")
 
-        reader = LargeFileLinesReader(self.src_path, index_path=self.index_path, lazy_init=False)
         tokenizer = GPT2TokenizerFast(tokenizer_file=self.tokenizer_file)
 
         num_tokens = 0
@@ -53,28 +52,9 @@ class PackedDataGenerator:
             f.write((0).to_bytes(self.header_size_in_bytes, byteorder="big"))
 
             # write data section (tokens)
-            for line in tqdm(reader):
+            for line in tqdm(self._reader):
                 try:
-                    if self.max_length:
-                        tokens = tokenizer(
-                            self.jq_filter.input_text(line).first(), max_length=self.max_length, truncation=True
-                        )["input_ids"][: self.max_length]
-                    else:
-                        tokens = tokenizer(self.jq_filter.input_text(line).first())["input_ids"]
-                    if len(tokens) != 0:
-                        for token_idx, token in enumerate(tokens):
-                            token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
-                            f.write(token_as_bytes)
-                            num_tokens += 1
-                            if num_tokens == self.max_tokens:
-                                segment_length = (token_idx + 1) * self.size_in_bytes
-                                index_list.append((curr_offset, segment_length))
-                                curr_offset += segment_length
-                                raise StopIteration
-                        f.write(eos_token_as_bytes)
-                        segment_length = (token_idx + 2) * self.size_in_bytes
-                        index_list.append((curr_offset, segment_length))
-                        curr_offset += segment_length
+                    self._process_line(curr_offset, eos_token_as_bytes, f, index_list, line, num_tokens, tokenizer)
                 except StopIteration:
                     break
                 except Exception as e:
@@ -90,6 +70,28 @@ class PackedDataGenerator:
         header_data = np.frombuffer(header_data, dtype="uint8")
         m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.header_size_in_bytes,))
         m[:] = header_data[:]
+
+    def _process_line(self, curr_offset, eos_token_as_bytes, f, index_list, line, num_tokens, tokenizer):
+        if self.max_length:
+            tokens = tokenizer(self.jq_filter.input_text(line).first(), max_length=self.max_length, truncation=True)[
+                "input_ids"
+            ][: self.max_length]
+        else:
+            tokens = tokenizer(self.jq_filter.input_text(line).first())["input_ids"]
+        if len(tokens) != 0:
+            for token_idx, token in enumerate(tokens):
+                token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
+                f.write(token_as_bytes)
+                num_tokens += 1
+                if num_tokens == self.max_tokens:
+                    segment_length = (token_idx + 1) * self.size_in_bytes
+                    index_list.append((curr_offset, segment_length))
+                    curr_offset += segment_length
+                    raise StopIteration
+            f.write(eos_token_as_bytes)
+            segment_length = (token_idx + 2) * self.size_in_bytes
+            index_list.append((curr_offset, segment_length))
+            curr_offset += segment_length
 
 
 def create_packed_data(

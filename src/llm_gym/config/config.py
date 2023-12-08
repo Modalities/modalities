@@ -38,11 +38,11 @@ class DatasetConfig(BaseModel):
         jq_pattern: str
 
     class PackedMemMapDatasetContinuousConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: Path
         block_size: conint(gt=0)
 
     class PackedMemMapDatasetMegatronConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: Path
         block_size: conint(gt=0)
 
     type_hint: DatasetTypes

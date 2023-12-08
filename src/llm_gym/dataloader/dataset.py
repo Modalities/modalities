@@ -6,11 +6,14 @@ from pathlib import Path
 
 import jq
 import numpy as np
+import torch
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
+from ..util import dist_setup_info
+from .create_packed_data import create_packed_data
 
 
 class Dataset(TorchdataSet):
@@ -53,6 +56,15 @@ class PackedMemMapDatasetBase(Dataset):
 
     def __init__(self, raw_data_path: str | Path, block_size: int):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+
+        if dist_setup_info.rank == 0:
+            if not self.raw_data_path.is_file():
+                raw_jsonl_data_path = self.raw_data_path.parent / Path(f"{self.raw_data_path.stem}.jsonl")
+                create_packed_data(src_path=raw_jsonl_data_path)
+        else:
+            print(f"Waiting for packed data initialization of Rank 0. My Rank is {dist_setup_info.rank}")
+        if dist_setup_info.dist_launched:
+            torch.distributed.barrier()  # data initialization is not threadsafe among ddp-processes
 
         # get number of total bytes in file
         with self.raw_data_path.open("rb") as f:

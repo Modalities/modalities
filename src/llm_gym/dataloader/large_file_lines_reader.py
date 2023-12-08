@@ -27,11 +27,23 @@ class LargeFileLinesReader(BaseReader):
         raw_data_path: Union[str, Path],
         index_path: Union[str, Path] = None,
         lazy_init: bool = False,
-        max_lines: int = None,
+        synced_init: bool = True,
     ):
+        """
+
+        :param raw_data_path: Path a jsonl file, which holds text data
+        :param index_path: Path to an index file, which is supposed to indicate the start character position
+                           and length of samples given in `raw_data_path`.
+                           If not defined, an index next to `raw_data_path` is picked,
+                           by replacing its suffix with ".idx".
+        :param lazy_init: In case no existing index file is found, it is generated on the fly if this option is toggled
+        :param synced_init: Needs to get toggled if torch.distributed-processes access this objects initialization.
+                            It uses a `torch.distributed.barrier` to sync these processes.
+                            If there are multiple processes running, but only one actually reaches this part of code,
+                            this must be turned off!
+        """
         self.raw_data_path = Path(raw_data_path)
         self.index_path = self._default_index_path(index_path)
-        self.max_lines = max_lines
 
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
@@ -39,15 +51,21 @@ class LargeFileLinesReader(BaseReader):
             raise FileNotFoundError("Index file must exist when lazy init is turned off")
 
         if lazy_init:
-            if dist_setup_info.rank == 0:
-                self.lazy_index_initialization()
+            if synced_init:
+                self.synced_index_initialization()
             else:
-                print(f"Waiting for index creation of Rank 0. My Rank is {dist_setup_info.rank}")
-            if dist_setup_info.dist_launched:
-                torch.distributed.barrier()  # index creation is not threadsafe among ddp-processes
+                self.lazy_index_initialization()
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
+
+    def synced_index_initialization(self):
+        if dist_setup_info.rank == 0:
+            self.lazy_index_initialization()
+        else:
+            print(f"Waiting for Rank 0 to initialize index. My Rank is {dist_setup_info.rank}")
+        if dist_setup_info.dist_launched:
+            torch.distributed.barrier()  # index creation is not threadsafe among ddp-processes
 
     def lazy_index_initialization(self):
         if not self.index_path.is_file():
