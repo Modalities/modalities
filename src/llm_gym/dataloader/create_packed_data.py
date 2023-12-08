@@ -30,7 +30,7 @@ class PackedDataGenerator:
         self.size_in_bytes = size_in_bytes
         self.header_size_in_bytes = header_size_in_bytes
 
-        self._reader = LargeFileLinesReader(src_path, index_path=index_path, lazy_init=True, synced_init=False)
+        self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self.num_samples = len(self._reader)
 
     def run(self, dst_path: str | Path):

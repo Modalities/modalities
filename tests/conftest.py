@@ -1,3 +1,4 @@
+import dataclasses
 import pickle
 from pathlib import Path
 
@@ -5,6 +6,8 @@ import pytest
 
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.config.config import AppConfig
+from llm_gym.dataloader.create_index import IndexGenerator
+from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -34,11 +37,24 @@ def dummy_config(monkeypatch) -> AppConfig:
     return AppConfig.model_validate(config_dict)
 
 
+@dataclasses.dataclass
+class DataPathCollection:
+    raw_data_path: Path
+    index_path: Path
+
+
 @pytest.fixture
-def dummy_data_path(tmpdir) -> Path:
+def dummy_data_path(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
+    index_path = LargeFileLinesReader.default_index_path(dummy_data_path, index_path=None)
     index_path.unlink(missing_ok=True)
+    return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
+
+
+@pytest.fixture
+def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
+    index_generator = IndexGenerator(dummy_data_path.raw_data_path)
+    index_generator.run(dummy_data_path.index_path)
     return dummy_data_path

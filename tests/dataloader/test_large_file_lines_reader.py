@@ -43,27 +43,19 @@ def test_index_creation(tmpdir):
     ] == dummy_content_text.split("\n")
 
 
-def test_large_file_lines_reader(dummy_data_path):
-    reader = LargeFileLinesReader(dummy_data_path, lazy_init=True)
-    assert dummy_data_path.read_text().count("\n") == 2
-    assert dummy_data_path.read_text().rsplit("\n")[-1] == ""
+def test_large_file_lines_reader(indexed_dummy_data_path):
+    raw_data_path = indexed_dummy_data_path.raw_data_path
+    reader = LargeFileLinesReader(raw_data_path)
+    assert raw_data_path.read_text().count("\n") == 2
+    assert raw_data_path.read_text().rsplit("\n")[-1] == ""
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
     assert len(reader) == 2
     assert all(map(len, reader))
 
 
-def test_large_file_lines_reader_lazy_index_init(tmpdir, dummy_data_path):
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
-    with pytest.raises(FileNotFoundError):
-        LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
-
-    LargeFileLinesReader(dummy_data_path, index_path, lazy_init=True)
-    LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
-
-
 def test_large_file_lines_reader_missing_source_data(tmpdir, dummy_data_path):
-    dummy_data_path.unlink(missing_ok=True)
-    assert not dummy_data_path.exists()
-    index_path = Path(tmpdir, f"{dummy_data_path.stem}.idx")
+    raw_data_path = dummy_data_path.raw_data_path
+    raw_data_path.unlink(missing_ok=True)
+    assert not raw_data_path.exists()
     with pytest.raises(FileNotFoundError):
-        LargeFileLinesReader(dummy_data_path, index_path, lazy_init=False)
+        LargeFileLinesReader(raw_data_path, dummy_data_path.index_path)
