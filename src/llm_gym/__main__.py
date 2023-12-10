@@ -12,7 +12,8 @@ from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
-from llm_gym.dataloader.dataloader import DataloaderFactory, LLMDataLoader
+from llm_gym.dataloader.dataloader import LLMDataLoader
+from llm_gym.dataloader.dataloader_factory import DataloaderFactory
 from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.dataloader.dataloader import LLMDataLoader
 from omegaconf import OmegaConf
@@ -222,8 +223,8 @@ class Main:
             ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
 
             gym.run(
-                num_batches_per_rank=self.config.training.num_batches_per_rank,
-                eval_interval_in_batches=self.config.training.eval_interval_in_batches,
+                num_training_batches_per_rank=self.config.training.num_batches_per_rank,
+                eval_interval_per_rank=self.config.training.eval_interval_in_batches,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
                 checkpointing=checkpointing,
