@@ -14,6 +14,9 @@ import torch
 from torch.nn import CrossEntropyLoss
 from copy import deepcopy
 
+# NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
+# CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
+
 
 class ExperimentConfig(BaseModel):
     llm_model_conf: GPTConfig  # Named it llm_model_conf as model_ is a protected namespace in pydantic
