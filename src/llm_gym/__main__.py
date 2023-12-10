@@ -235,7 +235,7 @@ class Main:
         return wrapped_model, optimizer
 
     def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
-        checkpointing_strategy = SaveAllCheckpointingStrategy()
+        checkpointing_strategy = SaveKMostRecentCheckpointsStrategy(k=-1)
         checkpointing_execution = FSDPToDiscCheckpointing(
             checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
             experiment_id=self.experiment_id,
