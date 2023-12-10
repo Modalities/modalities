@@ -3,6 +3,7 @@ from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXDatas
 
 import torch
 from torch.utils.data import DistributedSampler
+from transformers import GPT2TokenizerFast
 
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
@@ -40,6 +41,8 @@ class SchedulerTypes(LookupEnum):
 class SamplerTypes(LookupEnum):
     DistributedSampler = torch.utils.data.distributed.DistributedSampler
 
+class TokenizerTypes(LookupEnum):
+    GPT2TokenizerFast = GPT2TokenizerFast
 
 class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset

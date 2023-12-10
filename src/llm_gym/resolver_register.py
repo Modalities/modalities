@@ -4,6 +4,7 @@ import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
 from torch.utils.data import DataLoader, Sampler
+from transformers import PreTrainedTokenizer
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.config.lookup_types import (
@@ -13,6 +14,7 @@ from llm_gym.config.lookup_types import (
     LossTypes,
     ModelTypes,
     SamplerTypes,
+    TokenizerTypes,
 )
 from llm_gym.dataloader.dataset import Dataset
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
@@ -111,6 +113,10 @@ class ResolverRegister:
             **{
                 collator_type: ClassResolver([t.value for t in CollatorTypes], base=GPT2LLMCollator)
                 for collator_type in CollatorTypes
+            },
+            **{
+                tokenizer_type: ClassResolver([t.value for t in TokenizerTypes], base=PreTrainedTokenizer)
+                for tokenizer_type in TokenizerTypes
             },
         }
         return resolvers

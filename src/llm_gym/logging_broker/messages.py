@@ -16,6 +16,7 @@ T = TypeVar("T")
 @dataclass
 class Message(Generic[T]):
     """An object representing a message."""
+
     message_type: MessageTypes
     payload: T
     global_rank: int = 0
@@ -30,7 +31,9 @@ class ExperimentStatus(Enum):
 @dataclass
 class BatchProgressUpdate:
     """Object holding the state of the current batch computation progress."""
+
     train_batch_id: int  # current batch id in the training dataloader
-    dataset_batch_id: int  # current batch id in the respective dataloader. Note: in case of ExperimentState.TRAIN, dataset_batch_id=global_train_batch_id
+    dataset_batch_id: int  # current batch id in the respective dataloader.
+    # Note: in case of ExperimentState.TRAIN, dataset_batch_id=global_train_batch_id
     experiment_status: ExperimentStatus
-    dataset_tag: str
+    dataloader_tag: str

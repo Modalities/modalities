@@ -9,14 +9,17 @@ training:
       num_workers: 2
       pin_memory: true
       shuffle: false
-      dataset_tag: "train"
+      dataloader_tag: "train"
       dataset:
         type_hint: MemMapDataset
         config:
           raw_data_path: ./data/lorem_ipsum.jsonl
           block_size: ${model.config.config.block_size}
-          tokenizer_path: ./data/tokenizer/tokenizer.json
           jq_pattern: ".text"
+          tokenizer:
+            type_hint: GPT2TokenizerFast
+            config:
+              tokenizer_file: ./data/tokenizer/tokenizer.json
       sampler:
         type_hint: DistributedSampler
         config:
@@ -36,13 +39,13 @@ training:
         num_workers: 2
         pin_memory: true
         shuffle: false
-        dataset_tag: "val"
+        dataloader_tag: "val"
         dataset:
           type_hint: MemMapDataset
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
             block_size: ${model.config.config.block_size}
-            tokenizer_path: ./data/tokenizer/tokenizer.json
+            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
             jq_pattern: ".text"
         sampler:
           type_hint: DistributedSampler
@@ -58,13 +61,13 @@ training:
         num_workers: 2
         pin_memory: true
         shuffle: false
-        dataset_tag: "test"
+        dataloader_tag: "test"
         dataset:
           type_hint: MemMapDataset
           config:
             raw_data_path: ./data/lorem_ipsum.jsonl
             block_size: ${model.config.config.block_size}
-            tokenizer_path: ./data/tokenizer/tokenizer.json
+            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
             jq_pattern: ".text"
         sampler:
           type_hint: DistributedSampler

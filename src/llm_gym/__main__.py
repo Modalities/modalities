@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import click
 import click_pathlib
-from llm_gym.config.config import AppConfig
 from llm_gym.logging_broker.subscriber import MessageSubscriberIF
 import numpy as np
 import torch
@@ -15,9 +14,10 @@ from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckp
 from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataloader_factory import DataloaderFactory
 from llm_gym.fsdp.fsdp_running_env import RunningEnv
-from llm_gym.dataloader.dataloader import LLMDataLoader
 from omegaconf import OmegaConf
-from llm_gym.batch import EvaluationResultBatch
+from transformers import GPT2TokenizerFast
+from llm_gym.config.config import AppConfig, DataLoaderConfig
+from llm_gym.config.lookup_types import TokenizerTypes
 from llm_gym.dataloader.create_index import create_memmap_index
 from llm_gym.dataloader.create_packed_data import create_packed_data
 from llm_gym.evaluator import Evaluator
@@ -36,6 +36,7 @@ from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
 import torch.nn as nn
 from torch.optim import Optimizer
+from llm_gym.util import dist_setup_info, get_date_of_run
 from llm_gym.utils.generate_text import main as generate_text_main
 
 
@@ -65,10 +66,17 @@ def entry_point_run_llmgym(config_file_path: Path):
 @click.argument("model_path", type=str)
 @click.argument("config_path", type=str)
 @click.option(
-    "--tokenizer_file",
-    type=str,
+    "--tokenizer_type",
+    type=TokenizerTypes,
     show_default=True,
-    default="./data/tokenizer/tokenizer.json",
+    default=GPT2TokenizerFast,
+    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+)
+@click.option(
+    "--tokenizer_file",
+    type=Path,
+    show_default=True,
+    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
@@ -104,13 +112,29 @@ def entry_point_create_memmap_index(src_path, index_path):
     help="input path for index. will search in parent directory of src_path if none.",
 )
 @click.option(
+    "--tokenizer_type",
+    type=TokenizerTypes,
+    show_default=True,
+    default=GPT2TokenizerFast,
+    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+)
+@click.option(
+    "--tokenizer_file",
+    type=Path,
+    show_default=True,
+    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
+    help="path to tokenizer json",
+)
+@click.option(
     "--jq_pattern",
     type=str,
     show_default=True,
     default=".text",
     help="jq pattern to extract the data from the json line.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path, jq_pattern):
+def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
+    # TODO: creation of tokenizer not straight forward since we either require a whole APpConfig
+    #  or need create resolver = ClassResolver([A, B], base=Base) by collecting all possible classes, which is ugly
     create_packed_data(src_path, dst_path, index_path=index_path, jq_pattern=jq_pattern)
 
 
@@ -147,7 +171,7 @@ class Main:
 
             gym.run(
                 num_training_batches_per_rank=self.config.training.num_training_batches_per_rank,
-                eval_interval_per_rank=self.config.training.eval_interval_per_rank,
+                callback_interval_in_batches=self.config.training.eval_interval_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
                 checkpointing=checkpointing,
@@ -179,10 +203,10 @@ class Main:
 
         # Logging
         eval_split_lengths = {
-            dataloader.dataset_tag: len(dataloader) * config.training.world_size for dataloader in eval_dataloaders
+            dataloader.dataloader_tag: len(dataloader) * config.training.world_size for dataloader in eval_dataloaders
         }
 
-        train_split_lengths = {train_dataloader.dataset_tag: len(train_dataloader)}
+        train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
 
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
             config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
@@ -210,27 +234,6 @@ class Main:
         )
 
         return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
-
-    def run(self):
-        with self.running_env as running_env:
-            (
-                gym,
-                train_dataloader,
-                eval_data_loaders,
-                checkpointing,
-                wrapped_model,
-                optimizer,
-            ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
-
-            gym.run(
-                num_training_batches_per_rank=self.config.training.num_batches_per_rank,
-                eval_interval_per_rank=self.config.training.eval_interval_in_batches,
-                train_data_loader=train_dataloader,
-                evaluation_data_loaders=eval_data_loaders,
-                checkpointing=checkpointing,
-                model=wrapped_model,
-                optimizer=optimizer,
-            )
 
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
@@ -299,6 +302,7 @@ class Main:
             local_rank=config.training.local_rank,
         )
 
+        # TODO make logging rank configurable
         if config.training.global_rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,

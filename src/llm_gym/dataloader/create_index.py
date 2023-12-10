@@ -12,6 +12,13 @@ from tqdm import tqdm
 # TODO: benchmark against pyspark
 class IndexGenerator:
     def __init__(self, src_file: Path | str, chunksize: int = 4096, drop_faulty_entries: bool = False):
+        """
+        :param src_file: Path to a jsonl-file.
+        :param chunksize: defines the size of byte chunks that are processed via a producer-consumer approach.
+                          The producer reads chunks from the `src_file`, while the consumer creates index entries.
+        :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
+                                    Otherwise, the index generation fails with an exception.
+        """
         self.src_file = Path(src_file)
         self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
@@ -92,7 +99,7 @@ def create_memmap_index(src_path: str | Path, index_path: str | Path):
     raw_data_path = Path(src_path)
 
     if index_path is None:
-        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx.pkl")
+        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
     else:
         index_path = Path(index_path)
 

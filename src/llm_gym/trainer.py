@@ -1,18 +1,15 @@
 from typing import Callable
+import torch
+import torch.distributed as dist
+from torch.optim import Optimizer
+from llm_gym.batch import DatasetBatch, EvaluationResultBatch
 from llm_gym.fsdp.reducer import Reducer
-from llm_gym.logging_broker.messages import (
-    BatchProgressUpdate,
-    ExperimentStatus,
-    MessageTypes,
-)
+from llm_gym.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from llm_gym.logging_broker.publisher import MessagePublisher
 from llm_gym.loss_functions import Loss
 from llm_gym.models.model import NNModel, model_predict_batch
-import torch.distributed as dist
-import torch
-from llm_gym.batch import DatasetBatch, EvaluationResultBatch
-from torch.optim import Optimizer
 from llm_gym.dataloader.dataloader import LLMDataLoader
+
 
 
 class Trainer:
@@ -46,7 +43,7 @@ class Trainer:
         train_loader: LLMDataLoader,
         optimizer,
         loss_fun: Loss,
-        eval_interval_in_batches: int,
+        callback_interval_in_batches: int,
         num_batches_per_rank: int,
         epoch_done_callback: Callable[[int], None],
     ):
@@ -71,11 +68,11 @@ class Trainer:
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_batch_id=train_batch_id,
-                dataset_tag=train_loader.dataset_tag,
+                dataloader_tag=train_loader.dataloader_tag,
             )
 
             # Check, if model should be evaluated
-            if (train_batch_id + 1) % eval_interval_in_batches == 0:
+            if (train_batch_id + 1) % callback_interval_in_batches == 0:
                 if train_batch_id > 0:
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
@@ -85,7 +82,7 @@ class Trainer:
                     )
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
-                        dataset_tag=train_loader.dataset_tag,
+                        dataloader_tag=train_loader.dataloader_tag,
                         train_batch_id=train_batch_id,
                     )
                     self._publish_evaluation_result(
@@ -107,13 +104,13 @@ class Trainer:
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         train_batch_id: int,
-        dataset_tag: str,
+        dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
             train_batch_id=train_batch_id,
             dataset_batch_id=train_batch_id,
             experiment_status=ExperimentStatus.TRAIN,
-            dataset_tag=dataset_tag,
+            dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
 

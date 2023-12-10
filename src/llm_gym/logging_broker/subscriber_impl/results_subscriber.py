@@ -23,11 +23,11 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         eval_result = message.payload
         losses = {
-            f"{eval_result.dataset_tag} {loss_key}: {loss_values}"
+            f"{eval_result.dataloader_tag} {loss_key}: {loss_values}"
             for loss_key, loss_values in eval_result.losses.items()
         }
         metrics = {
-            f"{eval_result.dataset_tag} {metric_key}: {metric_values}"
+            f"{eval_result.dataloader_tag} {metric_key}: {metric_values}"
             for metric_key, metric_values in eval_result.metrics.items()
         }
 
@@ -55,10 +55,11 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         """Consumes a message from a message broker."""
         eval_result = message.payload
         losses = {
-            f"{eval_result.dataset_tag} {loss_key}": loss_values for loss_key, loss_values in eval_result.losses.items()
+            f"{eval_result.dataloader_tag} {loss_key}": loss_values
+            for loss_key, loss_values in eval_result.losses.items()
         }
         metrics = {
-            f"{eval_result.dataset_tag} {metric_key}": metric_values
+            f"{eval_result.dataloader_tag} {metric_key}": metric_values
             for metric_key, metric_values in eval_result.metrics.items()
         }
         wandb.log(data=losses, step=(eval_result.train_batch_id + 1) * self.num_ranks)

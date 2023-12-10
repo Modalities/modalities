@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import  List
+from typing import List
 
 from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator, FilePath
 
@@ -13,6 +13,7 @@ from llm_gym.config.lookup_types import (
     OptimizerTypes,
     SamplerTypes,
     SchedulerTypes,
+    TokenizerTypes,
 )
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
@@ -23,20 +24,33 @@ class WandbConfig(BaseModel):
     project_name: str
 
 
+class CudaKwargsConfig(BaseModel):
+    num_workers: conint(ge=1)
+    pin_memory: bool
+    shuffle: bool
+
+
+class TokenizerConfig(BaseModel):
+    class GPT2TokenizerFastConfig(BaseModel):
+        tokenizer_file: str  # FilePath not possible, since transformers.PretrainedTokenizers can only handle strings
+
+    type_hint: TokenizerTypes
+    config: GPT2TokenizerFastConfig
+
+
 class DatasetConfig(BaseModel):
-    # TODO: extend this with packed MemMapDataset / MegatronLMs-based packed version
     class MemMapDatasetConfig(BaseModel):
         raw_data_path: DirectoryPath | FilePath
         block_size: conint(gt=0)
-        tokenizer_path: FilePath
+        tokenizer: TokenizerConfig
         jq_pattern: str
 
     class PackedMemMapDatasetContinuousConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: Path
         block_size: conint(gt=0)
 
     class PackedMemMapDatasetMegatronConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: Path
         block_size: conint(gt=0)
 
     class OpenGPTXMMapDatasetConfig(BaseModel):
@@ -45,7 +59,6 @@ class DatasetConfig(BaseModel):
         sample_key: str
         sequence_len: PositiveInt
         dataset_tag: str
-    
 
     type_hint: DatasetTypes
     config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
@@ -69,11 +82,8 @@ class CollatorConfig(BaseModel):
 
 class DataLoaderConfig(BaseModel):
     class LLMDataLoaderConfig(CudaKwargsConfig):
-        dataset_tag: str
         batch_size: conint(gt=0)
-        num_workers: conint(ge=1)
-        pin_memory: bool
-        shuffle: bool
+        dataloader_tag: str
         dataset: DatasetConfig
         sampler: SamplerConfig
         collate_fn: CollatorConfig
@@ -113,14 +123,16 @@ class TrainingConfig(BaseModel):
         ret = self.num_training_samples // self.train_dataloader.config.batch_size
         if exact != ret:
             print(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+            # TODO: use logging.warning instead?
         return ret
 
     @property
-    def eval_interval_in_batches_per_rank(self):
+    def callback_interval_in_batches_per_rank(self):
         exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
         ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
         if exact != ret:
-            print(f"Calculated eval_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+            print(f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+            # TODO: use logging.warning instead?
         return ret
 
     @property
@@ -128,7 +140,8 @@ class TrainingConfig(BaseModel):
         exact = self.num_training_batches / self.world_size
         ret = self.num_training_batches // self.world_size
         if exact != ret:
-            print(f"Calculated eval_interval_in_batches is not an integer. Clipping {exact} to {ret} ")
+            print(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+            # TODO: use logging.warning instead?
         return ret
 
 

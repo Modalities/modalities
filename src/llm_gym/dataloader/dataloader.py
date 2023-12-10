@@ -1,18 +1,12 @@
-
-from torch.utils.data import Sampler, Dataset
-from torch.utils.data.dataloader import (
-    DataLoader,
-    _collate_fn_t,
-    _worker_init_fn_t,
-    T_co,
-)
 from typing import Iterable, List, Optional, Union
+from torch.utils.data import Dataset, Sampler
+from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
 
 
 class LLMDataLoader(DataLoader[T_co]):
     def __init__(
         self,
-        dataset_tag: str,
+        dataloader_tag: str,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
         shuffle: Optional[bool] = None,
@@ -50,11 +44,11 @@ class LLMDataLoader(DataLoader[T_co]):
             pin_memory_device=pin_memory_device,
         )
 
-        self._dataset_tag = dataset_tag
+        self._dataloader_tag = dataloader_tag
 
     @property
-    def dataset_tag(self) -> str:
-        return self._dataset_tag
+    def dataloader_tag(self) -> str:
+        return self._dataloader_tag
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
@@ -89,7 +83,5 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         return batch
 
     @property
-    def dataset_tag(self) -> str:
-        return self.data_loader._dataset_tag
-
-
+    def dataloader_tag(self) -> str:
+        return self.data_loader._dataloader_tag

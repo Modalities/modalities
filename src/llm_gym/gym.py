@@ -7,6 +7,11 @@ from llm_gym.models.model import NNModel
 from llm_gym.loss_functions import Loss
 from llm_gym.trainer import Trainer
 from torch.optim import Optimizer
+from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.evaluator import Evaluator
+from llm_gym.loss_functions import Loss
+from llm_gym.models.model import NNModel
+from llm_gym.trainer import Trainer
 
 
 class Gym:
@@ -26,6 +31,7 @@ class Gym:
         optimizer: Optimizer,
         num_training_batches_per_rank: int,
         eval_interval_per_rank: int,
+        callback_interval_in_batches: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
@@ -44,7 +50,7 @@ class Gym:
             train_loader=train_data_loader,
             loss_fun=self.loss_fun,
             optimizer=optimizer,
-            eval_interval_in_batches=eval_interval_per_rank,
+            callback_interval_in_batches=eval_interval_per_rank,
             num_batches_per_rank=num_training_batches_per_rank,
             epoch_done_callback=partial( # TODO rename to something more meaningful
                 self._run_evaluation_and_checkpointing,
