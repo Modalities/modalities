@@ -16,4 +16,8 @@ class DataloaderFactory:
                 collate_fn=collator,
             ),
         )
+
+        assert isinstance(
+            dataloader, LLMDataLoader
+        ), f"Dataloader Class must use the {LLMDataLoader.__name__}-Interface"
         return dataloader
