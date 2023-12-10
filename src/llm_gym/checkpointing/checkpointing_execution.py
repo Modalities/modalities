@@ -24,7 +24,7 @@ class CheckpointingEntityType(Enum):
     OPTIMIZER = "optimizer"
 
 
-class CheckpointingExecution(CheckpointingIF):
+class CheckpointingExecution(CheckpointingExecutionIF):
     @abstractmethod
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_batch_id: int):
         raise NotImplementedError

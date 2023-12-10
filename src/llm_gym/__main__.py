@@ -6,7 +6,6 @@ import click_pathlib
 from llm_gym.config.config import AppConfig
 from llm_gym.logging_broker.subscriber import MessageSubscriberIF
 import numpy as np
-from pydantic import DirectoryPath
 import torch
 from omegaconf import OmegaConf
 from llm_gym.batch import EvaluationResultBatch
