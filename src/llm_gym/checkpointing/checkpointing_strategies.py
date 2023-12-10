@@ -1,72 +1,50 @@
 from typing import Dict
-from llm_gym.checkpointing.checkpointing import (
-    CheckpointingStrategyIF,
-    CheckpointingInstruction,
-)
+from llm_gym.checkpointing.checkpointing import CheckpointingStrategyIF
+
 from llm_gym.batch import EvaluationResultBatch
+from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 
 
-class SaveMostRecentEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
-    """Class for Save Last Epoch only Checkpointing Strategy."""
-
-    def __init__(self):
+class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
+    def __init__(self, k: int = -1):
+        """Strategy for saving the k most recent checkpoints only.
+        k=-1: keep all checkpoints
+        k=0: don't keep any checkpoint
+        k>0: keep k checkpoints
+        """
         self.saved_batch_id_checkpoints = []
+        self.k = k
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
+        evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
-        checkpoints_to_delete = self.saved_batch_id_checkpoints.copy()
-        self.saved_batch_id_checkpoints = [global_train_batch_id]
-        return CheckpointingInstruction(save_current=True, checkpoints_to_delete=checkpoints_to_delete)
 
-
-class SaveLastEpochOnlyCheckpointingStrategy(CheckpointingStrategyIF):
-    """
-    Class for Save Last Epoch only Checkpointing Strategy.
-    """
-
-    def __init__(self):
-        pass
-
-    def get_model_checkpoint_instruction(
-        self,
-        global_train_batch_id: int,
-        num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
-        early_stoppping_criterion_fulfilled: bool = False,
-    ) -> CheckpointingInstruction:
+        self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
         checkpoints_to_delete = []
-        save_current = global_train_batch_id + 1 == num_batches or early_stoppping_criterion_fulfilled
+        save_current = True
+
+        if self.k > 0 and len(self.saved_batch_id_checkpoints) > self.k:
+            self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
+            # Delete oldest checkpoint
+            checkpoints_to_delete = [self.saved_batch_id_checkpoints[-1]]
+            self.saved_batch_id_checkpoints = self.saved_batch_id_checkpoints[:-1]
+        elif self.k==0:
+            save_current=False
+        elif self.k==-1:
+            self.saved_batch_id_checkpoints = [global_train_batch_id] + self.saved_batch_id_checkpoints
+
         return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=checkpoints_to_delete)
-
-
-class SaveAllCheckpointingStrategy(CheckpointingStrategyIF):
-    """
-    Class for Save All Checkpointing Stratergy.
-    """
-
-    def __init__(self):
-        pass
-
-    def get_model_checkpoint_instruction(
-        self,
-        global_train_batch_id: int,
-        num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
-        early_stoppping_criterion_fulfilled: bool = False,
-    ) -> CheckpointingInstruction:
-        return CheckpointingInstruction(save_current=True, checkpoints_to_delete=[])
 
 
 class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
     def __init__(self, k: int):
         self.k = k
 
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
         num_batches: int,

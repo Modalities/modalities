@@ -4,12 +4,15 @@ from typing import Dict, List, Tuple
 import click
 import click_pathlib
 from llm_gym.config.config import AppConfig
+from llm_gym.logging_broker.subscriber import MessageSubscriberIF
+import numpy as np
+from pydantic import DirectoryPath
 import torch
 from omegaconf import OmegaConf
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import SaveAllCheckpointingStrategy
+from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
 from llm_gym.dataloader.dataloader import DataloaderFactory, LLMDataLoader
 from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.dataloader.dataloader import LLMDataLoader
@@ -208,6 +211,27 @@ class Main:
 
         return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
 
+    def run(self):
+        with self.running_env as running_env:
+            (
+                gym,
+                train_dataloader,
+                eval_data_loaders,
+                checkpointing,
+                wrapped_model,
+                optimizer,
+            ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
+
+            gym.run(
+                num_batches_per_rank=self.config.training.num_batches_per_rank,
+                eval_interval_in_batches=self.config.training.eval_interval_in_batches,
+                train_data_loader=train_dataloader,
+                evaluation_data_loaders=eval_data_loaders,
+                checkpointing=checkpointing,
+                model=wrapped_model,
+                optimizer=optimizer,
+            )
+
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
     ) -> Tuple[nn.Module, Optimizer]:
@@ -244,7 +268,7 @@ class Main:
         return wrapped_model, optimizer
 
     def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
-        checkpointing_strategy = SaveAllCheckpointingStrategy()
+        checkpointing_strategy = SaveKMostRecentCheckpointsStrategy(k=-1)
         checkpointing_execution = FSDPToDiscCheckpointing(
             checkpoint_path="/raid/s3/opengptx/max_lue/LLMgym/checkpoints",
             experiment_id=self.experiment_id,
