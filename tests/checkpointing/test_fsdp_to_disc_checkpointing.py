@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile
-from typing import Any, Generator
+from typing import Any, Dict, Generator
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, GPTConfig
@@ -12,6 +12,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 import torch.distributed as dist
 import torch
 from torch.nn import CrossEntropyLoss
+from copy import deepcopy
 
 
 class ExperimentConfig(BaseModel):
@@ -59,9 +60,7 @@ class TestFSDPToDiscCheckpointing:
             yield tmp_dir_path
 
     @staticmethod
-    def _forward_backward_pass(experiment_config: ExperimentConfig, model: FSDP, optimizer: Optimizer):
-        ce_loss = CrossEntropyLoss()
-
+    def _generate_batch(experiment_config: ExperimentConfig):
         # prepare input and targets
         data = torch.randint(
             0, experiment_config.llm_model_conf.vocab_size, (8, experiment_config.llm_model_conf.block_size + 1)
@@ -69,6 +68,17 @@ class TestFSDPToDiscCheckpointing:
         batch_input_ids_dict = {experiment_config.llm_model_conf.sample_key: data[:, :-1]}
         batch_target_ids = data[:, 1:]
         batch_target_ids = batch_target_ids.contiguous()
+        return batch_input_ids_dict, batch_target_ids
+
+    @staticmethod
+    def _forward_backward_pass(
+        experiment_config: ExperimentConfig,
+        model: FSDP,
+        optimizer: Optimizer,
+        batch_input_ids_dict: Dict,
+        batch_target_ids: torch.Tensor,
+    ):
+        ce_loss = CrossEntropyLoss()
 
         # clear the gradients
         optimizer.zero_grad()
@@ -82,6 +92,42 @@ class TestFSDPToDiscCheckpointing:
 
         # update the weights based on the gradients
         optimizer.step()
+        return loss
+
+    @staticmethod
+    def _assert_equality_optimizer_param_group(
+        optimizer_1_state_dict: Dict, optimizer_2_state_dict: Dict, must_be_equal: bool
+    ):
+        if must_be_equal:
+            assert optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+        else:
+            assert not (optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"])
+
+    @staticmethod
+    def _assert_equality_optimizer_state(
+        optimizer_1_state_dict: Dict, optimizer_2_state_dict: Dict, must_be_equal: bool
+    ):
+        optimizer_1_state = optimizer_1_state_dict["state"]
+        optimizer_2_state = optimizer_2_state_dict["state"]
+        assert set(optimizer_1_state.keys()) == set(optimizer_2_state.keys())
+
+        for param_group_id in optimizer_1_state.keys():
+            state_1 = optimizer_1_state[param_group_id]
+            state_2 = optimizer_2_state[param_group_id]
+            assert set(state_1.keys()) == set(state_2.keys())
+            for state_key in state_1.keys():
+                if must_be_equal:
+                    assert torch.equal(state_1[state_key], state_2[state_key])
+                else:
+                    assert not torch.equal(state_1[state_key], state_2[state_key])
+
+    @staticmethod
+    def _assert_equality_two_models(params_1, params_2, must_be_equal: bool):
+        for p1, p2 in zip(params_1, params_2):
+            if must_be_equal:
+                assert torch.equal(p1, p2)
+            else:
+                assert not torch.equal(p1, p2)
 
     def test_save_checkpoint_after_backward_pass(
         self,
@@ -102,11 +148,20 @@ class TestFSDPToDiscCheckpointing:
             checkpointing_rank=0,
         )
 
-        untrained_model_parameters = fsdp_wrapped_model.parameters()
+        untrained_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
+        untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
-        self._forward_backward_pass(experiment_config=experiment_config, model=fsdp_wrapped_model, optimizer=optimizer)
-        updated_model_parameters = fsdp_wrapped_model.parameters()
+        batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
+        self._forward_backward_pass(
+            experiment_config=experiment_config,
+            model=fsdp_wrapped_model,
+            optimizer=optimizer,
+            batch_input_ids_dict=batch_input_ids_dict,
+            batch_target_ids=batch_target_ids,
+        )
+        updated_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
+        updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
         checkpointing._save_checkpoint(
@@ -119,19 +174,69 @@ class TestFSDPToDiscCheckpointing:
             experiment_id=experiment_id,
             global_train_batch_id=global_train_batch_id,
         )
-        # checkpointing.load_optimizer_checkpoint(
-        #     optimizer=optimizer,
-        #     model=fsdp_wrapped_model_2,
-        #     experiment_id=experiment_id,
-        #     global_train_batch_id=global_train_batch_id,
-        # )
-        loaded_and_updated_model_parameters = fsdp_wrapped_model_2.parameters()
 
-        # make sure that after the update all weights are different from the original ones
-        for p1, p2 in zip(updated_model_parameters, untrained_model_parameters):
-            assert torch.all(p1 != p2)
-        # make sure that the updated parameters are equal to the ones that we saved subsequently
-        for p1, p2 in zip(updated_model_parameters, loaded_and_updated_model_parameters):
-            assert torch.all(p1 == p2)
+        optimizer_2 = AdamW(fsdp_wrapped_model_2.parameters(), lr=0.001)
+
+        checkpointing.load_optimizer_checkpoint(
+            optimizer=optimizer_2,
+            model=fsdp_wrapped_model_2,
+            experiment_id=experiment_id,
+            global_train_batch_id=global_train_batch_id,
+        )
+
+        loaded_and_updated_model_parameters = [p.clone() for p in fsdp_wrapped_model_2.parameters()]
+        loaded_and_updated_optimizer_state_dict = deepcopy(optimizer_2.state_dict())
+
+        # make sure that after the update all weights are DIFFERENT from the original ones
+        self._assert_equality_two_models(updated_model_parameters, untrained_model_parameters, must_be_equal=False)
+        self._assert_equality_optimizer_param_group(
+            updated_optimizer_state_dict, untrained_optimizer_state_dict, must_be_equal=True
+        )
+
+        # make sure that the updated parameters are EQUAL to the ones that we saved subsequently
+        self._assert_equality_two_models(
+            updated_model_parameters, loaded_and_updated_model_parameters, must_be_equal=True
+        )
+        self._assert_equality_optimizer_param_group(
+            updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
+        )
+        self._assert_equality_optimizer_state(
+            updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
+        )
 
         # we should do another forward/backward pass and check if the weights are equally updated for the loaded model as for the not-loded model
+        # run backward pass
+        batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
+
+        loss_1 = self._forward_backward_pass(
+            experiment_config=experiment_config,
+            model=fsdp_wrapped_model,
+            optimizer=optimizer,
+            batch_input_ids_dict=batch_input_ids_dict,
+            batch_target_ids=batch_target_ids,
+        )
+        loss_2 = self._forward_backward_pass(
+            experiment_config=experiment_config,
+            model=fsdp_wrapped_model_2,
+            optimizer=optimizer_2,
+            batch_input_ids_dict=batch_input_ids_dict,
+            batch_target_ids=batch_target_ids,
+        )
+
+        assert loss_1 == loss_2
+
+        # make sure that after another update the two models and optimizers are the same
+        self._assert_equality_two_models(
+            fsdp_wrapped_model.parameters(), fsdp_wrapped_model_2.parameters(), must_be_equal=True
+        )
+        self._assert_equality_optimizer_param_group(
+            optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True
+        )
+        self._assert_equality_optimizer_state(optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True)
+
+        # make sure that the weights and state has changed to the previous forward backward pass
+        self._assert_equality_two_models(fsdp_wrapped_model.parameters(), updated_model_parameters, must_be_equal=False)
+        self._assert_equality_optimizer_param_group(
+            optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=True
+        )
+        self._assert_equality_optimizer_state(optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False)
