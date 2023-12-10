@@ -70,6 +70,9 @@ class SamplerConfig(BaseModel):
         num_replicas: conint(ge=0)
         shuffle: bool
 
+    type_hint: SamplerTypes
+    config: DistributedSamplerConfig
+
 
 class CollatorConfig(BaseModel):
     class GPT2LLMCollatorConfig(BaseModel):
