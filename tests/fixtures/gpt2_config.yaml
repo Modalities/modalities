@@ -21,3 +21,4 @@ llm_model_conf:
 running_env_conf:
   process_group_backend: "nccl"
   local_rank: ${oc.env:LOCAL_RANK}
+
