@@ -1,13 +1,13 @@
+from unittest.mock import call
+
 import torch
 
 from llm_gym.batch import DatasetBatch
 from llm_gym.gym import Gym
-
-
 from tests.conftest import set_env
 
 
-def test_run(
+def test_run_cpu(
     monkeypatch,
     checkpointing_mock,
     evaluator_mock,
@@ -48,3 +48,5 @@ def test_run(
         evaluation_data_loaders=[],
         eval_interval_in_batches=float(torch.inf),
     )
+    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
+    optimizer_mock.step.assert_called()

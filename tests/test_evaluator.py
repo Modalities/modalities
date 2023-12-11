@@ -1,4 +1,5 @@
 import os
+from unittest.mock import call, patch
 
 import torch
 
@@ -7,19 +8,16 @@ from llm_gym.evaluator import Evaluator
 from tests.conftest import set_env
 
 
-def test_evaluate(
+def test_evaluate_cpu(
     monkeypatch,
-    checkpointing_mock,
-    evaluator_mock,
     nn_model_mock,
-    optimizer_mock,
     loss_mock,
     llm_data_loader_mock,
     progress_publisher_mock,
-    trainer,
 ):
     set_env(monkeypatch=monkeypatch)
-
+    # for CPU testing with reduce
+    torch.distributed.init_process_group(backend="gloo")
     batch_size = 32
     seq_len = 64
     num_batches = 4
@@ -39,5 +37,8 @@ def test_evaluate(
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
+    with patch("llm_gym.fsdp.reducer.Reducer"):
+        ...
 
-    evaluator.evaluate(model=nn_model_mock, data_loaders=[], loss_fun=loss_mock, train_batch_id=0)
+    evaluator.evaluate(model=nn_model_mock, data_loaders=[llm_data_loader_mock], loss_fun=loss_mock, train_batch_id=0)
+    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
