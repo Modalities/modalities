@@ -17,19 +17,21 @@ class PackedDataGenerator:
         tokenizer: PreTrainedTokenizer,
         index_path: Path = None,
         jq_pattern: str = ".text",
-        max_tokens: int = None,
+        max_number_of_tokens: int = None,
         size_in_bytes: int = 4,
         header_size_in_bytes: int = 8,
     ):
         """
-        :param raw_data_path: Path to a jsonl file, which holds text data
+        :param src_path: Path to a jsonl file, which holds text data
         :param index_path: Path to an index file, which is supposed to indicate the start character position
                            and length of samples given in `raw_data_path`.
                            If not defined, an index next to `raw_data_path` is picked,
                            by replacing its suffix with ".idx".
-        :param tokenizer_file: TODO
+        :param tokenizer: PretrainedTokenizer object, which is used to pre-tokenize the provided data in `src_path`.
+                          Tokenization is necessary to work on final lengths of token sequences.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
-        :param max_tokens: TODO - necessary?
+        :param max_number_of_tokens: Limit the total amount of tokens in the packed dataset.
+                                     If not specified, the whole data is packed into the dataset.
         :param size_in_bytes: amount of bytes to represent tokens as integers.
                               If the vocabulary exceeds 2^`size_in_bytes`, this requires adaptation.
         :param header_size_in_bytes: amount of bytes to represent number of all tokens in dataset.
@@ -38,7 +40,7 @@ class PackedDataGenerator:
         self.src_path = src_path
         self.tokenizer = tokenizer
         self.jq_filter = jq.compile(jq_pattern)
-        self.max_tokens = max_tokens
+        self.max_tokens = max_number_of_tokens
         self.size_in_bytes = size_in_bytes
         self.header_size_in_bytes = header_size_in_bytes
 

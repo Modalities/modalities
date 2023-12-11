@@ -24,7 +24,7 @@ class MemMapDataset(Dataset):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param tokenizer: TODO
+        :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
