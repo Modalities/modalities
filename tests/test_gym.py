@@ -1,10 +1,11 @@
-from unittest.mock import call
+from unittest.mock import call, patch
 
 import torch
 
 from llm_gym.batch import DatasetBatch
+from llm_gym.fsdp.reducer import Reducer
 from llm_gym.gym import Gym
-from tests.conftest import set_env
+from tests.conftest import set_env_cpu
 
 
 def test_run_cpu(
@@ -17,7 +18,7 @@ def test_run_cpu(
     llm_data_loader_mock,
     trainer,
 ):
-    set_env(monkeypatch=monkeypatch)
+    set_env_cpu(monkeypatch=monkeypatch)
 
     batch_size = 32
     seq_len = 64
@@ -41,12 +42,13 @@ def test_run_cpu(
         optimizer=optimizer_mock,
         loss_fun=loss_mock,
     )
-
-    gym.run(
-        train_data_loader=llm_data_loader_mock,
-        num_batches_per_rank=num_batches,
-        evaluation_data_loaders=[],
-        eval_interval_in_batches=float(torch.inf),
-    )
-    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
-    optimizer_mock.step.assert_called()
+    with patch.object(Reducer, "reduce", return_value=None) as reduce_mock:
+        gym.run(
+            train_data_loader=llm_data_loader_mock,
+            num_batches_per_rank=num_batches,
+            evaluation_data_loaders=[],
+            eval_interval_in_batches=int(num_batches),
+        )
+        nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
+        optimizer_mock.step.assert_called()
+        reduce_mock.assert_called()
