@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DistributedSampler
 from transformers import GPT2TokenizerFast
 
+from llm_gym.data.mmap_dataset import MMapIndexedDataset
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataset_loader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.loss_functions import CLMCrossEntropyLoss
@@ -44,6 +45,7 @@ class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
+    MMapIndexedDataset = MMapIndexedDataset
 
 
 class SamplerTypes(LookupEnum):

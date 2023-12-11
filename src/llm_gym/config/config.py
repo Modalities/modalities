@@ -53,6 +53,10 @@ class DatasetConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
 
+    class MMapIndexedDatasetConfig(BaseModel):
+        path: Path
+        skip_warmup: bool
+
     type_hint: DatasetTypes
     config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
 
