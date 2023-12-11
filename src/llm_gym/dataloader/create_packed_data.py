@@ -1,5 +1,6 @@
 import pickle
 from pathlib import Path
+from typing import IO
 
 import jq
 import numpy as np
@@ -42,7 +43,9 @@ class PackedDataGenerator:
         self.header_size_in_bytes = header_size_in_bytes
 
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
-        self.num_samples = len(self._reader)
+        self._total_num_of_tokens = 0
+        self._curr_offset = self.header_size_in_bytes
+        self._index_list = []
 
     def _default_destination_path(self, destination_path: Path = None) -> Path:
         if destination_path is None:
@@ -55,17 +58,14 @@ class PackedDataGenerator:
         return Path(destination_path)
 
     def run(self, dst_path: Path = None):
+        assert self._total_num_of_tokens == 0, f"This {self.__name__} was already used and is exhausted. Use another!"
         dst_path = self._default_destination_path(destination_path=dst_path)
 
         if dst_path.exists():
             raise ValueError(f"file already exists at destination path '{dst_path}'.")
 
-        num_tokens = 0
-        curr_offset = self.header_size_in_bytes
-        index_list = []
-        eos_token_as_bytes = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0].to_bytes(
-            self.size_in_bytes, byteorder="big"
-        )
+        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
+        encoded_eos_token_as_bytes = encoded_eos_token.to_bytes(self.size_in_bytes, byteorder="big")
         with dst_path.open("wb") as f:
             # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
             f.write((0).to_bytes(self.header_size_in_bytes, byteorder="big"))
@@ -73,37 +73,37 @@ class PackedDataGenerator:
             # write data section (tokens)
             for line in tqdm(self._reader):
                 try:
-                    self._process_line(curr_offset, eos_token_as_bytes, f, index_list, line, num_tokens)
+                    self._process_line(encoded_eos_token_as_bytes, f, line)
                 except StopIteration:
                     break
                 except Exception as e:
                     print(f"could not process line: {e=}")
 
             # write index
-            f.write(pickle.dumps(index_list))
+            f.write(pickle.dumps(self._index_list))
 
         # update header
-        header_data = (index_list[-1][0] + index_list[-1][1] - self.header_size_in_bytes).to_bytes(
-            self.header_size_in_bytes, byteorder="big"
-        )
-        header_data = np.frombuffer(header_data, dtype="uint8")
+        start_of_index_in_bytes = self._index_list[-1][0] + self._index_list[-1][1]
+        length_of_byte_encoded_data_section = start_of_index_in_bytes - self.header_size_in_bytes
+        header_content = length_of_byte_encoded_data_section.to_bytes(self.header_size_in_bytes, byteorder="big")
+        header_content = np.frombuffer(header_content, dtype="uint8")
         m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.header_size_in_bytes,))
-        m[:] = header_data[:]
+        m[:] = header_content[:]
 
-    def _process_line(self, curr_offset, eos_token_as_bytes, f, index_list, line, num_tokens):
+    def _process_line(self, eos_token_as_bytes: bytes, f: IO, line: str):
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
-        if len(tokens) != 0:
-            for token_idx, token in enumerate(tokens):
-                token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
-                f.write(token_as_bytes)
-                num_tokens += 1
-                if num_tokens == self.max_tokens:
-                    segment_length = (token_idx + 1) * self.size_in_bytes
-                    index_list.append((curr_offset, segment_length))
-                    curr_offset += segment_length
-                    raise StopIteration
-            f.write(eos_token_as_bytes)
-            segment_length = (token_idx + 2) * self.size_in_bytes
-            index_list.append((curr_offset, segment_length))
-            curr_offset += segment_length
+        if len(tokens) == 0:
+            return
+        for token_idx, token in enumerate(tokens):
+            token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
+            f.write(token_as_bytes)
+            self._total_num_of_tokens += 1
+            if self._total_num_of_tokens == self.max_tokens:
+                segment_length = (token_idx + 1) * self.size_in_bytes
+                self._index_list.append((self._curr_offset, segment_length))
+                raise StopIteration
+        f.write(eos_token_as_bytes)
+        segment_length = (token_idx + 2) * self.size_in_bytes
+        self._index_list.append((self._curr_offset, segment_length))
+        self._curr_offset += segment_length

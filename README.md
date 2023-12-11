@@ -165,7 +165,10 @@ The packed data file is a bytestream containing both the tokenized data as well 
 
 header segment | data segment | index segment
 
-* **header segment**: This section is a 4 bytes sized integer which encodes the length of the data segment in bytes.
-* **data segment**: This section contains a concatenation of all documents in form of 4 bytes sized tokens. An end-of-sequence token is placed between consecutive documents.
-* **index segment**: This section contains a pickled index which locates the documents inside the data segment. The index is basically a list of tuples, where each tuple contains the start position and length in bytes for the corresponding document, e.g., `[(start_doc1, len_doc1), (start_doc2, len_doc2), ....]`.
+* **header segment**: This section is a 8 bytes sized integer which encodes the length of the data segment in bytes.
+* **data segment**: This section contains a concatenation of all documents in form of 4 bytes sized tokens. 
+An end-of-sequence token is placed between consecutive documents.
+* **index segment**: This section contains a pickled index which locates the documents inside the data segment.
+ The index is basically a list of tuples, where each tuple contains the start position and length in bytes for the 
+ corresponding document, e.g., `[(start_doc1, len_doc1), (start_doc2, len_doc2), ....]`.
 
