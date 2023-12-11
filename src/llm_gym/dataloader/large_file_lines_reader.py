@@ -18,7 +18,7 @@ class BaseReader(ABC):
 
 # TODO: benchmark tokenized version vs plain text version (regarding speed and storage consumption)
 class LargeFileLinesReader(BaseReader):
-    def __init__(self, raw_data_path: str | Path, index_path: str | Path = None):
+    def __init__(self, raw_data_path: Path, index_path: Path = None):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param index_path: Path to an index file, which is supposed to indicate the start character position
@@ -26,7 +26,7 @@ class LargeFileLinesReader(BaseReader):
                            If not defined, an index next to `raw_data_path` is picked,
                            by replacing its suffix with ".idx".
         """
-        self.raw_data_path = Path(raw_data_path)
+        self.raw_data_path = raw_data_path
         self.index_path = self.default_index_path(self.raw_data_path, index_path)
 
         if not self.raw_data_path.is_file():
@@ -38,12 +38,12 @@ class LargeFileLinesReader(BaseReader):
             self.index = pickle.load(f)
 
     @staticmethod
-    def default_index_path(raw_data_path: str | Path, index_path: str | Path | None) -> Path:
+    def default_index_path(raw_data_path: Path, index_path: Path = None) -> Path:
         if index_path is None:
             default_index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
             print(f"No specific Index Path provided. Pointing to index next to input data at: {default_index_path}")
             return default_index_path
-        return Path(index_path)
+        return index_path
 
     def __len__(self) -> int:
         return len(self.index)

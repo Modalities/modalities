@@ -86,14 +86,12 @@ def generate(
     print("")
 
 
-def main(
-    model_path: str | Path, config_path: str | Path, tokenizer: PreTrainedTokenizer, max_new_tokens: int, chat: bool
-):
+def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, max_new_tokens: int, chat: bool):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
 
-    path = Path(model_path)
+    path = model_path
     state_dict = torch.load(path)
     print(f"using {model_path}")
 

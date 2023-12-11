@@ -12,9 +12,9 @@ from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 class PackedDataGenerator:
     def __init__(
         self,
-        src_path: str | Path,
+        src_path: Path,
         tokenizer: PreTrainedTokenizer,
-        index_path: str | Path = None,
+        index_path: Path = None,
         jq_pattern: str = ".text",
         max_tokens: int = None,
         size_in_bytes: int = 4,
@@ -34,7 +34,7 @@ class PackedDataGenerator:
         :param header_size_in_bytes: amount of bytes to represent number of all tokens in dataset.
                                      If the amount exceeds 2^`header_size_in_bytes`, this requires adaptation.
         """
-        self.src_path = Path(src_path)
+        self.src_path = src_path
         self.tokenizer = tokenizer
         self.jq_filter = jq.compile(jq_pattern)
         self.max_tokens = max_tokens
@@ -54,7 +54,7 @@ class PackedDataGenerator:
             return default_destination_path
         return Path(destination_path)
 
-    def run(self, dst_path: str | Path = None):
+    def run(self, dst_path: Path = None):
         dst_path = self._default_destination_path(destination_path=dst_path)
 
         if dst_path.exists():

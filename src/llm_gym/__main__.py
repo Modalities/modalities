@@ -13,8 +13,9 @@ from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointin
 from llm_gym.checkpointing.checkpointing_strategies import SaveMostRecentEpochOnlyCheckpointingStrategy
 from llm_gym.config.config import AppConfig, DataLoaderConfig
 from llm_gym.config.lookup_types import TokenizerTypes
-from llm_gym.dataloader.create_index import create_memmap_index
+from llm_gym.dataloader.create_index import IndexGenerator
 from llm_gym.dataloader.create_packed_data import PackedDataGenerator
+from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_runner import Runner
@@ -57,8 +58,8 @@ def entry_point_run_llmgym(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=str)
-@click.argument("config_path", type=str)
+@click.argument("model_path", type=Path)
+@click.argument("config_path", type=Path)
 @click.option(
     "--tokenizer_type",
     type=TokenizerTypes,
@@ -81,19 +82,26 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
 
 
 @main.command(name="create_memmap_index")
-@click.argument("src_path", type=str)
+@click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
 def entry_point_create_memmap_index(src_path, index_path):
-    create_memmap_index(src_path, index_path)
+    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
+    if index_path.exists():
+        raise ValueError("index already exists. delete it or specify different output folder.")
+
+    print(f"reading raw data from {src_path}")
+    print(f"writing index to {index_path}")
+    generator = IndexGenerator(src_path)
+    generator.run(index_path)
 
 
 @main.command(name="create_packed_data")
-@click.argument("src_path", type=str)
+@click.argument("src_path", type=Path)
 @click.option(
     "--dst_path",
     type=str,

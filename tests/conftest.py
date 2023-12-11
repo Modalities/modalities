@@ -49,7 +49,7 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = LargeFileLinesReader.default_index_path(dummy_data_path, index_path=None)
+    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
     index_path.unlink(missing_ok=True)
     return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
 
