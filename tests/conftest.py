@@ -3,6 +3,7 @@ import pickle
 from pathlib import Path
 
 import pytest
+from transformers import GPT2TokenizerFast
 
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.config.config import AppConfig
@@ -58,3 +59,10 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
     index_generator.run(dummy_data_path.index_path)
     return dummy_data_path
+
+
+@pytest.fixture
+def gpt2_tokenizer() -> GPT2TokenizerFast:
+    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer.json")
+    assert default_gpt2_tokenizer_path.is_file()
+    return GPT2TokenizerFast(tokenizer_file=str(default_gpt2_tokenizer_path))
