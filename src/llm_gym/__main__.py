@@ -268,6 +268,7 @@ class Main:
 
     def _create_dataloader(self, config: DataLoaderConfig) -> LLMDataLoader:
         tokenizer = self.resolvers.build_component_by_config(config=config.config.dataset.config.tokenizer)
+        tokenizer.pad_token = tokenizer.eos_token
         dataset = self.resolvers.build_component_by_config(
             config=config.config.dataset, extra_kwargs=dict(tokenizer=tokenizer)
         )

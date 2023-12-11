@@ -33,14 +33,11 @@ class MemMapDataset(Dataset):
 
         self.reader = LargeFileLinesReader(self.raw_data_path)
         self.jq_filter = jq.compile(jq_pattern)
-        # TODO: tokenizer from tiktoken if it is faster?
         self.tokenizer = tokenizer
-        self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:
         return len(self.reader)
 
-    # TODO: tokenizer singleton?
     def __getitem__(self, idx: int) -> str:
         obj = self.tokenizer(
             self.jq_filter.input_text(self.reader[idx]).first(),
