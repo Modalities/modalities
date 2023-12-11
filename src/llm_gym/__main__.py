@@ -6,7 +6,6 @@ import click
 import click_pathlib
 import torch
 from omegaconf import OmegaConf
-from transformers import GPT2TokenizerFast
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
@@ -64,20 +63,21 @@ def entry_point_run_llmgym(config_file_path: Path):
     "--tokenizer_type",
     type=TokenizerTypes,
     show_default=True,
-    default=GPT2TokenizerFast,
+    default=TokenizerTypes.GPT2TokenizerFast,
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_tokens, chat):
-    generate_text_main(model_path, config_path, tokenizer_file, max_new_tokens, chat)
+def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
+    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
+    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
 
 
 @main.command(name="create_memmap_index")
@@ -110,7 +110,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     "--tokenizer_type",
     type=TokenizerTypes,
     show_default=True,
-    default=GPT2TokenizerFast,
+    default=TokenizerTypes.GPT2TokenizerFast,
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
