@@ -80,7 +80,8 @@ The mechanismn introduced to instantiate classes via `type_hint` in the `config.
 Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as `${subconfig.attribue}`. 
 
 Then, Pydantic validates the whole config as is and checks that each of the sub-configs are `pydantic.BaseModel` classes.
-For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced. With this we utilize Pydantics feature to auto-select a fitting type based on the keys in the config yaml file.
+For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced.
+With this we utilize Pydantics feature to auto-select a fitting type based on the keys in the config yaml file.
 
 `ClassResolver` replaces large if-else control structures to infer the correct concrete type with a `type_hint` used for correct class selection:
 ```python
@@ -137,11 +138,13 @@ optimizer = ...  # our example dependency
 scheduler = resolvers.build_component_by_config(config=config.scheduler, extra_kwargs=dict(optimizer=optimizer))
 ```
 
-To add a new resolver use `add_resolver`, and the corresponding added resolver will be accessible by the register_key given during adding. For access use the `build_component_by_key_query` function of the `ResolverRegistry`.
+To add a new resolver use `add_resolver`, and the corresponding added resolver will be accessible by the register_key given during adding.
+For access use the `build_component_by_key_query` function of the `ResolverRegistry`.
 
 ## Entry Points
 
-We use [click](https://click.palletsprojects.com/en/) as a tool to add new entry points and their CLI arguments. For this we have a main entry point from which all other entry points are started. 
+We use [click](https://click.palletsprojects.com/en/) as a tool to add new entry points and their CLI arguments.
+For this we have a main entry point from which all other entry points are started. 
 
 The main entry point is `src/llm_gym/__main__.py:main()`. 
 We register other sub-entrypoints by using our main `click.group`, called `main`, as follows: 
