@@ -70,6 +70,7 @@ class PackedDataGenerator:
         encoded_eos_token_as_bytes = encoded_eos_token.to_bytes(self.size_in_bytes, byteorder="big")
         with dst_path.open("wb") as f:
             # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
+            # not possible to prepend header after determining size of data section
             f.write((0).to_bytes(self.header_size_in_bytes, byteorder="big"))
 
             # write data section (tokens)
@@ -84,7 +85,9 @@ class PackedDataGenerator:
             # write index
             f.write(pickle.dumps(self._index_list))
 
-        # update header
+        self._update_data_length_in_pre_allocated_header(dst_path)
+
+    def _update_data_length_in_pre_allocated_header(self, dst_path: Path):
         start_of_index_in_bytes = self._index_list[-1][0] + self._index_list[-1][1]
         length_of_byte_encoded_data_section = start_of_index_in_bytes - self.header_size_in_bytes
         header_content = length_of_byte_encoded_data_section.to_bytes(self.header_size_in_bytes, byteorder="big")
