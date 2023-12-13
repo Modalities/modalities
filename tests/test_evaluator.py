@@ -15,6 +15,7 @@ def test_evaluate_cpu(
     llm_data_loader_mock,
     progress_publisher_mock,
 ):
+    # TODO: does not really ensure cpu-only usage. Alternative could be to patch `torch.cuda.is_available() = False`
     set_env_cpu(monkeypatch=monkeypatch)
 
     batch_size = 32
@@ -32,7 +33,7 @@ def test_evaluate_cpu(
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
 
     evaluator = Evaluator(
-        local_rank=os.getenv("LOCAL_RANK"),
+        local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
