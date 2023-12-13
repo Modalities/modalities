@@ -47,7 +47,7 @@ def test_run_cpu(
             train_data_loader=llm_data_loader_mock,
             num_batches_per_rank=num_batches,
             evaluation_data_loaders=[],
-            eval_interval_in_batches=int(num_batches),
+            callback_interval_in_batches=int(num_batches),
         )
         nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
         optimizer_mock.step.assert_called()
