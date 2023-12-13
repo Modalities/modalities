@@ -49,7 +49,12 @@ class Trainer:
         epoch_done_callback: Callable[[int], None],
     ):
         model.train()
-        cummulated_loss = torch.zeros(2).to(self.local_rank)
+        cummulated_loss = torch.zeros(2)
+
+        if torch.cuda.is_available():
+            cummulated_loss.to(self.local_rank)
+        else:
+            cummulated_loss.to("cpu")
 
         # batch loop
         batch: DatasetBatch
