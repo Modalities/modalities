@@ -1,12 +1,11 @@
 data:
-  dataset_dir_path: /raid/s3/opengptx/mehdi/temp/temp_data
   sample_key: "input_ids"
   target_key: "target_ids"
   sequence_len: 1024
   train_dataloader:
     type_hint: LLMDataLoader
     config:
-      dataset_tag: "train"
+      dataloader_tag: "train"
       batch_size: 8 # per rank
       num_workers: 2
       pin_memory: true
@@ -18,14 +17,21 @@ data:
           num_replicas: ${training.world_size}
           shuffle: true
       dataset:
-        path: /raid/s3/opengptx/mehdi/temp/temp_data/train_text_document.bin
-        sequence_len: ${data.sequence_len}
-        sample_key: "input_ids"
-        num_samples: ${training.num_training_samples}
+        type_hint: OpenGPTXMMapDataset
+        config: 
+          path: /raid/s3/opengptx/mehdi/temp/temp_data/train_text_document.bin
+          sequence_len: ${data.sequence_len}
+          sample_key: ${data.sample_key}
+          num_samples: ${training.num_training_samples}
+      collate_fn:
+        type_hint: GPT2LLMCollator
+        config: 
+          sample_key: ${data.sample_key}
+          target_key: ${data.target_key}
   eval_dataloaders:
     - type_hint: LLMDataLoader
       config:
-        dataset_tag: "val"
+        dataloader_tag: "val"
         batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
@@ -37,13 +43,20 @@ data:
             num_replicas: ${training.world_size}
             shuffle: false
         dataset:
-          num_samples: 800 # total summed over all ranks
-          path: /raid/s3/opengptx/mehdi/temp/temp_data/val_text_document.bin
-          sequence_len: ${data.sequence_len}
-          sample_key: "input_ids"
+          type_hint: OpenGPTXMMapDataset
+          config: 
+            num_samples: 800 # total summed over all ranks
+            path: /raid/s3/opengptx/mehdi/temp/temp_data/val_text_document.bin
+            sequence_len: ${data.sequence_len}
+            sample_key: ${data.sample_key}
+        collate_fn:
+          type_hint: GPT2LLMCollator
+          config: 
+            sample_key: ${data.sample_key}
+            target_key: ${data.target_key}
     - type_hint: LLMDataLoader
       config:
-        dataset_tag: "test"
+        dataloader_tag: "test"
         batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
@@ -55,10 +68,17 @@ data:
             num_replicas: ${training.world_size}
             shuffle: false
         dataset:
-          num_samples: 800 # total summed over all ranks
-          path: /raid/s3/opengptx/mehdi/temp/temp_data/test_text_document.bin
-          sequence_len: ${data.sequence_len}
-          sample_key: "input_ids"
+          type_hint: OpenGPTXMMapDataset
+          config: 
+            num_samples: 800 # total summed over all ranks
+            path: /raid/s3/opengptx/mehdi/temp/temp_data/test_text_document.bin
+            sequence_len: ${data.sequence_len}
+            sample_key: ${data.sample_key}
+        collate_fn:
+          type_hint: GPT2LLMCollator
+          config: 
+            sample_key: ${data.sample_key}
+            target_key: ${data.target_key}
 
 wandb:
   project_name: llm_gym
