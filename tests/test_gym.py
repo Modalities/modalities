@@ -5,7 +5,6 @@ import torch
 from llm_gym.batch import DatasetBatch
 from llm_gym.fsdp.reducer import Reducer
 from llm_gym.gym import Gym
-from tests.conftest import set_env_cpu
 
 
 def test_run_cpu(
@@ -16,10 +15,9 @@ def test_run_cpu(
     optimizer_mock,
     loss_mock,
     llm_data_loader_mock,
+    set_env_cpu,
     trainer,
 ):
-    set_env_cpu(monkeypatch=monkeypatch)
-
     batch_size = 32
     seq_len = 64
     num_batches = 4

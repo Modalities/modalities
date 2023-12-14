@@ -117,22 +117,35 @@ def progress_publisher_mock():
 @pytest.fixture(scope="function")
 def trainer(progress_publisher_mock):
     return Trainer(
-        local_rank=os.getenv("LOCAL_RANK"),
+        local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 
 
+@pytest.fixture(scope="function")
 def set_env_cpu(monkeypatch):
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
+    # TODO: does not really ensure cpu-only usage. Alternative could be to patch `torch.cuda.is_available() = False`
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("MASTER_ADDR", "localhost")
     monkeypatch.setenv("MASTER_PORT", "9948")
 
-    # cleanup
-    if torch.distributed.is_initialized():
-        torch.distributed.destroy_process_group()
+    def torch_distributed_cleanup():
+        if torch.distributed.is_initialized():
+            torch.distributed.destroy_process_group()
+
+    torch_distributed_cleanup()
     # gloo for CPU testing with reduce
     torch.distributed.init_process_group(backend="gloo")
+
+    # use this to destroy this fixture's effect after it being used
+    yield "torch.distributed.destroy_process_group"
+
+    # TODO: discuss with Mehdi and Max and explain the side effects here.
+    torch_distributed_cleanup()
+    # setting CUDA_VISIBLE_DEVICES to "" creates a cache entry, which prevents resetting this CPU-only setup.
+    # therefore after finish using this fixture, we need to clear this cache
+    torch.cuda.device_count.cache_clear()
