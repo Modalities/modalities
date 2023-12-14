@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, member
 from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXDatasetFactory
 
 import torch
@@ -48,7 +48,7 @@ class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
-    OpenGPTXMMapDatset = OpenGPTXDatasetFactory.create_dataset
+    OpenGPTXMMapDataset = member(OpenGPTXDatasetFactory.create_dataset)
 
 
 class CollatorTypes(LookupEnum):
