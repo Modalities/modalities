@@ -20,6 +20,7 @@ from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
+
 class WandbConfig(BaseModel):
     project_name: str
 
@@ -61,7 +62,7 @@ class DatasetConfig(BaseModel):
         dataset_tag: str
 
     type_hint: DatasetTypes
-    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
+    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig | OpenGPTXMMapDatasetConfig
 
 
 class SamplerConfig(BaseModel):
@@ -95,9 +96,14 @@ class DataLoaderConfig(BaseModel):
     config: LLMDataLoaderConfig
 
 
-class TrainingConfig(BaseModel):
+class DataConfig(BaseModel):
+    sample_key: str
+    target_key: str
+    sequence_len: int
     train_dataloader: DataLoaderConfig
     evaluation_dataloaders: List[DataLoaderConfig]
+
+class TrainingConfig(BaseModel):
     # TODO: use this in Progress Logging
     num_training_samples: conint(gt=0)
     callback_interval_in_samples: conint(gt=0)
@@ -213,6 +219,7 @@ class CheckpointConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
+    data: DataConfig
     training: TrainingConfig
     loss: LossConfig
     running_env: RunningEnvConfig
