@@ -40,7 +40,7 @@ def test_get_paths_to_delete(
     p.write_text(CONTENT)
 
     checkpointing = FSDPToDiscCheckpointing(
-        checkpoint_path=d.__str__(),
+        checkpoint_path=d,
         checkpointing_rank=0,
         experiment_id=str(1),
         global_rank=0,
@@ -59,7 +59,7 @@ def test_delete_checkpoint(tmp_path):
     p.write_text(CONTENT)
     # "<experiment_id>-<enitity>-<step>.bin"
     flagger = is_empty_directory(d.__str__())
-    checkpointing = FSDPToDiscCheckpointing(checkpoint_path=d.__str__(), checkpointing_rank=0, experiment_id=str(1),
+    checkpointing = FSDPToDiscCheckpointing(checkpoint_path=d, checkpointing_rank=0, experiment_id=str(1),
                                             global_rank=0,
                                             model_wrapping_fn=dummy_method)
     checkpointing._delete_checkpoint(batch_id=100)
