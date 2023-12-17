@@ -26,7 +26,7 @@ class ExperimentConfig(BaseModel):
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def experiment_config(self) -> ExperimentConfig:
-        config_file_path = Path("/raid/s3/opengptx/max_lue/LLMgym/tests/fixtures/gpt2_config.yaml")
+        config_file_path = Path("/raid/s3/opengptx/max_lue/LLMgym/tests/checkpointing/gpt2_config.yaml")
         config_dict = load_app_config_dict(config_file_path=config_file_path)
         experiment_config = ExperimentConfig.model_validate(config_dict)
         return experiment_config
@@ -207,7 +207,7 @@ class TestFSDPToDiscCheckpointing:
             updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
         )
 
-        # we should do another forward/backward pass and check if the weights are equally updated for the loaded model as for the not-loded model
+        # we do another forward/backward pass and check if the weights are equally updated for the loaded model as for the not-loded model
         # run backward pass
         batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
 
