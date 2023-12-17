@@ -3,6 +3,7 @@ from llm_gym.checkpointing.checkpointing import CheckpointingStrategyIF
 
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
+from llm_gym.exceptions import CheckpointingError
 
 
 class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
@@ -13,6 +14,8 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
         k>0: keep k checkpoints
         """
         self.saved_batch_id_checkpoints = []
+        if k < -1:
+            raise CheckpointingError("Checkpointing strategy needs k to be in {-1, 0, 1, ..., n}")
         self.k = k
 
     def get_checkpoint_instruction(
