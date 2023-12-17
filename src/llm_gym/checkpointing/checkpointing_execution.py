@@ -1,10 +1,9 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Callable, Tuple, List
-from llm_gym.checkpointing.checkpointing import CheckpointingIF, CheckpointingExecutionIF
+from typing import Callable, List
+from llm_gym.checkpointing.checkpointing import CheckpointingIF
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
-from llm_gym.models.model import NNModel
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
     FullStateDictConfig,
@@ -12,11 +11,9 @@ from torch.distributed.fsdp import (
     FullOptimStateDictConfig,
 )
 import torch
-import os
 from torch.optim import Optimizer
-import torch.distributed as dist
 import torch.nn as nn
-import glob
+from pathlib import Path
 
 
 class CheckpointingEntityType(Enum):
@@ -50,7 +47,7 @@ class CheckpointingExecution(CheckpointingIF):
 class FSDPToDiscCheckpointing(CheckpointingExecution):
     def __init__(
         self,
-        checkpoint_path: str,
+        checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
         checkpointing_rank: int,
@@ -68,13 +65,14 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         experiment_id: str,
         global_train_batch_id: int,
         entity_type: CheckpointingEntityType,
-    ):
+    ) -> Path:
         entity_file_name = (
             self.checkpoint_structure.replace("<experiment_id>", experiment_id)
             .replace("<enitity>", entity_type.value)
             .replace("<step>", str(global_train_batch_id + 1))
         )
-        full_path = os.path.join(self.checkpoint_path, entity_file_name)
+
+        full_path = Path(self.checkpoint_path, entity_file_name)
         return full_path
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_batch_id: int):
@@ -111,29 +109,22 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
 
-    def _get_paths_to_delete(self, batch_id: int) -> List[str]:
+    def _get_paths_to_delete(self, batch_id: int) -> List[Path]:
         entity_file_name_regex = self.checkpoint_structure.replace("<enitity>", "*").replace(
             "<step>", str(batch_id + 1)
         )
-        full_path_regex = os.path.join(self.checkpoint_path, entity_file_name_regex)
-        files_paths_to_delete = glob.glob(full_path_regex)
+        files_paths_to_delete = list(self.checkpoint_path.glob(entity_file_name_regex))
         return files_paths_to_delete
 
     def _delete_checkpoint(self, batch_id: int):
         if self.global_rank != 0:
             return
-        # TODO we need more logic to also delete optimizers and lr schedulers
-        entity_file_name = self.checkpoint_structure.replace("<enitity>", "model").replace("<step>", str(batch_id + 1))
-        full_path = os.path.join(self.checkpoint_path, entity_file_name)
-        if os.path.exists(full_path):
-            os.remove(full_path)
-        else:
-            raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 
         files_paths_to_delete = self._get_paths_to_delete(batch_id)
         for full_path in files_paths_to_delete:
-            if os.path.exists(full_path):
-                os.remove(full_path)
+            if full_path.exists():
+                # unlink removes the file
+                full_path.unlink()
             else:
                 raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 

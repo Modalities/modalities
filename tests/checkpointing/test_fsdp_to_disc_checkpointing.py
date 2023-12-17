@@ -60,7 +60,7 @@ class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def temporary_checkpoint_folder_path(self):
         with tempfile.TemporaryDirectory() as tmp_dir_path:
-            yield tmp_dir_path
+            yield Path(tmp_dir_path)
 
     @staticmethod
     def _generate_batch(experiment_config: ExperimentConfig):
@@ -136,7 +136,7 @@ class TestFSDPToDiscCheckpointing:
         self,
         fsdp_wrapped_model: FSDP,
         optimizer: Optimizer,
-        temporary_checkpoint_folder_path: str,
+        temporary_checkpoint_folder_path: Path,
         gpt2_model_2: GPT2LLM,
         experiment_config: ExperimentConfig,
     ):
