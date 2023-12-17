@@ -15,8 +15,8 @@ class CheckpointingStrategyIF(ABC):
     def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
-        num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
+        num_batches: int = None,
+        evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         raise NotImplementedError

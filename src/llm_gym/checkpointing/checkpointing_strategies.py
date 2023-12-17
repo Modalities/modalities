@@ -21,7 +21,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
     def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
-        num_batches: int,
+        num_batches: int = None,
         evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
@@ -49,8 +49,8 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
     def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
-        num_batches: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
+        num_batches: int = None,
+        evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         save_current = (global_train_batch_id + 1) % self.k == 0 and (global_train_batch_id + 1) > 0
