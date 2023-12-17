@@ -52,7 +52,6 @@ class Evaluator:
                 dataset_batch_id=-1,
                 dataset_tag=data_loader.dataset_tag,
             )
-            # for _, (batch_id, batch) in zip(range(1000), enumerate(data_loader)):
             for batch_id, batch in enumerate(data_loader):
                 batch_loss = self.evaluate_batch(
                     batch=batch,
