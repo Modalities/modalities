@@ -7,3 +7,6 @@ class BatchStateError(Exception):
 
 class CheckpointingError(Exception):
     pass
+
+class RunningEnvError(Exception):
+    pass

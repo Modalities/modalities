@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
 from typing import List
+from llm_gym.config.config_utils import ClassPath
 
 from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 
 from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_runner import RunnerConfig
+from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
@@ -38,7 +39,6 @@ class DataConfig(BaseModel):
 class TrainingConfig(BaseModel):
     num_training_batches: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
-    num_batches_per_training_sequence: int
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
@@ -61,7 +61,7 @@ class TrainingConfig(BaseModel):
         computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
         if computed_num_training_batches != self.num_training_batches:
             raise ValueError(
-                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"
+                "eval_interval_per_rank * world_size * eval_interval_in_batches"
                 " != num_training_batches"
             )
         return self
@@ -132,7 +132,7 @@ class AppConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     loss: LossConfig
-    runner: RunnerConfig
+    running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
