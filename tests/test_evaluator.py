@@ -32,7 +32,7 @@ def test_evaluate_cpu(
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
 
     evaluator = Evaluator(
-        local_rank=os.getenv("LOCAL_RANK"),
+        local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
