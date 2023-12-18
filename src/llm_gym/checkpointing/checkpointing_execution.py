@@ -2,15 +2,12 @@ from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
 from typing import Callable, List
-
 import torch
 import torch.nn as nn
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import StateDictType
 from torch.optim import Optimizer
-
-from llm_gym.checkpointing.checkpointing import CheckpointingIF
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
 
@@ -20,13 +17,23 @@ class CheckpointingEntityType(Enum):
     OPTIMIZER = "optimizer"
 
 
-class CheckpointingExecution(CheckpointingIF):
+class CheckpointingExecution:
     @abstractmethod
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_batch_id: int):
         raise NotImplementedError
 
     @abstractmethod
     def _delete_checkpoint(self, batch_id: int):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
         raise NotImplementedError
 
     def run_checkpoint_instructions(
