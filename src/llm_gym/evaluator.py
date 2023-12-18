@@ -1,16 +1,14 @@
 from typing import Callable, Dict, List
-from llm_gym.fsdp.reducer import Reducer
-from llm_gym.models.model import NNModel, model_predict_batch
-import torch.distributed as dist
+
 import torch
-from llm_gym.batch import DatasetBatch, InferenceResultBatch, EvaluationResultBatch
+import torch.distributed as dist
+
+from llm_gym.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
 from llm_gym.dataset_loader import LLMDataLoader
-from llm_gym.logging_broker.messages import (
-    BatchProgressUpdate,
-    ExperimentStatus,
-    MessageTypes,
-)
+from llm_gym.fsdp.reducer import Reducer
+from llm_gym.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from llm_gym.logging_broker.publisher import MessagePublisher
+from llm_gym.models.model import NNModel, model_predict_batch
 
 
 class Evaluator:
@@ -45,7 +43,11 @@ class Evaluator:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
         for data_loader in data_loaders:
-            cummulated_loss = torch.zeros(3).to(self.local_rank)
+            if torch.cuda.is_available():
+                cummulated_loss = torch.zeros(3).to(self.local_rank)
+            else:
+                cummulated_loss = torch.zeros(3).to("cpu")
+
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_batch_id=train_batch_id,
