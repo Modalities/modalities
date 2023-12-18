@@ -1,14 +1,10 @@
-import torch.nn as nn
-from torch.distributed.fsdp import (
-    FullyShardedDataParallel as FSDP,
-    FullStateDictConfig,
-    StateDictType,
-    FullOptimStateDictConfig,
-)
 from pathlib import Path
 
-from src.llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 import pytest
+import torch.nn as nn
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+from src.llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 
 
 @pytest.mark.skip
@@ -42,13 +38,12 @@ def test_delete_checkpoint(tmpdir):
     experiment_id = "2023-11-17-01:35:09"
     directory = Path(tmpdir)
 
-    optimizer_path = directory / f"{experiment_id}-optimizer-101.bin"
+    optimizer_path = directory / f"eid_{experiment_id}-optimizer-step_101.bin"
     optimizer_path.write_text(CONTENT)
 
-    model_path = directory / f"{experiment_id}-model-101.bin"
+    model_path = directory / f"eid_{experiment_id}-model-step_101.bin"
     model_path.write_text(CONTENT)
 
-    # "<experiment_id>-<enitity>-<step>.bin"
     checkpointing = FSDPToDiscCheckpointing(
         checkpoint_path=directory,
         checkpointing_rank=0,

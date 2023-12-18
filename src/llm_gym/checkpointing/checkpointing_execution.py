@@ -1,19 +1,18 @@
 from abc import abstractmethod
 from enum import Enum
+from pathlib import Path
 from typing import Callable, List
+
+import torch
+import torch.nn as nn
+from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import StateDictType
+from torch.optim import Optimizer
+
 from llm_gym.checkpointing.checkpointing import CheckpointingIF
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
-from torch.distributed.fsdp import (
-    FullyShardedDataParallel as FSDP,
-    FullStateDictConfig,
-    StateDictType,
-    FullOptimStateDictConfig,
-)
-import torch
-from torch.optim import Optimizer
-import torch.nn as nn
-from pathlib import Path
 
 
 class CheckpointingEntityType(Enum):
@@ -45,6 +44,8 @@ class CheckpointingExecution(CheckpointingIF):
 
 
 class FSDPToDiscCheckpointing(CheckpointingExecution):
+    CHECKPOINT_STRUCTURE = "eid_<experiment_id>-<entity>-step_<step>.bin"
+
     def __init__(
         self,
         checkpoint_path: Path,
@@ -58,7 +59,6 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         self.checkpointing_rank = checkpointing_rank
         self.model_wrapping_fn = model_wrapping_fn
         self.experiment_id = experiment_id
-        self.checkpoint_structure = f"eid_<experiment_id>-<enitity>-step_<step>.bin"
 
     def _get_checkpointing_path(
         self,
@@ -67,8 +67,8 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         entity_type: CheckpointingEntityType,
     ) -> Path:
         entity_file_name = (
-            self.checkpoint_structure.replace("<experiment_id>", experiment_id)
-            .replace("<enitity>", entity_type.value)
+            self.CHECKPOINT_STRUCTURE.replace("<experiment_id>", experiment_id)
+            .replace("<entity>", entity_type.value)
             .replace("<step>", str(global_train_batch_id + 1))
         )
 
@@ -110,11 +110,12 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
             torch.save(optim_state_dict, optimize_checkpoint_path)
 
     def _get_paths_to_delete(self, batch_id: int) -> List[Path]:
-        entity_file_name_regex = self.checkpoint_structure.replace("<enitity>", "*").replace(
-            "<step>", str(batch_id + 1)
-        )
-        files_paths_to_delete = list(self.checkpoint_path.glob(entity_file_name_regex))
-        return files_paths_to_delete
+        return [
+            self._get_checkpointing_path(
+                experiment_id=self.experiment_id, entity_type=entity_type, global_train_batch_id=batch_id
+            )
+            for entity_type in CheckpointingEntityType
+        ]
 
     def _delete_checkpoint(self, batch_id: int):
         if self.global_rank != 0:
