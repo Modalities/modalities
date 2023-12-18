@@ -12,7 +12,7 @@ from pathlib import Path
 import torch
 from omegaconf import OmegaConf
 from torch.nn import functional as F
-from transformers import GPT2TokenizerFast
+from transformers import PreTrainedTokenizer
 
 from llm_gym.config.config import AppConfig
 from llm_gym.resolver_register import ResolverRegister
@@ -58,7 +58,7 @@ bot: """
 
 def generate(
     model: torch.nn.Module,
-    tokenizer: GPT2TokenizerFast,
+    tokenizer: PreTrainedTokenizer,
     context: str,
     seq_len: int,
     max_new_tokens: int,
@@ -86,13 +86,12 @@ def generate(
     print("")
 
 
-def main(model_path: str | Path, config_path: str | Path, tokenizer_file: str, max_new_tokens: int, chat: bool):
+def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, max_new_tokens: int, chat: bool):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
 
-    tokenizer = GPT2TokenizerFast(tokenizer_file=tokenizer_file)
-    path = Path(model_path)
+    path = model_path
     state_dict = torch.load(path)
     print(f"using {model_path}")
 

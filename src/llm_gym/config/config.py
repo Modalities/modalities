@@ -16,7 +16,7 @@ from llm_gym.config.lookup_types import (
     TokenizerTypes,
 )
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_runner import RunnerConfig
+from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
@@ -52,6 +52,10 @@ class DatasetConfig(BaseModel):
     class PackedMemMapDatasetMegatronConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
+
+    class MMapIndexedDatasetConfig(BaseModel):
+        path: Path
+        skip_warmup: bool
 
     type_hint: DatasetTypes
     config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
@@ -195,7 +199,7 @@ class CheckpointConfig(BaseModel):
 class AppConfig(BaseModel):
     training: TrainingConfig
     loss: LossConfig
-    runner: RunnerConfig
+    running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig

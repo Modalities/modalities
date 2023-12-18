@@ -93,21 +93,3 @@ class IndexGenerator:
                     break
                 self.chunk_queue.put(chunk)
         self.chunk_queue.put(None)
-
-
-def create_memmap_index(src_path: str | Path, index_path: str | Path):
-    raw_data_path = Path(src_path)
-
-    if index_path is None:
-        index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
-    else:
-        index_path = Path(index_path)
-
-    if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
-
-    print(f"reading raw data from {raw_data_path}")
-    print(f"writing index to {index_path}")
-
-    generator = IndexGenerator(raw_data_path)
-    generator.run(index_path)

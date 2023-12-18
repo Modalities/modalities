@@ -1,19 +1,11 @@
-from typing import List
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from typing import Dict
+
+import torch.nn as nn
+from torch.optim import Optimizer
+
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.models.model import NNModel
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-
-
-@dataclass
-class CheckpointingInstruction:
-    """
-    Instruction to save and delete checkpoints.
-    """
-
-    save_current: bool = False
-    checkpoints_to_delete: List[int] = field(default_factory=list)
+from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 
 
 class CheckpointingStrategyIF(ABC):
@@ -22,35 +14,48 @@ class CheckpointingStrategyIF(ABC):
     """
 
     @abstractmethod
-    def get_model_checkpoint_instruction(
+    def get_checkpoint_instruction(
         self,
         global_train_batch_id: int,
-        num_batches: int,
-        evaluation_result: EvaluationResultBatch,
+        num_batches: int = None,
+        evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         raise NotImplementedError
 
 
-class CheckpointingExecutionIF(ABC):
+class CheckpointingIF(ABC):
+    @abstractmethod
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_checkpoint(
+        self,
+        train_batch_id: int,
+        num_batches: int,
+        evaluation_result: Dict[str, EvaluationResultBatch],
+        model: nn.Module,
+        optimizer: Optimizer,
+        early_stoppping_criterion_fulfilled: bool = False,
+    ):
+        raise NotImplementedError
+
+
+class CheckpointingExecutionIF(CheckpointingIF):
     @abstractmethod
     def run_checkpoint_instructions(
         self,
         checkpointing_instruction: CheckpointingInstruction,
         global_train_batch_id: int,
-        model: NNModel,
-    ):
-        raise NotImplementedError
-
-
-class CheckpointingIF:
-    def run(
-        self,
-        train_batch_id: int,
-        num_batches: int,
-        evaluation_result: EvaluationResultBatch,
-        model: NNModel,
-        early_stoppping_criterion_fulfilled: bool = False,
+        model: nn.Module,
+        optimizer: Optimizer,
     ):
         raise NotImplementedError
 
@@ -70,16 +75,17 @@ class Checkpointing(CheckpointingIF):
         self.checkpointing_execution = checkpointing_execution
         self.num_ranks = num_ranks
 
-    def run(
+    def save_checkpoint(
         self,
         train_batch_id: int,
         num_batches: int,
-        evaluation_result: EvaluationResultBatch,
-        model: NNModel,
+        evaluation_result: Dict[str, EvaluationResultBatch],
+        model: nn.Module,
+        optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
         global_train_batch_id = (train_batch_id + 1) * self.num_ranks - 1
-        checkpointing_instruction = self.checkpointing_strategy.get_model_checkpoint_instruction(
+        checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
             global_train_batch_id=global_train_batch_id,
             num_batches=num_batches,
             evaluation_result=evaluation_result,
@@ -89,23 +95,19 @@ class Checkpointing(CheckpointingIF):
             checkpointing_instruction=checkpointing_instruction,
             global_train_batch_id=global_train_batch_id,
             model=model,
+            optimizer=optimizer,
         )
 
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+        model = self.checkpointing_execution.load_model_checkpoint(
+            model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
+        )
+        return model
 
-class DummyCheckpointing(CheckpointingIF):
-    """
-    Checkpoint class to get checkpoint instruction.
-    """
-
-    def __init__(self):
-        pass
-
-    def run(
-        self,
-        train_batch_id: int,
-        num_batches: int,
-        evaluation_result: EvaluationResultBatch,
-        model: NNModel,
-        early_stoppping_criterion_fulfilled: bool = False,
-    ):
-        pass
+    def load_optimizer_checkpoint(
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+    ) -> Optimizer:
+        optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
+            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
+        )
+        return optimizer

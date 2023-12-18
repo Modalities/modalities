@@ -14,33 +14,28 @@ from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
 class Dataset(TorchdataSet):
-    def __init__(self, raw_data_path: str | Path, block_size: int):
-        self.raw_data_path = Path(raw_data_path)
+    def __init__(self, raw_data_path: Path, block_size: int):
+        self.raw_data_path = raw_data_path
         self.block_size = block_size
 
 
 class MemMapDataset(Dataset):
-    def __init__(
-        self, raw_data_path: str | Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"
-    ):
+    def __init__(self, raw_data_path: Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param tokenizer: TODO
+        :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
 
         self.reader = LargeFileLinesReader(self.raw_data_path)
         self.jq_filter = jq.compile(jq_pattern)
-        # TODO: tokenizer from tiktoken if it is faster?
         self.tokenizer = tokenizer
-        self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:
         return len(self.reader)
 
-    # TODO: tokenizer singleton?
     def __getitem__(self, idx: int) -> str:
         obj = self.tokenizer(
             self.jq_filter.input_text(self.reader[idx]).first(),
@@ -55,7 +50,7 @@ class PackedMemMapDatasetBase(Dataset):
     INT_SIZE_IN_BYTES = 4
     HEADER_SIZE_IN_BYTES = 8
 
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
@@ -94,7 +89,7 @@ class PackedMemMapDatasetBase(Dataset):
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
@@ -145,7 +140,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
 
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.

@@ -17,7 +17,7 @@ from llm_gym.config.lookup_types import (
     TokenizerTypes,
 )
 from llm_gym.dataloader.dataset import Dataset
-from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner, RunnerTypes
+from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
@@ -63,10 +63,10 @@ class ResolverRegister:
             self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint")
         )
         resolvers = {
-            config.runner.type_hint: ClassResolver(
-                [t.value for t in RunnerTypes],
-                base=Runner,
-                default=FSDPRunner,
+            config.running_env.type_hint: ClassResolver(
+                [t.value for t in RunningEnvTypes],
+                base=RunningEnv,
+                default=FSDPRunningEnv,
             ),
             config.model.type_hint: ClassResolver(
                 [t.value for t in ModelTypes],

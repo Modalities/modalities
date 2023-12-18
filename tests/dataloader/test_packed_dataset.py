@@ -1,5 +1,6 @@
 import pytest
 
+from llm_gym.dataloader.create_packed_data import PackedDataGenerator
 from llm_gym.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataset_loader import LLMDataLoader
 
@@ -34,3 +35,26 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
     dummy_packed_data_path.unlink(missing_ok=True)
     with pytest.raises(FileNotFoundError):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10)
+
+
+@pytest.mark.parametrize("max_num_of_tokens, expected_index_size", [(None, 4), (10, 1)])
+def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer, max_num_of_tokens, expected_index_size):
+    block_size = 5
+    packed_generator = PackedDataGenerator(
+        src_path=indexed_dummy_data_path.raw_data_path, tokenizer=gpt2_tokenizer, max_number_of_tokens=max_num_of_tokens
+    )
+    default_packed_dataset_path = packed_generator._default_destination_path()
+    assert not default_packed_dataset_path.is_file()
+    packed_generator.run()
+    packed_dataset = PackedMemMapDatasetContinuous(default_packed_dataset_path, block_size=block_size)
+
+    start_of_jsonl_content = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
+    tokenized_start_of_jsonl_content = gpt2_tokenizer(start_of_jsonl_content)["input_ids"]
+    packed_dataset_iterator = iter(packed_dataset)
+    assert tokenized_start_of_jsonl_content[:block_size] == next(packed_dataset_iterator)["input_ids"]
+    assert tokenized_start_of_jsonl_content[block_size : 2 * block_size] == next(packed_dataset_iterator)["input_ids"]
+    assert len(packed_dataset.index_base) == expected_index_size
+
+    # check validity of index section in packed dataset
+    for idx, (offset, entry_length) in enumerate(packed_dataset.index_base[:-1]):
+        assert offset + entry_length == packed_dataset.index_base[idx + 1][0]
