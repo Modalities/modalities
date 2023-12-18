@@ -1,13 +1,15 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from typing import Callable, List
+
 import torch
 import torch.nn as nn
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import StateDictType
 from torch.optim import Optimizer
+
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
 
@@ -17,7 +19,7 @@ class CheckpointingEntityType(Enum):
     OPTIMIZER = "optimizer"
 
 
-class CheckpointingExecution:
+class CheckpointingExecutionIF(ABC):
     @abstractmethod
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_batch_id: int):
         raise NotImplementedError
@@ -25,7 +27,7 @@ class CheckpointingExecution:
     @abstractmethod
     def _delete_checkpoint(self, batch_id: int):
         raise NotImplementedError
-    
+
     @abstractmethod
     def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
         raise NotImplementedError
@@ -50,7 +52,7 @@ class CheckpointingExecution:
             self._delete_checkpoint(batch_id=batch_id)
 
 
-class FSDPToDiscCheckpointing(CheckpointingExecution):
+class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
     CHECKPOINT_STRUCTURE = "eid_<experiment_id>-<entity>-step_<step>.bin"
 
     def __init__(
@@ -61,6 +63,16 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         checkpointing_rank: int,
         model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
     ):
+        """Implementation of checkpointing to disc via FSDP
+
+        Args:
+            checkpoint_path (Path): folder path to the checkpoint
+            experiment_id (str): ID of the experiment
+            global_rank (int): global rank within the current process group
+            checkpointing_rank (int): global rank that performs the checkpointing
+            model_wrapping_fn (Callable[[nn.Module, bool], FSDP]): Wrapping function that wraps raw model.
+                                                                   For FSDP, we pass in FSDPRunningEnv.wrap_model
+        """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.checkpointing_rank = checkpointing_rank
