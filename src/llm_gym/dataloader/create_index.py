@@ -13,6 +13,9 @@ from tqdm import tqdm
 class IndexGenerator:
     def __init__(self, src_file: Path | str, chunksize: int = 4096, drop_faulty_entries: bool = False):
         """
+        Reads in a JSON file as a binary file, iterates character by character und builds up
+        the sample index (char-wisestart and end position for each JSON sample) via "\n" character positions.
+
         :param src_file: Path to a jsonl-file.
         :param chunksize: defines the size of byte chunks that are processed via a producer-consumer approach.
                           The producer reads chunks from the `src_file`, while the consumer creates index entries.
