@@ -7,8 +7,6 @@ logs/
 *.whl
 *.arrow
 core.*
-data/datasets
-data/checkpoints
 checkpoint
 wandb
 
@@ -148,4 +146,3 @@ tags
 [._]*.un~
 
 # End of https://www.toptal.com/developers/gitignore/api/vim
-

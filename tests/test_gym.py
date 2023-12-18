@@ -7,7 +7,7 @@ from llm_gym.fsdp.reducer import Reducer
 from llm_gym.gym import Gym
 
 
-def test_run_cpu(
+def test_run_cpu_only(
     monkeypatch,
     checkpointing_mock,
     evaluator_mock,
@@ -33,19 +33,19 @@ def test_run_cpu(
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
 
     gym = Gym(
-        checkpointing=checkpointing_mock,
         trainer=trainer,
         evaluator=evaluator_mock,
-        model=nn_model_mock,
-        optimizer=optimizer_mock,
         loss_fun=loss_mock,
     )
     with patch.object(Reducer, "reduce", return_value=None) as reduce_mock:
         gym.run(
+            model=nn_model_mock,
+            optimizer=optimizer_mock,
             train_data_loader=llm_data_loader_mock,
             num_batches_per_rank=num_batches,
             evaluation_data_loaders=[],
             callback_interval_in_batches=int(num_batches),
+            checkpointing=checkpointing_mock,
         )
         nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
         optimizer_mock.step.assert_called()

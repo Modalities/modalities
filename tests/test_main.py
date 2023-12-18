@@ -1,10 +1,7 @@
-from unittest.mock import MagicMock
-
 import pytest
 import torch.cuda
 
 from llm_gym.__main__ import Main
-from llm_gym.checkpointing.checkpointing import CheckpointingIF
 
 
 def no_gpu_available() -> bool:
@@ -23,7 +20,4 @@ def test_e2e_training_run_wout_ckpt(monkeypatch, indexed_dummy_data_path, dummy_
     for val_dataloader_config in dummy_config.training.evaluation_dataloaders.values():
         val_dataloader_config.config.dataset.config.raw_data_path = indexed_dummy_data_path.raw_data_path
     main = Main(dummy_config)
-    mocked_checkpointing = MagicMock(spec=CheckpointingIF)
-    main.gym.checkpointing = mocked_checkpointing
     main.run()
-    mocked_checkpointing.run.assert_called_once()

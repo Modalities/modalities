@@ -94,10 +94,11 @@ loss:
     target_key: ${training.train_dataloader.config.collate_fn.config.target_key}
     prediction_key: ${model.config.config.prediction_key}
 
-runner:
-  type_hint: FSDPRunner
+running_env:
+  type_hint: FSDPRunningEnv
   config:
     process_group_backend: ${training.process_group_backend}
+    local_rank: ${oc.env:LOCAL_RANK}
 
 model:
   type_hint: GPT2LLM

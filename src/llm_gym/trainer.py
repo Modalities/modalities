@@ -100,6 +100,7 @@ class Trainer:
                 cummulated_loss = self._reset_loss()
 
     def _reset_loss(self):
+        # TODO: we should handle the device assignment more centrally.
         cummulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
             cummulated_loss.to(self.local_rank)
