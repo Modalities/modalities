@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 # TODO: benchmark against pyspark
 class IndexGenerator:
-    def __init__(self, src_file: Path | str, chunksize: int = 4096, drop_faulty_entries: bool = False):
+    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
         """
         Reads in a JSON file as a binary file, iterates character by character und builds up
         the sample index (char-wisestart and end position for each JSON sample) via "\n" character positions.
@@ -22,7 +22,7 @@ class IndexGenerator:
         :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
                                     Otherwise, the index generation fails with an exception.
         """
-        self.src_file = Path(src_file)
+        self.src_file = src_file
         self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
         with self.src_file.open(mode="r", encoding="utf-8") as fin:
