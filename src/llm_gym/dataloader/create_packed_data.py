@@ -22,10 +22,11 @@ class PackedDataGenerator:
         header_size_in_bytes: int = 8,
     ):
         """
+        Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.
         :param src_path: Path to a jsonl file, which holds text data
-        :param index_path: Path to an index file, which is supposed to indicate the start character position
-                           and length of samples given in `raw_data_path`.
-                           If not defined, an index next to `raw_data_path` is picked,
+        :param index_path: Path to an index file, which indicates the start character position
+                           and length of samples given in `src_path`.
+                           If not defined, an index file next to `src_path` is picked,
                            by replacing its suffix with ".idx".
         :param tokenizer: PretrainedTokenizer object, which is used to pre-tokenize the provided data in `src_path`.
                           Tokenization is necessary to work on final lengths of token sequences.
@@ -92,6 +93,7 @@ class PackedDataGenerator:
         length_of_byte_encoded_data_section = start_of_index_in_bytes - self.header_size_in_bytes
         header_content = length_of_byte_encoded_data_section.to_bytes(self.header_size_in_bytes, byteorder="big")
         header_content = np.frombuffer(header_content, dtype="uint8")
+        # write the header content to the packed dataset file
         m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.header_size_in_bytes,))
         m[:] = header_content[:]
 
@@ -100,7 +102,8 @@ class PackedDataGenerator:
         tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
         if len(tokens) == 0:
             return
-        for token_idx, token in enumerate(tokens):
+        token_idx = 0
+        for token in tokens:
             token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
             f.write(token_as_bytes)
             self._total_num_of_tokens += 1
@@ -108,7 +111,9 @@ class PackedDataGenerator:
                 segment_length = (token_idx + 1) * self.size_in_bytes
                 self._index_list.append((self._curr_offset, segment_length))
                 raise StopIteration
+            token_idx += 1
         f.write(eos_token_as_bytes)
-        segment_length = (token_idx + 2) * self.size_in_bytes
+        token_idx += 1
+        segment_length = (token_idx + 1) * self.size_in_bytes
         self._index_list.append((self._curr_offset, segment_length))
         self._curr_offset += segment_length
