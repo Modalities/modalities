@@ -30,27 +30,27 @@ class IndexGenerator:
             num_chars = fin.tell()
         self.num_chunks = num_chars // self.chunksize
         self.reminder = num_chars % self.chunksize
-        self.chunk_queue = queue.Queue()
-        self.index_map = []
-        self.exception_buffer = []
+        self._chunk_queue = queue.Queue()
+        self._index_map = []
+        self._exception_buffer = []
 
     def run(self, dst_file: Path):
-        self.exception_buffer = []
+        self._exception_buffer = []
         reader = threading.Thread(target=self._reader_thread)
         reader.start()
         processor = threading.Thread(target=self._indexer_thread)
         processor.start()
         reader.join()
         processor.join()
-        if self.exception_buffer:
-            raise self.exception_buffer[0]
-        print(f"Created index of length {len(self.index_map)}")
-        dst_file.write_bytes(pkl.dumps(self.index_map))
+        if self._exception_buffer:
+            raise self._exception_buffer[0]
+        print(f"Created index of length {len(self._index_map)}")
+        dst_file.write_bytes(pkl.dumps(self._index_map))
 
     def _indexer_thread(self):
         def queue_generator():
             while True:
-                chunk = self.chunk_queue.get()
+                chunk = self._chunk_queue.get()
                 if chunk is None:
                     break
                 yield chunk
@@ -62,7 +62,7 @@ class IndexGenerator:
                 line = [c.decode("iso-8859-1") for c in line]
                 line = "".join(line)
                 json.loads(line)
-                self.index_map.append((last_index, segment_len))
+                self._index_map.append((last_index, segment_len))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
                     print(f"faulty line at {last_index}-{curr_index}, skipping...")
@@ -70,9 +70,9 @@ class IndexGenerator:
                     print(f"{line=}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
-                    self.exception_buffer.append(err)
+                    self._exception_buffer.append(err)
 
-        self.index_map = []
+        self._index_map = []
         last_index = 0
         for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
             for char_index, c in enumerate(chunk):
@@ -88,11 +88,11 @@ class IndexGenerator:
         with open(self.src_file, "rb") as fin:
             while True:
                 chunk = fin.read(self.chunksize)
-                if self.exception_buffer:
+                if self._exception_buffer:
                     raise RuntimeError(
                         "Exception found in exception buffer. Probably the indexer thread ran into an error..."
                     )
                 if not chunk:
                     break
-                self.chunk_queue.put(chunk)
-        self.chunk_queue.put(None)
+                self._chunk_queue.put(chunk)
+        self._chunk_queue.put(None)
