@@ -34,7 +34,7 @@ class IndexGenerator:
         self._index_map = []
         self._exception_buffer = []
 
-    def run(self, dst_file: Path):
+    def create_index(self, target_path_for_index_file: Path):
         self._exception_buffer = []
         reader = threading.Thread(target=self._reader_thread)
         reader.start()
@@ -45,7 +45,7 @@ class IndexGenerator:
         if self._exception_buffer:
             raise self._exception_buffer[0]
         print(f"Created index of length {len(self._index_map)}")
-        dst_file.write_bytes(pkl.dumps(self._index_map))
+        target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
 
     def _indexer_thread(self):
         def queue_generator():

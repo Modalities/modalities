@@ -68,7 +68,7 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 @pytest.fixture
 def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
-    index_generator.run(dummy_data_path.index_path)
+    index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
 
 

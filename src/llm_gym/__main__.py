@@ -108,7 +108,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     print(f"reading raw data from {src_path}")
     print(f"writing index to {index_path}")
     generator = IndexGenerator(src_path)
-    generator.run(index_path)
+    generator.create_index(index_path)
 
 
 @main.command(name="create_packed_data")

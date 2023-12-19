@@ -30,7 +30,7 @@ def test_index_creation(tmpdir):
     def generate_data_index_file(data_path: Path, **kwargs):
         indexer = IndexGenerator(data_path, **kwargs)
         dummy_dst_path.unlink(missing_ok=True)
-        indexer.run(dummy_dst_path)
+        indexer.create_index(dummy_dst_path)
 
     with pytest.raises(ValueError):
         generate_data_index_file(plain_text_data_path)
