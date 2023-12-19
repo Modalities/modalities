@@ -34,9 +34,9 @@ class PackedDataGenerator:
         :param max_number_of_tokens: Limit the total amount of tokens in the packed dataset.
                                      If not specified, the whole data is packed into the dataset.
         :param size_in_bytes: amount of bytes to represent tokens as integers.
-                              If the vocabulary exceeds 2^`size_in_bytes`, this requires adaptation.
+                              If the vocabulary exceeds 2^(8*`size_in_bytes`), this requires adaptation.
         :param header_size_in_bytes: amount of bytes to represent number of all tokens in dataset.
-                                     If the amount exceeds 2^`header_size_in_bytes`, this requires adaptation.
+                                     If the amount exceeds 2^(8*`header_size_in_bytes`), this requires adaptation.
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
