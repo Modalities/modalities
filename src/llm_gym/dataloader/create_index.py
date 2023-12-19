@@ -3,6 +3,7 @@ import os
 import pickle as pkl
 import queue
 import threading
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -65,9 +66,9 @@ class IndexGenerator:
                 self._index_map.append((last_index, segment_len))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
-                    print(f"faulty line at {last_index}-{curr_index}, skipping...")
+                    warnings.warn(f"faulty line at {last_index}-{curr_index}, skipping...")
                 else:
-                    print(f"{line=}")
+                    warnings.warn(f"faulty line: {line=}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)

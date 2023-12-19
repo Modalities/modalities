@@ -1,4 +1,5 @@
 import pickle
+import warnings
 from pathlib import Path
 from typing import IO
 
@@ -75,13 +76,15 @@ class PackedDataGenerator:
             f.write((0).to_bytes(self.header_size_in_bytes, byteorder="big"))
 
             # write data section (tokens)
-            for line in tqdm(self._reader):
+            for idx, line in tqdm(enumerate(self._reader)):
                 try:
                     self._process_line(encoded_eos_token_as_bytes, f, line)
+                except ValueError:
+                    warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
                 except StopIteration:
                     break
-                except Exception as e:
-                    print(f"could not process line: {e=}")
+                except Exception as exception:
+                    warnings.warn(f"could not process line: {exception=}")
 
             # write index
             f.write(pickle.dumps(self._index_list))
@@ -101,7 +104,7 @@ class PackedDataGenerator:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
         if len(tokens) == 0:
-            return
+            raise ValueError("Received empty sample...")
         token_idx = 0
         for token in tokens:
             token_as_bytes = token.to_bytes(self.size_in_bytes, byteorder="big")
