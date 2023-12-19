@@ -113,7 +113,6 @@ class PackedDataGenerator:
                 raise StopIteration
             token_idx += 1
         f.write(eos_token_as_bytes)
-        token_idx += 1
         segment_length = (token_idx + 1) * self.size_in_bytes
         self._index_list.append((self._curr_offset, segment_length))
         self._curr_offset += segment_length
