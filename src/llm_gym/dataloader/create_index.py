@@ -27,9 +27,9 @@ class IndexGenerator:
         self.drop_faulty_entries = drop_faulty_entries
         with self.src_file.open(mode="r", encoding="utf-8") as fin:
             fin.seek(0, os.SEEK_END)
-            char_num = fin.tell()
-        self.chunks = char_num // self.chunksize
-        self.reminder = char_num % self.chunksize
+            num_chars = fin.tell()
+        self.num_chunks = num_chars // self.chunksize
+        self.reminder = num_chars % self.chunksize
         self.chunk_queue = queue.Queue()
         self.index_map = []
         self.exception_buffer = []
@@ -74,7 +74,7 @@ class IndexGenerator:
 
         self.index_map = []
         last_index = 0
-        for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.chunks):
+        for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
             for char_index, c in enumerate(chunk):
                 curr_index = chunk_idx * self.chunksize + char_index
                 if c == ord("\n"):
