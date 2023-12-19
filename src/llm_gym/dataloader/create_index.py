@@ -58,16 +58,16 @@ class IndexGenerator:
         def process_line(last_index: int, curr_index: int):
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
-                string = np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
-                string = [c.decode("iso-8859-1") for c in string]
-                string = "".join(string)
-                json.loads(string)
+                line = np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
+                line = [c.decode("iso-8859-1") for c in line]
+                line = "".join(line)
+                json.loads(line)
                 self.index_map.append((last_index, segment_len))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
                     print(f"faulty line at {last_index}-{curr_index}, skipping...")
                 else:
-                    print(f"{string=}")
+                    print(f"{line=}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
                     self.exception_buffer.append(err)
