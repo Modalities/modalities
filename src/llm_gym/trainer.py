@@ -1,15 +1,16 @@
 from typing import Callable
+
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+
 from llm_gym.batch import DatasetBatch, EvaluationResultBatch
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.fsdp.reducer import Reducer
 from llm_gym.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from llm_gym.logging_broker.publisher import MessagePublisher
 from llm_gym.loss_functions import Loss
 from llm_gym.models.model import NNModel, model_predict_batch
-from llm_gym.dataloader.dataloader import LLMDataLoader
-
 
 
 class Trainer:
@@ -48,7 +49,13 @@ class Trainer:
         epoch_done_callback: Callable[[int], None],
     ):
         model.train()
-        cummulated_loss = torch.zeros(2).to(self.local_rank)
+        cummulated_loss = torch.zeros(2)
+
+        # TODO: we should handle the device assignment more centrally.
+        if torch.cuda.is_available():
+            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
+        else:
+            cummulated_loss = cummulated_loss.to("cpu")
 
         # batch loop
         batch: DatasetBatch
@@ -98,7 +105,7 @@ class Trainer:
 
                 # reset loss
                 # TODO in the future we should outsource this functionality
-                cummulated_loss = torch.zeros(2).to(self.local_rank)
+                cummulated_loss = torch.zeros(2).to(torch.device(self.local_rank))
 
     @staticmethod
     def _publish_progress(

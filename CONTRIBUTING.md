@@ -31,7 +31,7 @@ pre-commit install --install-hooks
 
 - Make sure your code passes all the tests and pre-commit hooks. Use `pytest` from within the root of your local repository.
 
-- 
+
 ## Commit Guidelines
 
 We follow the [conventional commit style](https://www.conventionalcommits.org/en/v1.0.0/) for our commit messages.  
@@ -53,3 +53,5 @@ The available commit types vary slightly from the official ones:
 1. Create a merge request onto the `main` branch.
 
 2. Assign two reviewers, one with the regular reviewer functionality and one by using a comment e.g. `/cc @second-reviewer - reviewer`. If wished assign more people like this, but consider also marking "optional" reviewers to not block your merge request for too long.
+
+3. If your Merge Request stays open and the target branch (e.g. `main`) receives updates in the meantime, which lead to conflicts with your changes, resolve those and request another review from the team members of your choice. Do this explicitly by re-assigning them according to `2.`

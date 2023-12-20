@@ -43,7 +43,7 @@ class FSDPRunningEnv(RunningEnv):
 
     def __exit__(self, type, value, traceback):
         pass  # TODO uncomment part below
-        # dist.barrier()
+        # dist.barrier()    # TODO check for concurrency issues
         # dist.destroy_process_group()
 
     @staticmethod

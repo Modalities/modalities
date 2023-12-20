@@ -80,7 +80,8 @@ The mechanismn introduced to instantiate classes via `type_hint` in the `config.
 Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as `${subconfig.attribue}`. 
 
 Then, Pydantic validates the whole config as is and checks that each of the sub-configs are `pydantic.BaseModel` classes.
-For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced. With this we utilize Pydantics feature to auto-select a fitting type based on the keys in the config yaml file.
+For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced.
+With this we utilize Pydantics feature to auto-select a fitting type based on the keys in the config yaml file.
 
 `ClassResolver` replaces large if-else control structures to infer the correct concrete type with a `type_hint` used for correct class selection:
 ```python
@@ -137,9 +138,66 @@ optimizer = ...  # our example dependency
 scheduler = resolvers.build_component_by_config(config=config.scheduler, extra_kwargs=dict(optimizer=optimizer))
 ```
 
-To add a new resolver use `add_resolver`, and the corresponding added resolver will be accessible by the register_key given during adding. For access use the `build_component_by_key_query` function of the `ResolverRegistry`.
+To add a new resolver use `add_resolver`, and the corresponding added resolver will be accessible by the register_key given during adding.
+For access use the `build_component_by_key_query` function of the `ResolverRegistry`.
 
-# MemMapDataset Index Generator
+## Entry Points
+
+We use [click](https://click.palletsprojects.com/en/) as a tool to add new entry points and their CLI arguments.
+For this we have a main entry point from which all other entry points are started. 
+
+The main entry point is `src/llm_gym/__main__.py:main()`. 
+We register other sub-entrypoints by using our main `click.group`, called `main`, as follows: 
+```python
+@main.command(name="my_new_entry_point")
+```
+
+See the following full example:
+```python
+import click
+import click_pathlib
+
+
+@click.group()
+def main() -> None:
+    pass
+
+
+config_option = click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+
+
+@main.command(name="do_stuff")
+@config_option
+@click.option(
+    "--my_cli_argument",
+    type=int,
+    required=True,
+    help="New integer argument",
+)
+def entry_point_do_stuff(config_file_path: Path, my_cli_argument: int):
+    print(f"Do stuff with {config_file_path} and {my_cli_argument}...)
+    ...
+
+if __name__ == "__main__":
+    main()
+```
+With 
+```toml
+[project.scripts]
+llm_gym = "llm_gym.__main__:main"
+```
+in our `pyproject.toml`, we can start only main with `llm_gym` (which does nothing), or a specific sub-entrypoint e.g. `llm_gym do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+
+Alternatively, directly use `src/llm_gym/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+
+# MemMap Datasets
+
+## MemMapDataset Index Generator
 
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
@@ -149,7 +207,7 @@ llm_gym create_mmap_index <path/to/jsonl/file>
 
 The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_mmap_index --help`.
 
-# Packed Dataset Generator
+## Packed Dataset Generator
 
 The `PackedMemMapDatasetContinuous` and `PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a `MemMapDataset` index file as described [above](#memmapdataset-index-generator). Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
@@ -159,7 +217,7 @@ llm_gym create_packed_data <path/to/jsonl/file>
 
 The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_packed_data --help`.
 
-## Packed Data Format
+### Packed Data Format
 
 The packed data file is a bytestream containing both the tokenized data as well as an index denoting the start and length of the tokenized documents inside the bytestream. The data file consists of 3 concatenated parts:
 

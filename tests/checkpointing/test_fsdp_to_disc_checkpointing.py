@@ -23,6 +23,7 @@ class ExperimentConfig(BaseModel):
     running_env_conf: FSDPRunningEnvConfig
 
 
+@pytest.mark.skip(reason="Need to fix absolute path for config_file_path and needs to be run via torchrun in a torch distributed environment (torchrun)")
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def experiment_config(self) -> ExperimentConfig:

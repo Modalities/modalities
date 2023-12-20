@@ -33,6 +33,18 @@ class CheckpointingIF(ABC):
     ) -> Optimizer:
         raise NotImplementedError
 
+    @abstractmethod
+    def save_checkpoint(
+        self,
+        train_batch_id: int,
+        num_batches: int,
+        evaluation_result: Dict[str, EvaluationResultBatch],
+        model: nn.Module,
+        optimizer: Optimizer,
+        early_stoppping_criterion_fulfilled: bool = False,
+    ):
+        raise NotImplementedError
+
 
 class CheckpointingExecutionIF(CheckpointingIF):
     @abstractmethod
