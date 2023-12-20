@@ -52,6 +52,11 @@ class PackedMemMapDatasetBase(Dataset):
 
     def __init__(self, raw_data_path: Path, block_size: int):
         """
+        Base class for packed memmapped datasets. The underlying dataset file has the structure:
+        | header | data | index |
+        The header contains information about the length of the subsequent data sequence. The index contains
+        the tuple information (start, end) in terms of byte positions.
+
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
@@ -91,6 +96,9 @@ class PackedMemMapDatasetBase(Dataset):
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     def __init__(self, raw_data_path: Path, block_size: int):
         """
+        PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
+        irrespective of the samples' start and end position, as defined in the index.
+
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
@@ -125,12 +133,20 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
         for segment_offset, segment_len in tqdm(self.index_base):
+            # When the sum of of the length of the current previously seen samples doesn't
+            # exceed block_size_in_bytes, we add the current segment length to the previous
+            # ones and continue.
             if curr_len + segment_len < block_size_in_bytes:
                 curr_len += segment_len
+            # If the previous and current length equals block_size_in_bytes, we add the starting index
+            # and the total sequences length to the index list as a new sample.
             elif curr_len + segment_len == block_size_in_bytes:
                 self.index.append((curr_offset, block_size_in_bytes))
                 curr_len = 0
                 curr_offset += block_size_in_bytes
+            # Else case is executed when the current and previous segment length exceed the block_size.
+            # In this case we set the starting point of the next sample to the end of the current sample.
+            # This way, the start of a sample is never in the middle of a sentence.
             else:
                 self.index.append((curr_offset, block_size_in_bytes))
                 if segment_len > block_size_in_bytes:
