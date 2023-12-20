@@ -1,4 +1,5 @@
 import math
+from abc import abstractmethod
 from enum import Enum
 from typing import Dict
 
@@ -14,12 +15,12 @@ from llm_gym.models.model import NNModel
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
-class AttentionType(Enum):
+class AttentionType(str, Enum):
     DEFAULT_ATTENTION = "default_attention"
     PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
 
 
-class ActivationType(Enum):
+class ActivationType(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
 
@@ -200,9 +201,6 @@ class GPT2LLM(NNModel):
     def __init__(self, config: GPTConfig):
         super().__init__()
 
-        self.sample_key = config.sample_key
-        self.prediction_key = config.prediction_key
-
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
@@ -241,7 +239,7 @@ class GPT2LLM(NNModel):
             torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        input_ids = inputs[self.sample_key]
+        input_ids = inputs[self.config.sample_key]
         device = input_ids.device
         b, t = input_ids.size()
         assert (
@@ -257,7 +255,7 @@ class GPT2LLM(NNModel):
             x = block(x)
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-        return {self.prediction_key: logits}
+        return {self.config.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)

@@ -1,8 +1,10 @@
+import json
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
-from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator, FilePath
+from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
     CollatorTypes,
@@ -16,9 +18,8 @@ from llm_gym.config.lookup_types import (
     TokenizerTypes,
 )
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_running_env import RunningEnv, RunningEnvConfig
+from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
-
 
 
 class WandbConfig(BaseModel):
@@ -62,7 +63,12 @@ class DatasetConfig(BaseModel):
         dataset_tag: str
 
     type_hint: DatasetTypes
-    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig | OpenGPTXMMapDatasetConfig
+    config: Union[
+        MemMapDatasetConfig,
+        PackedMemMapDatasetContinuousConfig,
+        PackedMemMapDatasetMegatronConfig,
+        OpenGPTXMMapDatasetConfig,
+    ]
 
 
 class SamplerConfig(BaseModel):
@@ -102,6 +108,7 @@ class DataConfig(BaseModel):
     sequence_len: int
     train_dataloader: DataLoaderConfig
     evaluation_dataloaders: List[DataLoaderConfig]
+
 
 class TrainingConfig(BaseModel):
     # TODO: use this in Progress Logging
@@ -228,3 +235,29 @@ class AppConfig(BaseModel):
     scheduler: SchedulerConfig
     checkpoint: CheckpointConfig
     wandb: WandbConfig
+
+
+class PretrainedGPTConfig(PretrainedConfig):
+    model_type = "llm_gym_gpt2"
+
+    def __init__(self, config: GPTConfig = None, **kwargs):
+        if type(config) == dict:
+            config = GPTConfig(**config)
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        if self.config:
+            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
+            json_dict["config"]["attention"] = {
+                "attention_type": self.config.attention.attention_type.value,
+                "scaling_factor": self.config.attention.scaling_factor,
+            }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std,
+            }
+        else:
+            json_dict = {}
+        return json.dumps(json_dict)
