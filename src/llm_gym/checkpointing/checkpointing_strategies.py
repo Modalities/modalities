@@ -1,7 +1,7 @@
 from typing import Dict
-from llm_gym.checkpointing.checkpointing import CheckpointingStrategyIF
 
 from llm_gym.batch import EvaluationResultBatch
+from llm_gym.checkpointing.checkpointing import CheckpointingStrategyIF
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
 

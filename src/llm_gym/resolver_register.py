@@ -1,12 +1,13 @@
-from llm_gym.dataloader.dataloader import LLMDataLoader
 from typing import Any, Dict, List
+
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
 from torch.utils.data import DataLoader, Sampler
+from torch.utils.data.distributed import DistributedSampler
 from transformers import PreTrainedTokenizer
+
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
-from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.config.lookup_types import (
     CollatorTypes,
     DataloaderTypes,
@@ -16,13 +17,12 @@ from llm_gym.config.lookup_types import (
     SamplerTypes,
     TokenizerTypes,
 )
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataset import Dataset
+from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
-from torch.utils.data import Sampler
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data.dataloader import DataLoader
 
 
 class ResolverRegister:
@@ -61,9 +61,7 @@ class ResolverRegister:
         return found_values
 
     def _create_resolver_register(self, config: AppConfig) -> Dict[str, ClassResolver]:
-        expected_resolvers = set(
-            self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint")
-        )
+        set(self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint"))
         resolvers = {
             config.running_env.type_hint: ClassResolver(
                 [t.value for t in RunningEnvTypes],

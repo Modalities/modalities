@@ -86,10 +86,10 @@ wandb:
 training:
   process_group_backend: "nccl"
   num_training_samples: 224000
-  callback_interval_in_samples: 2  # TODO check if multiple of global batch size
-  training_batch_size: 32
-  evaluation_batch_size: 21
-  test_batch_size: 21
+  callback_interval_in_samples: 100
+  training_batch_size: 64
+  evaluation_batch_size: 64
+  test_batch_size: 32
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}

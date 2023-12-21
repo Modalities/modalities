@@ -1,16 +1,16 @@
 from enum import Enum, member
-from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXDatasetFactory
 
 import torch
 from torch.utils.data import DistributedSampler
 from transformers import GPT2TokenizerFast
 
-from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
+from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
+from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXDatasetFactory
 from llm_gym.loss_functions import CLMCrossEntropyLoss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
-from llm_gym.dataloader.dataloader import LLMDataLoader
 
 
 class LookupEnum(Enum):
@@ -38,17 +38,20 @@ class SchedulerTypes(LookupEnum):
     OneCycleLR = torch.optim.lr_scheduler.OneCycleLR
 
 
-class SamplerTypes(LookupEnum):
-    DistributedSampler = torch.utils.data.distributed.DistributedSampler
-
 class TokenizerTypes(LookupEnum):
     GPT2TokenizerFast = GPT2TokenizerFast
+
 
 class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
+    MMapIndexedDataset = MMapIndexedDatasetBuilder
     OpenGPTXMMapDataset = member(OpenGPTXDatasetFactory.create_dataset)
+
+
+class SamplerTypes(LookupEnum):
+    DistributedSampler = DistributedSampler
 
 
 class CollatorTypes(LookupEnum):

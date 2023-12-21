@@ -1,26 +1,28 @@
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
+
 import click
 import click_pathlib
-from llm_gym.logging_broker.subscriber import MessageSubscriberIF
-import numpy as np
 import torch
+import torch.nn as nn
 from omegaconf import OmegaConf
+from torch.optim import Optimizer
+from transformers import GPT2TokenizerFast
+
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing import Checkpointing
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
+from llm_gym.config.config import AppConfig
+from llm_gym.config.lookup_types import TokenizerTypes
+from llm_gym.dataloader.create_index import IndexGenerator
+from llm_gym.dataloader.create_packed_data import PackedDataGenerator
 from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataloader_factory import DataloaderFactory
-from llm_gym.fsdp.fsdp_running_env import RunningEnv
-from omegaconf import OmegaConf
-from transformers import GPT2TokenizerFast
-from llm_gym.config.config import AppConfig, DataLoaderConfig
-from llm_gym.config.lookup_types import TokenizerTypes
-from llm_gym.dataloader.create_index import create_memmap_index
-from llm_gym.dataloader.create_packed_data import create_packed_data
+from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 from llm_gym.evaluator import Evaluator
+from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.gym import Gym
 from llm_gym.logging_broker.message_broker import MessageBroker
 from llm_gym.logging_broker.messages import BatchProgressUpdate, MessageTypes
@@ -34,9 +36,6 @@ from llm_gym.loss_functions import Loss
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
-import torch.nn as nn
-from torch.optim import Optimizer
-from llm_gym.util import dist_setup_info, get_date_of_run
 from llm_gym.utils.generate_text import main as generate_text_main
 
 
@@ -63,8 +62,15 @@ def entry_point_run_llmgym(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=str)
-@click.argument("config_path", type=str)
+@click.argument("model_path", type=Path)
+@click.argument("config_path", type=Path)
+@click.option(
+    "--tokenizer_type",
+    type=TokenizerTypes,
+    show_default=True,
+    default=TokenizerTypes.GPT2TokenizerFast,
+    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+)
 @click.option(
     "--tokenizer_type",
     type=TokenizerTypes,
@@ -76,29 +82,37 @@ def entry_point_run_llmgym(config_file_path: Path):
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_file, max_new_tokens, chat):
-    generate_text_main(model_path, config_path, tokenizer_file, max_new_tokens, chat)
+def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
+    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
+    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
 
 
 @main.command(name="create_memmap_index")
-@click.argument("src_path", type=str)
+@click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
 def entry_point_create_memmap_index(src_path, index_path):
-    create_memmap_index(src_path, index_path)
+    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
+    if index_path.exists():
+        raise ValueError("index already exists. delete it or specify different output folder.")
+
+    print(f"reading raw data from {src_path}")
+    print(f"writing index to {index_path}")
+    generator = IndexGenerator(src_path)
+    generator.create_index(index_path)
 
 
 @main.command(name="create_packed_data")
-@click.argument("src_path", type=str)
+@click.argument("src_path", type=Path)
 @click.option(
     "--dst_path",
     type=str,
@@ -115,14 +129,14 @@ def entry_point_create_memmap_index(src_path, index_path):
     "--tokenizer_type",
     type=TokenizerTypes,
     show_default=True,
-    default=GPT2TokenizerFast,
+    default=TokenizerTypes.GPT2TokenizerFast,
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[1] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option(
@@ -133,9 +147,15 @@ def entry_point_create_memmap_index(src_path, index_path):
     help="jq pattern to extract the data from the json line.",
 )
 def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
-    # TODO: creation of tokenizer not straight forward since we either require a whole APpConfig
-    #  or need create resolver = ClassResolver([A, B], base=Base) by collecting all possible classes, which is ugly
-    create_packed_data(src_path, dst_path, index_path=index_path, jq_pattern=jq_pattern)
+    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
+    #  we can currently not rely on the existing class resolver.
+    #  This is based on its connection to the overall `AppConfig`.
+    #  One would requires an object of it to instantiate the ResolverRegistry.
+    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
+    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
+    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
+    generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
+    generator.run(dst_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -153,8 +173,10 @@ class Main:
         self.warmstart_experiment_id = "2023-11-16-07:42:45_PM"
 
         # coldstart
-        self.experiment_id = get_date_of_run()
+        self.global_train_batch_id = 0
+        self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
 
+        self.experiment_id = get_date_of_run()
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
@@ -171,7 +193,7 @@ class Main:
 
             gym.run(
                 num_training_batches_per_rank=self.config.training.num_training_batches_per_rank,
-                callback_interval_in_batches=self.config.training.eval_interval_per_rank,
+                callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
                 checkpointing=checkpointing,
@@ -189,23 +211,22 @@ class Main:
         wrapped_model, optimizer = self.get_model_and_optimizer(
             config=config, running_env=running_env, checkpointing=checkpointing
         )
-        # Loss fun
+        # Loss function
         loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 
         # Dataloaders
-        train_dataloader = DataloaderFactory.get_dataloader(
-            resolvers=resolvers, config=config.training.train_dataloader
-        )
+        train_dataloader = DataloaderFactory.get_dataloader(resolvers=resolvers, config=config.data.train_dataloader)
         eval_dataloaders = [
             DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
-            for dataloader_config in config.training.evaluation_dataloaders
+            for dataloader_config in config.data.evaluation_dataloaders
         ]
 
         # Logging
         eval_split_lengths = {
             dataloader.dataloader_tag: len(dataloader) * config.training.world_size for dataloader in eval_dataloaders
         }
-
+        # TODO: check why not *config.training.world_size
+        #  and consider just using config.training.num_training_samples for progress Subscriber
         train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
 
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
@@ -268,6 +289,7 @@ class Main:
         # scheduler = self.resolvers.build_component_by_config(
         #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
         # )
+
         return wrapped_model, optimizer
 
     def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
@@ -303,6 +325,7 @@ class Main:
         )
 
         # TODO make logging rank configurable
+        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
         if config.training.global_rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,
@@ -313,7 +336,6 @@ class Main:
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
-
         else:
             progress_subscriber = DummyProgressSubscriber()
         message_broker.add_subscriber(

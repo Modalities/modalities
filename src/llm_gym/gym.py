@@ -1,13 +1,10 @@
 from functools import partial
 from typing import List
-from llm_gym.checkpointing.checkpointing import Checkpointing
-from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
-from llm_gym.evaluator import Evaluator
-from llm_gym.models.model import NNModel
-from llm_gym.loss_functions import Loss
-from llm_gym.trainer import Trainer
+
 from torch.optim import Optimizer
+
 from llm_gym.checkpointing.checkpointing import Checkpointing
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.loss_functions import Loss
 from llm_gym.models.model import NNModel
@@ -51,7 +48,7 @@ class Gym:
             optimizer=optimizer,
             callback_interval_in_batches=callback_interval_in_batches,
             num_batches_per_rank=num_training_batches_per_rank,
-            epoch_done_callback=partial( # TODO rename to something more meaningful
+            epoch_done_callback=partial(  # TODO rename to something more meaningful
                 self._run_evaluation_and_checkpointing,
                 model=model,
                 optimizer=optimizer,

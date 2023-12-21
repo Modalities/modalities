@@ -1,15 +1,18 @@
+import functools
 from abc import ABC, abstractmethod
-from llm_gym.config.lookup_types import LookupEnum
-from llm_gym.config.types import ProcessGroupBackendType
-from pydantic import BaseModel
+
 import torch
 import torch.distributed as dist
+import torch.nn as nn
+from pydantic import BaseModel
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+from llm_gym.config.lookup_types import LookupEnum
+from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.env_utils import bfSixteen, has_bfloat_support
 from llm_gym.models.gpt2.gpt2_model import Block
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
-from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
-import functools
-import torch.nn as nn
 
 
 class RunningEnv(ABC, object):

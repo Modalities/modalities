@@ -1,9 +1,11 @@
-from typing import Dict
 from abc import ABC, abstractmethod
+from typing import Dict
+
+import torch.nn as nn
+from torch.optim import Optimizer
+
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
-from torch.optim import Optimizer
-import torch.nn as nn
 
 
 class CheckpointingStrategyIF(ABC):

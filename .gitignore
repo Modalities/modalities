@@ -7,8 +7,6 @@ logs/
 *.whl
 *.arrow
 core.*
-data/datasets
-data/checkpoints
 checkpoint
 wandb
 
@@ -157,4 +155,5 @@ data/checkpoints
 checkpoints
 checkpoint
 wandb
+
 

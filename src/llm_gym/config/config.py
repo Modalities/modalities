@@ -55,6 +55,10 @@ class DatasetConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
 
+    class MMapIndexedDatasetConfig(BaseModel):
+        path: Path
+        skip_warmup: bool
+
     class OpenGPTXMMapDatasetConfig(BaseModel):
         num_samples: conint(ge=1)
         path: FilePath
@@ -67,6 +71,7 @@ class DatasetConfig(BaseModel):
         MemMapDatasetConfig,
         PackedMemMapDatasetContinuousConfig,
         PackedMemMapDatasetMegatronConfig,
+        MMapIndexedDatasetConfig,
         OpenGPTXMMapDatasetConfig,
     ]
 

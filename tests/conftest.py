@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from torch.optim import Optimizer
+from transformers import GPT2TokenizerFast
 
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.checkpointing.checkpointing import CheckpointingIF
@@ -59,7 +60,7 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = LargeFileLinesReader.default_index_path(dummy_data_path, index_path=None)
+    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
     index_path.unlink(missing_ok=True)
     return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
 
@@ -67,8 +68,15 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 @pytest.fixture
 def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
-    index_generator.run(dummy_data_path.index_path)
+    index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
+
+
+@pytest.fixture
+def gpt2_tokenizer() -> GPT2TokenizerFast:
+    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer.json")
+    assert default_gpt2_tokenizer_path.is_file()
+    return GPT2TokenizerFast(tokenizer_file=str(default_gpt2_tokenizer_path))
 
 
 @pytest.fixture(scope="function")
@@ -109,22 +117,35 @@ def progress_publisher_mock():
 @pytest.fixture(scope="function")
 def trainer(progress_publisher_mock):
     return Trainer(
-        local_rank=os.getenv("LOCAL_RANK"),
+        local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 
 
+@pytest.fixture(scope="function")
 def set_env_cpu(monkeypatch):
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
+    # TODO: does not really ensure cpu-only usage. Alternative could be to patch `torch.cuda.is_available() = False`
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("MASTER_ADDR", "localhost")
     monkeypatch.setenv("MASTER_PORT", "9948")
 
-    # cleanup
-    if torch.distributed.is_initialized():
-        torch.distributed.destroy_process_group()
+    def torch_distributed_cleanup():
+        if torch.distributed.is_initialized():
+            torch.distributed.destroy_process_group()
+
+    torch_distributed_cleanup()
     # gloo for CPU testing with reduce
     torch.distributed.init_process_group(backend="gloo")
+
+    # use this to destroy this fixture's effect after it being used
+    yield "torch.distributed.destroy_process_group"
+
+    # TODO: discuss with Mehdi and Max and explain the side effects here.
+    torch_distributed_cleanup()
+    # setting CUDA_VISIBLE_DEVICES to "" creates a cache entry, which prevents resetting this CPU-only setup.
+    # therefore after finish using this fixture, we need to clear this cache
+    torch.cuda.device_count.cache_clear()

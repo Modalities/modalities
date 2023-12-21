@@ -49,13 +49,7 @@ class Trainer:
         epoch_done_callback: Callable[[int], None],
     ):
         model.train()
-        cummulated_loss = torch.zeros(2)
-
-        # TODO: we should handle the device assignment more centrally.
-        if torch.cuda.is_available():
-            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
-        else:
-            cummulated_loss = cummulated_loss.to("cpu")
+        cummulated_loss = self._reset_loss()
 
         # batch loop
         batch: DatasetBatch
@@ -103,9 +97,16 @@ class Trainer:
 
                 # TODO early stopping
 
-                # reset loss
-                # TODO in the future we should outsource this functionality
-                cummulated_loss = torch.zeros(2).to(torch.device(self.local_rank))
+                cummulated_loss = self._reset_loss()
+
+    def _reset_loss(self):
+        # TODO: we should handle the device assignment more centrally.
+        cummulated_loss = torch.zeros(2)
+        if torch.cuda.is_available():
+            cummulated_loss.to(torch.device(self.local_rank))
+        else:
+            cummulated_loss.to("cpu")
+        return cummulated_loss
 
     @staticmethod
     def _publish_progress(

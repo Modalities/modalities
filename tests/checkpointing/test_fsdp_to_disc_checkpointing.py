@@ -1,21 +1,24 @@
-from pathlib import Path
 import tempfile
+from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, Generator
+
+import pytest
+import torch
+import torch.distributed as dist
+from pydantic import BaseModel
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.nn import CrossEntropyLoss
+from torch.optim import AdamW, Optimizer
+
 from llm_gym.__main__ import load_app_config_dict
+from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, GPTConfig
-from pydantic import BaseModel
-import pytest
-from torch.optim import Optimizer, AdamW
-from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-import torch.distributed as dist
-import torch
-from torch.nn import CrossEntropyLoss
-from copy import deepcopy
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
-# CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
+# CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
+#   /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
 
 
 class ExperimentConfig(BaseModel):
@@ -23,7 +26,10 @@ class ExperimentConfig(BaseModel):
     running_env_conf: FSDPRunningEnvConfig
 
 
-@pytest.mark.skip(reason="Need to fix absolute path for config_file_path and needs to be run via torchrun in a torch distributed environment (torchrun)")
+@pytest.mark.skip(
+    reason="Need to fix absolute path for config_file_path and needs to be run via "
+    "torchrun in a torch distributed environment (torchrun)"
+)
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def experiment_config(self) -> ExperimentConfig:
@@ -208,7 +214,8 @@ class TestFSDPToDiscCheckpointing:
             updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
         )
 
-        # we do another forward/backward pass and check if the weights are equally updated for the loaded model as for the not-loded model
+        # we do another forward/backward pass and check
+        #  if the weights are equally updated for the loaded model as for the not-loaded model
         # run backward pass
         batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
 

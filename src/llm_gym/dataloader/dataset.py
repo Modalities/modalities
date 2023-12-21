@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pickle
 from pathlib import Path
+
 import jq
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchdataSet
@@ -13,33 +14,28 @@ from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
 class Dataset(TorchdataSet):
-    def __init__(self, raw_data_path: str | Path, block_size: int):
-        self.raw_data_path = Path(raw_data_path)
+    def __init__(self, raw_data_path: Path, block_size: int):
+        self.raw_data_path = raw_data_path
         self.block_size = block_size
 
 
 class MemMapDataset(Dataset):
-    def __init__(
-        self, raw_data_path: str | Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"
-    ):
+    def __init__(self, raw_data_path: Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param tokenizer: TODO
+        :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
 
         self.reader = LargeFileLinesReader(self.raw_data_path)
         self.jq_filter = jq.compile(jq_pattern)
-        # TODO: tokenizer from tiktoken if it is faster?
         self.tokenizer = tokenizer
-        self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self) -> int:
         return len(self.reader)
 
-    # TODO: tokenizer singleton?
     def __getitem__(self, idx: int) -> str:
         obj = self.tokenizer(
             self.jq_filter.input_text(self.reader[idx]).first(),
@@ -54,8 +50,13 @@ class PackedMemMapDatasetBase(Dataset):
     INT_SIZE_IN_BYTES = 4
     HEADER_SIZE_IN_BYTES = 8
 
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
+        Base class for packed memmapped datasets. The underlying dataset file has the structure:
+        | header | data | index |
+        The header contains information about the length of the subsequent data sequence. The index contains
+        the tuple information (start, end) in terms of byte positions.
+
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
@@ -93,8 +94,11 @@ class PackedMemMapDatasetBase(Dataset):
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
+        PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
+        irrespective of the samples' start and end position, as defined in the index.
+
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
@@ -129,12 +133,20 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
         for segment_offset, segment_len in tqdm(self.index_base):
+            # When the sum of of the length of the current previously seen samples doesn't
+            # exceed block_size_in_bytes, we add the current segment length to the previous
+            # ones and continue.
             if curr_len + segment_len < block_size_in_bytes:
                 curr_len += segment_len
+            # If the previous and current length equals block_size_in_bytes, we add the starting index
+            # and the total sequences length to the index list as a new sample.
             elif curr_len + segment_len == block_size_in_bytes:
                 self.index.append((curr_offset, block_size_in_bytes))
                 curr_len = 0
                 curr_offset += block_size_in_bytes
+            # Else case is executed when the current and previous segment length exceed the block_size.
+            # In this case we set the starting point of the next sample to the end of the current sample.
+            # This way, the start of a sample is never in the middle of a sentence.
             else:
                 self.index.append((curr_offset, block_size_in_bytes))
                 if segment_len > block_size_in_bytes:
@@ -144,7 +156,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
 
-    def __init__(self, raw_data_path: str | Path, block_size: int):
+    def __init__(self, raw_data_path: Path, block_size: int):
         """
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `llm_gym create_packed_data` to create one based on a jsonl-file.
@@ -172,4 +184,3 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         attention_mask = [1] * len(tokens)
         return {"input_ids": tokens, "attention_mask": attention_mask}
-

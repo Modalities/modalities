@@ -30,7 +30,7 @@ def test_index_creation(tmpdir):
     def generate_data_index_file(data_path: Path, **kwargs):
         indexer = IndexGenerator(data_path, **kwargs)
         dummy_dst_path.unlink(missing_ok=True)
-        indexer.run(dummy_dst_path)
+        indexer.create_index(dummy_dst_path)
 
     with pytest.raises(ValueError):
         generate_data_index_file(plain_text_data_path)
@@ -46,10 +46,10 @@ def test_index_creation(tmpdir):
 def test_large_file_lines_reader(indexed_dummy_data_path):
     raw_data_path = indexed_dummy_data_path.raw_data_path
     reader = LargeFileLinesReader(raw_data_path)
-    assert raw_data_path.read_text().count("\n") == 2
+    assert raw_data_path.read_text().count("\n") == 4
     assert raw_data_path.read_text().rsplit("\n")[-1] == ""
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
-    assert len(reader) == 2
+    assert len(reader) == 4
     assert all(map(len, reader))
 
 
