@@ -22,7 +22,7 @@ class LargeFileLinesReader(BaseReader):
     def __init__(self, raw_data_path: Path, index_path: Path = None):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
-        :param index_path: Path to an index file, which indicates the start character position
+        :param index_path: Path to an index file, which indicates the start character/byte position
                            and length of samples given in `raw_data_path`.
                            If not defined, an index next to `raw_data_path` is picked,
                            by replacing its suffix with ".idx".
