@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import jq
 import numpy as np
@@ -137,10 +137,8 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
 
 
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
-    def generate_megatron_index(self):
-        # index_output_path = Path(index_output_path)
-
-        self.index = []
+    def generate_megatron_index(self) -> List[Tuple[int, int]]:
+        index = []
         curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
@@ -153,20 +151,21 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
             # If the previous and current length equals block_size_in_bytes, we add the starting index
             # and the total sequences length to the index list as a new sample.
             elif curr_len + segment_len == block_size_in_bytes:
-                self.index.append((curr_offset, block_size_in_bytes))
+                index.append((curr_offset, block_size_in_bytes))
                 curr_len = 0
                 curr_offset += block_size_in_bytes
             # Else case is executed when the current and previous segment length exceed the block_size.
             # In this case we set the starting point of the next sample to the end of the current sample.
             # This way, the start of a sample is never in the middle of a sentence.
             else:
-                self.index.append((curr_offset, block_size_in_bytes))
+                index.append((curr_offset, block_size_in_bytes))
                 if segment_len > block_size_in_bytes:
                     curr_offset += block_size_in_bytes
                     curr_len = 0
                 else:
                     curr_offset = segment_offset
                     curr_len = segment_len
+        return index
 
     def __init__(self, raw_data_path: Path, block_size: int):
         """
@@ -180,13 +179,13 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
         self.num_samples = total_tokens // self.block_size
 
-        self.generate_megatron_index()
+        self._index = self.generate_megatron_index()
 
     def __len__(self) -> int:
-        return len(self.index)
+        return len(self._index)
 
     def __getitem__(self, idx: int) -> dict:
-        offset, length = self.index[idx]
+        offset, length = self._index[idx]
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
             mode="r",
