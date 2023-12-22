@@ -119,10 +119,10 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
 
         # get number of total tokens in file
         total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
-        self.num_samples = total_tokens // self.block_size
+        self._num_samples = total_tokens // self.block_size
 
     def __len__(self) -> int:
-        return self.num_samples
+        return self._num_samples
 
     def __getitem__(self, idx: int) -> dict:
         tokens_as_byte_strings = np.memmap(
@@ -174,11 +174,6 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
-
-        # get number of total tokens in file
-        total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
-        self.num_samples = total_tokens // self.block_size
-
         self._index = self.generate_megatron_index()
 
     def __len__(self) -> int:
