@@ -58,7 +58,9 @@ class LargeFileLinesReader(BaseReader):
     def __read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
         def safe_decoder(byte_char):
             try:
-                c = byte_char.decode("iso-8859-1")
+                # TODO: verify why iso-8859-1 was necessary here in the path.
+                #   Maybe there was an issue with the actual loading of the jsonl-files
+                c = byte_char.decode("utf8")
             except Exception as exception:
                 c = ""
                 warnings.warn(f'Encountered invalid char: "{byte_char}".')

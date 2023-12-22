@@ -60,7 +60,7 @@ class IndexGenerator:
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
                 line = np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
-                line = [c.decode("iso-8859-1") for c in line]
+                line = [c.decode("utf8") for c in line]
                 line = "".join(line)
                 json.loads(line)
                 self._index_map.append((last_index, segment_len))
