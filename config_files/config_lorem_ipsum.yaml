@@ -17,6 +17,7 @@ training:
           index_path: ./data/lorem_ipsum.idx
           block_size: ${model.config.config.block_size}
           jq_pattern: ".text"
+          sample_key: "input_ids"
           tokenizer:
             type_hint: GPT2TokenizerFast
             config:
@@ -30,7 +31,7 @@ training:
       collate_fn:
         type_hint: GPT2LLMCollator
         config:
-          sample_key: "input_ids"
+          sample_key: ${training.train_dataloader.config.dataset.config.sample_key}
           target_key: "target_ids"
   evaluation_dataloaders:
     val:
@@ -93,7 +94,7 @@ model:
   type_hint: GPT2LLM
   config:
     config:
-      sample_key: ${training.train_dataloader.config.collate_fn.config.sample_key}
+      sample_key: ${training.train_dataloader.config.dataset.config.sample_key}
       prediction_key: "logits"
       block_size: 128
       vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency

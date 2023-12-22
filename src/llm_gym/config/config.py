@@ -46,14 +46,17 @@ class DatasetConfig(BaseModel):
         block_size: conint(gt=0)
         tokenizer: TokenizerConfig
         jq_pattern: str
+        sample_key: str
 
     class PackedMemMapDatasetContinuousConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
+        sample_key: str
 
     class PackedMemMapDatasetMegatronConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
+        sample_key: str
 
     class MMapIndexedDatasetConfig(BaseModel):
         path: Path
