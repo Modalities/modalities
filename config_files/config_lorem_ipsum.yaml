@@ -14,6 +14,7 @@ training:
         type_hint: MemMapDataset
         config:
           raw_data_path: ./data/lorem_ipsum.jsonl
+          index_path: ./data/lorem_ipsum.idx
           block_size: ${model.config.config.block_size}
           jq_pattern: ".text"
           tokenizer:
@@ -40,13 +41,7 @@ training:
         pin_memory: true
         shuffle: false
         dataloader_tag: "val"
-        dataset:
-          type_hint: MemMapDataset
-          config:
-            raw_data_path: ./data/lorem_ipsum.jsonl
-            block_size: ${model.config.config.block_size}
-            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
-            jq_pattern: ".text"
+        dataset: ${training.train_dataloader.config.dataset}
         sampler:
           type_hint: DistributedSampler
           config:
@@ -62,13 +57,7 @@ training:
         pin_memory: true
         shuffle: false
         dataloader_tag: "test"
-        dataset:
-          type_hint: MemMapDataset
-          config:
-            raw_data_path: ./data/lorem_ipsum.jsonl
-            block_size: ${model.config.config.block_size}
-            tokenizer: ${training.train_dataloader.config.dataset.config.tokenizer}
-            jq_pattern: ".text"
+        dataset: ${training.train_dataloader.config.dataset}
         sampler:
           type_hint: DistributedSampler
           config:

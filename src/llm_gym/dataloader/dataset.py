@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pickle
 from pathlib import Path
+from typing import Optional
 
 import jq
 import numpy as np
@@ -20,16 +21,27 @@ class Dataset(TorchdataSet):
 
 
 class MemMapDataset(Dataset):
-    def __init__(self, raw_data_path: Path, block_size: int, tokenizer: PreTrainedTokenizer, jq_pattern: str = ".text"):
+    def __init__(
+        self,
+        raw_data_path: Path,
+        block_size: int,
+        tokenizer: PreTrainedTokenizer,
+        index_path: Optional[Path] = None,
+        jq_pattern: str = ".text",
+    ):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
         :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
+        :param index_path: Path to an index file, which indicates the start character/byte position
+                           and length of samples given in `raw_data_path`.
+                           If not defined, an index next to `raw_data_path` is picked,
+                           by replacing its suffix with ".idx".
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size)
 
-        self.reader = LargeFileLinesReader(self.raw_data_path)
+        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
         self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer = tokenizer
 

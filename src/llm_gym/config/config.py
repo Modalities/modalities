@@ -1,9 +1,9 @@
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List, Text
+from typing import Dict, List, Optional, Text
 
-from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint
 
 from llm_gym.config.lookup_types import (
     CollatorTypes,
@@ -41,7 +41,8 @@ class TokenizerConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     class MemMapDatasetConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: FilePath
+        index_path: Optional[FilePath] = None
         block_size: conint(gt=0)
         tokenizer: TokenizerConfig
         jq_pattern: str
