@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, List, Text
 
@@ -109,8 +110,7 @@ class TrainingConfig(BaseModel):
         exact = self.num_training_samples / self.train_dataloader.config.batch_size
         ret = self.num_training_samples // self.train_dataloader.config.batch_size
         if exact != ret:
-            print(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
         return ret
 
     @property
@@ -118,8 +118,9 @@ class TrainingConfig(BaseModel):
         exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
         ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
         if exact != ret:
-            print(f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(
+                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
+            )
         return ret
 
     @property
@@ -127,8 +128,7 @@ class TrainingConfig(BaseModel):
         exact = self.num_training_batches / self.world_size
         ret = self.num_training_batches // self.world_size
         if exact != ret:
-            print(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
         return ret
 
 

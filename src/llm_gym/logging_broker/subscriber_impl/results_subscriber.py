@@ -1,5 +1,5 @@
+import rich
 import wandb
-from rich import print
 from rich.console import Group
 from rich.panel import Panel
 
@@ -40,7 +40,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             group_content.append("\nMetrics:")
             group_content.extend(metrics)
         if losses or metrics:
-            print(Panel(Group(*group_content)))
+            rich.print(Panel(Group(*group_content)))
 
 
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):

@@ -1,4 +1,5 @@
 import pickle
+import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
@@ -58,9 +59,10 @@ class LargeFileLinesReader(BaseReader):
         def safe_decoder(byte_char):
             try:
                 c = byte_char.decode("iso-8859-1")
-            except Exception:
+            except Exception as exception:
                 c = ""
-                print(f'Encountered invalid char: "{byte_char}"')
+                warnings.warn(f'Encountered invalid char: "{byte_char}".')
+                warnings.warn(f"Encountered problem: {exception}")
             return c
 
         string = (
