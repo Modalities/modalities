@@ -19,7 +19,7 @@ from llm_gym.config.lookup_types import (
 )
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
-from llm_gym.models.gpt2.gpt2_model import GPTConfig
+from llm_gym.models.gpt2.gpt2_model import GPT2Config
 
 
 class WandbConfig(BaseModel):
@@ -64,15 +64,14 @@ class DatasetConfig(BaseModel):
         path: FilePath
         sample_key: str
         sequence_len: PositiveInt
-        dataset_tag: str
 
     type_hint: DatasetTypes
     config: Union[
+        OpenGPTXMMapDatasetConfig,
         MemMapDatasetConfig,
         PackedMemMapDatasetContinuousConfig,
         PackedMemMapDatasetMegatronConfig,
         MMapIndexedDatasetConfig,
-        OpenGPTXMMapDatasetConfig,
     ]
 
 
@@ -112,23 +111,11 @@ class DataConfig(BaseModel):
     target_key: str
     sequence_len: int
     train_dataloader: DataLoaderConfig
-    evaluation_dataloaders: List[DataLoaderConfig]
-
-
-class TrainingConfig(BaseModel):
-    # TODO: use this in Progress Logging
-    num_training_samples: conint(gt=0)
-    callback_interval_in_samples: conint(gt=0)
-    process_group_backend: ProcessGroupBackendType
-    local_rank: conint(ge=0)
-    global_rank: conint(ge=0)
-    world_size: conint(ge=0)
-    main_rank: conint(ge=0)
-    eval_interval_in_batches: conint(ge=1)
+    eval_dataloaders: List[DataLoaderConfig]
 
     @property
     def eval_interval_per_rank(self):
-        return self.eval_interval_in_batches // self.world_size
+        return self.callback_interval_in_samples // self.world_size
 
     @property
     def num_training_batches_per_rank(self):
@@ -166,11 +153,6 @@ class TrainingConfig(BaseModel):
         return ret
 
 
-# TODO: remove this?? Seems unnecessary to add another composition layer here
-class GPT2Config(BaseModel):
-    config: GPTConfig
-
-
 class ModelConfig(BaseModel):
     type_hint: ModelTypes
     config: GPT2Config
@@ -184,6 +166,17 @@ class CLMCrossEntropyLossConfig(BaseModel):
 class LossConfig(BaseModel):
     type_hint: LossTypes
     config: CLMCrossEntropyLossConfig
+
+
+class TrainingConfig(BaseModel):
+    # TODO: use this in Progress Logging
+    num_training_samples: conint(gt=0)
+    callback_interval_in_samples: conint(gt=0)
+    process_group_backend: ProcessGroupBackendType
+    local_rank: conint(ge=0)
+    global_rank: conint(ge=0)
+    world_size: conint(ge=0)
+    main_rank: conint(ge=0)
 
 
 class AdamWConfig(BaseModel):
@@ -233,21 +226,21 @@ class CheckpointConfig(BaseModel):
 class AppConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
-    loss: LossConfig
     running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     checkpoint: CheckpointConfig
     wandb: WandbConfig
+    loss: LossConfig
 
 
 class PretrainedGPTConfig(PretrainedConfig):
     model_type = "llm_gym_gpt2"
 
-    def __init__(self, config: GPTConfig = None, **kwargs):
+    def __init__(self, config: GPT2Config = None, **kwargs):
         if type(config) == dict:
-            config = GPTConfig(**config)
+            config = GPT2Config(**config)
         self.config = config
 
         super().__init__(**kwargs)

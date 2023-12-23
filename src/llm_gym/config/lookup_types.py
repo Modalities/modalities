@@ -1,4 +1,4 @@
-from enum import Enum, member
+from enum import Enum
 
 import torch
 from torch.utils.data import DistributedSampler
@@ -7,7 +7,6 @@ from transformers import GPT2TokenizerFast
 from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
-from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXDatasetFactory
 from llm_gym.loss_functions import CLMCrossEntropyLoss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
@@ -47,7 +46,9 @@ class DatasetTypes(LookupEnum):
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
     MMapIndexedDataset = MMapIndexedDatasetBuilder
-    OpenGPTXMMapDataset = member(OpenGPTXDatasetFactory.create_dataset)
+    # TODO: ClassResolver does not work with functions ... therefore there is also no
+    # support for factories.
+    # OpenGPTXMMapDataset = member(OpenGPTXDatasetFactory.create_dataset)
 
 
 class SamplerTypes(LookupEnum):
