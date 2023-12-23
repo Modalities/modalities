@@ -31,7 +31,7 @@ from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
-from llm_gym.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
+from llm_gym.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from llm_gym.loss_functions import Loss
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
@@ -209,9 +209,6 @@ class Main:
         val_dataloader = validation_dataloader_lookup["val"]
         test_dataloader = validation_dataloader_lookup["test"]
 
-        val_split_lengths = {
-            dl.dataloader_tag: len(dl) * config.training.world_size for dl in validation_dataloader_lookup.values()
-        }
         # TODO: check why not *config.training.world_size
         #  and consider just using config.training.num_training_samples for progress Subscriber
         train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
@@ -227,8 +224,15 @@ class Main:
         loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
 
         # Logging
+
+        eval_split_lengths = {
+            val_dataloader.dataloader_tag: len(val_dataloader) * config.training.world_size,
+            test_dataloader.dataloader_tag: len(test_dataloader) * config.training.world_size,
+        }
+        train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
+
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-            config=config, train_split_lengths=train_split_lengths, eval_split_lengths=val_split_lengths
+            config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
         )
 
         # Trainer
@@ -291,7 +295,7 @@ class Main:
     def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
         checkpointing_strategy = SaveKMostRecentCheckpointsStrategy(k=-1)
         checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path=Path(__file__).parents[2] / Path("data", "checkpoints"),
+            checkpoint_path=Path("/raid/s3/opengptx/max_lue/LLMgym/checkpoints"),
             experiment_id=self.experiment_id,
             global_rank=config.training.global_rank,
             checkpointing_rank=0,
@@ -320,17 +324,21 @@ class Main:
             local_rank=config.training.local_rank,
         )
 
-        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
         if config.training.global_rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,
                 train_split_lengths=train_split_lengths,
                 eval_split_lengths=eval_split_lengths,
             )
-            evaluation_result_subscriber = RichResultSubscriber(num_ranks=config.training.world_size)
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.training.world_size,
+                project=config.wandb.project_name,
+                experiment_id=self.experiment_id,
+            )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
+
         else:
             progress_subscriber = DummyProgressSubscriber()
         message_broker.add_subscriber(
