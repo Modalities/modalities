@@ -87,23 +87,15 @@ training:
   process_group_backend: "nccl"
   num_training_samples: 224000
   callback_interval_in_samples: 100
-  training_batch_size: 64
-  evaluation_batch_size: 64
-  test_batch_size: 32
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
 
+
 checkpoint:
   dir_path: checkpoint
   checkpointing_rank: ${training.main_rank}
-
-loss:
-  type_hint: CLMCrossEntropyLoss
-  config:
-    target_key: ${data.target_key}
-    prediction_key: ${model.config.prediction_key}
 
 running_env:
   type_hint: FSDPRunningEnv
@@ -143,3 +135,10 @@ optimizer:
   type_hint: AdamW
   config:
     lr: 0.0001
+
+
+loss:
+  type_hint: CLMCrossEntropyLoss
+  config:
+    target_key: ${data.target_key}
+    prediction_key: ${model.config.prediction_key}
