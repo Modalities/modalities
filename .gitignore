@@ -147,13 +147,6 @@ tags
 
 # End of https://www.toptal.com/developers/gitignore/api/vim
 
-*.whl
-*.arrow
-core.*
-data/datasets
-data/checkpoints
 checkpoints
-checkpoint
-wandb
 
 

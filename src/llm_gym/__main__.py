@@ -31,7 +31,7 @@ from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
-from llm_gym.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
+from llm_gym.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from llm_gym.loss_functions import Loss
 from llm_gym.resolver_register import ResolverRegister
 from llm_gym.trainer import Trainer
@@ -225,6 +225,7 @@ class Main:
         eval_split_lengths = {
             dataloader.dataloader_tag: len(dataloader) * config.training.world_size for dataloader in eval_dataloaders
         }
+
         # TODO: check why not *config.training.world_size
         #  and consider just using config.training.num_training_samples for progress Subscriber
         train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
@@ -332,10 +333,15 @@ class Main:
                 train_split_lengths=train_split_lengths,
                 eval_split_lengths=eval_split_lengths,
             )
-            evaluation_result_subscriber = RichResultSubscriber(num_ranks=config.training.world_size)
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.training.world_size,
+                project=config.wandb.project_name,
+                experiment_id=self.experiment_id,
+            )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
+
         else:
             progress_subscriber = DummyProgressSubscriber()
         message_broker.add_subscriber(

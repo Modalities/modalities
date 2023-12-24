@@ -1,9 +1,10 @@
 import json
 import os
+import warnings
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 
-from pydantic import BaseModel, DirectoryPath, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint
 from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
@@ -42,18 +43,22 @@ class TokenizerConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     class MemMapDatasetConfig(BaseModel):
-        raw_data_path: DirectoryPath | FilePath
+        raw_data_path: FilePath
+        index_path: Optional[FilePath] = None
         block_size: conint(gt=0)
         tokenizer: TokenizerConfig
         jq_pattern: str
+        sample_key: str
 
     class PackedMemMapDatasetContinuousConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
+        sample_key: str
 
     class PackedMemMapDatasetMegatronConfig(BaseModel):
         raw_data_path: Path
         block_size: conint(gt=0)
+        sample_key: str
 
     class MMapIndexedDatasetConfig(BaseModel):
         path: Path
@@ -130,8 +135,7 @@ class DataConfig(BaseModel):
         exact = self.num_training_samples / self.train_dataloader.config.batch_size
         ret = self.num_training_samples // self.train_dataloader.config.batch_size
         if exact != ret:
-            print(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
         return ret
 
     @property
@@ -139,8 +143,9 @@ class DataConfig(BaseModel):
         exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
         ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
         if exact != ret:
-            print(f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(
+                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
+            )
         return ret
 
     @property
@@ -148,8 +153,7 @@ class DataConfig(BaseModel):
         exact = self.num_training_batches / self.world_size
         ret = self.num_training_batches // self.world_size
         if exact != ret:
-            print(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-            # TODO: use logging.warning instead?
+            warnings.warn(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
         return ret
 
 

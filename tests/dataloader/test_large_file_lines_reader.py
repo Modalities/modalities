@@ -16,11 +16,16 @@ def create_dummy_data(tmpdir_path: Path, content: str) -> Path:
     return dummy_data_path
 
 
-def test_index_creation(tmpdir):
-    dummy_content_text = (
+@pytest.mark.parametrize(
+    "dummy_content_text",
+    [
         "This is \na dummy text\nwith newline chars\nand other\\n randøm\nchars.\n"
-        "It also includes malformatted json chars, like\n{{\n"
-    )
+        "It also includes malformatted json chars, like\n{{\n",
+        "This is \na dummy text\nwith newline chars\nand other\\n randøm\nchars.\n"
+        "It also includes malformatted json chars, like\n{{\nbut does not come with a trailing newline char...",
+    ],
+)
+def test_index_creation(tmpdir, dummy_content_text):
     plain_text_data_path = create_dummy_data(tmpdir_path=Path(tmpdir), content=dummy_content_text)
     jsonl_content_entries = [json.dumps(dict(text=s)) for s in dummy_content_text.split("\n")]
     jsonl_content = "\n".join(jsonl_content_entries)
