@@ -2,7 +2,6 @@ from typing import List
 
 import pytest
 
-from src.llm_gym.checkpointing.checkpointing import CheckpointingInstruction
 from src.llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
 
 

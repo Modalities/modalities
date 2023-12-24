@@ -1,21 +1,13 @@
 from typing import Dict
-from llm_gym.logging_broker.messages import (
-    BatchProgressUpdate,
-    Message,
-    ExperimentStatus,
-)
-from llm_gym.logging_broker.subscriber import MessageSubscriberIF
-from rich.progress import (
-    Progress,
-    MofNCompleteColumn,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
-from rich.live import Live
+
 from rich.console import Group
+from rich.live import Live
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.rule import Rule
 from rich.text import Text
+
+from llm_gym.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, Message
+from llm_gym.logging_broker.subscriber import MessageSubscriberIF
 
 
 class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
@@ -25,6 +17,7 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
 
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     """A subscriber object for the RichProgress observable."""
+
     def __init__(
         self,
         num_ranks: int,
@@ -75,13 +68,13 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
         batch_progress = message.payload
 
         if batch_progress.experiment_status == ExperimentStatus.TRAIN:
-            task_id = self.train_split_task_ids[batch_progress.dataset_tag]
+            task_id = self.train_split_task_ids[batch_progress.dataloader_tag]
             self.train_splits_progress.update(
                 task_id=task_id,
                 completed=(batch_progress.train_batch_id + 1) * self.num_ranks,
             )
         else:
-            task_id = self.eval_split_task_ids[batch_progress.dataset_tag]
+            task_id = self.eval_split_task_ids[batch_progress.dataloader_tag]
             self.eval_splits_progress.update(
                 task_id=task_id,
                 completed=(batch_progress.dataset_batch_id + 1) * self.num_ranks,

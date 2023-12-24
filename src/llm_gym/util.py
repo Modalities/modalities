@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from torch import distributed as dist
+
 
 def get_date_of_run():
     """create date and time for file save uniqueness
@@ -15,3 +17,18 @@ def format_metrics_to_gb(item):
     metric_num = item / g_gigabyte
     metric_num = round(metric_num, ndigits=4)
     return metric_num
+
+
+class DistributedSetupInfo:
+    @property
+    def dist_launched(self) -> bool:
+        return dist.is_initialized() and dist.is_torchelastic_launched()
+
+    @property
+    def rank(self) -> int:
+        if not dist.is_initialized():
+            return 0
+        return dist.get_rank()
+
+
+dist_setup_info = DistributedSetupInfo()

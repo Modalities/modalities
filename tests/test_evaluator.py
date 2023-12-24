@@ -5,18 +5,11 @@ import torch
 
 from llm_gym.batch import DatasetBatch
 from llm_gym.evaluator import Evaluator
-from tests.conftest import set_env_cpu
 
 
 def test_evaluate_cpu(
-    monkeypatch,
-    nn_model_mock,
-    loss_mock,
-    llm_data_loader_mock,
-    progress_publisher_mock,
+    monkeypatch, nn_model_mock, loss_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
 ):
-    set_env_cpu(monkeypatch=monkeypatch)
-
     batch_size = 32
     seq_len = 64
     num_batches = 4

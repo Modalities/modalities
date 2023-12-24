@@ -44,18 +44,12 @@ class Trainer:
         train_loader: LLMDataLoader,
         optimizer,
         loss_fun: Loss,
-        eval_interval_in_batches: int,
+        callback_interval_in_batches: int,
         num_batches_per_rank: int,
         epoch_done_callback: Callable[[int], None],
     ):
         model.train()
-        cummulated_loss = torch.zeros(2)
-
-        # TODO: we should handle the device assignment more centrally.
-        if torch.cuda.is_available():
-            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
-        else:
-            cummulated_loss = cummulated_loss.to("cpu")
+        cummulated_loss = self._reset_loss()
 
         # batch loop
         batch: DatasetBatch
@@ -75,11 +69,11 @@ class Trainer:
             Trainer._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_batch_id=train_batch_id,
-                dataset_tag=train_loader.dataset_tag,
+                dataloader_tag=train_loader.dataloader_tag,
             )
 
             # Check, if model should be evaluated
-            if (train_batch_id + 1) % eval_interval_in_batches == 0:
+            if (train_batch_id + 1) % callback_interval_in_batches == 0:
                 if train_batch_id > 0:
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
@@ -89,7 +83,7 @@ class Trainer:
                     )
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
-                        dataset_tag=train_loader.dataset_tag,
+                        dataloader_tag=train_loader.dataloader_tag,
                         train_batch_id=train_batch_id,
                     )
                     Trainer._publish_evaluation_result(
@@ -103,21 +97,28 @@ class Trainer:
 
                 # TODO early stopping
 
-                # reset loss
-                # TODO in the future we should outsource this functionality
-                cummulated_loss = torch.zeros(2).to(torch.device(self.local_rank))
+                cummulated_loss = self._reset_loss()
+
+    def _reset_loss(self):
+        # TODO: we should handle the device assignment more centrally.
+        cummulated_loss = torch.zeros(2)
+        if torch.cuda.is_available():
+            cummulated_loss.to(torch.device(self.local_rank))
+        else:
+            cummulated_loss.to("cpu")
+        return cummulated_loss
 
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         train_batch_id: int,
-        dataset_tag: str,
+        dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
             train_batch_id=train_batch_id,
             dataset_batch_id=train_batch_id,
             experiment_status=ExperimentStatus.TRAIN,
-            dataset_tag=dataset_tag,
+            dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
 

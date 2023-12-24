@@ -1,0 +1,125 @@
+wandb:
+  project_name: llm_gym
+
+training:
+  train_dataloader:
+    type_hint: LLMDataLoader
+    config:
+      batch_size: 32
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+      dataloader_tag: "train"
+      dataset:
+        type_hint: MemMapDataset
+        config:
+          raw_data_path: ./data/lorem_ipsum.jsonl
+          index_path: ./data/lorem_ipsum.idx
+          block_size: ${model.config.config.block_size}
+          jq_pattern: ".text"
+          sample_key: "input_ids"
+          tokenizer:
+            type_hint: GPT2TokenizerFast
+            config:
+              tokenizer_file: ./data/tokenizer/tokenizer.json
+      sampler:
+        type_hint: DistributedSampler
+        config:
+          rank: ${training.global_rank}
+          num_replicas: ${training.world_size}
+          shuffle: true
+      collate_fn:
+        type_hint: GPT2LLMCollator
+        config:
+          sample_key: ${training.train_dataloader.config.dataset.config.sample_key}
+          target_key: "target_ids"
+  evaluation_dataloaders:
+    val:
+      type_hint: LLMDataLoader
+      config:
+        batch_size: 21
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "val"
+        dataset: ${training.train_dataloader.config.dataset}
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.global_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        collate_fn: ${training.train_dataloader.config.collate_fn}
+    test:
+      type_hint: LLMDataLoader
+      config:
+        batch_size: 21
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "test"
+        dataset: ${training.train_dataloader.config.dataset}
+        sampler:
+          type_hint: DistributedSampler
+          config:
+            rank: ${training.global_rank}
+            num_replicas: ${training.world_size}
+            shuffle: false
+        collate_fn: ${training.train_dataloader.config.collate_fn}
+  process_group_backend: "nccl"
+  num_training_samples: 5
+  callback_interval_in_samples: 1
+  local_rank: ${oc.env:LOCAL_RANK}
+  global_rank: ${oc.env:RANK}
+  world_size: ${oc.env:WORLD_SIZE}
+  main_rank: 0
+
+checkpoint:
+  dir_path: data/checkpoints
+  checkpointing_rank: ${training.main_rank}
+
+loss:
+  type_hint: CLMCrossEntropyLoss
+  config:
+    target_key: ${training.train_dataloader.config.collate_fn.config.target_key}
+    prediction_key: ${model.config.config.prediction_key}
+
+running_env:
+  type_hint: FSDPRunningEnv
+  config:
+    process_group_backend: ${training.process_group_backend}
+    local_rank: ${oc.env:LOCAL_RANK}
+
+model:
+  type_hint: GPT2LLM
+  config:
+    config:
+      sample_key: ${training.train_dataloader.config.dataset.config.sample_key}
+      prediction_key: "logits"
+      block_size: 128
+      vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+      n_layer: 2
+      n_head: 4
+      ffn_hidden: 128
+      n_embd: 128
+      dropout: 0.0
+      bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+      attention:
+        attention_type: pytorch_flash_attention
+        scaling_factor: 3
+      activation: fused_swiglu
+      epsilon: 1e-5
+      weight_init:
+        mean: 0.0
+        std: 0.02
+
+scheduler:
+  type_hint: StepLR
+  config:
+    step_size: 1
+    gamma: 0.1
+
+optimizer:
+  type_hint: AdamW
+  config:
+    lr: 0.0001
