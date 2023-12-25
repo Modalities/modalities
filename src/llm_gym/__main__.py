@@ -218,7 +218,7 @@ class Main:
         train_dataloader = DataloaderFactory.get_dataloader(resolvers=resolvers, config=config.data.train_dataloader)
         eval_dataloaders = [
             DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
-            for dataloader_config in config.data.evaluation_dataloaders
+            for dataloader_config in config.data.eval_dataloaders
         ]
 
         # Logging
