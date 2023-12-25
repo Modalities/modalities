@@ -103,9 +103,9 @@ class Trainer:
         # TODO: we should handle the device assignment more centrally.
         cummulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
-            cummulated_loss.to(torch.device(self.local_rank))
+            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
         else:
-            cummulated_loss.to("cpu")
+            cummulated_loss = cummulated_loss.to("cpu")
         return cummulated_loss
 
     @staticmethod
