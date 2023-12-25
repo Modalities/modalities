@@ -1,14 +1,16 @@
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Tuple
-from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDataset, make_dataset, print_rank_0
+
 import numpy as np
-from pydantic import FilePath
 import torch
 from numpy._typing import NDArray
+from pydantic import FilePath
 from torch.utils.data.dataset import Dataset
-from pathlib import Path
+
+from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import make_dataset, print_rank_0
 
 
 def get_num_tokens_per_epoch(documents: NDArray, sizes: NDArray) -> NDArray:
@@ -313,14 +315,15 @@ def build_index_mappings(
     return doc_idx, sample_idx, shuffle_idx
 
 
-class OpenGPTXDataset(Dataset):
+class OpenGPTXMMapDataset(Dataset):
     def __init__(
         self,
         sample_key: str,
-        text_dataset: MMapIndexedDataset,
-        dataset_dir: str,
-        doc_idx: NDArray[int],
-        dataset_name: str,
+        path: FilePath,
+        # text_dataset: MMapIndexedDataset,
+        # dataset_dir: str,
+        # doc_idx: NDArray[int],
+        # dataset_name: str,
         sequence_len: int,
         num_samples: int,
         seed: int = 47,
@@ -343,6 +346,12 @@ class OpenGPTXDataset(Dataset):
 
         """
 
+        dataset_dir = path.parents[0]
+        dataset_filename_prefix = path.stem
+        text_dataset = make_dataset(path=dataset_dir.joinpath(dataset_filename_prefix))
+
+        doc_idx = np.arange(0, len(text_dataset))
+
         self.sample_key = sample_key
         # Contains the document inidices
         self.doc_idx = doc_idx
@@ -358,7 +367,7 @@ class OpenGPTXDataset(Dataset):
             self.sample_idx,
             self.shuffle_idx,
         ) = build_index_mappings(
-            name=dataset_name,
+            name=dataset_filename_prefix,
             sizes=text_dataset.sizes,
             num_samples=num_samples,
             sequence_len=self.sequence_len,
@@ -410,20 +419,21 @@ class OpenGPTXDataset(Dataset):
         return {self.sample_key: np.array(sample, dtype=np.int64)}
 
 
-class OpenGPTXDatasetFactory:
+class OpenGPTXMMapDatasetFactory:
     @staticmethod
-    def create_dataset(num_samples: int, path: FilePath, sample_key: str, sequence_len: int) -> OpenGPTXDataset:
-        dataset_directory = path.parents[0]
-        dataset_filename_prefix = path.stem
-        text_dataset = make_dataset(path=dataset_directory.joinpath(dataset_filename_prefix))
+    def create_dataset(num_samples: int, path: FilePath, sample_key: str, sequence_len: int) -> OpenGPTXMMapDataset:
+        # dataset_dir = path.parents[0]
+        # dataset_filename_prefix = path.stem
+        # text_dataset = make_dataset(path=dataset_dir.joinpath(dataset_filename_prefix))
 
-        instances = OpenGPTXDataset(
-            sample_key=sample_key,
-            text_dataset=text_dataset,
-            doc_idx=np.arange(0, len(text_dataset)),
-            dataset_dir=dataset_directory,
-            num_samples=num_samples,
-            dataset_name=dataset_filename_prefix,
-            sequence_len=sequence_len,
-        )
-        return instances
+        # instances = OpenGPTXDataset(
+        #     sample_key=sample_key,
+        #     text_dataset=text_dataset,
+        #     doc_idx=np.arange(0, len(text_dataset)),
+        #     dataset_dir=dataset_dir,
+        #     num_samples=num_samples,
+        #     dataset_name=dataset_filename_prefix,
+        #     sequence_len=sequence_len,
+        # )
+        # return instances
+        pass
