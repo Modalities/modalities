@@ -91,6 +91,7 @@ training:
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
+  train_batch_size: ${data.train_dataloader.config.batch_size}
 
 
 checkpoint:

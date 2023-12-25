@@ -118,44 +118,6 @@ class DataConfig(BaseModel):
     train_dataloader: DataLoaderConfig
     eval_dataloaders: List[DataLoaderConfig]
 
-    @property
-    def eval_interval_per_rank(self):
-        return self.callback_interval_in_samples // self.world_size
-
-    @property
-    def num_training_batches_per_rank(self):
-        exact = self.num_training_batches / self.world_size
-        ret = self.num_training_batches // self.world_size
-        if exact != ret:
-            print(f"Calculated num_training_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def num_training_batches(self) -> int:
-        exact = self.num_training_samples / self.train_dataloader.config.batch_size
-        ret = self.num_training_samples // self.train_dataloader.config.batch_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def callback_interval_in_batches_per_rank(self):
-        exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
-        ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
-        if exact != ret:
-            warnings.warn(
-                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
-            )
-        return ret
-
-    @property
-    def num_batches_per_rank(self):
-        exact = self.num_training_batches / self.world_size
-        ret = self.num_training_batches // self.world_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
 
 class ModelConfig(BaseModel):
     type_hint: ModelTypes
@@ -181,6 +143,33 @@ class TrainingConfig(BaseModel):
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
+    train_batch_size: conint(gt=0)
+
+    @property
+    def num_training_batches_per_rank(self):
+        exact = self.num_training_batches / self.world_size
+        ret = self.num_training_batches // self.world_size
+        if exact != ret:
+            print(f"Calculated num_training_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def num_training_batches(self) -> int:
+        exact = self.num_training_samples / self.train_batch_size
+        ret = self.num_training_samples // self.train_batch_size
+        if exact != ret:
+            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def callback_interval_in_batches_per_rank(self):
+        exact = self.callback_interval_in_samples / self.train_batch_size / self.world_size
+        ret = self.callback_interval_in_samples // self.train_batch_size // self.world_size
+        if exact != ret:
+            warnings.warn(
+                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
+            )
+        return ret
 
 
 class AdamWConfig(BaseModel):
