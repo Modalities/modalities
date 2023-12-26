@@ -21,8 +21,8 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     def __init__(
         self,
         num_ranks: int,
-        train_split_lengths: Dict[str, int],
-        eval_split_lengths: Dict[str, int],
+        train_split_num_samples: Dict[str, int],
+        eval_splits_num_samples: Dict[str, int],
     ) -> None:
         self.num_ranks = num_ranks
 
@@ -34,8 +34,8 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             TimeRemainingColumn(),
         )
         self.train_split_task_ids = {}
-        for split_key, split_length in train_split_lengths.items():
-            task_id = self.train_splits_progress.add_task(description=split_key, total=split_length)
+        for split_key, split_num_samples in train_split_num_samples.items():
+            task_id = self.train_splits_progress.add_task(description=split_key, total=split_num_samples)
             self.train_split_task_ids[split_key] = task_id
 
         # eval split progress bars
@@ -46,8 +46,8 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             TimeRemainingColumn(),
         )
         self.eval_split_task_ids = {}
-        for split_key, split_length in eval_split_lengths.items():
-            task_id = self.eval_splits_progress.add_task(description=split_key, total=split_length)
+        for split_key, split_num_samples in eval_splits_num_samples.items():
+            task_id = self.eval_splits_progress.add_task(description=split_key, total=split_num_samples)
             self.eval_split_task_ids[split_key] = task_id
 
         group = Group(
@@ -71,11 +71,11 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             task_id = self.train_split_task_ids[batch_progress.dataloader_tag]
             self.train_splits_progress.update(
                 task_id=task_id,
-                completed=(batch_progress.train_batch_id + 1) * self.num_ranks,
+                completed=(batch_progress.train_sample_id + 1) * self.num_ranks,
             )
         else:
             task_id = self.eval_split_task_ids[batch_progress.dataloader_tag]
             self.eval_splits_progress.update(
                 task_id=task_id,
-                completed=(batch_progress.dataset_batch_id + 1) * self.num_ranks,
+                completed=(batch_progress.dataset_sample_id + 1) * self.num_ranks,
             )
