@@ -63,5 +63,9 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             for metric_key, metric_values in eval_result.metrics.items()
         }
         # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
-        wandb.log(data=losses, step=(eval_result.train_local_sample_id + 1) * self.num_ranks)
-        wandb.log(data=metrics, step=(eval_result.train_local_sample_id + 1) * self.num_ranks)
+        wandb.log(
+            data=losses, step=eval_result.global_train_sample_id + 1
+        )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
+        wandb.log(
+            data=metrics, step=eval_result.global_train_sample_id + 1
+        )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)

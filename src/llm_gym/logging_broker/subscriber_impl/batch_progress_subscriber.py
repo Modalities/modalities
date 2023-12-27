@@ -71,11 +71,13 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             task_id = self.train_split_task_ids[batch_progress.dataloader_tag]
             self.train_splits_progress.update(
                 task_id=task_id,
-                completed=(batch_progress.train_sample_id + 1) * self.num_ranks,
+                completed=batch_progress.global_train_sample_id
+                + 1,  # (batch_progress.train_sample_id + 1) * self.num_ranks,
             )
         else:
             task_id = self.eval_split_task_ids[batch_progress.dataloader_tag]
             self.eval_splits_progress.update(
                 task_id=task_id,
-                completed=(batch_progress.dataset_sample_id + 1) * self.num_ranks,
+                completed=batch_progress.global_dataset_sample_id
+                + 1,  # (batch_progress.dataset_sample_id + 1) * self.num_ranks,
             )

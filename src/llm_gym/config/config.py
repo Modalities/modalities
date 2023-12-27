@@ -146,7 +146,7 @@ class TrainingConfig(BaseModel):
     train_batch_size: conint(gt=0)
 
     @property
-    def num_training_batches_per_rank(self):
+    def local_num_train_samples(self):
         exact = self.num_training_batches / self.world_size
         ret = self.num_training_batches // self.world_size
         if exact != ret:

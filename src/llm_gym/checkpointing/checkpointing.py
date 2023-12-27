@@ -16,8 +16,8 @@ class CheckpointingStrategyIF(ABC):
     @abstractmethod
     def get_checkpoint_instruction(
         self,
-        global_train_batch_id: int,
-        num_batches: int = None,
+        global_train_sample_id: int,
+        global_num_train_samples: int = None,
         evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
@@ -26,20 +26,20 @@ class CheckpointingStrategyIF(ABC):
 
 class CheckpointingIF(ABC):
     @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
         raise NotImplementedError
 
     @abstractmethod
     def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_sample_id: int
     ) -> Optimizer:
         raise NotImplementedError
 
     @abstractmethod
     def save_checkpoint(
         self,
-        train_batch_id: int,
-        num_batches: int,
+        global_train_sample_id: int,
+        global_num_train_samples: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
@@ -53,7 +53,7 @@ class CheckpointingExecutionIF(CheckpointingIF):
     def run_checkpoint_instructions(
         self,
         checkpointing_instruction: CheckpointingInstruction,
-        global_train_batch_id: int,
+        global_train_sample_id: int,
         model: nn.Module,
         optimizer: Optimizer,
     ):
@@ -77,37 +77,37 @@ class Checkpointing(CheckpointingIF):
 
     def save_checkpoint(
         self,
-        train_batch_id: int,
-        num_batches: int,
+        global_train_sample_id: int,
+        global_num_train_samples: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
-        global_train_batch_id = (train_batch_id + 1) * self.num_ranks - 1
         checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
-            global_train_batch_id=global_train_batch_id,
-            num_batches=num_batches,
+            global_train_sample_id=global_train_sample_id,
+            global_num_train_samples=global_num_train_samples,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
+
         self.checkpointing_execution.run_checkpoint_instructions(
             checkpointing_instruction=checkpointing_instruction,
-            global_train_batch_id=global_train_batch_id,
+            global_train_sample_id=global_train_sample_id,
             model=model,
             optimizer=optimizer,
         )
 
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
         model = self.checkpointing_execution.load_model_checkpoint(
-            model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
+            model=model, experiment_id=experiment_id, global_train_sample_id=global_train_sample_id
         )
         return model
 
     def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_sample_id: int
     ) -> Optimizer:
         optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
-            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
+            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_sample_id=global_train_sample_id
         )
         return optimizer
