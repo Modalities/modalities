@@ -1,12 +1,13 @@
 from llm_gym.config.config import DataLoaderConfig
 from llm_gym.dataloader.dataloader import LLMDataLoader
+from llm_gym.dataloader.samplers import ResumableBatchSampler
 from llm_gym.resolver_register import ResolverRegister
 
 
 class DataloaderFactory:
     @staticmethod
     def get_dataloader(
-        resolvers: ResolverRegister, config: DataLoaderConfig, skip_num_samples: int = 0
+        resolvers: ResolverRegister, config: DataLoaderConfig, skip_num_batches: int = 0
     ) -> LLMDataLoader:
         # TODO: replace this with dynamic nested object instantiation. (More details: Different Dataloaders require
         #  different objects in their constructors. the resolvers should be able to provide the necessary complex
@@ -33,11 +34,15 @@ class DataloaderFactory:
             ),
         )
 
+        resumable_batch_sampler = ResumableBatchSampler(
+            start_index=skip_num_batches, underlying_batch_sampler=batch_sampler
+        )
+
         dataloader = resolvers.build_component_by_config(
             config=config,
             extra_kwargs=dict(
                 dataset=dataset,
-                batch_sampler=batch_sampler,
+                batch_sampler=resumable_batch_sampler,
                 collate_fn=collator,
             ),
         )

@@ -16,7 +16,7 @@ from llm_gym.config.config import AppConfig
 from llm_gym.dataloader.create_index import IndexGenerator
 from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-from llm_gym.dataloader.samplers import ResumableSampler
+from llm_gym.dataloader.samplers import ResumableBatchSampler
 from llm_gym.evaluator import Evaluator
 from llm_gym.logging_broker.publisher import MessagePublisher
 from llm_gym.loss_functions import Loss
@@ -155,18 +155,10 @@ def set_env_cpu(monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def resumable_sampler() -> ResumableSampler:
-    data_source = list(range(0, 20, 2))[::-1]
-    seq_sampler = SequentialSampler(data_source=data_source)
-    sampler = ResumableSampler(start_index=3, existing_sampler=seq_sampler)
-    return sampler
-
-
-@pytest.fixture(scope="function")
-def resumable_batch_sampler() -> ResumableSampler:
+def resumable_batch_sampler() -> ResumableBatchSampler:
     data_source = list(range(12))[::-1]  # torch.range(0,11)[::-1].reshape(3, 4)
     seq_sampler = SequentialSampler(data_source=data_source)
 
     seq_sampler = BatchSampler(sampler=seq_sampler, batch_size=3, drop_last=False)
-    sampler = ResumableSampler(start_index=2, existing_sampler=seq_sampler)
+    sampler = ResumableBatchSampler(start_index=2, underlying_batch_sampler=seq_sampler)
     return sampler

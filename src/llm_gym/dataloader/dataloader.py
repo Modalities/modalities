@@ -1,18 +1,20 @@
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, Optional, Union
 
 from torch.utils.data import Dataset, Sampler
 from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
+
+from llm_gym.dataloader.samplers import ResumableBatchSampler
 
 
 class LLMDataLoader(DataLoader[T_co]):
     def __init__(
         self,
         dataloader_tag: str,
+        batch_sampler: ResumableBatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
         shuffle: Optional[bool] = None,
         sampler: Union[Sampler, Iterable, None] = None,
-        batch_sampler: Union[Sampler[List], Iterable[List], None] = None,
         num_workers: int = 0,
         collate_fn: Optional[_collate_fn_t] = None,
         pin_memory: bool = False,
@@ -59,7 +61,7 @@ class LLMDataLoader(DataLoader[T_co]):
         # we defined the property sampler_batch_size to return the actual batch size used in the dataloder.
         # BatchSampler is required, as we must seek forward in the dataloder during a warm start and
         # we don't want to load all the data during the fast-forward.
-        return self.batch_sampler.batch_size
+        return self.batch_sampler.sampler_batch_size
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
