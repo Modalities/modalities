@@ -223,7 +223,7 @@ class Main:
 
         # Logging
         eval_split_lengths = {
-            dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.batch_size
+            dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.sampler_batch_size
             for dataloader in eval_dataloaders
         }
 
@@ -232,7 +232,7 @@ class Main:
         train_split_lengths = {
             train_dataloader.dataloader_tag: len(train_dataloader)
             * config.training.world_size
-            * train_dataloader.batch_size
+            * train_dataloader.sampler_batch_size
         }
 
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(

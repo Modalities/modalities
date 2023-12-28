@@ -1,4 +1,5 @@
 from typing import Iterable, List, Optional, Union
+
 from torch.utils.data import Dataset, Sampler
 from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
 
@@ -25,6 +26,7 @@ class LLMDataLoader(DataLoader[T_co]):
         persistent_workers: bool = False,
         pin_memory_device: str = "",
     ):
+        assert batch_sampler is not None and batch_size == 1
         super().__init__(
             dataset=dataset,
             batch_size=batch_size,
@@ -49,6 +51,15 @@ class LLMDataLoader(DataLoader[T_co]):
     @property
     def dataloader_tag(self) -> str:
         return self._dataloader_tag
+
+    @property
+    def sampler_batch_size(self) -> int:
+        # The parent Dataloader class has already a batch_size property defined which is originally used
+        # when the batch_sampler is not specified. Since the  LLMDataLoader enforces to always use a BatchSampler,
+        # we defined the property sampler_batch_size to return the actual batch size used in the dataloder.
+        # BatchSampler is required, as we must seek forward in the dataloder during a warm start and
+        # we don't want to load all the data during the fast-forward.
+        return self.batch_sampler.batch_size
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
@@ -85,3 +96,7 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
     @property
     def dataloader_tag(self) -> str:
         return self.data_loader._dataloader_tag
+
+    @property
+    def sampler_batch_size(self) -> int:
+        return self.data_loader.batch_sampler.batch_size

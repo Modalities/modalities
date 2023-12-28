@@ -66,7 +66,7 @@ class Evaluator:
                 cummulated_loss[1] += len(batch)
 
                 local_dataset_sample_id = Evaluator._get_local_sample_id(
-                    batch_id=batch_id, batch_size=data_loader.batch_size  # type: ignore
+                    batch_id=batch_id, batch_size=data_loader.sampler_batch_size
                 )
 
                 global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
