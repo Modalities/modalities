@@ -3,12 +3,13 @@ from typing import Any, Dict, List
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import BatchSampler, DataLoader, Sampler
 from torch.utils.data.distributed import DistributedSampler
 from transformers import PreTrainedTokenizer
 
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
 from llm_gym.config.lookup_types import (
+    BatchSamplerTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -95,6 +96,14 @@ class ResolverRegister:
                     default=DistributedSampler,
                 )
                 for sampler_type in SamplerTypes
+            },
+            **{
+                batch_sampler_type: ClassResolver(
+                    classes=[t.value for t in BatchSamplerTypes],
+                    base=BatchSampler,
+                    default=BatchSampler,
+                )
+                for batch_sampler_type in BatchSamplerTypes
             },
             **{
                 dataloader_type: ClassResolver(

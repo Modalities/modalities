@@ -1,7 +1,7 @@
 from enum import Enum
 
 import torch
-from torch.utils.data import DistributedSampler
+from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
 from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
@@ -54,6 +54,10 @@ class DatasetTypes(LookupEnum):
 
 class SamplerTypes(LookupEnum):
     DistributedSampler = DistributedSampler
+
+
+class BatchSamplerTypes(LookupEnum):
+    BatchSampler = BatchSampler
 
 
 class CollatorTypes(LookupEnum):

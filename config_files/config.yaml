@@ -6,16 +6,21 @@ data:
     type_hint: LLMDataLoader
     config:
       dataloader_tag: "train"
-      batch_size: 8 # per rank
+      # batch_size: 8 # per rank
       num_workers: 2
       pin_memory: true
       shuffle: false
-      sampler:
-        type_hint: DistributedSampler
-        config:
-          rank: ${training.local_rank}
-          num_replicas: ${training.world_size}
-          shuffle: true
+      batch_sampler:
+        type_hint: BatchSampler
+        config: 
+          batch_size: 8 # per rank
+          drop_last: false
+          sampler:
+            type_hint: DistributedSampler
+            config:
+              rank: ${training.local_rank}
+              num_replicas: ${training.world_size}
+              shuffle: true
       dataset:
         type_hint: OpenGPTXMMapDataset
         config: 
@@ -32,16 +37,21 @@ data:
     - type_hint: LLMDataLoader
       config:
         dataloader_tag: "val"
-        batch_size: 8 # per rank
+        # batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
         shuffle: false
-        sampler:
-          type_hint: DistributedSampler
-          config:
-            rank: ${training.local_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
+        batch_sampler:
+          type_hint: BatchSampler
+          config: 
+            batch_size: 8 # per rank
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.local_rank}
+                num_replicas: ${training.world_size}
+                shuffle: false
         dataset:
           type_hint: OpenGPTXMMapDataset
           config: 
@@ -57,16 +67,21 @@ data:
     - type_hint: LLMDataLoader
       config:
         dataloader_tag: "test"
-        batch_size: 8 # per rank
+        # batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
         shuffle: false
-        sampler:
-          type_hint: DistributedSampler
-          config:
-            rank: ${training.local_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
+        batch_sampler:
+          type_hint: BatchSampler
+          config: 
+            batch_size: 8 # per rank
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.local_rank}
+                num_replicas: ${training.world_size}
+                shuffle: false
         dataset:
           type_hint: OpenGPTXMMapDataset
           config: 
@@ -91,7 +106,7 @@ training:
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_size}
+  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
 
 
 checkpoint:

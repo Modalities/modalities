@@ -8,6 +8,7 @@ from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, 
 from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
+    BatchSamplerTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -90,6 +91,16 @@ class SamplerConfig(BaseModel):
     config: DistributedSamplerConfig
 
 
+class BatchSamplerConfig(BaseModel):
+    class StandardBatchSamplerConfig(BaseModel):
+        sampler: SamplerConfig
+        batch_size: conint(gt=0)
+        drop_last: bool
+
+    type_hint: BatchSamplerTypes
+    config: StandardBatchSamplerConfig
+
+
 class CollatorConfig(BaseModel):
     class GPT2LLMCollatorConfig(BaseModel):
         sample_key: str
@@ -101,10 +112,9 @@ class CollatorConfig(BaseModel):
 
 class DataLoaderConfig(BaseModel):
     class LLMDataLoaderConfig(CudaKwargsConfig):
-        batch_size: conint(gt=0)
         dataloader_tag: str
         dataset: DatasetConfig
-        sampler: SamplerConfig
+        batch_sampler: BatchSamplerConfig
         collate_fn: CollatorConfig
 
     type_hint: DataloaderTypes
