@@ -156,7 +156,7 @@ def set_env_cpu(monkeypatch):
 
 @pytest.fixture(scope="function")
 def resumable_sampler() -> ResumableSampler:
-    data_source = list(range(10))[::-1]
+    data_source = list(range(0, 20, 2))[::-1]
     seq_sampler = SequentialSampler(data_source=data_source)
     sampler = ResumableSampler(start_index=3, existing_sampler=seq_sampler)
     return sampler
