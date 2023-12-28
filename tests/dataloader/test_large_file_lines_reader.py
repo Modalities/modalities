@@ -51,10 +51,10 @@ def test_index_creation(tmpdir, dummy_content_text):
 def test_large_file_lines_reader(indexed_dummy_data_path):
     raw_data_path = indexed_dummy_data_path.raw_data_path
     reader = LargeFileLinesReader(raw_data_path)
-    assert raw_data_path.read_text().count("\n") == 4
+    assert raw_data_path.read_text().count("\n") == 12
     assert raw_data_path.read_text().rsplit("\n")[-1] == ""
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
-    assert len(reader) == 4
+    assert len(reader) == 12
     assert all(map(len, reader))
 
 
