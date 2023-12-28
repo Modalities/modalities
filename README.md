@@ -203,10 +203,10 @@ Alternatively, directly use `src/llm_gym/__main__.py do_stuff --config_file_path
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
 ```sh
-llm_gym create_mmap_index <path/to/jsonl/file>
+llm_gym create_memmap_index <path/to/jsonl/file>
 ```
 
-The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_mmap_index --help`.
+The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_memmap_index --help`.
 
 ## Packed Dataset Generator
 
