@@ -8,7 +8,6 @@ data:
   train_dataloader:
     type_hint: LLMDataLoader
     config:
-      batch_size: 32
       num_workers: 2
       pin_memory: true
       shuffle: false
@@ -25,12 +24,17 @@ data:
             type_hint: GPT2TokenizerFast
             config:
               tokenizer_file: ./data/tokenizer/tokenizer.json
-      sampler:
-        type_hint: DistributedSampler
+      batch_sampler:
+        type_hint: BatchSampler
         config:
-          rank: ${training.global_rank}
-          num_replicas: ${training.world_size}
-          shuffle: true
+          batch_size: 32 # per rank
+          drop_last: false
+          sampler:
+            type_hint: DistributedSampler
+            config:
+              rank: ${training.global_rank}
+              num_replicas: ${training.world_size}
+              shuffle: true
       collate_fn:
         type_hint: GPT2LLMCollator
         config:
@@ -45,12 +49,17 @@ data:
         shuffle: false
         dataloader_tag: "val"
         dataset: ${data.train_dataloader.config.dataset}
-        sampler:
-          type_hint: DistributedSampler
+        batch_sampler:
+          type_hint: BatchSampler
           config:
-            rank: ${training.global_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
+            batch_size: 32 # per rank
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.global_rank}
+                num_replicas: ${training.world_size}
+                shuffle: true
         collate_fn: ${data.train_dataloader.config.collate_fn}
     - type_hint: LLMDataLoader
       config:
@@ -60,12 +69,17 @@ data:
         shuffle: false
         dataloader_tag: "test"
         dataset: ${data.train_dataloader.config.dataset}
-        sampler:
-          type_hint: DistributedSampler
+        batch_sampler:
+          type_hint: BatchSampler
           config:
-            rank: ${training.global_rank}
-            num_replicas: ${training.world_size}
-            shuffle: false
+            batch_size: 32 # per rank
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.global_rank}
+                num_replicas: ${training.world_size}
+                shuffle: true
         collate_fn: ${data.train_dataloader.config.collate_fn}
 
 training:
@@ -76,7 +90,7 @@ training:
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_size}
+  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
 
 
 checkpoint:
