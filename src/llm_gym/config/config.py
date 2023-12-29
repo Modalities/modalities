@@ -255,7 +255,9 @@ class RunMode(Enum):
 
 class LLMGymSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
-        checkpoint_folder_path: str
+        checkpoint_model_path: Path
+        checkpoint_optimizer_path: Optional[Path] = None
+        checkpoint_lr_scheduler_path: Optional[Path] = None
         checkpoint_num_seen_samples: conint(ge=0)
 
     run_mode: RunMode

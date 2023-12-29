@@ -11,10 +11,9 @@ from torch.optim import Optimizer
 from transformers import GPT2TokenizerFast
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import Checkpointing
-from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
-from llm_gym.config.config import AppConfig
+from llm_gym.checkpointing.checkpointing import Checkpointing, CheckpointingIF
+from llm_gym.checkpointing.checkpointing_factory import CheckpointingFactory
+from llm_gym.config.config import AppConfig, LLMGymSetupConfig, RunMode
 from llm_gym.config.lookup_types import TokenizerTypes
 from llm_gym.dataloader.create_index import IndexGenerator
 from llm_gym.dataloader.create_packed_data import PackedDataGenerator
@@ -44,16 +43,13 @@ def main() -> None:
     pass
 
 
-config_option = click.option(
+@main.command(name="run")
+@click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Path to a file with the YAML config file.",
 )
-
-
-@main.command(name="run")
-@config_option
 def entry_point_run_llmgym(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
@@ -168,15 +164,16 @@ class Main:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
 
-        # warmstart
-        self.global_train_sample_id = 139999
-        self.warmstart_experiment_id = "2023-11-16-07:42:45_PM"
+        # # warmstart
+        # self.global_train_sample_id = 139999
+        # self.warmstart_experiment_id = "2023-11-16-07:42:45_PM"
 
-        # coldstart
-        self.global_train_sample_id = 0
-        self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
+        # # coldstart
+        # self.global_train_sample_id = 0
+        # self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
 
         self.experiment_id = get_date_of_run()
+
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
@@ -203,9 +200,16 @@ class Main:
 
     def construct_components(
         self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
-    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], Checkpointing, nn.Module, Optimizer]:
+    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
         # Checkpointing
-        checkpointing = self.get_checkpointing(config=config, running_env=running_env)
+
+        checkpointing = CheckpointingFactory.get_checkpointing(
+            resolvers=self.resolvers,
+            config=config.checkpointing,
+            running_env=running_env,
+            experiment_id=self.experiment_id,
+            num_ranks=config.training.world_size,
+        )
 
         # Model and optimizer
         wrapped_model, optimizer = self.get_model_and_optimizer(
@@ -261,12 +265,14 @@ class Main:
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
     ) -> Tuple[nn.Module, Optimizer]:
+        run_mode = config.llm_gym_setup.run_mode
+
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
-        if self.global_train_sample_id > 0:  # warm start
+        if run_mode == RunMode.WARM_START:
+            warm_start_settings: LLMGymSetupConfig.WarmStartSettings = config.llm_gym_setup.settings  # type: ignore
             wrapped_model = checkpointing.load_model_checkpoint(
-                experiment_id=self.warmstart_experiment_id,
-                global_train_sample_id=self.global_train_sample_id,
+                file_path=warm_start_settings.checkpoint_model_path,
                 model=model,
             )
 
@@ -274,11 +280,18 @@ class Main:
                 config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
             )
 
+            # TODO improve this
+            if warm_start_settings.checkpoint_optimizer_path is None:
+                raise (
+                    NotImplementedError(
+                        "So far we always have to provide an optimizer checkpoint. "
+                        "For fine-tuning a pre-trained, we might not want to load "
+                        "an optimizer checkpoint."
+                    )
+                )
+
             optimizer = checkpointing.load_optimizer_checkpoint(
-                optimizer=optimizer,
-                model=wrapped_model,
-                experiment_id=self.warmstart_experiment_id,
-                global_train_sample_id=self.global_train_sample_id,
+                optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
             )
 
         else:
@@ -293,22 +306,6 @@ class Main:
         # )
 
         return wrapped_model, optimizer
-
-    def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
-        checkpointing_strategy = SaveKMostRecentCheckpointsStrategy(k=-1)
-        checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path=Path("/raid/s3/opengptx/max_lue/LLMgym/checkpoints"),
-            experiment_id=self.experiment_id,
-            global_rank=config.training.global_rank,
-            checkpointing_rank=0,
-            model_wrapping_fn=running_env.wrap_model,
-        )
-        checkpointing = Checkpointing(
-            checkpointing_execution=checkpointing_execution,
-            checkpointing_strategy=checkpointing_strategy,
-            num_ranks=config.training.world_size,
-        )
-        return checkpointing
 
     def get_logging_publishers(
         self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]

@@ -149,7 +149,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
             else:
                 raise CheckpointingError(f"Checkpoint {full_path} could not be removed. It does not exist!")
 
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
         # NOTE: The model and optimizer need to be sharded after calling this function!
 
@@ -167,29 +167,17 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         # load model
         if self.global_rank == self.checkpointing_rank:
             # load model on rank 0 into CPU RAM
-            model_checkpoint_path = self._get_checkpointing_path(
-                experiment_id=experiment_id,
-                global_train_sample_id=global_train_sample_id,
-                entity_type=CheckpointingEntityType.MODEL,
-            )
-            model_state = torch.load(model_checkpoint_path)
+            model_state = torch.load(file_path)
             model.load_state_dict(model_state)
         fsdp_model = self.model_wrapping_fn(model=model, sync_module_states=True)
         return fsdp_model
 
-    def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: FSDP, experiment_id: str, global_train_sample_id: int
-    ) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
         # load optimizer
         full_optimizer_state_dict = None
         if self.global_rank == self.checkpointing_rank:
             # load full optimizer state dict to rank 0 (CPU RAM)
-            optimizer_checkpoint_path = self._get_checkpointing_path(
-                experiment_id=experiment_id,
-                global_train_sample_id=global_train_sample_id,
-                entity_type=CheckpointingEntityType.OPTIMIZER,
-            )
-            full_optimizer_state_dict = torch.load(optimizer_checkpoint_path)
+            full_optimizer_state_dict = torch.load(file_path)
 
         # distribute the optimizer state dict from rank 0 to all the other ranks
         sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(

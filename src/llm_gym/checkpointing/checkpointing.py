@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict
 
 import torch.nn as nn
@@ -26,12 +27,15 @@ class CheckpointingStrategyIF(ABC):
 
 class CheckpointingIF(ABC):
     @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         raise NotImplementedError
 
     @abstractmethod
     def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_sample_id: int
+        self,
+        optimizer: Optimizer,
+        model: nn.Module,
+        file_path: Path,
     ) -> Optimizer:
         raise NotImplementedError
 
@@ -98,16 +102,14 @@ class Checkpointing(CheckpointingIF):
             optimizer=optimizer,
         )
 
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
-        model = self.checkpointing_execution.load_model_checkpoint(
-            model=model, experiment_id=experiment_id, global_train_sample_id=global_train_sample_id
-        )
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+        model = self.checkpointing_execution.load_model_checkpoint(model=model, file_path=file_path)
         return model
 
-    def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_sample_id: int
-    ) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
         optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
-            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_sample_id=global_train_sample_id
+            optimizer=optimizer,
+            model=model,
+            file_path=file_path,
         )
         return optimizer
