@@ -18,7 +18,6 @@ class CheckpointingStrategyIF(ABC):
     def get_checkpoint_instruction(
         self,
         global_train_sample_id: int,
-        global_num_train_samples: int = None,
         evaluation_result: Dict[str, EvaluationResultBatch] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
@@ -43,7 +42,6 @@ class CheckpointingIF(ABC):
     def save_checkpoint(
         self,
         global_train_sample_id: int,
-        global_num_train_samples: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
@@ -82,7 +80,6 @@ class Checkpointing(CheckpointingIF):
     def save_checkpoint(
         self,
         global_train_sample_id: int,
-        global_num_train_samples: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
@@ -90,7 +87,6 @@ class Checkpointing(CheckpointingIF):
     ):
         checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
             global_train_sample_id=global_train_sample_id,
-            global_num_train_samples=global_num_train_samples,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )

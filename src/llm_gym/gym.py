@@ -66,9 +66,6 @@ class Gym:
         checkpointing: Checkpointing,
     ):
         global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
-        global_num_train_samples = self._local_num_samples_to_global_num_samples(
-            local_num_samples=local_num_train_samples
-        )
 
         eval_result = self.evaluator.evaluate(
             model=model,
@@ -81,7 +78,6 @@ class Gym:
         # TODO: implement early stopping
         checkpointing.save_checkpoint(
             global_train_sample_id=global_train_sample_id,
-            global_num_train_samples=global_num_train_samples,
             evaluation_result=eval_result,
             model=model,
             optimizer=optimizer,
