@@ -1,6 +1,7 @@
 import json
 import os
 import warnings
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -226,7 +227,22 @@ class CheckpointConfig(BaseModel):
     dir_path: Path
 
 
+class RunMode(Enum):
+    FROM_SCRATCH = "FROM_SCRATCH"
+    WARM_START = "WARM_START"
+
+
+class LLMGymSetupConfig(BaseModel):
+    class WarmStartSettings(BaseModel):
+        checkpoint_folder_path: str
+        checkpoint_num_seen_samples: conint(ge=0)
+
+    run_mode: RunMode
+    settings: Optional[WarmStartSettings]
+
+
 class AppConfig(BaseModel):
+    llm_gym_setup_config: LLMGymSetupConfig
     data: DataConfig
     training: TrainingConfig
     running_env: RunningEnvConfig

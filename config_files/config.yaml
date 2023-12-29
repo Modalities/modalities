@@ -1,3 +1,10 @@
+llmgym_setup:
+  run_mode: from_scratch
+  # run_mode: warmstart
+  # settings: 
+  #   checkpoint_folder_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__11:16:13
+  #   checkpoint_num_seen_samples: 512
+
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
