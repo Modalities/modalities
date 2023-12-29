@@ -10,6 +10,8 @@ from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
     BatchSamplerTypes,
+    CheckpointingExectionTypes,
+    CheckpointingStrategyTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -222,9 +224,28 @@ class SchedulerConfig(BaseModel):
     config: StepLRConfig | ConstantLRConfig | OneCycleLRConfig
 
 
-class CheckpointConfig(BaseModel):
-    checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
-    dir_path: Path
+class CheckpointingConfig(BaseModel):
+    class CheckpointingStrategyConfig(BaseModel):
+        class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
+            k: PositiveInt
+
+        class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
+            k: int
+
+        type_hint: CheckpointingStrategyTypes
+        config: SaveEveryKStepsCheckpointingStrategyConfig | SaveKMostRecentCheckpointsStrategyConfig
+
+    class CheckpointingExecutionConfig(BaseModel):
+        class FSDPToDiscCheckpointingConfig(BaseModel):
+            checkpoint_path: Path
+            global_rank: conint(ge=0)
+            checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
+
+        type_hint: CheckpointingExectionTypes
+        config: FSDPToDiscCheckpointingConfig
+
+    checkpointing_strategy: CheckpointingStrategyConfig
+    checkpointing_execution: CheckpointingExecutionConfig
 
 
 class RunMode(Enum):
@@ -238,18 +259,18 @@ class LLMGymSetupConfig(BaseModel):
         checkpoint_num_seen_samples: conint(ge=0)
 
     run_mode: RunMode
-    settings: Optional[WarmStartSettings]
+    settings: Optional[WarmStartSettings] = None
 
 
 class AppConfig(BaseModel):
-    llm_gym_setup_config: LLMGymSetupConfig
+    llm_gym_setup: LLMGymSetupConfig
     data: DataConfig
     training: TrainingConfig
     running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
-    checkpoint: CheckpointConfig
+    checkpointing: CheckpointingConfig
     wandb: WandbConfig
     loss: LossConfig
 

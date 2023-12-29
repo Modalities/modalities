@@ -4,6 +4,11 @@ import torch
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
+from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from llm_gym.checkpointing.checkpointing_strategies import (
+    SaveEveryKStepsCheckpointingStrategy,
+    SaveKMostRecentCheckpointsStrategy,
+)
 from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
@@ -67,3 +72,12 @@ class CollatorTypes(LookupEnum):
 class DataloaderTypes(LookupEnum):
     RepeatingDataLoader = RepeatingDataLoader
     LLMDataLoader = LLMDataLoader
+
+
+class CheckpointingStrategyTypes(LookupEnum):
+    SaveKMostRecentCheckpointsStrategy = SaveKMostRecentCheckpointsStrategy
+    SaveEveryKStepsCheckpointingStrategy = SaveEveryKStepsCheckpointingStrategy
+
+
+class CheckpointingExectionTypes(LookupEnum):
+    FSDPToDiscCheckpointing = FSDPToDiscCheckpointing

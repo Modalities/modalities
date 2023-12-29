@@ -7,9 +7,12 @@ from torch.utils.data import BatchSampler, DataLoader, Sampler
 from torch.utils.data.distributed import DistributedSampler
 from transformers import PreTrainedTokenizer
 
+from llm_gym.checkpointing.checkpointing import CheckpointingExecutionIF, CheckpointingStrategyIF
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
 from llm_gym.config.lookup_types import (
     BatchSamplerTypes,
+    CheckpointingExectionTypes,
+    CheckpointingStrategyTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -124,6 +127,18 @@ class ResolverRegister:
             **{
                 tokenizer_type: ClassResolver([t.value for t in TokenizerTypes], base=PreTrainedTokenizer)
                 for tokenizer_type in TokenizerTypes
+            },
+            **{
+                checkpointing_strategy_type: ClassResolver(
+                    [t.value for t in CheckpointingStrategyTypes], base=CheckpointingStrategyIF
+                )
+                for checkpointing_strategy_type in CheckpointingStrategyTypes
+            },
+            **{
+                checkpointing_execution_type: ClassResolver(
+                    [t.value for t in CheckpointingExectionTypes], base=CheckpointingExecutionIF
+                )
+                for checkpointing_execution_type in CheckpointingExectionTypes
             },
         }
         return resolvers

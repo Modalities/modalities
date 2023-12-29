@@ -1,6 +1,6 @@
-llmgym_setup:
-  run_mode: from_scratch
-  # run_mode: warmstart
+llm_gym_setup:
+  run_mode: FROM_SCRATCH
+  # run_mode: WARM_START
   # settings: 
   #   checkpoint_folder_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__11:16:13
   #   checkpoint_num_seen_samples: 512
@@ -115,10 +115,17 @@ training:
   main_rank: 0
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
 
-
-checkpoint:
-  dir_path: checkpoint
-  checkpointing_rank: ${training.main_rank}
+checkpointing:
+  checkpointing_strategy:
+    type_hint: SaveKMostRecentCheckpointsStrategy
+    config:
+      k: -1   # -1 to save all checkpoints
+  checkpointing_execution:
+    type_hint: FSDPToDiscCheckpointing
+    config: 
+      checkpoint_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints
+      global_rank: ${oc.env:RANK}
+      checkpointing_rank: 0
 
 running_env:
   type_hint: FSDPRunningEnv
