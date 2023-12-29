@@ -4,7 +4,7 @@ llm_gym_setup:
   settings: 
     checkpoint_model_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__14:55:32/eid_2023-12-29__14:55:32-model-num_samples_1024.bin
     checkpoint_optimizer_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__14:55:32/eid_2023-12-29__14:55:32-optimizer-num_samples_1024.bin   
-    checkpoint_num_seen_samples: 1024
+    global_num_seen_samples: 1024
 
 data:
   sample_key: "input_ids"
@@ -115,6 +115,7 @@ training:
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  global_num_seen_samples: ${llm_gym_setup.settings.global_num_seen_samples}
 
 checkpointing:
   checkpointing_strategy:

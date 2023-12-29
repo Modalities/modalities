@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
@@ -157,13 +157,30 @@ class TrainingConfig(BaseModel):
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
     train_batch_size: conint(gt=0)
+    global_num_seen_samples: conint(ge=0)
 
     @property
     def local_num_train_samples(self):
-        exact = self.num_training_batches / self.world_size
-        ret = self.num_training_batches // self.world_size
+        exact = self.num_training_samples / self.world_size
+        ret = self.num_training_samples // self.world_size
         if exact != ret:
-            print(f"Calculated num_training_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+            print(f"Calculated local_num_training_samples is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def local_num_seen_train_samples(self):
+        exact = self.global_num_seen_samples / self.world_size
+        ret = self.global_num_seen_samples // self.world_size
+        if exact != ret:
+            print(f"Calculated global_num_seen_samples is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def skip_num_local_train_batches(self) -> int:
+        exact = self.global_num_seen_samples / self.world_size / self.train_batch_size
+        ret = self.global_num_seen_samples // self.world_size // self.train_batch_size
+        if exact != ret:
+            print(f"Calculated skip_num_local_train_batches is not an integer. Clipping {exact} to {ret} ")
         return ret
 
     @property
@@ -256,12 +273,22 @@ class RunMode(Enum):
 class LLMGymSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
         checkpoint_model_path: Path
+        global_num_seen_samples: conint(gt=0)
         checkpoint_optimizer_path: Optional[Path] = None
         checkpoint_lr_scheduler_path: Optional[Path] = None
-        checkpoint_num_seen_samples: conint(ge=0)
+
+    class FromScratchSettings(BaseModel):
+        global_num_seen_samples: int = 0
 
     run_mode: RunMode
-    settings: Optional[WarmStartSettings] = None
+    settings: WarmStartSettings  # | FromScratchSettings
+
+    @model_validator(mode="after")
+    def check_passwords_match(self) -> "LLMGymSetupConfig":
+        if self.run_mode == RunMode.FROM_SCRATCH:
+            if self.settings.global_num_seen_samples != 0:
+                raise ValueError("When starting from scratch, global_num_seen_samples must be 0.")
+        return self
 
 
 class AppConfig(BaseModel):

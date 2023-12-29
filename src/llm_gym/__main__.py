@@ -163,15 +163,6 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 class Main:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-
-        # # warmstart
-        # self.global_train_sample_id = 139999
-        # self.warmstart_experiment_id = "2023-11-16-07:42:45_PM"
-
-        # # coldstart
-        # self.global_train_sample_id = 0
-        # self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
-
         self.experiment_id = get_date_of_run()
 
         self.resolvers = ResolverRegister(config=config)
@@ -189,7 +180,8 @@ class Main:
             ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
 
             gym.run(
-                local_num_train_samples=self.config.training.local_num_train_samples,
+                local_num_train_samples=self.config.training.local_num_train_samples
+                - self.config.training.local_num_seen_train_samples,
                 callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
@@ -219,7 +211,14 @@ class Main:
         loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 
         # Dataloaders
-        train_dataloader = DataloaderFactory.get_dataloader(resolvers=resolvers, config=config.data.train_dataloader)
+        # skip_num_samples = 0
+        # if run_mode == RunMode.WARM_START:
+        #     skip_num_samples = config.llm_gym_setup.settings.checkpoint_num_seen_samples
+
+        skip_num_local_train_batches = config.training.skip_num_local_train_batches
+        train_dataloader = DataloaderFactory.get_dataloader(
+            resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
+        )
         eval_dataloaders = [
             DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
             for dataloader_config in config.data.eval_dataloaders
@@ -234,7 +233,7 @@ class Main:
         # TODO: check why not *config.training.world_size
         #  and consider just using config.training.num_training_samples for progress Subscriber
         train_split_lengths = {
-            train_dataloader.dataloader_tag: len(train_dataloader)
+            train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
             * config.training.world_size
             * train_dataloader.sampler_batch_size
         }

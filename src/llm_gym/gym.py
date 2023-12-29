@@ -31,7 +31,8 @@ class Gym:
         self._run_evaluation_and_checkpointing(
             model=model,
             optimizer=optimizer,
-            local_train_sample_id=-1,
+            local_train_sample_id=train_data_loader.sampler_batch_size * train_data_loader.batch_sampler.start_index
+            - 1,
             evaluation_data_loaders=evaluation_data_loaders,
             checkpointing=checkpointing,
             local_num_train_samples=local_num_train_samples,
