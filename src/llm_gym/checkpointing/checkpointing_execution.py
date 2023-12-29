@@ -91,7 +91,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
             .replace("<num_samples>", str(global_train_sample_id + 1))
         )
 
-        full_path = Path(self.checkpoint_path, entity_file_name)
+        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_sample_id: int):
@@ -118,6 +118,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
                 global_train_sample_id=global_train_sample_id,
                 entity_type=CheckpointingEntityType.MODEL,
             )
+            model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model_state, model_checkpoint_path)
 
             # save optimizer
