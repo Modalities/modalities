@@ -7,7 +7,7 @@ def get_date_of_run():
     """create date and time for file save uniqueness
     example: 2022-05-07-08:31:12_PM'
     """
-    date_of_run = datetime.now().strftime("%Y-%m-%d-%I:%M:%S_%p")
+    date_of_run = datetime.now().strftime("%Y-%m-%d__%H:%M:%S")
     return date_of_run
 
 
