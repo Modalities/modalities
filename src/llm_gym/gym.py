@@ -22,7 +22,6 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
-        local_num_train_samples: int,
         callback_interval_in_batches: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
@@ -31,11 +30,9 @@ class Gym:
         self._run_evaluation_and_checkpointing(
             model=model,
             optimizer=optimizer,
-            local_train_sample_id=train_data_loader.sampler_batch_size * train_data_loader.batch_sampler.start_index
-            - 1,
+            local_train_sample_id=train_data_loader.fast_forward_sample_id,
             evaluation_data_loaders=evaluation_data_loaders,
             checkpointing=checkpointing,
-            local_num_train_samples=local_num_train_samples,
         )
 
         self.trainer.train(
@@ -44,13 +41,11 @@ class Gym:
             loss_fun=self.loss_fun,
             optimizer=optimizer,
             callback_interval_in_batches=callback_interval_in_batches,
-            local_num_train_samples=local_num_train_samples,
             epoch_done_callback=partial(  # TODO rename to something more meaningful
                 self._run_evaluation_and_checkpointing,
                 model=model,
                 optimizer=optimizer,
                 evaluation_data_loaders=evaluation_data_loaders,
-                local_num_train_samples=local_num_train_samples,
                 checkpointing=checkpointing,
             ),
             local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
@@ -60,7 +55,6 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
-        local_num_train_samples: int,
         local_train_sample_id: int,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,

@@ -180,8 +180,6 @@ class Main:
             ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
 
             gym.run(
-                local_num_train_samples=self.config.training.local_num_train_samples
-                - self.config.training.local_num_seen_train_samples,
                 callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,

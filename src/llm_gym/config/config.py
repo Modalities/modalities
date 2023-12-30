@@ -281,7 +281,7 @@ class LLMGymSetupConfig(BaseModel):
         global_num_seen_samples: int = 0
 
     run_mode: RunMode
-    settings: WarmStartSettings  # | FromScratchSettings
+    settings: WarmStartSettings | FromScratchSettings
 
     @model_validator(mode="after")
     def check_passwords_match(self) -> "LLMGymSetupConfig":

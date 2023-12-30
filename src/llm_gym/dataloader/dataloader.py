@@ -63,6 +63,24 @@ class LLMDataLoader(DataLoader[T_co]):
         # we don't want to load all the data during the fast-forward.
         return self.batch_sampler.sampler_batch_size
 
+    @property
+    def fast_forward_sample_id(self) -> int:
+        """The sample id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward sample id
+        """
+        return self.sampler_batch_size * self.batch_sampler.start_index
+
+    @property
+    def fast_forward_batch_id(self) -> int:
+        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward batch id
+        """
+        return self.batch_sampler.start_index
+
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
     def __init__(self, data_loader: LLMDataLoader[T_co], reshuffle_after_epoch: bool = False):
@@ -102,3 +120,21 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
     @property
     def sampler_batch_size(self) -> int:
         return self.data_loader.batch_sampler.batch_size
+
+    @property
+    def fast_forward_sample_id(self) -> int:
+        """The sample id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward sample id
+        """
+        return self.data_loader.sampler_batch_size * self.batch_sampler.start_index
+
+    @property
+    def fast_forward_batch_id(self) -> int:
+        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward batch id
+        """
+        return self.data_loader.batch_sampler.start_index

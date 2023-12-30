@@ -45,7 +45,6 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
-        local_num_train_samples: int,
         epoch_done_callback: Callable[[int], None],
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
@@ -54,7 +53,8 @@ class Trainer:
 
         # batch loop
         batch: DatasetBatch
-        for local_train_batch_id, batch in zip(range(local_num_train_samples), train_loader):
+        for batch_id, batch in enumerate(train_loader):
+            local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # train single batch
             batch_loss = self._train_batch(
                 batch=batch,
@@ -69,7 +69,7 @@ class Trainer:
 
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                local_batch_id=local_train_batch_id + train_loader.batch_sampler.start_index,
+                local_batch_id=local_train_batch_id,
                 batch_size=train_loader.sampler_batch_size,
                 dataloader_tag=train_loader.dataloader_tag,
                 local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
