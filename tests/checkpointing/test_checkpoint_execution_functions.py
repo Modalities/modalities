@@ -35,13 +35,15 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
 
 
 def test_delete_checkpoint(tmpdir):
-    experiment_id = "2023-11-17_01-35-09"
+    experiment_id = "2022-05-07__14-31-22"
     directory = Path(tmpdir)
 
-    optimizer_path = directory / f"eid_{experiment_id}-optimizer-num_samples_101.bin"
+    (directory / experiment_id).mkdir(exist_ok=True)
+
+    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_samples_101.bin"
     optimizer_path.write_text(CONTENT)
 
-    model_path = directory / f"eid_{experiment_id}-model-num_samples_101.bin"
+    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_samples_101.bin"
     model_path.write_text(CONTENT)
 
     checkpointing = FSDPToDiscCheckpointing(
@@ -52,4 +54,4 @@ def test_delete_checkpoint(tmpdir):
         model_wrapping_fn=dummy_method,
     )
     checkpointing._delete_checkpoint(global_train_sample_id=100)
-    assert is_empty_directory(directory.__str__())
+    assert is_empty_directory((directory / experiment_id).__str__())
