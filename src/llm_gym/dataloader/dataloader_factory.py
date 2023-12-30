@@ -1,7 +1,26 @@
-from llm_gym.config.config import DataLoaderConfig
+from torch.utils.data.dataset import Dataset
+
+from llm_gym.config.config import DataLoaderConfig, DatasetConfig
 from llm_gym.dataloader.dataloader import LLMDataLoader
+from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from llm_gym.dataloader.samplers import ResumableBatchSampler
 from llm_gym.resolver_register import ResolverRegister
+
+
+class OpenGPTXDatasetWrapper(Dataset):
+    def __init__(self, open_gptx_dataset: OpenGPTXMMapDataset, num_samples: int) -> None:
+        super().__init__()
+        self.open_gptx_dataset = open_gptx_dataset
+        self.num_samples = num_samples
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx: int):
+        if self.num_samples > idx:
+            return self.open_gptx_dataset.__getitem__(idx)
+        else:
+            raise ValueError("num_samples <= idx")
 
 
 class DataloaderFactory:
@@ -21,6 +40,14 @@ class DataloaderFactory:
         dataset = resolvers.build_component_by_config(
             config=config.config.dataset, extra_kwargs=additional_init_payload
         )
+
+        # BUG: Sometimes the dataset genereated by the OpenGPTXMMap implementation has too many samples.
+        # This is a workaround to fix the dataset to the size, as specified in the config!
+        # TODO: Fix the OpenGPTX implementation and get rid of this hack.
+        if isinstance(config.config.dataset.config, DatasetConfig.OpenGPTXMMapDatasetConfig):
+            dataset = OpenGPTXDatasetWrapper(
+                open_gptx_dataset=dataset, num_samples=config.config.dataset.config.num_samples
+            )
 
         collator = resolvers.build_component_by_config(config=config.config.collate_fn)
         sampler = resolvers.build_component_by_config(
