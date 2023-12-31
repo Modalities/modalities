@@ -5,9 +5,9 @@ from torch import distributed as dist
 
 def get_date_of_run():
     """create date and time for file save uniqueness
-    example: 2022-05-07-08:31:12_PM'
+    example: 2022-05-07__14-31-22'
     """
-    date_of_run = datetime.now().strftime("%Y-%m-%d__%H:%M:%S")
+    date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
     return date_of_run
 
 
