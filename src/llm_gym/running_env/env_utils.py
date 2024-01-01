@@ -1,8 +1,10 @@
+from enum import Enum
+
 import torch
-from pkg_resources import packaging
-from torch.distributed.fsdp import MixedPrecision
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
+from pkg_resources import packaging
+from torch.distributed.fsdp import MixedPrecision
 
 
 def has_bfloat_support():
@@ -38,8 +40,15 @@ bfSixteen_working = MixedPrecision(
     buffer_dtype=torch.bfloat16,
 )
 
-fp32_policy = MixedPrecision(
+fpThirtytwo = MixedPrecision(
     param_dtype=torch.float32,
     reduce_dtype=torch.float32,
     buffer_dtype=torch.float32,
 )
+
+
+class MixedPrecisionSettings(Enum):
+    FP_16 = fpSixteen
+    BF_16 = bfSixteen
+    BF_16_WORKING = bfSixteen_working
+    BF_32 = fpThirtytwo
