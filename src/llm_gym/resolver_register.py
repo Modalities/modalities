@@ -23,10 +23,10 @@ from llm_gym.config.lookup_types import (
 )
 from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataset import Dataset
-from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
+from llm_gym.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 
 
 class ResolverRegister:

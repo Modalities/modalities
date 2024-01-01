@@ -21,7 +21,6 @@ from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataloader_factory import DataloaderFactory
 from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
 from llm_gym.evaluator import Evaluator
-from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.gym import Gym
 from llm_gym.logging_broker.message_broker import MessageBroker
 from llm_gym.logging_broker.messages import BatchProgressUpdate, MessageTypes
@@ -33,6 +32,7 @@ from llm_gym.logging_broker.subscriber_impl.batch_progress_subscriber import (
 from llm_gym.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from llm_gym.loss_functions import Loss
 from llm_gym.resolver_register import ResolverRegister
+from llm_gym.running_env.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.trainer import Trainer
 from llm_gym.util import get_date_of_run
 from llm_gym.utils.generate_text import main as generate_text_main
