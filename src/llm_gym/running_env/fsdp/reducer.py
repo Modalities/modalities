@@ -1,6 +1,7 @@
 from typing import Callable
-import torch.distributed as dist
+
 import torch
+import torch.distributed as dist
 
 
 class Reducer:

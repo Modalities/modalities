@@ -5,8 +5,8 @@ from llm_gym.checkpointing.checkpointing import (
     CheckpointingStrategyIF,
 )
 from llm_gym.config.config import CheckpointingConfig
-from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.resolver_register import ResolverRegister
+from llm_gym.running_env.fsdp.fsdp_running_env import RunningEnv
 
 
 class CheckpointingFactory:

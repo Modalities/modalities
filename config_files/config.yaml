@@ -1,10 +1,13 @@
 llm_gym_setup:
-  # run_mode: FROM_SCRATCH
-  run_mode: WARM_START
+  run_mode: FROM_SCRATCH
   settings: 
-    checkpoint_model_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__14:55:32/eid_2023-12-29__14:55:32-model-num_samples_1024.bin
-    checkpoint_optimizer_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-29__14:55:32/eid_2023-12-29__14:55:32-optimizer-num_samples_1024.bin   
-    global_num_seen_samples: 1024
+    global_num_seen_samples: 0
+
+  # run_mode: WARM_START
+  # settings: 
+  #   checkpoint_model_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-30__17:54:34/eid_2023-12-30__17:54:34-model-num_samples_1024.bin
+  #   checkpoint_optimizer_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-30__17:54:34/eid_2023-12-30__17:54:34-optimizer-num_samples_1024.bin   
+  #   global_num_seen_samples: 1024
 
 data:
   sample_key: "input_ids"
@@ -134,6 +137,10 @@ running_env:
   config:
     process_group_backend: ${training.process_group_backend}
     local_rank: ${training.local_rank}
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+
 
 model:
   type_hint: GPT2LLM

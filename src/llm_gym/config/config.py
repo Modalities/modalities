@@ -23,8 +23,8 @@ from llm_gym.config.lookup_types import (
     TokenizerTypes,
 )
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPT2Config
+from llm_gym.running_env.fsdp.fsdp_running_env import RunningEnvConfig
 
 
 class WandbConfig(BaseModel):
@@ -281,7 +281,9 @@ class LLMGymSetupConfig(BaseModel):
         global_num_seen_samples: int = 0
 
     run_mode: RunMode
-    settings: FromScratchSettings  # WarmStartSettings |
+    settings: FromScratchSettings
+    # settings: WarmStartSettings
+
 
     @model_validator(mode="after")
     def check_passwords_match(self) -> "LLMGymSetupConfig":
