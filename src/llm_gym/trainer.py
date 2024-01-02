@@ -99,11 +99,7 @@ class Trainer:
                         evaluation_result_publisher=self.evaluation_result_publisher,
                         evaluation_result=evaluation_result,
                     )
-                    epoch_done_callback(
-                        local_train_sample_id=Trainer._get_local_sample_id(
-                            batch_id=local_train_batch_id, batch_size=train_loader.sampler_batch_size
-                        )
-                    )
+                    epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     model.train()
 
                 # TODO early stopping
