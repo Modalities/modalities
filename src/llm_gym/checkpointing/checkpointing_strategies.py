@@ -1,9 +1,24 @@
+from abc import ABC, abstractmethod
 from typing import Dict
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import CheckpointingStrategyIF
 from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from llm_gym.exceptions import CheckpointingError
+
+
+class CheckpointingStrategyIF(ABC):
+    """
+    Checkpoint Interface to get checkpoint instruction.
+    """
+
+    @abstractmethod
+    def get_checkpoint_instruction(
+        self,
+        global_train_sample_id: int,
+        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        early_stoppping_criterion_fulfilled: bool = False,
+    ) -> CheckpointingInstruction:
+        raise NotImplementedError
 
 
 class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):

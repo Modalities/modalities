@@ -21,6 +21,31 @@ class CheckpointingEntityType(Enum):
 
 class CheckpointingExecutionIF(ABC):
     @abstractmethod
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_optimizer_checkpoint(
+        self,
+        optimizer: Optimizer,
+        model: nn.Module,
+        file_path: Path,
+    ) -> Optimizer:
+        raise NotImplementedError
+
+    @abstractmethod
+    def run_checkpoint_instruction(
+        self,
+        checkpointing_instruction: CheckpointingInstruction,
+        global_train_sample_id: int,
+        model: nn.Module,
+        optimizer: Optimizer,
+    ):
+        raise NotImplementedError
+
+
+class CheckpointingExecution(CheckpointingExecutionIF):
+    @abstractmethod
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_sample_id: int):
         raise NotImplementedError
 
@@ -28,17 +53,7 @@ class CheckpointingExecutionIF(ABC):
     def _delete_checkpoint(self, global_train_sample_id: int):
         raise NotImplementedError
 
-    @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_sample_id: int) -> nn.Module:
-        raise NotImplementedError
-
-    @abstractmethod
-    def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_sample_id: int
-    ) -> Optimizer:
-        raise NotImplementedError
-
-    def run_checkpoint_instructions(
+    def run_checkpoint_instruction(
         self,
         checkpointing_instruction: CheckpointingInstruction,
         global_train_sample_id: int,
@@ -52,7 +67,7 @@ class CheckpointingExecutionIF(ABC):
             self._delete_checkpoint(global_train_sample_id=global_train_sample_id)
 
 
-class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
+class FSDPToDiscCheckpointing(CheckpointingExecution):
     CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_samples_{num_samples}.bin"
 
     def __init__(
