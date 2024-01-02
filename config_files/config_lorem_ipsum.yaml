@@ -1,3 +1,8 @@
+llm_gym_setup:
+  run_mode: FROM_SCRATCH
+  settings:
+    global_num_seen_samples: 0
+
 wandb:
   project_name: llm_gym
 
@@ -89,11 +94,20 @@ training:
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  global_num_seen_samples: ${llm_gym_setup.settings.global_num_seen_samples}
 
 
-checkpoint:
-  dir_path: data/checkpoints
-  checkpointing_rank: ${training.main_rank}
+checkpointing:
+  checkpointing_strategy:
+    type_hint: SaveKMostRecentCheckpointsStrategy
+    config:
+      k: -1   # -1 to save all checkpoints
+  checkpointing_execution:
+    type_hint: FSDPToDiscCheckpointing
+    config: 
+      checkpoint_path: data/checkpoints
+      global_rank: ${oc.env:RANK}
+      checkpointing_rank: 0
 
 loss:
   type_hint: CLMCrossEntropyLoss
