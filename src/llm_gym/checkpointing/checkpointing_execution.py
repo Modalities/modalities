@@ -53,7 +53,7 @@ class CheckpointingExecutionIF(ABC):
 
 
 class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
-    CHECKPOINT_STRUCTURE = "eid_<experiment_id>-<entity>-num_samples_<num_samples>.bin"
+    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_samples_{num_samples}.bin"
 
     def __init__(
         self,
@@ -85,10 +85,8 @@ class FSDPToDiscCheckpointing(CheckpointingExecutionIF):
         global_train_sample_id: int,
         entity_type: CheckpointingEntityType,
     ) -> Path:
-        entity_file_name = (
-            self.CHECKPOINT_STRUCTURE.replace("<experiment_id>", experiment_id)
-            .replace("<entity>", entity_type.value)
-            .replace("<num_samples>", str(global_train_sample_id + 1))
+        entity_file_name = self.CHECKPOINT_STRUCTURE.format(
+            experiment_id=experiment_id, entity=entity_type.value, num_samples=str(global_train_sample_id + 1)
         )
 
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
