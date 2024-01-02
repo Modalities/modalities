@@ -23,7 +23,7 @@ data:
       shuffle: false
       batch_sampler:
         type_hint: BatchSampler
-        config: 
+        config:
           batch_size: 8 # per rank
           drop_last: false
           sampler:
@@ -41,7 +41,7 @@ data:
           num_samples: ${training.num_training_samples}
       collate_fn:
         type_hint: GPT2LLMCollator
-        config: 
+        config:
           sample_key: ${data.sample_key}
           target_key: ${data.target_key}
   eval_dataloaders:
@@ -84,7 +84,7 @@ data:
         shuffle: false
         batch_sampler:
           type_hint: BatchSampler
-          config: 
+          config:
             batch_size: 8 # per rank
             drop_last: false
             sampler:

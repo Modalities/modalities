@@ -31,7 +31,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             for metric_key, metric_values in eval_result.metrics.items()
         }
 
-        num_samples = (eval_result.train_local_sample_id + 1) * self.num_ranks
+        num_samples = (eval_result.global_train_sample_id + 1) * self.num_ranks
         group_content = [f"[yellow]Iteration #{num_samples}:"]
         if losses:
             group_content.append("\nLosses:")

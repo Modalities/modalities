@@ -6,22 +6,8 @@ import torch.nn as nn
 from torch.optim import Optimizer
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
-
-
-class CheckpointingStrategyIF(ABC):
-    """
-    Checkpoint Interface to get checkpoint instruction.
-    """
-
-    @abstractmethod
-    def get_checkpoint_instruction(
-        self,
-        global_train_sample_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch] = None,
-        early_stoppping_criterion_fulfilled: bool = False,
-    ) -> CheckpointingInstruction:
-        raise NotImplementedError
+from llm_gym.checkpointing.checkpointing_execution import CheckpointingExecutionIF
+from llm_gym.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 
 
 class CheckpointingIF(ABC):
@@ -46,18 +32,6 @@ class CheckpointingIF(ABC):
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
-    ):
-        raise NotImplementedError
-
-
-class CheckpointingExecutionIF(CheckpointingIF):
-    @abstractmethod
-    def run_checkpoint_instructions(
-        self,
-        checkpointing_instruction: CheckpointingInstruction,
-        global_train_sample_id: int,
-        model: nn.Module,
-        optimizer: Optimizer,
     ):
         raise NotImplementedError
 
@@ -91,7 +65,7 @@ class Checkpointing(CheckpointingIF):
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
 
-        self.checkpointing_execution.run_checkpoint_instructions(
+        self.checkpointing_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
             global_train_sample_id=global_train_sample_id,
             model=model,

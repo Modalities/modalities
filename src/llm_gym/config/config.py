@@ -247,7 +247,7 @@ class CheckpointingConfig(BaseModel):
             k: PositiveInt
 
         class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
-            k: int
+            k: conint(ge=-1)
 
         type_hint: CheckpointingStrategyTypes
         config: SaveEveryKStepsCheckpointingStrategyConfig | SaveKMostRecentCheckpointsStrategyConfig
@@ -283,6 +283,7 @@ class LLMGymSetupConfig(BaseModel):
     run_mode: RunMode
     settings: FromScratchSettings
     # settings: WarmStartSettings
+
 
     @model_validator(mode="after")
     def check_passwords_match(self) -> "LLMGymSetupConfig":
