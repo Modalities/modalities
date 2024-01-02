@@ -1,12 +1,25 @@
+import json
 import os
+import warnings
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional, Text
 
-from pydantic import BaseModel, DirectoryPath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from transformers import PretrainedConfig
 
-from llm_gym.config.lookup_types import LossTypes, ModelTypes, OptimizerTypes, SchedulerTypes
+from llm_gym.config.lookup_types import (
+    CollatorTypes,
+    DataloaderTypes,
+    DatasetTypes,
+    LossTypes,
+    ModelTypes,
+    OptimizerTypes,
+    SamplerTypes,
+    SchedulerTypes,
+    TokenizerTypes,
+)
 from llm_gym.config.types import ProcessGroupBackendType
-from llm_gym.fsdp.fsdp_runner import RunnerConfig
+from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
 from llm_gym.models.gpt2.gpt2_model import GPTConfig
 
 
@@ -20,53 +33,112 @@ class CudaKwargsConfig(BaseModel):
     shuffle: bool
 
 
+class TokenizerConfig(BaseModel):
+    class GPT2TokenizerFastConfig(BaseModel):
+        tokenizer_file: str  # FilePath not possible, since transformers.PretrainedTokenizers can only handle strings
+
+    type_hint: TokenizerTypes
+    config: GPT2TokenizerFastConfig
+
+
+class DatasetConfig(BaseModel):
+    class MemMapDatasetConfig(BaseModel):
+        raw_data_path: FilePath
+        index_path: Optional[FilePath] = None
+        block_size: conint(gt=0)
+        tokenizer: TokenizerConfig
+        jq_pattern: str
+        sample_key: str
+
+    class PackedMemMapDatasetContinuousConfig(BaseModel):
+        raw_data_path: Path
+        block_size: conint(gt=0)
+        sample_key: str
+
+    class PackedMemMapDatasetMegatronConfig(BaseModel):
+        raw_data_path: Path
+        block_size: conint(gt=0)
+        sample_key: str
+
+    class MMapIndexedDatasetConfig(BaseModel):
+        path: Path
+        skip_warmup: bool
+
+    type_hint: DatasetTypes
+    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
+
+
+class SamplerConfig(BaseModel):
+    class DistributedSamplerConfig(BaseModel):
+        rank: conint(ge=0)
+        num_replicas: conint(ge=0)
+        shuffle: bool
+
+    type_hint: SamplerTypes
+    config: DistributedSamplerConfig
+
+
+class CollatorConfig(BaseModel):
+    class GPT2LLMCollatorConfig(BaseModel):
+        sample_key: str
+        target_key: str
+
+    type_hint: CollatorTypes
+    config: GPT2LLMCollatorConfig
+
+
 class DataLoaderConfig(BaseModel):
-    train_dataset_tag: str
-    val_dataset_tag: str
-    test_dataset_tag: str
-    cuda_kwargs: CudaKwargsConfig
+    class LLMDataLoaderConfig(CudaKwargsConfig):
+        batch_size: conint(gt=0)
+        dataloader_tag: str
+        dataset: DatasetConfig
+        sampler: SamplerConfig
+        collate_fn: CollatorConfig
 
-
-class DataConfig(BaseModel):
-    dataset_dir_path: DirectoryPath
-    sample_key: str
-    target_key: str
-    sequence_len: PositiveInt
-    dataloader: DataLoaderConfig
+    type_hint: DataloaderTypes
+    config: LLMDataLoaderConfig
 
 
 class TrainingConfig(BaseModel):
-    num_training_batches: conint(gt=0)
+    train_dataloader: DataLoaderConfig
+    evaluation_dataloaders: Dict[Text, DataLoaderConfig]
+    # TODO: use this in Progress Logging
+    num_training_samples: conint(gt=0)
+    callback_interval_in_samples: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
-    num_batches_per_training_sequence: int
     local_rank: conint(ge=0)
     global_rank: conint(ge=0)
     world_size: conint(ge=0)
     main_rank: conint(ge=0)
-    eval_interval_in_batches: conint(ge=1)
-    training_batch_size: int
-    evaluation_batch_size: int
-    test_batch_size: int
 
     @property
-    def eval_interval_per_rank(self):
-        return self.num_training_batches // self.eval_interval_in_batches // self.world_size
+    def num_training_batches(self) -> int:
+        exact = self.num_training_samples / self.train_dataloader.config.batch_size
+        ret = self.num_training_samples // self.train_dataloader.config.batch_size
+        if exact != ret:
+            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def callback_interval_in_batches_per_rank(self):
+        exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
+        ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
+        if exact != ret:
+            warnings.warn(
+                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
+            )
+        return ret
 
     @property
     def num_batches_per_rank(self):
-        return self.num_training_batches // self.world_size
-
-    @model_validator(mode="after")
-    def validate_multiples(self) -> "TrainingConfig":
-        computed_num_training_batches = self.eval_interval_per_rank * self.world_size * self.eval_interval_in_batches
-        if computed_num_training_batches != self.num_training_batches:
-            raise ValueError(
-                "num_batches_per_training_sequence_per_rank * world_size * num_batches_per_training_sequence"
-                " != num_training_batches"
-            )
-        return self
+        exact = self.num_training_batches / self.world_size
+        ret = self.num_training_batches // self.world_size
+        if exact != ret:
+            warnings.warn(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
+        return ret
 
 
+# TODO: remove this?? Seems unnecessary to add another composition layer here
 class GPT2Config(BaseModel):
     config: GPTConfig
 
@@ -94,10 +166,11 @@ class OptimizerConfig(BaseModel):
     type_hint: OptimizerTypes
     config: AdamWConfig
 
+
 class OneCycleLRConfig(BaseModel):
     max_lr: PositiveFloat
     total_steps: conint(ge=1)
-    pct_start: confloat(ge=0.)
+    pct_start: confloat(ge=0.0)
     anneal_strategy: str
     cycle_momentum: bool
     base_momentum: float | List
@@ -107,6 +180,7 @@ class OneCycleLRConfig(BaseModel):
     three_phase: bool
     last_epochs: int
     verbose: bool
+
 
 class StepLRConfig(BaseModel):
     step_size: conint(ge=1)
@@ -129,12 +203,37 @@ class CheckpointConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    data: DataConfig
     training: TrainingConfig
     loss: LossConfig
-    runner: RunnerConfig
+    running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     checkpoint: CheckpointConfig
     wandb: WandbConfig
+
+
+class PretrainedGPTConfig(PretrainedConfig):
+    model_type = "llm_gym_gpt2"
+
+    def __init__(self, config: GPTConfig = None, **kwargs):
+        if type(config) == dict:
+            config = GPTConfig(**config)
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        if self.config:
+            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
+            json_dict["config"]["attention"] = {
+                "attention_type": self.config.attention.attention_type.value,
+                "scaling_factor": self.config.attention.scaling_factor,
+            }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std,
+            }
+        else:
+            json_dict = {}
+        return json.dumps(json_dict)

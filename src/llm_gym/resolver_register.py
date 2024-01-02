@@ -1,33 +1,43 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
+from torch.utils.data import DataLoader, Sampler
+from transformers import PreTrainedTokenizer
 
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
-from llm_gym.config.lookup_types import LossTypes, ModelTypes
-from llm_gym.fsdp.fsdp_runner import FSDPRunner, Runner, RunnerTypes
+from llm_gym.config.lookup_types import (
+    CollatorTypes,
+    DataloaderTypes,
+    DatasetTypes,
+    LossTypes,
+    ModelTypes,
+    SamplerTypes,
+    TokenizerTypes,
+)
+from llm_gym.dataloader.dataset import Dataset
+from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
+from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, NNModel
 
 
 class ResolverRegister:
     def __init__(self, config: AppConfig) -> None:
-        self._resolver_register: Dict[str, ClassResolver] = ResolverRegister._create_resolver_register(config=config)
+        self._resolver_register: Dict[str, ClassResolver] = self._create_resolver_register(config=config)
 
     def build_component_by_config(self, config: BaseModel, extra_kwargs: Dict = {}) -> Any:
         assert (
             "type_hint" in config.model_fields.keys()
         ), f"Field 'type_hint' missing but needed for initalisation in {config}"
 
+        kwargs = {key: getattr(config.config, key) for key in config.config.model_dump().keys()}
+        kwargs.update(extra_kwargs)  # allow override via extra_kwargs, to add nested objects
         return self._build_component(
             register_key=config.type_hint,
             register_query=config.type_hint.name,
-            extra_kwargs=dict(
-                # do not model_dump recursively
-                **{key: getattr(config.config, key) for key in config.config.model_dump().keys()},
-                **extra_kwargs,
-            ),
+            extra_kwargs=kwargs,
         )
 
     def build_component_by_key_query(self, register_key: str, type_hint: str, extra_kwargs: Dict = {}) -> Any:
@@ -39,18 +49,24 @@ class ResolverRegister:
             pos_kwargs=extra_kwargs,
         )
 
-    @staticmethod
-    def _create_resolver_register(config: AppConfig) -> Dict[str, ClassResolver]:
-        expected_resolvers = [
-            value["type_hint"]
-            for value in config.model_dump().values()
-            if isinstance(value, Dict) and "type_hint" in value.keys()
-        ]
+    def _find_values_with_key_in_nested_structure(self, nested_structure: Dict, key: str) -> List[Any]:
+        found_values = []
+        for k, v in nested_structure.items():
+            if k == key:
+                found_values.append(v)
+            elif isinstance(v, dict):
+                found_values.extend(self._find_values_with_key_in_nested_structure(v, key))
+        return found_values
+
+    def _create_resolver_register(self, config: AppConfig) -> Dict[str, ClassResolver]:
+        expected_resolvers = set(
+            self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint")
+        )
         resolvers = {
-            config.runner.type_hint: ClassResolver(
-                [t.value for t in RunnerTypes],
-                base=Runner,
-                default=FSDPRunner,
+            config.running_env.type_hint: ClassResolver(
+                [t.value for t in RunningEnvTypes],
+                base=RunningEnv,
+                default=FSDPRunningEnv,
             ),
             config.model.type_hint: ClassResolver(
                 [t.value for t in ModelTypes],
@@ -71,6 +87,26 @@ class ResolverRegister:
                 [t.value for t in LossTypes],
                 base=Loss,
                 default=CLMCrossEntropyLoss,
+            ),
+            config.training.train_dataloader.config.dataset.config.tokenizer.type_hint: ClassResolver(
+                [t.value for t in TokenizerTypes],
+                base=PreTrainedTokenizer,
+            ),
+            config.training.train_dataloader.config.dataset.type_hint: ClassResolver(
+                [t.value for t in DatasetTypes],
+                base=Dataset,
+            ),
+            config.training.train_dataloader.config.sampler.type_hint: ClassResolver(
+                [t.value for t in SamplerTypes],
+                base=Sampler,
+            ),
+            config.training.train_dataloader.type_hint: ClassResolver(
+                [t.value for t in DataloaderTypes],
+                base=DataLoader,
+            ),
+            config.training.train_dataloader.config.collate_fn.type_hint: ClassResolver(
+                [t.value for t in CollatorTypes],
+                base=GPT2LLMCollator,
             ),
         }
         assert set(expected_resolvers) == set(

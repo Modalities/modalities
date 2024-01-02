@@ -1,10 +1,10 @@
-from collections import defaultdict
-from dataclasses import dataclass, field
-from functools import partial
-from typing import Callable, Dict, List, Union
-from llm_gym.exceptions import BatchStateError
-import torch
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Dict
+
+import torch
+
+from llm_gym.exceptions import BatchStateError
 
 
 class TorchDeviceMixin(ABC):
@@ -96,15 +96,15 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
 @dataclass
 class EvaluationResultBatch(Batch):
     """Data class for storing the results of a single or multiple batches.
-     Also entire epoch results are stored in here."""
+    Also entire epoch results are stored in here."""
 
-    dataset_tag: str
+    dataloader_tag: str
     train_batch_id: int
     losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
     metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
 
     def __str__(self) -> str:
-        eval_str = f"Evaluation result on dataset tag {self.dataset_tag} after {self.train_batch_id+1} batches:"
+        eval_str = f"Evaluation result on dataset tag {self.dataloader_tag} after {self.train_batch_id + 1} batches:"
         eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()])
         eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()])
         eval_str += "\n==============================================="

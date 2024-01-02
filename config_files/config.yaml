@@ -17,12 +17,11 @@ wandb:
 
 training:
   process_group_backend: "nccl"
-  num_training_batches: 7000
-  num_batches_per_training_sequence: 100
-  eval_interval_in_batches: 2
-  training_batch_size: 32
-  evaluation_batch_size: 21
-  test_batch_size: 21
+  num_training_batches: 700000
+  eval_interval_in_batches: 1000 # per rank! 
+  training_batch_size: 64
+  evaluation_batch_size: 64
+  test_batch_size: 32
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
@@ -38,10 +37,11 @@ loss:
     target_key: ${data.target_key}
     prediction_key: ${model.config.config.prediction_key}
 
-runner:
-  type_hint: FSDPRunner
+running_env:
+  type_hint: FSDPRunningEnv
   config:
     process_group_backend: ${training.process_group_backend}
+    local_rank: ${training.local_rank}
 
 model:
   type_hint: GPT2LLM

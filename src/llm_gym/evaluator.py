@@ -52,7 +52,7 @@ class Evaluator:
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_batch_id=train_batch_id,
                 dataset_batch_id=-1,
-                dataset_tag=data_loader.dataset_tag,
+                dataloader_tag=data_loader.dataloader_tag,
             )
             for batch_id, batch in enumerate(data_loader):
                 batch_loss = self.evaluate_batch(
@@ -68,7 +68,7 @@ class Evaluator:
                     batch_progress_publisher=self.batch_progress_publisher,
                     train_batch_id=train_batch_id,
                     dataset_batch_id=batch_id,
-                    dataset_tag=data_loader.dataset_tag,
+                    dataloader_tag=data_loader.dataloader_tag,
                 )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
             total_loss = Reducer.reduce(
@@ -79,19 +79,19 @@ class Evaluator:
 
             evaluation_result = EvaluationResultBatch(
                 losses={loss_fun.tag: total_loss},
-                dataset_tag=data_loader.dataset_tag,
+                dataloader_tag=data_loader.dataloader_tag,
                 train_batch_id=train_batch_id,
             )
             Evaluator._publish_evaluation_result(
                 evaluation_result_publisher=self.evaluation_result_publisher,
                 evaluation_result=evaluation_result,
             )
-            result_dict[data_loader.dataset_tag] = evaluation_result
+            result_dict[data_loader.dataloader_tag] = evaluation_result
         # Evaluator._publish_progress(
         #     batch_progress_publisher=self.batch_progress_publisher,
         #     train_batch_id=train_batch_id + 1,
         #     dataset_batch_id=0,
-        #     dataset_tag=data_loader.dataset_tag,
+        #     dataloader_tag=data_loader.dataloader_tag,
         # )
         return result_dict
 
@@ -100,13 +100,13 @@ class Evaluator:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         train_batch_id: int,
         dataset_batch_id: int,
-        dataset_tag: str,
+        dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
             train_batch_id=train_batch_id,
             dataset_batch_id=dataset_batch_id,
             experiment_status=ExperimentStatus.EVALUATION,
-            dataset_tag=dataset_tag,
+            dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
 

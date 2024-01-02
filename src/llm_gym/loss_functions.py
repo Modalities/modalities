@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from llm_gym.batch import InferenceResultBatch
-from torch.nn import CrossEntropyLoss
+
 import torch
+from torch.nn import CrossEntropyLoss
+
+from llm_gym.batch import InferenceResultBatch
 
 
 class Loss(ABC):
