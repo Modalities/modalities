@@ -1,8 +1,8 @@
 import rich
-import wandb
 from rich.console import Group
 from rich.panel import Panel
 
+import wandb
 from llm_gym.batch import EvaluationResultBatch
 from llm_gym.logging_broker.messages import Message
 from llm_gym.logging_broker.subscriber import MessageSubscriberIF
@@ -31,8 +31,8 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             for metric_key, metric_values in eval_result.metrics.items()
         }
 
-        step = (eval_result.train_batch_id + 1) * self.num_ranks
-        group_content = [f"[yellow]Iteration #{step}:"]
+        num_samples = (eval_result.global_train_sample_id + 1) * self.num_ranks
+        group_content = [f"[yellow]Iteration #{num_samples}:"]
         if losses:
             group_content.append("\nLosses:")
             group_content.extend(losses)
@@ -62,5 +62,10 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             f"{eval_result.dataloader_tag} {metric_key}": metric_values
             for metric_key, metric_values in eval_result.metrics.items()
         }
-        wandb.log(data=losses, step=(eval_result.train_batch_id + 1) * self.num_ranks)
-        wandb.log(data=metrics, step=(eval_result.train_batch_id + 1) * self.num_ranks)
+        # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
+        wandb.log(
+            data=losses, step=eval_result.global_train_sample_id + 1
+        )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
+        wandb.log(
+            data=metrics, step=eval_result.global_train_sample_id + 1
+        )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)

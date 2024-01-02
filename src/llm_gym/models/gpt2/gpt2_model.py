@@ -1,6 +1,6 @@
 import math
-from abc import abstractmethod
 from enum import Enum
+from functools import partial
 from typing import Dict
 
 import torch
@@ -10,7 +10,6 @@ from pydantic import BaseModel, confloat, conint, model_validator
 from torch.nn import functional as F
 
 from llm_gym.models.model import NNModel
-
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -35,7 +34,7 @@ class WeightInitailizationConfig(BaseModel):
     std: confloat(ge=0.0)
 
 
-class GPTConfig(BaseModel):
+class GPT2Config(BaseModel):
     sample_key: str
     prediction_key: str
     block_size: conint(ge=1)
@@ -52,15 +51,13 @@ class GPTConfig(BaseModel):
     weight_init: WeightInitailizationConfig
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "GPTConfig":
-        for param, param_name in zip([self.ffn_hidden, self.vocab_size, self.n_embd],
-                                     ["ffn_hidden", "vocab_size", "n_embd"]):
-
+    def validate_sizes(self) -> "GPT2Config":
+        for param, param_name in zip(
+            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+        ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
-                raise ValueError(
-                    f"{param_name} with value {param} should be divisible by 128 for efficient training."
-                )
+                raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
         return self
 
 
@@ -84,38 +81,38 @@ class LayerNorm(nn.Module):
 
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, config: GPTConfig):
+    def __init__(
+        self, n_head: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
+    ):
         super().__init__()
-        assert config.n_embd % config.n_head == 0
+        assert n_embd % n_head == 0
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
-            in_features=config.n_embd,
-            out_features=config.attention.scaling_factor * config.n_embd,
-            bias=config.bias,
+            in_features=n_embd,
+            out_features=attention.scaling_factor * n_embd,
+            bias=bias,
         )
 
         # output projection
         self.c_proj = nn.Linear(
-            in_features=config.n_embd,
-            out_features=config.n_embd,
-            bias=config.bias,
+            in_features=n_embd,
+            out_features=n_embd,
+            bias=bias,
         )
 
         # regularization
-        self.attn_dropout = nn.Dropout(config.dropout)
-        self.resid_dropout = nn.Dropout(config.dropout)
-        self.n_head = config.n_head
-        self.n_embd = config.n_embd
-        self.dropout = config.dropout
-        self.flash = config.attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
+        self.attn_dropout = nn.Dropout(dropout)
+        self.resid_dropout = nn.Dropout(dropout)
+        self.n_head = n_head
+        self.n_embd = n_embd
+        self.dropout = dropout
+        self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
             self.register_buffer(
                 "bias",
-                torch.tril(torch.ones(config.block_size, config.block_size)).view(
-                    1, 1, config.block_size, config.block_size
-                ),
+                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -153,20 +150,20 @@ class CausalSelfAttention(nn.Module):
 
 
 class TransformerMLP(nn.Module):
-    def __init__(self, config: GPTConfig):
+    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, dropout: float):
         super().__init__()
         self.c_fc = nn.Linear(
-            in_features=config.n_embd,
-            out_features=config.ffn_hidden,  # 4 * config.n_embd,
-            bias=config.bias,
+            in_features=n_embd,
+            out_features=ffn_hidden,  # 4 * n_embd,
+            bias=bias,
         )
         self.gelu = nn.GELU()
         self.c_proj = nn.Linear(
-            in_features=config.ffn_hidden,
-            out_features=config.n_embd,
-            bias=config.bias,
+            in_features=ffn_hidden,
+            out_features=n_embd,
+            bias=bias,
         )
-        self.dropout = nn.Dropout(config.dropout)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.c_fc(x)
@@ -177,17 +174,30 @@ class TransformerMLP(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, config: GPTConfig):
+    def __init__(
+        self,
+        n_embd: int,
+        bias: bool,
+        epsilon: float,
+        activation: ActivationType,
+        n_head: int,
+        attention: AttentionConfig,
+        dropout: float,
+        block_size: int,
+        ffn_hidden: int,
+    ):
         super().__init__()
-        self.ln_1 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
-        self.attn = CausalSelfAttention(config)
-        self.ln_2 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
+        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.attn = CausalSelfAttention(
+            n_head=n_head, n_embd=n_embd, attention=attention, bias=bias, dropout=dropout, block_size=block_size
+        )
+        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
-        if config.activation == ActivationType.GELU:
-            self.mlp = TransformerMLP(config)
-        elif config.activation == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * config.n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(config.n_embd, hidden_dim, config.n_embd, bias=False)
+        if activation == ActivationType.GELU:
+            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+        elif activation == ActivationType.FUSED_SWIGLU:
+            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
         else:
             raise Exception("unimplemented activation")
 
@@ -198,23 +208,56 @@ class Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
-    def __init__(self, config: GPTConfig):
+    def __init__(
+        self,
+        sample_key: str,
+        prediction_key: str,
+        block_size: int,
+        vocab_size: int,
+        n_layer: int,
+        n_head: int,
+        n_embd: int,
+        ffn_hidden: int,
+        dropout: float,
+        bias: bool,
+        attention: AttentionConfig,
+        activation: ActivationType,
+        epsilon: float,
+        weight_init: WeightInitailizationConfig,
+    ):
         super().__init__()
+        self.sample_key = sample_key
+        self.prediction_key = prediction_key
+        self.block_size = block_size
 
-        assert config.vocab_size is not None
-        assert config.block_size is not None
-        self.config = config
+        assert vocab_size is not None
+        assert block_size is not None
 
         self.transformer = nn.ModuleDict(
             dict(
-                wte=nn.Embedding(num_embeddings=config.vocab_size, embedding_dim=config.n_embd),
-                wpe=nn.Embedding(num_embeddings=config.block_size, embedding_dim=config.n_embd),
-                drop=nn.Dropout(config.dropout),
-                h=nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-                ln_f=LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon),
+                wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
+                wpe=nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd),
+                drop=nn.Dropout(dropout),
+                h=nn.ModuleList(
+                    [
+                        Block(
+                            n_embd=n_embd,
+                            bias=bias,
+                            epsilon=epsilon,
+                            activation=activation,
+                            n_head=n_head,
+                            attention=attention,
+                            dropout=dropout,
+                            block_size=block_size,
+                            ffn_hidden=ffn_hidden,
+                        )
+                        for _ in range(n_layer)
+                    ]
+                ),
+                ln_f=LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon),
             )
         )
-        self.lm_head = nn.Linear(in_features=config.n_embd, out_features=config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
@@ -222,29 +265,25 @@ class GPT2LLM(NNModel):
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
         # init all weights
-        self.apply(self._init_weights)
+        self.apply(partial(self._init_weights, weight_init=weight_init))
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(
-                    p, mean=config.weight_init.mean, std=config.weight_init.std / math.sqrt(2 * config.n_layer)
-                )
+                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
 
-    def _init_weights(self, module: nn.Module):
+    def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
+            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
+            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        input_ids = inputs[self.config.sample_key]
+        input_ids = inputs[self.sample_key]
         device = input_ids.device
         b, t = input_ids.size()
-        assert (
-            t <= self.config.block_size
-        ), f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
         pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
 
         # forward the GPT model itself
@@ -255,7 +294,7 @@ class GPT2LLM(NNModel):
             x = block(x)
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-        return {self.config.prediction_key: logits}
+        return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)

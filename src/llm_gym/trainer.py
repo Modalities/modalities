@@ -5,7 +5,7 @@ import torch.distributed as dist
 from torch.optim import Optimizer
 
 from llm_gym.batch import DatasetBatch, EvaluationResultBatch
-from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.fsdp.reducer import Reducer
 from llm_gym.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from llm_gym.logging_broker.publisher import MessagePublisher
@@ -45,15 +45,16 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
-        num_batches_per_rank: int,
         epoch_done_callback: Callable[[int], None],
+        local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
         cummulated_loss = self._reset_loss()
 
         # batch loop
         batch: DatasetBatch
-        for train_batch_id, batch in zip(range(num_batches_per_rank), train_loader):
+        for batch_id, batch in enumerate(train_loader):
+            local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # train single batch
             batch_loss = self._train_batch(
                 batch=batch,
@@ -66,57 +67,67 @@ class Trainer:
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
 
-            Trainer._publish_progress(
+            self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                train_batch_id=train_batch_id,
+                local_batch_id=local_train_batch_id,
+                batch_size=train_loader.sampler_batch_size,
                 dataloader_tag=train_loader.dataloader_tag,
+                local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
 
             # Check, if model should be evaluated
-            if (train_batch_id + 1) % callback_interval_in_batches == 0:
-                if train_batch_id > 0:
+            if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
+                if local_train_batch_id > 0:
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
                         tensor=cummulated_loss,
                         operation=dist.ReduceOp.SUM,
                         post_processing_fun=lambda t: t[0] / t[1],
                     )
+                    local_train_sample_id = Trainer._get_local_sample_id(
+                        batch_id=local_train_batch_id, batch_size=train_loader.sampler_batch_size
+                    )
+
+                    global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
+
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
                         dataloader_tag=train_loader.dataloader_tag,
-                        train_batch_id=train_batch_id,
+                        global_train_sample_id=global_train_sample_id,
                     )
-                    Trainer._publish_evaluation_result(
+                    self._publish_evaluation_result(
                         evaluation_result_publisher=self.evaluation_result_publisher,
                         evaluation_result=evaluation_result,
                     )
-                    epoch_done_callback(
-                        train_batch_id=train_batch_id,
-                    )
+                    epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     model.train()
 
                 # TODO early stopping
-
                 cummulated_loss = self._reset_loss()
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
         cummulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
-            cummulated_loss.to(torch.device(self.local_rank))
+            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
         else:
-            cummulated_loss.to("cpu")
+            cummulated_loss = cummulated_loss.to("cpu")
         return cummulated_loss
 
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        train_batch_id: int,
+        local_batch_id: int,
+        batch_size: int,
         dataloader_tag: str,
+        local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
+        local_train_sample_id = Trainer._get_local_sample_id(batch_id=local_batch_id, batch_size=batch_size)
+        global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
+
         payload = BatchProgressUpdate(
-            train_batch_id=train_batch_id,
-            dataset_batch_id=train_batch_id,
+            global_train_sample_id=global_train_sample_id,
+            global_dataset_sample_id=global_train_sample_id,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )
@@ -130,3 +141,7 @@ class Trainer:
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )
+
+    @staticmethod
+    def _get_local_sample_id(batch_id: int, batch_size: int) -> int:
+        return (batch_id + 1) * batch_size - 1

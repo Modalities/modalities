@@ -1,13 +1,17 @@
 import json
 import os
 import warnings
+from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Text
+from typing import List, Optional, Union
 
-from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint
+from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
+    BatchSamplerTypes,
+    CheckpointingExectionTypes,
+    CheckpointingStrategyTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -20,7 +24,7 @@ from llm_gym.config.lookup_types import (
 )
 from llm_gym.config.types import ProcessGroupBackendType
 from llm_gym.fsdp.fsdp_running_env import RunningEnvConfig
-from llm_gym.models.gpt2.gpt2_model import GPTConfig
+from llm_gym.models.gpt2.gpt2_model import GPT2Config
 
 
 class WandbConfig(BaseModel):
@@ -64,8 +68,20 @@ class DatasetConfig(BaseModel):
         path: Path
         skip_warmup: bool
 
+    class OpenGPTXMMapDatasetConfig(BaseModel):
+        num_samples: conint(ge=1)
+        path: FilePath
+        sample_key: str
+        sequence_len: PositiveInt
+
     type_hint: DatasetTypes
-    config: MemMapDatasetConfig | PackedMemMapDatasetContinuousConfig | PackedMemMapDatasetMegatronConfig
+    config: Union[
+        OpenGPTXMMapDatasetConfig,
+        MemMapDatasetConfig,
+        PackedMemMapDatasetContinuousConfig,
+        PackedMemMapDatasetMegatronConfig,
+        MMapIndexedDatasetConfig,
+    ]
 
 
 class SamplerConfig(BaseModel):
@@ -76,6 +92,16 @@ class SamplerConfig(BaseModel):
 
     type_hint: SamplerTypes
     config: DistributedSamplerConfig
+
+
+class BatchSamplerConfig(BaseModel):
+    class StandardBatchSamplerConfig(BaseModel):
+        sampler: SamplerConfig
+        batch_size: conint(gt=0)
+        drop_last: bool
+
+    type_hint: BatchSamplerTypes
+    config: StandardBatchSamplerConfig
 
 
 class CollatorConfig(BaseModel):
@@ -89,58 +115,21 @@ class CollatorConfig(BaseModel):
 
 class DataLoaderConfig(BaseModel):
     class LLMDataLoaderConfig(CudaKwargsConfig):
-        batch_size: conint(gt=0)
         dataloader_tag: str
         dataset: DatasetConfig
-        sampler: SamplerConfig
+        batch_sampler: BatchSamplerConfig
         collate_fn: CollatorConfig
 
     type_hint: DataloaderTypes
     config: LLMDataLoaderConfig
 
 
-class TrainingConfig(BaseModel):
+class DataConfig(BaseModel):
+    sample_key: str
+    target_key: str
+    sequence_len: int
     train_dataloader: DataLoaderConfig
-    evaluation_dataloaders: Dict[Text, DataLoaderConfig]
-    # TODO: use this in Progress Logging
-    num_training_samples: conint(gt=0)
-    callback_interval_in_samples: conint(gt=0)
-    process_group_backend: ProcessGroupBackendType
-    local_rank: conint(ge=0)
-    global_rank: conint(ge=0)
-    world_size: conint(ge=0)
-    main_rank: conint(ge=0)
-
-    @property
-    def num_training_batches(self) -> int:
-        exact = self.num_training_samples / self.train_dataloader.config.batch_size
-        ret = self.num_training_samples // self.train_dataloader.config.batch_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def callback_interval_in_batches_per_rank(self):
-        exact = self.callback_interval_in_samples / self.train_dataloader.config.batch_size / self.world_size
-        ret = self.callback_interval_in_samples // self.train_dataloader.config.batch_size // self.world_size
-        if exact != ret:
-            warnings.warn(
-                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
-            )
-        return ret
-
-    @property
-    def num_batches_per_rank(self):
-        exact = self.num_training_batches / self.world_size
-        ret = self.num_training_batches // self.world_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_batches_per_rank is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-
-# TODO: remove this?? Seems unnecessary to add another composition layer here
-class GPT2Config(BaseModel):
-    config: GPTConfig
+    eval_dataloaders: List[DataLoaderConfig]
 
 
 class ModelConfig(BaseModel):
@@ -156,6 +145,61 @@ class CLMCrossEntropyLossConfig(BaseModel):
 class LossConfig(BaseModel):
     type_hint: LossTypes
     config: CLMCrossEntropyLossConfig
+
+
+class TrainingConfig(BaseModel):
+    # TODO: use this in Progress Logging
+    num_training_samples: conint(gt=0)
+    callback_interval_in_samples: conint(gt=0)
+    process_group_backend: ProcessGroupBackendType
+    local_rank: conint(ge=0)
+    global_rank: conint(ge=0)
+    world_size: conint(ge=0)
+    main_rank: conint(ge=0)
+    train_batch_size: conint(gt=0)
+    global_num_seen_samples: conint(ge=0)
+
+    @property
+    def local_num_train_samples(self):
+        exact = self.num_training_samples / self.world_size
+        ret = self.num_training_samples // self.world_size
+        if exact != ret:
+            print(f"Calculated local_num_training_samples is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def local_num_seen_train_samples(self):
+        exact = self.global_num_seen_samples / self.world_size
+        ret = self.global_num_seen_samples // self.world_size
+        if exact != ret:
+            print(f"Calculated global_num_seen_samples is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def skip_num_local_train_batches(self) -> int:
+        exact = self.global_num_seen_samples / self.world_size / self.train_batch_size
+        ret = self.global_num_seen_samples // self.world_size // self.train_batch_size
+        if exact != ret:
+            print(f"Calculated skip_num_local_train_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def num_training_batches(self) -> int:
+        exact = self.num_training_samples / self.train_batch_size
+        ret = self.num_training_samples // self.train_batch_size
+        if exact != ret:
+            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+        return ret
+
+    @property
+    def callback_interval_in_batches_per_rank(self):
+        exact = self.callback_interval_in_samples / self.train_batch_size / self.world_size
+        ret = self.callback_interval_in_samples // self.train_batch_size // self.world_size
+        if exact != ret:
+            warnings.warn(
+                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
+            )
+        return ret
 
 
 class AdamWConfig(BaseModel):
@@ -197,28 +241,75 @@ class SchedulerConfig(BaseModel):
     config: StepLRConfig | ConstantLRConfig | OneCycleLRConfig
 
 
-class CheckpointConfig(BaseModel):
-    checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
-    dir_path: Path
+class CheckpointingConfig(BaseModel):
+    class CheckpointingStrategyConfig(BaseModel):
+        class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
+            k: PositiveInt
+
+        class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
+            k: conint(ge=-1)
+
+        type_hint: CheckpointingStrategyTypes
+        config: SaveEveryKStepsCheckpointingStrategyConfig | SaveKMostRecentCheckpointsStrategyConfig
+
+    class CheckpointingExecutionConfig(BaseModel):
+        class FSDPToDiscCheckpointingConfig(BaseModel):
+            checkpoint_path: Path
+            global_rank: conint(ge=0)
+            checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
+
+        type_hint: CheckpointingExectionTypes
+        config: FSDPToDiscCheckpointingConfig
+
+    checkpointing_strategy: CheckpointingStrategyConfig
+    checkpointing_execution: CheckpointingExecutionConfig
+
+
+class RunMode(Enum):
+    FROM_SCRATCH = "FROM_SCRATCH"
+    WARM_START = "WARM_START"
+
+
+class LLMGymSetupConfig(BaseModel):
+    class WarmStartSettings(BaseModel):
+        checkpoint_model_path: Path
+        global_num_seen_samples: conint(gt=0)
+        checkpoint_optimizer_path: Optional[Path] = None
+        checkpoint_lr_scheduler_path: Optional[Path] = None
+
+    class FromScratchSettings(BaseModel):
+        global_num_seen_samples: int = 0
+
+    run_mode: RunMode
+    settings: FromScratchSettings  # WarmStartSettings |
+
+    @model_validator(mode="after")
+    def check_passwords_match(self) -> "LLMGymSetupConfig":
+        if self.run_mode == RunMode.FROM_SCRATCH:
+            if self.settings.global_num_seen_samples != 0:
+                raise ValueError("When starting from scratch, global_num_seen_samples must be 0.")
+        return self
 
 
 class AppConfig(BaseModel):
+    llm_gym_setup: LLMGymSetupConfig
+    data: DataConfig
     training: TrainingConfig
-    loss: LossConfig
     running_env: RunningEnvConfig
     model: ModelConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
-    checkpoint: CheckpointConfig
+    checkpointing: CheckpointingConfig
     wandb: WandbConfig
+    loss: LossConfig
 
 
 class PretrainedGPTConfig(PretrainedConfig):
     model_type = "llm_gym_gpt2"
 
-    def __init__(self, config: GPTConfig = None, **kwargs):
+    def __init__(self, config: GPT2Config = None, **kwargs):
         if type(config) == dict:
-            config = GPTConfig(**config)
+            config = GPT2Config(**config)
         self.config = config
 
         super().__init__(**kwargs)

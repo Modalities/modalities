@@ -1,61 +1,37 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict
 
 import torch.nn as nn
 from torch.optim import Optimizer
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing_instruction import CheckpointingInstruction
-
-
-class CheckpointingStrategyIF(ABC):
-    """
-    Checkpoint Interface to get checkpoint instruction.
-    """
-
-    @abstractmethod
-    def get_checkpoint_instruction(
-        self,
-        global_train_batch_id: int,
-        num_batches: int = None,
-        evaluation_result: Dict[str, EvaluationResultBatch] = None,
-        early_stoppping_criterion_fulfilled: bool = False,
-    ) -> CheckpointingInstruction:
-        raise NotImplementedError
+from llm_gym.checkpointing.checkpointing_execution import CheckpointingExecutionIF
+from llm_gym.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 
 
 class CheckpointingIF(ABC):
     @abstractmethod
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         raise NotImplementedError
 
     @abstractmethod
     def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
+        self,
+        optimizer: Optimizer,
+        model: nn.Module,
+        file_path: Path,
     ) -> Optimizer:
         raise NotImplementedError
 
     @abstractmethod
     def save_checkpoint(
         self,
-        train_batch_id: int,
-        num_batches: int,
+        global_train_sample_id: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
-    ):
-        raise NotImplementedError
-
-
-class CheckpointingExecutionIF(CheckpointingIF):
-    @abstractmethod
-    def run_checkpoint_instructions(
-        self,
-        checkpointing_instruction: CheckpointingInstruction,
-        global_train_batch_id: int,
-        model: nn.Module,
-        optimizer: Optimizer,
     ):
         raise NotImplementedError
 
@@ -77,37 +53,33 @@ class Checkpointing(CheckpointingIF):
 
     def save_checkpoint(
         self,
-        train_batch_id: int,
-        num_batches: int,
+        global_train_sample_id: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
-        global_train_batch_id = (train_batch_id + 1) * self.num_ranks - 1
         checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
-            global_train_batch_id=global_train_batch_id,
-            num_batches=num_batches,
+            global_train_sample_id=global_train_sample_id,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
-        self.checkpointing_execution.run_checkpoint_instructions(
+
+        self.checkpointing_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
-            global_train_batch_id=global_train_batch_id,
+            global_train_sample_id=global_train_sample_id,
             model=model,
             optimizer=optimizer,
         )
 
-    def load_model_checkpoint(self, model: nn.Module, experiment_id: str, global_train_batch_id: int) -> nn.Module:
-        model = self.checkpointing_execution.load_model_checkpoint(
-            model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
-        )
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+        model = self.checkpointing_execution.load_model_checkpoint(model=model, file_path=file_path)
         return model
 
-    def load_optimizer_checkpoint(
-        self, optimizer: Optimizer, model: nn.Module, experiment_id: str, global_train_batch_id: int
-    ) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
         optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
-            optimizer=optimizer, model=model, experiment_id=experiment_id, global_train_batch_id=global_train_batch_id
+            optimizer=optimizer,
+            model=model,
+            file_path=file_path,
         )
         return optimizer

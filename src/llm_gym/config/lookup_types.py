@@ -1,12 +1,18 @@
 from enum import Enum
 
 import torch
-from torch.utils.data import DistributedSampler
+from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
-from llm_gym.data.mmap_dataset import MMapIndexedDataset
+from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from llm_gym.checkpointing.checkpointing_strategies import (
+    SaveEveryKStepsCheckpointingStrategy,
+    SaveKMostRecentCheckpointsStrategy,
+)
+from llm_gym.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from llm_gym.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
-from llm_gym.dataset_loader import LLMDataLoader, RepeatingDataLoader
+from llm_gym.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
+from llm_gym.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from llm_gym.loss_functions import CLMCrossEntropyLoss
 from llm_gym.models.gpt2.collator import GPT2LLMCollator
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM
@@ -45,11 +51,18 @@ class DatasetTypes(LookupEnum):
     MemMapDataset = MemMapDataset
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
-    MMapIndexedDataset = MMapIndexedDataset
+    MMapIndexedDataset = MMapIndexedDatasetBuilder
+    # TODO: ClassResolver does not work with functions ... therefore there is also no
+    # support for factories.
+    OpenGPTXMMapDataset = OpenGPTXMMapDataset  # member(OpenGPTXDatasetFactory.create_dataset)
 
 
 class SamplerTypes(LookupEnum):
     DistributedSampler = DistributedSampler
+
+
+class BatchSamplerTypes(LookupEnum):
+    BatchSampler = BatchSampler
 
 
 class CollatorTypes(LookupEnum):
@@ -59,3 +72,12 @@ class CollatorTypes(LookupEnum):
 class DataloaderTypes(LookupEnum):
     RepeatingDataLoader = RepeatingDataLoader
     LLMDataLoader = LLMDataLoader
+
+
+class CheckpointingStrategyTypes(LookupEnum):
+    SaveKMostRecentCheckpointsStrategy = SaveKMostRecentCheckpointsStrategy
+    SaveEveryKStepsCheckpointingStrategy = SaveEveryKStepsCheckpointingStrategy
+
+
+class CheckpointingExectionTypes(LookupEnum):
+    FSDPToDiscCheckpointing = FSDPToDiscCheckpointing

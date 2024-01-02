@@ -3,11 +3,16 @@ from typing import Any, Dict, List
 import torch.optim as optim
 from class_resolver import ClassResolver
 from pydantic import BaseModel
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import BatchSampler, DataLoader, Sampler
+from torch.utils.data.distributed import DistributedSampler
 from transformers import PreTrainedTokenizer
 
+from llm_gym.checkpointing.checkpointing import CheckpointingExecutionIF, CheckpointingStrategyIF
 from llm_gym.config.config import AppConfig, OptimizerTypes, SchedulerTypes
 from llm_gym.config.lookup_types import (
+    BatchSamplerTypes,
+    CheckpointingExectionTypes,
+    CheckpointingStrategyTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -16,6 +21,7 @@ from llm_gym.config.lookup_types import (
     SamplerTypes,
     TokenizerTypes,
 )
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataset import Dataset
 from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 from llm_gym.loss_functions import CLMCrossEntropyLoss, Loss
@@ -59,9 +65,7 @@ class ResolverRegister:
         return found_values
 
     def _create_resolver_register(self, config: AppConfig) -> Dict[str, ClassResolver]:
-        expected_resolvers = set(
-            self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint")
-        )
+        set(self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint"))
         resolvers = {
             config.running_env.type_hint: ClassResolver(
                 [t.value for t in RunningEnvTypes],
@@ -88,30 +92,55 @@ class ResolverRegister:
                 base=Loss,
                 default=CLMCrossEntropyLoss,
             ),
-            config.training.train_dataloader.config.dataset.config.tokenizer.type_hint: ClassResolver(
-                [t.value for t in TokenizerTypes],
-                base=PreTrainedTokenizer,
-            ),
-            config.training.train_dataloader.config.dataset.type_hint: ClassResolver(
-                [t.value for t in DatasetTypes],
-                base=Dataset,
-            ),
-            config.training.train_dataloader.config.sampler.type_hint: ClassResolver(
-                [t.value for t in SamplerTypes],
-                base=Sampler,
-            ),
-            config.training.train_dataloader.type_hint: ClassResolver(
-                [t.value for t in DataloaderTypes],
-                base=DataLoader,
-            ),
-            config.training.train_dataloader.config.collate_fn.type_hint: ClassResolver(
-                [t.value for t in CollatorTypes],
-                base=GPT2LLMCollator,
-            ),
+            **{
+                sampler_type: ClassResolver(
+                    classes=[t.value for t in SamplerTypes],
+                    base=Sampler,
+                    default=DistributedSampler,
+                )
+                for sampler_type in SamplerTypes
+            },
+            **{
+                batch_sampler_type: ClassResolver(
+                    classes=[t.value for t in BatchSamplerTypes],
+                    base=BatchSampler,
+                    default=BatchSampler,
+                )
+                for batch_sampler_type in BatchSamplerTypes
+            },
+            **{
+                dataloader_type: ClassResolver(
+                    [t.value for t in DataloaderTypes],
+                    base=DataLoader,
+                    default=LLMDataLoader,
+                )
+                for dataloader_type in DataloaderTypes
+            },
+            **{
+                dataset_type: ClassResolver([t.value for t in DatasetTypes], base=Dataset)
+                for dataset_type in DatasetTypes
+            },
+            **{
+                collator_type: ClassResolver([t.value for t in CollatorTypes], base=GPT2LLMCollator)
+                for collator_type in CollatorTypes
+            },
+            **{
+                tokenizer_type: ClassResolver([t.value for t in TokenizerTypes], base=PreTrainedTokenizer)
+                for tokenizer_type in TokenizerTypes
+            },
+            **{
+                checkpointing_strategy_type: ClassResolver(
+                    [t.value for t in CheckpointingStrategyTypes], base=CheckpointingStrategyIF
+                )
+                for checkpointing_strategy_type in CheckpointingStrategyTypes
+            },
+            **{
+                checkpointing_execution_type: ClassResolver(
+                    [t.value for t in CheckpointingExectionTypes], base=CheckpointingExecutionIF
+                )
+                for checkpointing_execution_type in CheckpointingExectionTypes
+            },
         }
-        assert set(expected_resolvers) == set(
-            resolvers
-        ), f"Some resolvers are not registered: {set(expected_resolvers).symmetric_difference(resolvers)}"
         return resolvers
 
     def add_resolver(self, resolver_key: str, resolver: ClassResolver):

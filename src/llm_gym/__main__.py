@@ -11,16 +11,15 @@ from torch.optim import Optimizer
 from transformers import GPT2TokenizerFast
 
 from llm_gym.batch import EvaluationResultBatch
-from llm_gym.checkpointing.checkpointing import Checkpointing
-from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
-from llm_gym.config.config import AppConfig
+from llm_gym.checkpointing.checkpointing import Checkpointing, CheckpointingIF
+from llm_gym.checkpointing.checkpointing_factory import CheckpointingFactory
+from llm_gym.config.config import AppConfig, LLMGymSetupConfig, RunMode
 from llm_gym.config.lookup_types import TokenizerTypes
 from llm_gym.dataloader.create_index import IndexGenerator
 from llm_gym.dataloader.create_packed_data import PackedDataGenerator
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.dataloader_factory import DataloaderFactory
 from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-from llm_gym.dataset_loader import LLMDataLoader
 from llm_gym.evaluator import Evaluator
 from llm_gym.fsdp.fsdp_running_env import RunningEnv
 from llm_gym.gym import Gym
@@ -44,16 +43,13 @@ def main() -> None:
     pass
 
 
-config_option = click.option(
+@main.command(name="run")
+@click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Path to a file with the YAML config file.",
 )
-
-
-@main.command(name="run")
-@config_option
 def entry_point_run_llmgym(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
@@ -167,12 +163,8 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 class Main:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-
-        # warmstart
-        self.global_train_batch_id = 0
-        self.warmstart_experiment_id = "2023-11-15-11:53:54_PM"
-
         self.experiment_id = get_date_of_run()
+
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
@@ -185,10 +177,9 @@ class Main:
                 checkpointing,
                 wrapped_model,
                 optimizer,
-            ) = self.construct_components(self.resolvers, self.config, running_env=running_env)
+            ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
 
             gym.run(
-                num_batches_per_rank=self.config.training.num_batches_per_rank,
                 callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
                 train_data_loader=train_dataloader,
                 evaluation_data_loaders=eval_data_loaders,
@@ -199,37 +190,51 @@ class Main:
 
     def construct_components(
         self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
-    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], Checkpointing, nn.Module, Optimizer]:
-        train_dataloader = DataloaderFactory.get_dataloader(resolvers, config.training.train_dataloader)
-        validation_dataloader_lookup = {
-            dataloader_tag: DataloaderFactory.get_dataloader(resolvers, config=config)
-            for dataloader_tag, config in config.training.evaluation_dataloaders.items()
-        }
-        # TODO: should get replaced with dynamic handling of multiple validation dataloaders
-        val_dataloader = validation_dataloader_lookup["val"]
-        test_dataloader = validation_dataloader_lookup["test"]
-
-        # TODO: check why not *config.training.world_size
-        #  and consider just using config.training.num_training_samples for progress Subscriber
-        train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
-
+    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
         # Checkpointing
-        checkpointing = self.get_checkpointing(config=config, running_env=running_env)
 
+        checkpointing = CheckpointingFactory.get_checkpointing(
+            resolvers=self.resolvers,
+            config=config.checkpointing,
+            running_env=running_env,
+            experiment_id=self.experiment_id,
+            num_ranks=config.training.world_size,
+        )
+
+        # Model and optimizer
         wrapped_model, optimizer = self.get_model_and_optimizer(
             config=config, running_env=running_env, checkpointing=checkpointing
         )
-
         # Loss function
-        loss_fun: Loss = self.resolvers.build_component_by_config(config=config.loss)
+        loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
+
+        # Dataloaders
+        # skip_num_samples = 0
+        # if run_mode == RunMode.WARM_START:
+        #     skip_num_samples = config.llm_gym_setup.settings.checkpoint_num_seen_samples
+
+        skip_num_local_train_batches = config.training.skip_num_local_train_batches
+        train_dataloader = DataloaderFactory.get_dataloader(
+            resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
+        )
+        eval_dataloaders = [
+            DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
+            for dataloader_config in config.data.eval_dataloaders
+        ]
 
         # Logging
-
         eval_split_lengths = {
-            val_dataloader.dataloader_tag: len(val_dataloader) * config.training.world_size,
-            test_dataloader.dataloader_tag: len(test_dataloader) * config.training.world_size,
+            dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.sampler_batch_size
+            for dataloader in eval_dataloaders
         }
-        train_split_lengths = {train_dataloader.dataloader_tag: len(train_dataloader)}
+
+        # TODO: check why not *config.training.world_size
+        #  and consider just using config.training.num_training_samples for progress Subscriber
+        train_split_lengths = {
+            train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
+            * config.training.world_size
+            * train_dataloader.sampler_batch_size
+        }
 
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
             config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
@@ -250,22 +255,21 @@ class Main:
         )
 
         # Gym
-        gym = Gym(
-            trainer=trainer,
-            evaluator=evaluator,
-            loss_fun=loss_fun,
-        )
-        return gym, train_dataloader, [val_dataloader, test_dataloader], checkpointing, wrapped_model, optimizer
+        gym = Gym(trainer=trainer, evaluator=evaluator, loss_fun=loss_fun, num_ranks=config.training.world_size)
+
+        return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
 
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
     ) -> Tuple[nn.Module, Optimizer]:
+        run_mode = config.llm_gym_setup.run_mode
+
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
-        if self.global_train_batch_id > 0:  # warm start
+        if run_mode == RunMode.WARM_START:
+            warm_start_settings: LLMGymSetupConfig.WarmStartSettings = config.llm_gym_setup.settings  # type: ignore
             wrapped_model = checkpointing.load_model_checkpoint(
-                experiment_id=self.warmstart_experiment_id,
-                global_train_batch_id=self.global_train_batch_id,
+                file_path=warm_start_settings.checkpoint_model_path,
                 model=model,
             )
 
@@ -273,11 +277,18 @@ class Main:
                 config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
             )
 
+            # TODO improve this
+            if warm_start_settings.checkpoint_optimizer_path is None:
+                raise (
+                    NotImplementedError(
+                        "So far we always have to provide an optimizer checkpoint. "
+                        "For fine-tuning a pre-trained, we might not want to load "
+                        "an optimizer checkpoint."
+                    )
+                )
+
             optimizer = checkpointing.load_optimizer_checkpoint(
-                optimizer=optimizer,
-                model=wrapped_model,
-                experiment_id=self.warmstart_experiment_id,
-                global_train_batch_id=self.global_train_batch_id,
+                optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
             )
 
         else:
@@ -285,28 +296,13 @@ class Main:
             optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
                 config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
             )
+
         # TODO implement scheduler
-        #  scheduler = self.resolvers.build_component_by_config(
+        # scheduler = self.resolvers.build_component_by_config(
         #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
-        #  )
+        # )
 
         return wrapped_model, optimizer
-
-    def get_checkpointing(self, config: AppConfig, running_env: RunningEnv) -> Checkpointing:
-        checkpointing_strategy = SaveKMostRecentCheckpointsStrategy(k=-1)
-        checkpointing_execution = FSDPToDiscCheckpointing(
-            checkpoint_path=Path("/raid/s3/opengptx/max_lue/LLMgym/checkpoints"),
-            experiment_id=self.experiment_id,
-            global_rank=config.training.global_rank,
-            checkpointing_rank=0,
-            model_wrapping_fn=running_env.wrap_model,
-        )
-        checkpointing = Checkpointing(
-            checkpointing_execution=checkpointing_execution,
-            checkpointing_strategy=checkpointing_strategy,
-            num_ranks=config.training.world_size,
-        )
-        return checkpointing
 
     def get_logging_publishers(
         self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
@@ -324,11 +320,13 @@ class Main:
             local_rank=config.training.local_rank,
         )
 
+        # TODO make logging rank configurable
+        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
         if config.training.global_rank == 0:
             progress_subscriber = RichProgressSubscriber(
                 num_ranks=config.training.world_size,
-                train_split_lengths=train_split_lengths,
-                eval_split_lengths=eval_split_lengths,
+                train_split_num_samples=train_split_lengths,
+                eval_splits_num_samples=eval_split_lengths,
             )
             evaluation_result_subscriber = WandBEvaluationResultSubscriber(
                 num_ranks=config.training.world_size,

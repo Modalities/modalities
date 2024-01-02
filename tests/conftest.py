@@ -7,14 +7,16 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from torch.optim import Optimizer
+from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.checkpointing.checkpointing import CheckpointingIF
 from llm_gym.config.config import AppConfig
 from llm_gym.dataloader.create_index import IndexGenerator
+from llm_gym.dataloader.dataloader import LLMDataLoader
 from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-from llm_gym.dataset_loader import LLMDataLoader
+from llm_gym.dataloader.samplers import ResumableBatchSampler
 from llm_gym.evaluator import Evaluator
 from llm_gym.logging_broker.publisher import MessagePublisher
 from llm_gym.loss_functions import Loss
@@ -150,3 +152,13 @@ def set_env_cpu(monkeypatch):
     # setting CUDA_VISIBLE_DEVICES to "" creates a cache entry, which prevents resetting this CPU-only setup.
     # therefore after finish using this fixture, we need to clear this cache
     torch.cuda.device_count.cache_clear()
+
+
+@pytest.fixture(scope="function")
+def resumable_batch_sampler() -> ResumableBatchSampler:
+    data_source = list(range(12))[::-1]  # torch.range(0,11)[::-1].reshape(3, 4)
+    seq_sampler = SequentialSampler(data_source=data_source)
+
+    seq_sampler = BatchSampler(sampler=seq_sampler, batch_size=3, drop_last=False)
+    sampler = ResumableBatchSampler(start_index=2, underlying_batch_sampler=seq_sampler)
+    return sampler
