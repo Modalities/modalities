@@ -119,6 +119,9 @@ running_env:
   config:
     process_group_backend: ${training.process_group_backend}
     local_rank: ${oc.env:LOCAL_RANK}
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
 
 model:
   type_hint: GPT2LLM
