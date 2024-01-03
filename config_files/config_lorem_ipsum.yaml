@@ -107,7 +107,6 @@ checkpointing:
     config: 
       checkpoint_path: data/checkpoints
       global_rank: ${oc.env:RANK}
-      checkpointing_rank: 0
 
 loss:
   type_hint: CLMCrossEntropyLoss

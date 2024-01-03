@@ -1,5 +1,4 @@
 import json
-import os
 import warnings
 from enum import Enum
 from pathlib import Path
@@ -256,7 +255,6 @@ class CheckpointingConfig(BaseModel):
         class FSDPToDiscCheckpointingConfig(BaseModel):
             checkpoint_path: Path
             global_rank: conint(ge=0)
-            checkpointing_rank: conint(ge=0, le=os.environ.get("WORLD_SIZE", 0))
 
         type_hint: CheckpointingExectionTypes
         config: FSDPToDiscCheckpointingConfig
@@ -283,7 +281,6 @@ class LLMGymSetupConfig(BaseModel):
     run_mode: RunMode
     settings: FromScratchSettings
     # settings: WarmStartSettings
-
 
     @model_validator(mode="after")
     def check_passwords_match(self) -> "LLMGymSetupConfig":

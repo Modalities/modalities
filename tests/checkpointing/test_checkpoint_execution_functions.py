@@ -28,7 +28,7 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
     p.write_text(CONTENT)
 
     checkpointing = FSDPToDiscCheckpointing(
-        checkpoint_path=d, checkpointing_rank=0, experiment_id=str(1), global_rank=0, model_wrapping_fn=dummy_method
+        checkpoint_path=d, experiment_id=str(1), global_rank=0, model_wrapping_fn=dummy_method
     )
     files_paths_to_delete = checkpointing._get_paths_to_delete(global_train_sample_id=100)
     assert len(files_paths_to_delete) != 0
@@ -48,7 +48,6 @@ def test_delete_checkpoint(tmpdir):
 
     checkpointing = FSDPToDiscCheckpointing(
         checkpoint_path=directory,
-        checkpointing_rank=0,
         experiment_id=experiment_id,
         global_rank=0,
         model_wrapping_fn=dummy_method,

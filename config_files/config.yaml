@@ -130,7 +130,6 @@ checkpointing:
     config: 
       checkpoint_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints
       global_rank: ${oc.env:RANK}
-      checkpointing_rank: 0
 
 running_env:
   type_hint: FSDPRunningEnv

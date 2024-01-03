@@ -75,7 +75,6 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
-        checkpointing_rank: int,
         model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
     ):
         """Implementation of checkpointing to disc via FSDP
@@ -84,13 +83,11 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
-            checkpointing_rank (int): global rank that performs the checkpointing
             model_wrapping_fn (Callable[[nn.Module, bool], FSDP]): Wrapping function that wraps raw model.
                                                                    For FSDP, we pass in FSDPRunningEnv.wrap_model
         """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
-        self.checkpointing_rank = checkpointing_rank
         self.model_wrapping_fn = model_wrapping_fn
         self.experiment_id = experiment_id
 
@@ -124,7 +121,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
                 model=model, optim=optimizer, optim_state_dict=optimizer_state
             )  # all the state dicts of the different ranks are synchronized
 
-        if self.checkpointing_rank == self.global_rank:
+        if self.global_rank == 0:
             # save model
             model_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
@@ -178,7 +175,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         # distribute the optimizer state and model parmeters to the other ranks.
 
         # load model
-        if self.global_rank == self.checkpointing_rank:
+        if self.global_rank == 0:
             # load model on rank 0 into CPU RAM
             model_state = torch.load(file_path)
             model.load_state_dict(model_state)
@@ -188,7 +185,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
     def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
         # load optimizer
         full_optimizer_state_dict = None
-        if self.global_rank == self.checkpointing_rank:
+        if self.global_rank == 0:
             # load full optimizer state dict to rank 0 (CPU RAM)
             full_optimizer_state_dict = torch.load(file_path)
 

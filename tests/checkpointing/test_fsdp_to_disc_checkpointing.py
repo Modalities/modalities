@@ -155,7 +155,6 @@ class TestFSDPToDiscCheckpointing:
             experiment_id=experiment_id,
             global_rank=dist.get_rank(),
             model_wrapping_fn=FSDPRunningEnv.wrap_model,
-            checkpointing_rank=0,
         )
 
         untrained_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
