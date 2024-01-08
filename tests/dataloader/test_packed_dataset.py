@@ -1,7 +1,7 @@
-from modalities.dataloader.dataloader import LLMDataLoader
 import pytest
 
 from modalities.dataloader.create_packed_data import PackedDataGenerator
+from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 
 
