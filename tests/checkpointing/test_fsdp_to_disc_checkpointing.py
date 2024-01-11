@@ -13,7 +13,7 @@ from torch.optim import AdamW, Optimizer
 
 from llm_gym.__main__ import load_app_config_dict
 from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
+from llm_gym.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
 from llm_gym.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.

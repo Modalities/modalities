@@ -52,7 +52,7 @@ def main() -> None:
 )
 def entry_point_run_llmgym(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    config = AppConfig.model_validate(config_dict)
+    config = AppConfig.model_validate(config_dict, strict=True)
     main = Main(config)
     main.run()
 

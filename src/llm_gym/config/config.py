@@ -75,8 +75,8 @@ class DatasetConfig(BaseModel):
 
     type_hint: DatasetTypes
     config: Union[
-        OpenGPTXMMapDatasetConfig,
         MemMapDatasetConfig,
+        OpenGPTXMMapDatasetConfig,
         PackedMemMapDatasetContinuousConfig,
         PackedMemMapDatasetMegatronConfig,
         MMapIndexedDatasetConfig,
