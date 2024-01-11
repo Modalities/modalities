@@ -157,7 +157,7 @@ model:
     attention:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
-    activation: fused_swiglu
+    activation: gelu
     epsilon: 1e-5
     weight_init:
       mean: 0.0

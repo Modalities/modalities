@@ -17,10 +17,7 @@ def is_module_to_apply_activation_checkpointing(submodule: torch.nn.Module):
 
 def apply_activation_checkpointing_inplace(model: torch.nn.Module) -> None:
     assert isinstance(model, FSDP), "activation checkpointing can only be applied to FSDP wrapped models!"
-    non_reentrant_wrapper = partial(
-        checkpoint_wrapper,
-        checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-    )
+    non_reentrant_wrapper = partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=True)
 
     return apply_activation_checkpointing(
         model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=is_module_to_apply_activation_checkpointing
