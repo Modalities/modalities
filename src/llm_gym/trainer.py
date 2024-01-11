@@ -19,10 +19,12 @@ class Trainer:
         local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
+        gradient_acc_step: int,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
+        self.gradient_acc_step = gradient_acc_step
 
     def _train_batch(
         self,
@@ -30,12 +32,16 @@ class Trainer:
         model: NNModel,
         optimizer: Optimizer,
         loss_fun: Loss,
+        batch_id: int,
+        data_loader: LLMDataLoader,
     ) -> torch.Tensor:
-        optimizer.zero_grad()
         result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
+        loss = loss_fun(result_batch) / self.gradient_acc_step
         loss.backward()
-        optimizer.step()
+
+        if (batch_id + 1) % self.gradient_acc_step == 0 or (batch_id + 1) == len(data_loader):
+            optimizer.step()
+            optimizer.zero_grad()
         return loss
 
     def train(
@@ -61,6 +67,8 @@ class Trainer:
                 model=model,
                 optimizer=optimizer,
                 loss_fun=loss_fun,
+                batch_id=batch_id,
+                data_loader=train_loader,
             )
 
             # save the batch loss
