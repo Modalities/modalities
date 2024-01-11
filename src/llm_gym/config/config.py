@@ -157,6 +157,7 @@ class TrainingConfig(BaseModel):
     main_rank: conint(ge=0)
     train_batch_size: conint(gt=0)
     global_num_seen_samples: conint(ge=0)
+    do_apply_activation_checkpointing: bool
 
     @property
     def local_num_train_samples(self):
