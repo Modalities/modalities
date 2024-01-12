@@ -93,7 +93,7 @@ training:
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.local_train_micro_batch_size}
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
   gradient_acc_step: 1
 
