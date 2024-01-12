@@ -2,9 +2,9 @@ from unittest.mock import call, patch
 
 import torch
 
-from llm_gym.batch import DatasetBatch
-from llm_gym.fsdp.reducer import Reducer
-from llm_gym.gym import Gym
+from modalities.batch import DatasetBatch
+from modalities.running_env.fsdp.reducer import Reducer
+from modalities.gym import Gym
 
 
 def test_run_cpu_only(

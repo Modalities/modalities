@@ -1,8 +1,8 @@
 [project]
-name = "LLMgym"
+name = "modalities"
 version = "0.1.0"
 requires-python = ">=3.8,<3.12"
-description = "LLMgym, a python framework for distributed and reproducible foundation model training in research."
+description = "Modalities, a python framework for distributed and reproducible foundation model training."
 dependencies = [
     "torch>=2.0",
     "tqdm",
@@ -29,7 +29,7 @@ linting = ["pre-commit"]
 tests = ["pytest"]
 
 [project.scripts]
-llm_gym = "llm_gym.__main__:main"
+modalities = "modalities.__main__:main"
 
 [build-system]
 requires = ["setuptools >= 61.0.0"]

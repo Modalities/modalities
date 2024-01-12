@@ -3,8 +3,8 @@ from unittest.mock import call
 
 import torch
 
-from llm_gym.batch import DatasetBatch
-from llm_gym.evaluator import Evaluator
+from modalities.batch import DatasetBatch
+from modalities.evaluator import Evaluator
 
 
 def test_evaluate_cpu(

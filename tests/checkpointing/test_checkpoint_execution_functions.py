@@ -4,7 +4,7 @@ import pytest
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
-from src.llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from src.modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 
 
 @pytest.mark.skip

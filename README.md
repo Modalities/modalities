@@ -1,11 +1,11 @@
-# LLMgym
+# Modalities
 
 # Installation
 
 Create conda environment and activate it via 
 ```
-conda create -n llm_gym python=3.10
-conda activate llm_gym
+conda create -n modalities python=3.10
+conda activate modalities
 ```
 
 then, install the repository via
@@ -18,7 +18,7 @@ If you want to contribute, have look at `CONTRIBUTING.md`.
 
 
 # Usage
-For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/llm_gym/__main__.py run --config_file_path config_files/config.yaml`.
+For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/modalities/__main__.py run --config_file_path config_files/config.yaml`.
 
 Or, if you are a VsCode user, add this to your `launch.json`:
 ```json
@@ -37,7 +37,7 @@ Or, if you are a VsCode user, add this to your `launch.json`:
                 "--nproc_per_node",
                 "2",
                 "--rdzv-endpoint=0.0.0.0:29503",
-                "src/llm_gym/__main__.py",
+                "src/modalities/__main__.py",
                 "run",
                 "--config_file_path",
                 "config_files/config.yaml",
@@ -74,7 +74,7 @@ activation_resolver.make(type_hint, activation_kwargs),
 ```
 
 In our implmentation we go a step further, as both,
-* a `type_hint` in a `BaseModel` config must be of type `llm_gym.config.lookup_types.LookupEnum` and 
+* a `type_hint` in a `BaseModel` config must be of type `modalities.config.lookup_types.LookupEnum` and 
 * `config` is a union of allowed concrete configs of base type `BaseModel`. 
 `config` hereby replaces `activation_kwargs` in the example above, and replaces it with pydantic-validated `BaseModel` configs.
 
@@ -125,7 +125,7 @@ For access use the `build_component_by_key_query` function of the `ResolverRegis
 We use [click](https://click.palletsprojects.com/en/) as a tool to add new entry points and their CLI arguments.
 For this we have a main entry point from which all other entry points are started. 
 
-The main entry point is `src/llm_gym/__main__.py:main()`. 
+The main entry point is `src/modalities/__main__.py:main()`. 
 We register other sub-entrypoints by using our main `click.group`, called `main`, as follows: 
 ```python
 @main.command(name="my_new_entry_point")
@@ -168,11 +168,11 @@ if __name__ == "__main__":
 With 
 ```toml
 [project.scripts]
-llm_gym = "llm_gym.__main__:main"
+modalities = "modalities.__main__:main"
 ```
-in our `pyproject.toml`, we can start only main with `llm_gym` (which does nothing), or a specific sub-entrypoint e.g. `llm_gym do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+in our `pyproject.toml`, we can start only main with `modalities` (which does nothing), or a specific sub-entrypoint e.g. `modalities do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
-Alternatively, directly use `src/llm_gym/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
 # MemMap Datasets
 
@@ -181,20 +181,20 @@ Alternatively, directly use `src/llm_gym/__main__.py do_stuff --config_file_path
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
 ```sh
-llm_gym create_memmap_index <path/to/jsonl/file>
+modalities create_memmap_index <path/to/jsonl/file>
 ```
 
-The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_memmap_index --help`.
+The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_memmap_index --help`.
 
 ## Packed Dataset Generator
 
 The `PackedMemMapDatasetContinuous` and `PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a `MemMapDataset` index file as described [above](#memmapdataset-index-generator). Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
 ```sh
-llm_gym create_packed_data <path/to/jsonl/file>
+modalities create_packed_data <path/to/jsonl/file>
 ```
 
-The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_packed_data --help`.
+The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_packed_data --help`.
 
 ### Packed Data Format
 
