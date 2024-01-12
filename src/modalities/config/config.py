@@ -96,7 +96,7 @@ class SamplerConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     class StandardBatchSamplerConfig(BaseModel):
         sampler: SamplerConfig
-        local_train_micro_batch_size: conint(gt=0)
+        batch_size: conint(gt=0)
         drop_last: bool
 
     type_hint: BatchSamplerTypes

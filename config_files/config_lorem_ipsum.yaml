@@ -56,7 +56,7 @@ data:
         batch_sampler:
           type_hint: BatchSampler
           config:
-            local_train_micro_batch_size: 3
+            batch_size: 3
             drop_last: false
             sampler:
               type_hint: DistributedSampler
@@ -75,7 +75,7 @@ data:
         batch_sampler:
           type_hint: BatchSampler
           config:
-            local_train_micro_batch_size: 3
+            batch_size: 3
             drop_last: false
             sampler:
               type_hint: DistributedSampler
