@@ -1,4 +1,4 @@
-# LLMgym
+# Modalities
 
 # Installation
 
@@ -37,7 +37,7 @@ Or, if you are a VsCode user, add this to your `launch.json`:
                 "--nproc_per_node",
                 "2",
                 "--rdzv-endpoint=0.0.0.0:29503",
-                "src/llm_gym/__main__.py",
+                "src/modalities/__main__.py",
                 "run",
                 "--config_file_path",
                 "config_files/config.yaml",
@@ -181,7 +181,7 @@ Alternatively, directly use `src/llm_gym/__main__.py do_stuff --config_file_path
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
 ```sh
-llm_gym create_memmap_index <path/to/jsonl/file>
+modalities create_memmap_index <path/to/jsonl/file>
 ```
 
 The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_memmap_index --help`.
@@ -191,7 +191,7 @@ The index will be created in the same directory as the raw data file. For furthe
 The `PackedMemMapDatasetContinuous` and `PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a `MemMapDataset` index file as described [above](#memmapdataset-index-generator). Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
 ```sh
-llm_gym create_packed_data <path/to/jsonl/file>
+modalities create_packed_data <path/to/jsonl/file>
 ```
 
 The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `llm_gym create_packed_data --help`.

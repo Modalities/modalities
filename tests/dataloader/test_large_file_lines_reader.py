@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from llm_gym.dataloader.create_index import IndexGenerator
-from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.create_index import IndexGenerator
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
 def create_dummy_data(tmpdir_path: Path, content: str) -> Path:

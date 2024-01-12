@@ -4,7 +4,7 @@ llm_gym_setup:
     global_num_seen_samples: 0
 
 wandb:
-  project_name: llm_gym
+  project_name: modalities
 
 data:
   sample_key: "input_ids"
