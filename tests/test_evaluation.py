@@ -38,7 +38,7 @@ def test_pretrained_gpt_model(tmp_path):
     model = model.eval()
 
     # register config and model
-    AutoConfig.register("llm_gym_gpt2", PretrainedGPTConfig)
+    AutoConfig.register("modalities_gpt2", PretrainedGPTConfig)
     AutoModelForCausalLM.register(PretrainedGPTConfig, PretrainedGPTModel)
 
     # load saved model

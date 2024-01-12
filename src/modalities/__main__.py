@@ -13,7 +13,7 @@ from transformers import GPT2TokenizerFast
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, LLMGymSetupConfig, RunMode
+from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -50,7 +50,7 @@ def main() -> None:
     required=True,
     help="Path to a file with the YAML config file.",
 )
-def entry_point_run_llmgym(config_file_path: Path):
+def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
@@ -211,7 +211,7 @@ class Main:
         # Dataloaders
         # skip_num_samples = 0
         # if run_mode == RunMode.WARM_START:
-        #     skip_num_samples = config.llm_gym_setup.settings.checkpoint_num_seen_samples
+        #     skip_num_samples = config.modalities_setup.settings.checkpoint_num_seen_samples
 
         skip_num_local_train_batches = config.training.skip_num_local_train_batches
         train_dataloader = DataloaderFactory.get_dataloader(
@@ -262,12 +262,12 @@ class Main:
     def get_model_and_optimizer(
         self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
     ) -> Tuple[nn.Module, Optimizer]:
-        run_mode = config.llm_gym_setup.run_mode
+        run_mode = config.modalities_setup.run_mode
 
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
         if run_mode == RunMode.WARM_START:
-            warm_start_settings: LLMGymSetupConfig.WarmStartSettings = config.llm_gym_setup.settings  # type: ignore
+            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings  # type: ignore
             wrapped_model = checkpointing.load_model_checkpoint(
                 file_path=warm_start_settings.checkpoint_model_path,
                 model=model,

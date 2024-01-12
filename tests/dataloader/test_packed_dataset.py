@@ -1,8 +1,8 @@
+from modalities.dataloader.dataloader import LLMDataLoader
 import pytest
 
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
-from modalities.dataset_loader import LLMDataLoader
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])

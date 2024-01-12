@@ -268,7 +268,7 @@ class RunMode(Enum):
     WARM_START = "WARM_START"
 
 
-class LLMGymSetupConfig(BaseModel):
+class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
         checkpoint_model_path: Path
         global_num_seen_samples: conint(gt=0)
@@ -283,7 +283,7 @@ class LLMGymSetupConfig(BaseModel):
     # settings: WarmStartSettings
 
     @model_validator(mode="after")
-    def check_passwords_match(self) -> "LLMGymSetupConfig":
+    def check_passwords_match(self) -> "ModalitiesSetupConfig":
         if self.run_mode == RunMode.FROM_SCRATCH:
             if self.settings.global_num_seen_samples != 0:
                 raise ValueError("When starting from scratch, global_num_seen_samples must be 0.")
@@ -291,7 +291,7 @@ class LLMGymSetupConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    llm_gym_setup: LLMGymSetupConfig
+    modalities_setup: ModalitiesSetupConfig
     data: DataConfig
     training: TrainingConfig
     running_env: RunningEnvConfig
@@ -304,7 +304,7 @@ class AppConfig(BaseModel):
 
 
 class PretrainedGPTConfig(PretrainedConfig):
-    model_type = "llm_gym_gpt2"
+    model_type = "modalities_gpt2"
 
     def __init__(self, config: GPT2Config = None, **kwargs):
         if type(config) == dict:
