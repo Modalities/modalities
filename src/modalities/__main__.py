@@ -245,6 +245,7 @@ class Main:
             local_rank=config.training.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
+            gradient_acc_step=config.training.gradient_acc_step,
         )
 
         # Evaluator

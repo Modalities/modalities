@@ -13,7 +13,7 @@ from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
+from modalities.running_env.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
