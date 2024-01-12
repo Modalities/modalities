@@ -20,15 +20,15 @@ data:
       dataset:
         type_hint: MemMapDataset
         config:
-          raw_data_path: ./data/lorem_ipsum.jsonl
-          index_path: ./data/lorem_ipsum.idx
+          raw_data_path: data/lorem_ipsum.jsonl
+          index_path: data/lorem_ipsum.idx
           block_size: ${data.sequence_len}
           jq_pattern: ".text"
           sample_key: ${data.sample_key}
           tokenizer:
             type_hint: GPT2TokenizerFast
             config:
-              tokenizer_file: ./data/tokenizer/tokenizer.json
+              tokenizer_file: data/tokenizer/tokenizer.json
       batch_sampler:
         type_hint: BatchSampler
         config:
