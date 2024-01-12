@@ -1,4 +1,4 @@
-# Contributing to LLMgym
+# Contributing to Modalities
 ## Table of Contents
 
 - [Getting Started](#getting-started)
@@ -11,13 +11,13 @@
 Install the project via
 ```shell
 # ensure that you already created and activated a virtual environment before
-cd llmgym && pip install .
+cd modalities && pip install .
 ```
 
 For developers, use
 ```shell
 # ensure that you already created and activated a virtual environment before
-cd llmgym && pip install -e .[tests,linting]
+cd modalities && pip install -e .[tests,linting]
 pre-commit install --install-hooks
 ```
 

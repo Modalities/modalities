@@ -1,10 +1,10 @@
-llm_gym_setup:
+modalities_setup:
   run_mode: FROM_SCRATCH
   settings:
     global_num_seen_samples: 0
 
 wandb:
-  project_name: llm_gym
+  project_name: modalities
 
 data:
   sample_key: "input_ids"
@@ -20,19 +20,19 @@ data:
       dataset:
         type_hint: MemMapDataset
         config:
-          raw_data_path: ./data/lorem_ipsum.jsonl
-          index_path: ./data/lorem_ipsum.idx
+          raw_data_path: data/lorem_ipsum.jsonl
+          index_path: data/lorem_ipsum.idx
           block_size: ${data.sequence_len}
           jq_pattern: ".text"
           sample_key: ${data.sample_key}
           tokenizer:
             type_hint: GPT2TokenizerFast
             config:
-              tokenizer_file: ./data/tokenizer/tokenizer.json
+              tokenizer_file: data/tokenizer/tokenizer.json
       batch_sampler:
         type_hint: BatchSampler
         config:
-          batch_size: 3 # per rank
+          batch_size: 3
           drop_last: false
           sampler:
             type_hint: DistributedSampler
@@ -56,7 +56,7 @@ data:
         batch_sampler:
           type_hint: BatchSampler
           config:
-            batch_size: 3 # per rank
+            batch_size: 3
             drop_last: false
             sampler:
               type_hint: DistributedSampler
@@ -75,7 +75,7 @@ data:
         batch_sampler:
           type_hint: BatchSampler
           config:
-            batch_size: 3 # per rank
+            batch_size: 3
             drop_last: false
             sampler:
               type_hint: DistributedSampler
@@ -87,15 +87,15 @@ data:
 
 training:
   process_group_backend: "nccl"
-  num_training_samples: 12
+  global_num_training_samples: 12
   callback_interval_in_samples: 6
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
-  global_num_seen_samples: ${llm_gym_setup.settings.global_num_seen_samples}
-
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  gradient_acc_step: 1
 
 checkpointing:
   checkpointing_strategy:
@@ -104,7 +104,7 @@ checkpointing:
       k: -1   # -1 to save all checkpoints
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
-    config: 
+    config:
       checkpoint_path: data/checkpoints
       global_rank: ${oc.env:RANK}
 
@@ -139,7 +139,7 @@ model:
     attention:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
-    activation: fused_swiglu
+    activation: gelu
     epsilon: 1e-5
     weight_init:
       mean: 0.0

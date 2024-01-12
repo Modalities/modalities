@@ -2,7 +2,7 @@ from typing import List
 
 import pytest
 
-from src.llm_gym.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
+from src.modalities.checkpointing.checkpointing_strategies import SaveKMostRecentCheckpointsStrategy
 
 
 @pytest.mark.parametrize(

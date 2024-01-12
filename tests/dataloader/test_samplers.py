@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data.sampler import BatchSampler
 
-from llm_gym.dataloader.samplers import ResumableBatchSampler
+from modalities.dataloader.samplers import ResumableBatchSampler
 
 
 def test_resumable_sampler(resumable_batch_sampler: ResumableBatchSampler):

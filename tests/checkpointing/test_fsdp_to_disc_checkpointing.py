@@ -11,15 +11,16 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
-from llm_gym.__main__ import load_app_config_dict
-from llm_gym.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from llm_gym.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
-from llm_gym.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
+from modalities.__main__ import load_app_config_dict
+from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from modalities.running_env.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
 #   /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
 
+_ROOT_DIR = Path(__file__).parents[1]
 
 class ExperimentConfig(BaseModel):
     llm_model_conf: GPT2Config  # Named it llm_model_conf as model_ is a protected namespace in pydantic
@@ -33,7 +34,7 @@ class ExperimentConfig(BaseModel):
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def experiment_config(self) -> ExperimentConfig:
-        config_file_path = Path("/raid/s3/opengptx/max_lue/LLMgym/tests/checkpointing/gpt2_config.yaml")
+        config_file_path = _ROOT_DIR / Path("tests/checkpointing/gpt2_config.yaml")
         config_dict = load_app_config_dict(config_file_path=config_file_path)
         experiment_config = ExperimentConfig.model_validate(config_dict)
         return experiment_config

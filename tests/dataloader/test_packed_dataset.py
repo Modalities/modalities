@@ -1,8 +1,8 @@
+from modalities.dataloader.dataloader import LLMDataLoader
 import pytest
 
-from llm_gym.dataloader.create_packed_data import PackedDataGenerator
-from llm_gym.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
-from llm_gym.dataset_loader import LLMDataLoader
+from modalities.dataloader.create_packed_data import PackedDataGenerator
+from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
@@ -37,7 +37,7 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
 
 
-@pytest.mark.parametrize("max_num_of_tokens, expected_index_size", [(None, 4), (10, 1)])
+@pytest.mark.parametrize("max_num_of_tokens, expected_index_size", [(None, 12), (10, 1)])
 def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer, max_num_of_tokens, expected_index_size):
     block_size = 5
     packed_generator = PackedDataGenerator(
@@ -50,7 +50,7 @@ def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer, max_num_
         default_packed_dataset_path, block_size=block_size, sample_key="input_ids"
     )
 
-    start_of_jsonl_content = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
+    start_of_jsonl_content = "0 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
     tokenized_start_of_jsonl_content = gpt2_tokenizer(start_of_jsonl_content)["input_ids"]
     packed_dataset_iterator = iter(packed_dataset)
     assert tokenized_start_of_jsonl_content[:block_size] == next(packed_dataset_iterator)["input_ids"]

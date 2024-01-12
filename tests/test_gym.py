@@ -2,9 +2,9 @@ from unittest.mock import call, patch
 
 import torch
 
-from llm_gym.batch import DatasetBatch
-from llm_gym.fsdp.reducer import Reducer
-from llm_gym.gym import Gym
+from modalities.batch import DatasetBatch
+from modalities.running_env.running_env.fsdp.reducer import Reducer
+from modalities.gym import Gym
 
 
 def test_run_cpu_only(
@@ -34,6 +34,7 @@ def test_run_cpu_only(
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
     llm_data_loader_mock.batch_size = batch_size
     llm_data_loader_mock.fast_forward_batch_id = 0
+    llm_data_loader_mock.__len__ = lambda _ : num_batches
 
     gym = Gym(trainer=trainer, evaluator=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
     with patch.object(Reducer, "reduce", return_value=None) as reduce_mock:

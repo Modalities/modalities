@@ -1,11 +1,11 @@
 import torch
 from torch.utils.data import BatchSampler, SequentialSampler
 
-from llm_gym.config.config import AppConfig
-from llm_gym.dataloader.dataloader import LLMDataLoader
-from llm_gym.dataloader.dataloader_factory import DataloaderFactory
-from llm_gym.dataloader.samplers import ResumableBatchSampler
-from llm_gym.resolver_register import ResolverRegister
+from modalities.config.config import AppConfig
+from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.dataloader_factory import DataloaderFactory
+from modalities.dataloader.samplers import ResumableBatchSampler
+from modalities.resolver_register import ResolverRegister
 
 
 def test_resumable_dataloader() -> LLMDataLoader:
