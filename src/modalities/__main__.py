@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -117,7 +119,7 @@ def entry_point_create_memmap_index(src_path, index_path):
 )
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
