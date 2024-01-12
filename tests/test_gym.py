@@ -3,7 +3,7 @@ from unittest.mock import call, patch
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.fsdp.reducer import Reducer
+from modalities.running_env.fsdp.reducer import Reducer
 from modalities.gym import Gym
 
 
