@@ -157,6 +157,7 @@ class TrainingConfig(BaseModel):
     main_rank: conint(ge=0)
     local_train_micro_batch_size: conint(gt=0)
     global_num_seen_samples: conint(ge=0)
+    do_apply_activation_checkpointing: bool
     gradient_acc_step: conint(gt=0)
 
     @property

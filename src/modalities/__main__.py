@@ -10,6 +10,7 @@ from omegaconf import OmegaConf
 from torch.optim import Optimizer
 from transformers import GPT2TokenizerFast
 
+from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
@@ -205,6 +206,10 @@ class Main:
         wrapped_model, optimizer = self.get_model_and_optimizer(
             config=config, running_env=running_env, checkpointing=checkpointing
         )
+        if config.training.do_apply_activation_checkpointing:
+            apply_activation_checkpointing_inplace(wrapped_model)
+            logging.info("Applied activation checkpointing!")
+
         # Loss function
         loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 

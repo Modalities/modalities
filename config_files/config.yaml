@@ -27,7 +27,7 @@ data:
               shuffle: true
       dataset:
         type_hint: OpenGPTXMMapDataset
-        config: 
+        config:
           path: /path/to/tokenized/data.bin
           sequence_len: ${data.sequence_len}
           sample_key: ${data.sample_key}
@@ -47,7 +47,7 @@ data:
         shuffle: false
         batch_sampler:
           type_hint: BatchSampler
-          config: 
+          config:
             batch_size: 8 # per rank
             drop_last: false
             sampler:
@@ -58,14 +58,14 @@ data:
                 shuffle: false
         dataset:
           type_hint: OpenGPTXMMapDataset
-          config: 
+          config:
             num_samples: 800 # total summed over all ranks
             path: /path/to/tokenized/val_text_document.bin
             sequence_len: ${data.sequence_len}
             sample_key: ${data.sample_key}
         collate_fn:
           type_hint: GPT2LLMCollator
-          config: 
+          config:
             sample_key: ${data.sample_key}
             target_key: ${data.target_key}
     - type_hint: LLMDataLoader
@@ -87,14 +87,14 @@ data:
                 shuffle: false
         dataset:
           type_hint: OpenGPTXMMapDataset
-          config: 
+          config:
             num_samples: 800 # total summed over all ranks
             path: path/to/tokenized/test_text_document.bin
             sequence_len: ${data.sequence_len}
             sample_key: ${data.sample_key}
         collate_fn:
           type_hint: GPT2LLMCollator
-          config: 
+          config:
             sample_key: ${data.sample_key}
             target_key: ${data.target_key}
 
@@ -111,16 +111,19 @@ training:
   main_rank: 0
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  do_apply_activation_checkpointing: True
 
 checkpointing:
   checkpointing_strategy:
     type_hint: SaveKMostRecentCheckpointsStrategy
     config:
-      k: -1   # -1 to save all checkpoints
+      k: -1 # -1 to save all checkpoints
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
     config: 
       checkpoint_path: /path/to/checkpoints
+    config:
+      checkpoint_path: checkpoints
       global_rank: ${oc.env:RANK}
 
 running_env:
@@ -131,7 +134,6 @@ running_env:
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
-
 
 model:
   type_hint: GPT2LLM
@@ -149,7 +151,7 @@ model:
     attention:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
-    activation: fused_swiglu
+    activation: gelu
     epsilon: 1e-5
     weight_init:
       mean: 0.0
@@ -165,7 +167,6 @@ optimizer:
   type_hint: AdamW
   config:
     lr: 0.0001
-
 
 loss:
   type_hint: CLMCrossEntropyLoss
