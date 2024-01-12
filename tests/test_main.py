@@ -1,7 +1,7 @@
 import pytest
 import torch.cuda
 
-from llm_gym.__main__ import Main
+from modalities.__main__ import Main
 
 
 def no_gpu_available() -> bool:

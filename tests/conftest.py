@@ -10,18 +10,18 @@ from torch.optim import Optimizer
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
-from llm_gym.__main__ import load_app_config_dict
-from llm_gym.checkpointing.checkpointing import CheckpointingIF
-from llm_gym.config.config import AppConfig
-from llm_gym.dataloader.create_index import IndexGenerator
-from llm_gym.dataloader.dataloader import LLMDataLoader
-from llm_gym.dataloader.large_file_lines_reader import LargeFileLinesReader
-from llm_gym.dataloader.samplers import ResumableBatchSampler
-from llm_gym.evaluator import Evaluator
-from llm_gym.logging_broker.publisher import MessagePublisher
-from llm_gym.loss_functions import Loss
-from llm_gym.models.model import NNModel
-from llm_gym.trainer import Trainer
+from modalities.__main__ import load_app_config_dict
+from modalities.checkpointing.checkpointing import CheckpointingIF
+from modalities.config.config import AppConfig
+from modalities.dataloader.create_index import IndexGenerator
+from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.samplers import ResumableBatchSampler
+from modalities.evaluator import Evaluator
+from modalities.logging_broker.publisher import MessagePublisher
+from modalities.loss_functions import Loss
+from modalities.models.model import NNModel
+from modalities.trainer import Trainer
 
 _ROOT_DIR = Path(__file__).parents[1]
 

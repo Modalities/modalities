@@ -1,10 +1,10 @@
-llm_gym_setup:
+modalities_setup:
   run_mode: FROM_SCRATCH
   settings:
     global_num_seen_samples: 0
 
 wandb:
-  project_name: llm_gym
+  project_name: modalities
 
 data:
   sample_key: "input_ids"
@@ -94,7 +94,7 @@ training:
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
   local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.local_train_micro_batch_size}
-  global_num_seen_samples: ${llm_gym_setup.settings.global_num_seen_samples}
+  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
   gradient_acc_step: 1
 
 checkpointing:

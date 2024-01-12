@@ -1,15 +1,15 @@
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
-from llm_gym.config.config import PretrainedGPTConfig
-from llm_gym.models.gpt2.gpt2_model import (
+from modalities.config.config import PretrainedGPTConfig
+from modalities.models.gpt2.gpt2_model import (
     ActivationType,
     AttentionConfig,
     AttentionType,
     GPT2Config,
     WeightInitailizationConfig,
 )
-from llm_gym.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
+from modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
 
 def test_pretrained_gpt_model(tmp_path):
@@ -38,7 +38,7 @@ def test_pretrained_gpt_model(tmp_path):
     model = model.eval()
 
     # register config and model
-    AutoConfig.register("llm_gym_gpt2", PretrainedGPTConfig)
+    AutoConfig.register("modalities_gpt2", PretrainedGPTConfig)
     AutoModelForCausalLM.register(PretrainedGPTConfig, PretrainedGPTModel)
 
     # load saved model

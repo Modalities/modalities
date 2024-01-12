@@ -1,14 +1,7 @@
-llm_gym_setup:
+modalities_setup:
   run_mode: FROM_SCRATCH
   settings: 
     global_num_seen_samples: 0
-
-  # run_mode: WARM_START
-  # settings: 
-  #   checkpoint_model_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-30__17:54:34/eid_2023-12-30__17:54:34-model-num_samples_1024.bin
-  #   checkpoint_optimizer_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints/2023-12-30__17:54:34/eid_2023-12-30__17:54:34-optimizer-num_samples_1024.bin   
-  #   global_num_seen_samples: 1024
-
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
@@ -35,7 +28,7 @@ data:
       dataset:
         type_hint: OpenGPTXMMapDataset
         config: 
-          path: /raid/s3/opengptx/mehdi/temp/temp_data/train_text_document.bin
+          path: /path/to/tokenized/data.bin
           sequence_len: ${data.sequence_len}
           sample_key: ${data.sample_key}
           num_samples: ${training.num_training_samples}
@@ -67,7 +60,7 @@ data:
           type_hint: OpenGPTXMMapDataset
           config: 
             num_samples: 800 # total summed over all ranks
-            path: /raid/s3/opengptx/mehdi/temp/temp_data/val_text_document.bin
+            path: /path/to/tokenized/val_text_document.bin
             sequence_len: ${data.sequence_len}
             sample_key: ${data.sample_key}
         collate_fn:
@@ -78,7 +71,6 @@ data:
     - type_hint: LLMDataLoader
       config:
         dataloader_tag: "test"
-        # batch_size: 8 # per rank
         num_workers: 2
         pin_memory: true
         shuffle: false
@@ -97,7 +89,7 @@ data:
           type_hint: OpenGPTXMMapDataset
           config: 
             num_samples: 800 # total summed over all ranks
-            path: /raid/s3/opengptx/mehdi/temp/temp_data/test_text_document.bin
+            path: path/to/tokenized/test_text_document.bin
             sequence_len: ${data.sequence_len}
             sample_key: ${data.sample_key}
         collate_fn:
@@ -107,7 +99,7 @@ data:
             target_key: ${data.target_key}
 
 wandb:
-  project_name: llm_gym
+  project_name: modalities
 
 training:
   process_group_backend: "nccl"
@@ -118,7 +110,7 @@ training:
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
-  global_num_seen_samples: ${llm_gym_setup.settings.global_num_seen_samples}
+  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
 
 checkpointing:
   checkpointing_strategy:
@@ -128,7 +120,7 @@ checkpointing:
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
     config: 
-      checkpoint_path: /raid/s3/opengptx/max_lue/LLMgym/checkpoints
+      checkpoint_path: /path/to/checkpoints
       global_rank: ${oc.env:RANK}
 
 running_env:
