@@ -48,7 +48,7 @@ def dummy_config(monkeypatch) -> AppConfig:
     monkeypatch.setenv("WORLD_SIZE", "1")
     dummy_config_path = _ROOT_DIR / Path("config_files/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    app_config = AppConfig.model_validate(config_dict, strict=True)
+    app_config = AppConfig.model_validate(config_dict)
     return app_config
 
 
