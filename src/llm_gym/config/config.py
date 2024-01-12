@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 from transformers import PretrainedConfig
 
 from llm_gym.config.lookup_types import (
@@ -80,7 +80,7 @@ class DatasetConfig(BaseModel):
         PackedMemMapDatasetContinuousConfig,
         PackedMemMapDatasetMegatronConfig,
         MMapIndexedDatasetConfig,
-    ]
+    ] = Field(union_mode="left_to_right")
 
 
 class SamplerConfig(BaseModel):
