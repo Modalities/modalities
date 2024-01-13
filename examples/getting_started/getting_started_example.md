@@ -128,7 +128,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --rdzv-endpoint localhost:29505 \
                                               $(which modalities) run --config_file_path config_example_mem_map_dataset.yaml
 ```
 
-The command breaking
+The command can be broken down into the following parts:
 
 1. **`CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7`**:
    - Sets the `CUDA_VISIBLE_DEVICES` environment variable to a list of GPU device IDs (`0` to `7`). This restricts the visible CUDA devices to these specific GPUs.
