@@ -117,6 +117,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         """
         PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
         irrespective of the samples' start and end position, as defined in the index.
+        Therefore, for this datset, the index is irrelevant. 
 
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `modalities create_packed_data` to create one based on a jsonl-file.
