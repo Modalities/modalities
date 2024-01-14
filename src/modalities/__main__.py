@@ -335,6 +335,7 @@ class Main:
                 experiment_id=self.experiment_id,
                 mode=config.wandb.mode,
                 dir=config.wandb.dir,
+                experiment_config=config
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
