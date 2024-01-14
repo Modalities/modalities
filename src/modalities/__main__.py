@@ -12,6 +12,7 @@ from omegaconf import OmegaConf
 from torch.optim import Optimizer
 from transformers import GPT2TokenizerFast
 
+from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
@@ -207,6 +208,10 @@ class Main:
         wrapped_model, optimizer = self.get_model_and_optimizer(
             config=config, running_env=running_env, checkpointing=checkpointing
         )
+        if config.training.do_apply_activation_checkpointing:
+            apply_activation_checkpointing_inplace(wrapped_model)
+            logging.info("Applied activation checkpointing!")
+
         # Loss function
         loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 
@@ -247,6 +252,7 @@ class Main:
             local_rank=config.training.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
+            gradient_acc_step=config.training.gradient_acc_step,
         )
 
         # Evaluator
@@ -334,6 +340,8 @@ class Main:
                 num_ranks=config.training.world_size,
                 project=config.wandb.project_name,
                 experiment_id=self.experiment_id,
+                mode=config.wandb.mode,
+                dir=config.wandb.dir,
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
