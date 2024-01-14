@@ -5,6 +5,7 @@ modalities_setup:
 
 wandb:
   project_name: modalities
+  mode: ONLINE
 
 data:
   sample_key: "input_ids"
