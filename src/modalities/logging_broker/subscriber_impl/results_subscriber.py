@@ -69,3 +69,10 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         wandb.log(
             data=metrics, step=eval_result.global_train_sample_id + 1
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
+        throughput_metrics = {
+            f"{eval_result.dataloader_tag} {metric_key}": metric_values
+            for metric_key, metric_values in eval_result.throughput_metrics.items()
+        }
+        wandb.log(
+            data=throughput_metrics, step=eval_result.global_train_sample_id + 1
+        ) 

@@ -12,3 +12,7 @@ class CheckpointingError(Exception):
 
 class RunningEnvError(Exception):
     pass
+
+
+class TimeRecorderStateError(Exception):
+    pass
