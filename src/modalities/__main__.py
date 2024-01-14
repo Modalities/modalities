@@ -70,13 +70,6 @@ def entry_point_run_modalities(config_file_path: Path):
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
     "--tokenizer_file",
     type=Path,
     show_default=True,
