@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import rich
 from rich.console import Group
 from rich.panel import Panel
@@ -46,10 +48,10 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber object for the WandBEvaluationResult observable."""
 
-    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: str) -> None:
+    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: str, dir: Path) -> None:
         super().__init__()
         self.num_ranks = num_ranks
-        wandb.init(project=project, name=experiment_id, mode=mode)
+        wandb.init(project=project, name=experiment_id, mode=mode, dir=dir)
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""

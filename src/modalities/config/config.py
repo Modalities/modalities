@@ -34,6 +34,7 @@ class WandbConfig(BaseModel):
 
     project_name: str
     mode: WandbMode
+    dir: Optional[Path] = Field(default_factory=lambda: Path("."))
 
 
 class CudaKwargsConfig(BaseModel):
