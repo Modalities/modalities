@@ -27,7 +27,13 @@ from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
 
 
 class WandbConfig(BaseModel):
+    class WandbMode(Enum):
+        ONLINE = "ONLINE"
+        OFFLINE = "OFFLINE"
+        DISABLED = "DISABLED"
+
     project_name: str
+    mode: WandbMode
 
 
 class CudaKwargsConfig(BaseModel):
@@ -276,7 +282,6 @@ class CheckpointingConfig(BaseModel):
 class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
-
 
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):

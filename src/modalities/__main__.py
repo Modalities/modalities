@@ -338,6 +338,7 @@ class Main:
                 num_ranks=config.training.world_size,
                 project=config.wandb.project_name,
                 experiment_id=self.experiment_id,
+                mode=config.wandb.mode.value.lower(),
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber

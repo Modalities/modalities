@@ -46,10 +46,10 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber object for the WandBEvaluationResult observable."""
 
-    def __init__(self, num_ranks: int, project: str, experiment_id: str) -> None:
+    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: str) -> None:
         super().__init__()
         self.num_ranks = num_ranks
-        wandb.init(project=project, name=experiment_id)
+        wandb.init(project=project, name=experiment_id, mode=mode)
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
