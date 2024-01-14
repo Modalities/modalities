@@ -8,7 +8,7 @@ As a reference, this example has the following folder structure. Folders in <> w
 └── getting_started
     ├── checkpoints
     │   └─ <checkpoint_folders>
-    ├── config_example_mem_map_dataset.yaml
+    ├── example_config.yaml
     ├── data
     │   ├── mem_map
     │   │   └<preprocessed dataset files>
@@ -19,7 +19,7 @@ As a reference, this example has the following folder structure. Folders in <> w
     ├── tokenizer
     │   └── tokenizer.json
     └── wandb
-        └── <wand_logs>
+        └── <wandb_logs>
 ```
 
 ## 1. Preprocessing
@@ -39,7 +39,7 @@ and need to be preprocessed into the [MemMap dataset format](https://github.com/
 Firstly, we create the dataset index via
 
 ```sh
-cd modalities/examples/mem_map_redpajama_gpt
+cd modalities/examples/getting_started/
 
 # train split
 modalities create_memmap_index --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
@@ -125,7 +125,7 @@ Having created the dataset and defined the experiment in the configuration file,
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --rdzv-endpoint localhost:29505 \
                                               --nnodes 1 \
                                               --nproc_per_node 8 \
-                                              $(which modalities) run --config_file_path config_example_mem_map_dataset.yaml
+                                              $(which modalities) run --config_file_path example_config.yaml
 ```
 
 The command can be broken down into the following parts:
@@ -164,7 +164,7 @@ Given a checkpoint and tokenizer, we can load the model for text generation as f
 ```sh
 modalities generate_text --tokenizer_file tokenizer/tokenizer.json \
                          --chat checkpoints/2024-01-12__19-04-26/eid_2024-01-12__19-04-26-model-num_samples_768.bin \
-                         config_example_mem_map_dataset.yaml 
+                         example_config.yaml 
 ```
 which opens an interactive chatting CMD interface.
 

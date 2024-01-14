@@ -2,6 +2,11 @@ modalities_setup:
   run_mode: FROM_SCRATCH
   settings: 
     global_num_seen_samples: 0
+
+wandb:
+  project_name: modalities
+  mode: ONLINE
+
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
@@ -22,7 +27,7 @@ data:
           sampler:
             type_hint: DistributedSampler
             config:
-              rank: ${training.local_rank}
+              rank: ${training.global_rank}
               num_replicas: ${training.world_size}
               shuffle: true
       dataset:
@@ -52,7 +57,7 @@ data:
             sampler:
               type_hint: DistributedSampler
               config:
-                rank: ${training.local_rank}
+                rank: ${training.global_rank}
                 num_replicas: ${training.world_size}
                 shuffle: false
         dataset:
@@ -67,20 +72,18 @@ data:
             sample_key: ${data.sample_key}
             target_key: ${data.target_key}
 
-
-wandb:
-  project_name: modalities
-
 training:
   process_group_backend: "nccl"
-  num_training_samples: 2048
+  global_num_training_samples: 2048
   callback_interval_in_samples: 256
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  gradient_acc_step: 1
+  do_apply_activation_checkpointing: false
 
 checkpointing:
   checkpointing_strategy:
@@ -97,7 +100,7 @@ running_env:
   type_hint: FSDPRunningEnv
   config:
     process_group_backend: ${training.process_group_backend}
-    local_rank: ${training.local_rank}
+    local_rank: ${oc.env:LOCAL_RANK}
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
@@ -119,7 +122,7 @@ model:
     attention:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
-    activation: fused_swiglu
+    activation: gelu
     epsilon: 1e-5
     weight_init:
       mean: 0.0
