@@ -66,7 +66,7 @@ class Gym:
         eval_result = self.evaluator.evaluate(
             model=model,
             data_loaders=evaluation_data_loaders,
-            loss_fun=self.loss_fun,
+            loss_functions=[self.loss_fun],
             global_train_sample_id=global_train_sample_id,
             local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
         )
