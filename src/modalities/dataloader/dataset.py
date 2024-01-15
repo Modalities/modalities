@@ -36,6 +36,8 @@ class MemMapDataset(Dataset):
         jq_pattern: str = ".text",
     ):
         """
+        Pytorch Dataset with mmap support.
+
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
         :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.

@@ -78,7 +78,8 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         global_rank: int,
         model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
     ):
-        """Implementation of checkpointing to disc via FSDP
+        """
+        Implementation of checkpointing to disc via FSDP
 
         Args:
             checkpoint_path (Path): folder path to the checkpoint

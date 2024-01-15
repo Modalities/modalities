@@ -1,5 +1,5 @@
 Welcome to Modalities's documentation!
-===================================
+======================================================================
 
 **EDIT "docs/source/index.rst" IN ORDER TO MAKE CHANGES HERE**
 
@@ -42,4 +42,7 @@ Welcome to Modalities's documentation!
 
    future_work
 
+.. toctree::
+   :caption: API
 
+   api/modules
