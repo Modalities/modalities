@@ -4,6 +4,11 @@
 .. role:: bash(code)
    :language: bash
 
+
+Entrypoints
+=======================================================
+
+
 **EDIT "docs/source/entrypoints.rst" IN ORDER TO MAKE CHANGES HERE**
 
 We use `click <https://click.palletsprojects.com/en/>`_ as a tool to add new entry points and their CLI arguments.

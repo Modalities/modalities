@@ -2,14 +2,14 @@
    :language: python
 
 Configuration
-============
+========================================================================
 
 **EDIT "docs/source/configuration.rst" IN ORDER TO MAKE CHANGES HERE**
 
 Training config is defined in yaml formatted files. See :file:`data/config_lorem_ipsum.yaml`. These configs are very explicit specifying all training parameters to keep model trainings as transparent and reproducible as possible. Each config setting is reflected in pydantic classes in :file:`src/llm_gym/config/*.py`. In the config you need to define which config classes to load in field type_hint. This specifies the concrete class. A second parameter, config, then takes all the constructor arguments for that config class. This way it is easy to change i.e. DataLoaders while still having input validation in place.
 
 Pydantic and ClassResolver
-------------
+------------------------------------------------------------------------
 
 The mechanismn introduced to instantiate classes via :python:`type_hint` in the :file:`config.yaml`, utilizes 
 
@@ -17,7 +17,7 @@ The mechanismn introduced to instantiate classes via :python:`type_hint` in the 
 2) Pydantic for the validation of the config
 3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
 
-Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as :python:`${subconfig.attribue}`. 
+Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as `${subconfig.attribue}`. 
 
 Then, Pydantic validates the whole config as is and checks that each of the sub-configs are :python:`pydantic.BaseModel` classes.
 For configs, which allow different concrete classes to be instantiated by :python:`ClassResolver`, the special member names :python:`type_hint` and :python:`config` are introduced.
@@ -41,6 +41,7 @@ In our implmentation we go a step further, as both,
 
 * a :python:`type_hint` in a :python:`BaseModel` config must be of type :python:`llm_gym.config.lookup_types.LookupEnum` and 
 * :python:`config` is a union of allowed concrete configs of base type :python:`BaseModel`. 
+
 :python:`config` hereby replaces :python:`activation_kwargs` in the example above, and replaces it with pydantic-validated :python:`BaseModel` configs.
 
 With this, a mapping between type hint strings needed for `class-resolver`, and the concrete class is introduced, while allowing pydantic to select the correct concrete config:

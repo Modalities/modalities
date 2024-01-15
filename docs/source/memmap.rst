@@ -5,12 +5,12 @@
    :language: bash
 
 MemMap Datasets
-==============
+====================================================
 
 **EDIT "docs/source/memmap.rst" IN ORDER TO MAKE CHANGES HERE**
 
 MemMapDataset Index Generator
--------------
+------------------------------------------------------------------------------
 
 The :python:`MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The :python:`MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
@@ -21,7 +21,7 @@ The :python:`MemMapDataset` requires an index file providing the necessary point
 The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_memmap_index --help`.
 
 Packed Dataset Generator
----------------
+--------------------------------------------------------------------------------
 
 The :python:`PackedMemMapDatasetContinuous` and :python:`PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a :python:`MemMapDataset` index file as described `above <memMapDataset-index-generator>`_. Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
@@ -32,7 +32,7 @@ The :python:`PackedMemMapDatasetContinuous` and :python:`PackedMemMapDatasetMega
 The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_packed_data --help`.
 
 Packed Data Format
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The packed data file is a bytestream containing both the tokenized data as well as an index denoting the start and length of the tokenized documents inside the bytestream. The data file consists of 3 concatenated parts:
 
