@@ -16,7 +16,7 @@ The :python:`MemMapDataset` requires an index file providing the necessary point
 
 .. code-block:: bash
 
-  llm_gym create_memmap_index <path/to/jsonl/file>
+  modalities create_memmap_index <path/to/jsonl/file>
 
 The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_memmap_index --help`.
 
@@ -27,7 +27,7 @@ The :python:`PackedMemMapDatasetContinuous` and :python:`PackedMemMapDatasetMega
 
 .. code-block:: bash
 
-  llm_gym create_packed_data <path/to/jsonl/file>
+  modalities create_packed_data <path/to/jsonl/file>
 
 The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_packed_data --help`.
 
