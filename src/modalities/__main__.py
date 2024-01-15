@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -69,13 +71,6 @@ def entry_point_run_modalities(config_file_path: Path):
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
     "--tokenizer_file",
     type=Path,
     show_default=True,
@@ -118,7 +113,7 @@ def entry_point_create_memmap_index(src_path, index_path):
 )
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
@@ -340,6 +335,7 @@ class Main:
                 experiment_id=self.experiment_id,
                 mode=config.wandb.mode,
                 dir=config.wandb.dir,
+                experiment_config=config
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber

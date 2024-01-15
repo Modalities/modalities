@@ -109,11 +109,11 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, config.model.config.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, config.model.config.block_size, max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, config.model.config.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, config.model.config.block_size, max_new_tokens)
         except KeyboardInterrupt:
             print("closing app...")
             break

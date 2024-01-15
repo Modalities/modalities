@@ -1,0 +1,144 @@
+modalities_setup:
+  run_mode: FROM_SCRATCH
+  settings: 
+    global_num_seen_samples: 0
+data:
+  sample_key: "input_ids"
+  target_key: "target_ids"
+  sequence_len: 1024
+  train_dataloader:
+    type_hint: LLMDataLoader
+    config:
+      dataloader_tag: "train"
+      # batch_size: 8 # per rank
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+      batch_sampler:
+        type_hint: BatchSampler
+        config:
+          batch_size: 8 # per rank
+          drop_last: false
+          sampler:
+            type_hint: DistributedSampler
+            config:
+              rank: ${training.local_rank}
+              num_replicas: ${training.world_size}
+              shuffle: true
+      dataset:
+        type_hint: PackedMemMapDatasetContinuous
+        config: 
+          raw_data_path: ./data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_train.pbin
+          block_size: ${data.sequence_len}
+          sample_key: ${data.sample_key}
+      collate_fn:
+        type_hint: GPT2LLMCollator
+        config:
+          sample_key: ${data.sample_key}
+          target_key: ${data.target_key}
+  eval_dataloaders:
+    - type_hint: LLMDataLoader
+      config:
+        dataloader_tag: "val"
+        # batch_size: 8 # per rank
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        batch_sampler:
+          type_hint: BatchSampler
+          config: 
+            batch_size: 8 # per rank
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.local_rank}
+                num_replicas: ${training.world_size}
+                shuffle: false
+        dataset:
+          type_hint: PackedMemMapDatasetContinuous
+          config: 
+            raw_data_path: ./data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_test.pbin
+            block_size: ${data.sequence_len}
+            sample_key: ${data.sample_key}
+        collate_fn:
+          type_hint: GPT2LLMCollator
+          config: 
+            sample_key: ${data.sample_key}
+            target_key: ${data.target_key}
+
+
+wandb:
+  project_name: modalities
+
+training:
+  process_group_backend: "nccl"
+  num_training_samples: 2048
+  callback_interval_in_samples: 512
+  local_rank: ${oc.env:LOCAL_RANK}
+  global_rank: ${oc.env:RANK}
+  world_size: ${oc.env:WORLD_SIZE}
+  main_rank: 0
+  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+
+checkpointing:
+  checkpointing_strategy:
+    type_hint: SaveKMostRecentCheckpointsStrategy
+    config:
+      k: -1   # -1 to save all checkpoints
+  checkpointing_execution:
+    type_hint: FSDPToDiscCheckpointing
+    config: 
+      checkpoint_path: ./data/checkpoints
+      global_rank: ${oc.env:RANK}
+
+running_env:
+  type_hint: FSDPRunningEnv
+  config:
+    process_group_backend: ${training.process_group_backend}
+    local_rank: ${training.local_rank}
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+
+
+model:
+  type_hint: GPT2LLM
+  config:
+    sample_key: ${data.sample_key}
+    prediction_key: "logits"
+    block_size: ${data.sequence_len}
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head: 12
+    ffn_hidden: 2048
+    n_embd: 768
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention:
+      attention_type: pytorch_flash_attention
+      scaling_factor: 3
+    activation: fused_swiglu
+    epsilon: 1e-5
+    weight_init:
+      mean: 0.0
+      std: 0.02
+
+scheduler:
+  type_hint: StepLR
+  config:
+    step_size: 1
+    gamma: 0.1
+
+optimizer:
+  type_hint: AdamW
+  config:
+    lr: 0.0001
+
+
+loss:
+  type_hint: CLMCrossEntropyLoss
+  config:
+    target_key: ${data.target_key}
+    prediction_key: ${model.config.prediction_key}

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import rich
 from rich.console import Group
@@ -8,7 +9,7 @@ import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.config.config import WandbConfig
+from modalities.config.config import AppConfig, WandbConfig
 
 class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def consume_message(self, message: Message[EvaluationResultBatch]):
@@ -48,10 +49,16 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber object for the WandBEvaluationResult observable."""
 
-    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: WandbConfig.WandbMode, dir: Path) -> None:
+    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: WandbConfig.WandbMode, dir: Path, 
+                 experiment_config: Optional[AppConfig] = None) -> None:
         super().__init__()
         self.num_ranks = num_ranks
-        wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=dir)
+
+        # experiment_config_json = None
+        # if experiment_config is not None:
+        #     experiment_config_json = experiment_config.model_dump(mode="json")
+
+        wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=dir, config=experiment_config)
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
