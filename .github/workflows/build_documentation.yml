@@ -13,7 +13,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install myst-parser
-        pip install -e .
+        pip install .
         pip install sphinx-rtd-theme
     - name: "Parse into HTML"
       run: |
