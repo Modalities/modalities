@@ -12,8 +12,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Check path
       run: |
-        pwd
-        ls -alsh
+        pip install myst-parser
     - uses: ammaraskar/sphinx-action@master
       with:
         docs-folder: "docs/"
