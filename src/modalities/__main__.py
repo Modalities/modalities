@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -8,7 +10,6 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.optim import Optimizer
-from transformers import GPT2TokenizerFast
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
@@ -30,7 +31,7 @@ from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import 
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
-from modalities.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
+from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from modalities.loss_functions import Loss
 from modalities.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
@@ -66,13 +67,6 @@ def entry_point_run_modalities(config_file_path: Path):
     type=TokenizerTypes,
     show_default=True,
     default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=GPT2TokenizerFast,
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
@@ -118,7 +112,7 @@ def entry_point_create_memmap_index(src_path, index_path):
 )
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
@@ -334,7 +328,14 @@ class Main:
                 train_split_num_samples=train_split_lengths,
                 eval_splits_num_samples=eval_split_lengths,
             )
-            evaluation_result_subscriber = RichResultSubscriber(num_ranks=config.training.world_size)
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.training.world_size,
+                project=config.wandb.project_name,
+                experiment_id=self.experiment_id,
+                mode=config.wandb.mode,
+                dir=config.wandb.dir,
+                experiment_config=config,
+            )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
