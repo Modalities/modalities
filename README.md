@@ -1,5 +1,7 @@
 # Modalities
 
+Documentation: https://modalities.github.io/modalities/
+
 # Installation
 
 Create conda environment and activate it via 
