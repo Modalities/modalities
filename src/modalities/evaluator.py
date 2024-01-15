@@ -57,28 +57,6 @@ class Evaluator:
                 global_dataset_sample_id=-1,
                 dataloader_tag=data_loader.dataloader_tag,
             )
-            for batch_id, batch in enumerate(data_loader):
-                batch_loss = self.evaluate_batch(
-                    batch=batch,
-                    model=model,
-                    loss_fun=loss_fun,
-                )
-
-                cummulated_loss[0] += batch_loss.item()  # sum up batch loss
-                cummulated_loss[1] += len(batch)
-
-                local_dataset_sample_id = Evaluator._get_local_sample_id(
-                    batch_id=batch_id, batch_size=data_loader.sampler_batch_size
-                )
-
-                global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
-
-                Evaluator._publish_progress(
-                    batch_progress_publisher=self.batch_progress_publisher,
-                    global_train_sample_id=global_train_sample_id,
-                    global_dataset_sample_id=global_dataset_sample_id,
-                    dataloader_tag=data_loader.dataloader_tag,
-                )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
