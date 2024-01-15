@@ -21,7 +21,7 @@ In VSCode, add this to your :file:`launch.json`:
           "--nproc_per_node",
           "2",
           "--rdzv-endpoint=0.0.0.0:29503",
-          "src/llm_gym/__main__.py",
+          "src/modalities/__main__.py",
           "run",
           "--config_file_path",
           "config_files/config.yaml",

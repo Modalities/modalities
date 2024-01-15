@@ -10,9 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Check path
+    - name: Install dependencies
       run: |
         pip install myst-parser
-    - uses: ammaraskar/sphinx-action@master
-      with:
-        docs-folder: "docs/"
+        pip install -e .
+        pip install sphinx-rtd-theme
+    - name: "Parse into HTML"
+      run: |
+        sphinx-build -M html docs/source/ docs/build/
+    
