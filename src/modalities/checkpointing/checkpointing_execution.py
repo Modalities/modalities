@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable, List
 
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -138,6 +139,11 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
+        # we need this barrier here, such that all processes exit this function at the same time
+        # Since we run throughput measurements in the trainer, the non-checkpointing ranks would already
+        # trigger the time measurement in the trainer and would then wait for the checkpointing rank,
+        # leading to wrong throughput measurements.
+        dist.barrier()
 
     def _get_paths_to_delete(self, global_train_sample_id: int) -> List[Path]:
         return [

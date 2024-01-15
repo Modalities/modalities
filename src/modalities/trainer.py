@@ -138,13 +138,14 @@ class Trainer:
                     #epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     thoughput_aggregator.remove_keys()
                     #epoch_done_callback(local_train_sample_id=local_train_sample_id)
-
+                    model.train()
 
                 # TODO early stopping
                 cummulated_loss = self._reset_loss()
-                # we start the time recoder here again to also capture the time spend loading
+            # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
+
 
 
     def _reset_loss(self):
