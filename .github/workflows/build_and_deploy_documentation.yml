@@ -20,5 +20,17 @@ jobs:
       run: |
         sphinx-build -M html docs/source/ docs/build/
         sphinx-apidoc -o docs/source/api src/modalities
+  pages:
+    runs-on: ubuntu-20.04
+    steps:
+    - name : "Deploy Github Pages"
+    - id: deployment
+      uses: sphinx-notes/pages@v3
+      with:
+        publish: false
+    - uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ${{ steps.deployment.outputs.artifact }}
 
     
