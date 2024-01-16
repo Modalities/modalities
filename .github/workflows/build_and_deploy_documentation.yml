@@ -1,6 +1,7 @@
 name: "Build Sphinx Documentation"
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main 
