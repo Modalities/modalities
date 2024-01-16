@@ -100,7 +100,7 @@ html_theme = "sphinx_rtd_theme"
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
 #
-# html_logo = "logo.png"
+html_logo = "../logo.jpg"
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
