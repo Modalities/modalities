@@ -8,13 +8,10 @@
 Entrypoints
 =======================================================
 
-
-**EDIT "docs/source/entrypoints.rst" IN ORDER TO MAKE CHANGES HERE**
-
 We use `click <https://click.palletsprojects.com/en/>`_ as a tool to add new entry points and their CLI arguments.
 For this we have a main entry point from which all other entry points are started. 
 
-The main entry point is :file:`src/llm_gym/__main__.py:main()`. 
+The main entry point is :file:`src/modalities/__main__.py:main()`. 
 We register other sub-entrypoints by using our main :python:`click.group`, called :python:`main`, as follows:
 
 .. code-block:: python
@@ -64,8 +61,8 @@ With
 .. code-block:: python
     
   [project.scripts]
-  llm_gym = "llm_gym.__main__:main"
+  modalities = "modalities.__main__:main"
 
-in our :file:`pyproject.toml`, we can start only main with :python:`llm_gym` (which does nothing), or a specific sub-entrypoint e.g. :bash:`llm_gym do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+in our :file:`pyproject.toml`, we can start only main with :python:`modalities` (which does nothing), or a specific sub-entrypoint e.g. :bash:`modalities do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
-Alternatively, directly use :bash:`src/llm_gym/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+Alternatively, directly use :bash:`src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
