@@ -1,8 +1,6 @@
 Quickstart
 ====================================================
 
-**EDIT "docs/source/quickstart.rst" IN ORDER TO MAKE CHANGES HERE**
-
 Installation
 -----------------------------------------------------
 Setup a conda environment `conda create -n modalities python=3.10 & conda activate modalities` and install the requirements `pip install -e .`.

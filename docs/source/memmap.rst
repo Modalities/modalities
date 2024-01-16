@@ -7,8 +7,6 @@
 MemMap Datasets
 ====================================================
 
-**EDIT "docs/source/memmap.rst" IN ORDER TO MAKE CHANGES HERE**
-
 MemMapDataset Index Generator
 ------------------------------------------------------------------------------
 
@@ -18,7 +16,7 @@ The :python:`MemMapDataset` requires an index file providing the necessary point
 
   modalities create_memmap_index <path/to/jsonl/file>
 
-The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_memmap_index --help`.
+The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`modalities create_memmap_index --help`.
 
 Packed Dataset Generator
 --------------------------------------------------------------------------------
@@ -29,7 +27,7 @@ The :python:`PackedMemMapDatasetContinuous` and :python:`PackedMemMapDatasetMega
 
   modalities create_packed_data <path/to/jsonl/file>
 
-The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`llm_gym create_packed_data --help`.
+The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via :bash:`modalities create_packed_data --help`.
 
 Packed Data Format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

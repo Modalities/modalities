@@ -4,9 +4,7 @@
 Configuration
 ========================================================================
 
-**EDIT "docs/source/configuration.rst" IN ORDER TO MAKE CHANGES HERE**
-
-Training config is defined in yaml formatted files. See :file:`data/config_lorem_ipsum.yaml`. These configs are very explicit specifying all training parameters to keep model trainings as transparent and reproducible as possible. Each config setting is reflected in pydantic classes in :file:`src/llm_gym/config/*.py`. In the config you need to define which config classes to load in field type_hint. This specifies the concrete class. A second parameter, config, then takes all the constructor arguments for that config class. This way it is easy to change i.e. DataLoaders while still having input validation in place.
+Training config is defined in yaml formatted files. See :file:`data/config_lorem_ipsum.yaml`. These configs are very explicit specifying all training parameters to keep model trainings as transparent and reproducible as possible. Each config setting is reflected in pydantic classes in :file:`src/modalities/config/*.py`. In the config you need to define which config classes to load in field type_hint. This specifies the concrete class. A second parameter, config, then takes all the constructor arguments for that config class. This way it is easy to change i.e. DataLoaders while still having input validation in place.
 
 Pydantic and ClassResolver
 ------------------------------------------------------------------------
@@ -39,7 +37,7 @@ With this we utilize Pydantics feature to auto-select a fitting type based on th
 
 In our implmentation we go a step further, as both,
 
-* a :python:`type_hint` in a :python:`BaseModel` config must be of type :python:`llm_gym.config.lookup_types.LookupEnum` and 
+* a :python:`type_hint` in a :python:`BaseModel` config must be of type :python:`modalities.config.lookup_types.LookupEnum` and 
 * :python:`config` is a union of allowed concrete configs of base type :python:`BaseModel`. 
 
 :python:`config` hereby replaces :python:`activation_kwargs` in the example above, and replaces it with pydantic-validated :python:`BaseModel` configs.
