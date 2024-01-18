@@ -9,6 +9,8 @@ from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentSt
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import NNModel, model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.trainer import ThroughputAggregationKeys
+from modalities.util import Aggregator, TimeRecorder
 
 
 class Evaluator:
@@ -55,28 +57,32 @@ class Evaluator:
                 global_dataset_sample_id=-1,
                 dataloader_tag=data_loader.dataloader_tag,
             )
-            for batch_id, batch in enumerate(data_loader):
-                batch_loss = self.evaluate_batch(
-                    batch=batch,
-                    model=model,
-                    loss_fun=loss_fun,
-                )
+            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+            with TimeRecorder() as forward_backward_timer_recorder:
+                for batch_id, batch in enumerate(data_loader):
+                    batch_loss = self.evaluate_batch(
+                        batch=batch,
+                        model=model,
+                        loss_fun=loss_fun,
+                    )
 
-                cummulated_loss[0] += batch_loss.item()  # sum up batch loss
-                cummulated_loss[1] += len(batch)
+                    cummulated_loss[0] += batch_loss.item()  # sum up batch loss
+                    cummulated_loss[1] += len(batch)
+                    batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
-                local_dataset_sample_id = Evaluator._get_local_sample_id(
-                    batch_id=batch_id, batch_size=data_loader.sampler_batch_size
-                )
+                    local_dataset_sample_id = Evaluator._get_local_sample_id(
+                        batch_id=batch_id, batch_size=data_loader.sampler_batch_size
+                    )
 
-                global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
+                    global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
 
-                Evaluator._publish_progress(
-                    batch_progress_publisher=self.batch_progress_publisher,
-                    global_train_sample_id=global_train_sample_id,
-                    global_dataset_sample_id=global_dataset_sample_id,
-                    dataloader_tag=data_loader.dataloader_tag,
-                )
+                    Evaluator._publish_progress(
+                        batch_progress_publisher=self.batch_progress_publisher,
+                        global_train_sample_id=global_train_sample_id,
+                        global_dataset_sample_id=global_dataset_sample_id,
+                        dataloader_tag=data_loader.dataloader_tag,
+                    )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
             total_loss = Reducer.reduce(
                 tensor=cummulated_loss,
@@ -84,8 +90,22 @@ class Evaluator:
                 post_processing_fun=lambda t: t[0] / t[1],
             )
 
+            foward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(
+                torch.device(self.local_rank)
+            )
+            thoughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
+            )
+            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+            synced_foward_backward_time = thoughput_aggregator.get_all_reduced_value(
+                ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
+            )
+            num_samples_per_second = synced_num_samples / synced_foward_backward_time
+
             evaluation_result = EvaluationResultBatch(
                 losses={loss_fun.tag: total_loss},
+                # TODO: hardcoded metric key
+                throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
                 global_train_sample_id=global_train_sample_id,
             )

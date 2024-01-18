@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Callable
 
 import torch
@@ -11,7 +12,12 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel, model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.util import Aggregator, TimeRecorder
 
+
+class ThroughputAggregationKeys(Enum):
+    NUM_SAMPLES = "NUM_SAMPLES"
+    FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
 
 class Trainer:
     def __init__(
@@ -56,9 +62,13 @@ class Trainer:
     ):
         model.train()
         cummulated_loss = self._reset_loss()
+        thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         # batch loop
         batch: DatasetBatch
+        dist.barrier()
+        forward_backward_time_recorder = TimeRecorder()
+        forward_backward_time_recorder.start()
         for batch_id, batch in enumerate(train_loader):
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # train single batch
@@ -70,11 +80,12 @@ class Trainer:
                 batch_id=batch_id,
                 data_loader=train_loader,
             )
-
+            forward_backward_time_recorder.stop()
             # save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
-
+            batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+            thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,
@@ -86,6 +97,21 @@ class Trainer:
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
+                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(
+                        torch.device(self.local_rank)
+                    )
+                    forward_backward_time_recorder.reset()
+
+                    thoughput_aggregator.add_value(
+                        key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
+                    )
+                    synced_num_samples = thoughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.NUM_SAMPLES
+                    )
+                    synced_foward_backward_time = thoughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
+                    )
+                    synced_num_samples_per_second = synced_num_samples / synced_foward_backward_time
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
                         tensor=cummulated_loss,
@@ -100,6 +126,8 @@ class Trainer:
 
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
+                        # TODO: hardcoded metric key
+                        throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
                         dataloader_tag=train_loader.dataloader_tag,
                         global_train_sample_id=global_train_sample_id,
                     )
@@ -107,11 +135,18 @@ class Trainer:
                         evaluation_result_publisher=self.evaluation_result_publisher,
                         evaluation_result=evaluation_result,
                     )
-                    epoch_done_callback(local_train_sample_id=local_train_sample_id)
+                    #epoch_done_callback(local_train_sample_id=local_train_sample_id)
+                    thoughput_aggregator.remove_keys()
+                    #epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     model.train()
 
                 # TODO early stopping
                 cummulated_loss = self._reset_loss()
+            # we start the time recoder here again to also capture the time spend loading
+            # via the dataloader.
+            forward_backward_time_recorder.start()
+
+
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
