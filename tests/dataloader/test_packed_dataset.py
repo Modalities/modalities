@@ -25,7 +25,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
 def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
     ds = PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size, sample_key="input_ids")
     assert len(ds) == expected_length
-    retrieved_input_ids = [list(batch["input_ids"]) for batch in ds]
+    retrieved_input_ids = [list(packed_samples["input_ids"]) for packed_samples in ds]
     assert retrieved_input_ids == expected_output
 
 
