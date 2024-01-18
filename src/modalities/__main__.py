@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -35,7 +37,7 @@ from modalities.loss_functions import Loss
 from modalities.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
-from modalities.util import get_date_of_run
+from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
 from modalities.utils.generate_text import main as generate_text_main
 
 
@@ -66,13 +68,6 @@ def entry_point_run_modalities(config_file_path: Path):
     type=TokenizerTypes,
     show_default=True,
     default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=GPT2TokenizerFast,
     help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
 )
 @click.option(
@@ -118,7 +113,7 @@ def entry_point_create_memmap_index(src_path, index_path):
 )
 @click.option(
     "--index_path",
-    type=str,
+    type=Path,
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
@@ -179,6 +174,8 @@ class Main:
                 wrapped_model,
                 optimizer,
             ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
+
+            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
             gym.run(
                 callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
@@ -340,6 +337,7 @@ class Main:
                 experiment_id=self.experiment_id,
                 mode=config.wandb.mode,
                 dir=config.wandb.dir,
+                experiment_config=config
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
