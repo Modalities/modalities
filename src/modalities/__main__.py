@@ -37,7 +37,7 @@ from modalities.loss_functions import Loss
 from modalities.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
-from modalities.util import get_date_of_run
+from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
 from modalities.utils.generate_text import main as generate_text_main
 
 
@@ -174,6 +174,8 @@ class Main:
                 wrapped_model,
                 optimizer,
             ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
+
+            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
             gym.run(
                 callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,

@@ -163,7 +163,7 @@ Given a checkpoint and tokenizer, we can load the model for text generation as f
 
 ```sh
 modalities generate_text --tokenizer_file tokenizer/tokenizer.json \
-                         --chat checkpoints/2024-01-12__19-04-26/eid_2024-01-12__19-04-26-model-num_samples_768.bin \
+                        checkpoints/2024-01-15__14-02-37/eid_2024-01-15__14-02-37-model-num_samples_768.bin \
                          example_config.yaml 
 ```
 which opens an interactive chatting CMD interface.

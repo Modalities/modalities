@@ -11,6 +11,8 @@ from modalities.loss_functions import Loss
 from modalities.metrics import Metric
 from modalities.models.model import NNModel, model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.trainer import ThroughputAggregationKeys
+from modalities.util import Aggregator, TimeRecorder
 
 
 class Evaluator:
@@ -33,8 +35,8 @@ class Evaluator:
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         with torch.no_grad():
             result_batch = model_predict_batch(model=model, batch=batch)
-        losses = {l.tag: l(result_batch) for l in loss_functions}
-        metrics = {m.tag: m(result_batch) for m in metrics}
+        losses = {loss_fun.tag: loss_fun(result_batch) for loss_fun in loss_functions}
+        metrics = {metric_fun.tag: metric_fun(result_batch) for metric_fun in metrics}
         return losses, metrics
 
     def evaluate(
@@ -55,21 +57,43 @@ class Evaluator:
                 global_dataset_sample_id=-1,
                 dataloader_tag=data_loader.dataloader_tag,
             )
+            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
-            cummulated_losses, cummulated_metrics = self._process_batches_in_data_loader(
-                model=model,
-                data_loader=data_loader,
-                loss_functions=loss_functions,
-                metrics=metrics,
-                global_train_sample_id=global_train_sample_id,
-                local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
-            )
+            with TimeRecorder() as forward_backward_timer_recorder:
+                cummulated_losses, cummulated_metrics = self._process_batches_in_data_loader(
+                    model=model,
+                    data_loader=data_loader,
+                    loss_functions=loss_functions,
+                    metrics=metrics,
+                    global_train_sample_id=global_train_sample_id,
+                    local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
+                )
+
             total_losses = self._reduce_cummulatives_vars(cummulated_losses)
             total_metrics = self._reduce_cummulatives_vars(cummulated_metrics)
+
+            foward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(
+                torch.device(self.local_rank)
+            )
+
+            thoughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.NUM_SAMPLES, value=len(data_loader) * data_loader.sampler_batch_size
+            )
+            thoughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
+            )
+
+            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+            synced_foward_backward_time = thoughput_aggregator.get_all_reduced_value(
+                ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
+            )
+            num_samples_per_second = synced_num_samples / synced_foward_backward_time
 
             evaluation_result = EvaluationResultBatch(
                 losses=total_losses,
                 metrics=total_metrics,
+                # TODO: hardcoded metric key
+                throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
                 global_train_sample_id=global_train_sample_id,
             )
@@ -95,8 +119,8 @@ class Evaluator:
         global_train_sample_id: int,
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
-        cummulated_losses = {l.tag: self._prepare_cummulated_var() for l in loss_functions}
-        cummulated_metrics = {m.tag: self._prepare_cummulated_var() for m in metrics}
+        cummulated_losses = {loss_fun.tag: self._prepare_cummulated_var() for loss_fun in loss_functions}
+        cummulated_metrics = {metric_fun.tag: self._prepare_cummulated_var() for metric_fun in metrics}
 
         for batch_id, batch in enumerate(data_loader):
             batch_losses, batch_metrics = self.evaluate_batch(
@@ -108,6 +132,10 @@ class Evaluator:
 
             self._update_cummulated_vars(len(batch), batch_losses, cummulated_losses)
             self._update_cummulated_vars(len(batch), batch_metrics, cummulated_metrics)
+
+            data_loader.batch_size
+            # batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+            # thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
             local_dataset_sample_id = Evaluator._get_local_sample_id(
                 batch_id=batch_id, batch_size=data_loader.sampler_batch_size

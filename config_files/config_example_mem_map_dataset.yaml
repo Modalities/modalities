@@ -1,7 +1,8 @@
 modalities_setup:
   run_mode: FROM_SCRATCH
-  settings: 
+  settings:
     global_num_seen_samples: 0
+
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
@@ -52,7 +53,7 @@ data:
             sampler:
               type_hint: DistributedSampler
               config:
-                rank: ${training.local_rank}
+                rank: ${training.global_rank}
                 num_replicas: ${training.world_size}
                 shuffle: false
         dataset:
@@ -79,8 +80,10 @@ training:
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  gradient_acc_step: 1
+  do_apply_activation_checkpointing: True
 
 checkpointing:
   checkpointing_strategy:
@@ -89,7 +92,7 @@ checkpointing:
       k: -1   # -1 to save all checkpoints
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
-    config: 
+    config:
       checkpoint_path: ./data/checkpoints
       global_rank: ${oc.env:RANK}
 
