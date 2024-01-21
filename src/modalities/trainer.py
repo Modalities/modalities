@@ -19,6 +19,7 @@ class ThroughputAggregationKeys(Enum):
     NUM_SAMPLES = "NUM_SAMPLES"
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
 
+
 class Trainer:
     def __init__(
         self,
@@ -135,9 +136,8 @@ class Trainer:
                         evaluation_result_publisher=self.evaluation_result_publisher,
                         evaluation_result=evaluation_result,
                     )
-                    #epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     thoughput_aggregator.remove_keys()
-                    #epoch_done_callback(local_train_sample_id=local_train_sample_id)
+                    epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     model.train()
 
                 # TODO early stopping
@@ -145,8 +145,6 @@ class Trainer:
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
-
-
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
