@@ -76,9 +76,12 @@ class Evaluator:
                 torch.device(self.local_rank)
             )
 
-            thoughput_aggregator.add_value(
-                key=ThroughputAggregationKeys.NUM_SAMPLES, value=len(data_loader) * data_loader.sampler_batch_size
+            data_loader_num_samples = torch.tensor(len(data_loader) * data_loader.sampler_batch_size).to(
+                torch.device(self.local_rank)
             )
+
+            thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=data_loader_num_samples)
+
             thoughput_aggregator.add_value(
                 key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
             )
