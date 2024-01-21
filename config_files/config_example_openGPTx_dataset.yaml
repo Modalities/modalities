@@ -100,17 +100,21 @@ data:
 
 wandb:
   project_name: modalities
+  mode: ONLINE
+
 
 training:
   process_group_backend: "nccl"
-  num_training_samples: 2048
+  global_num_training_samples: 2048
   callback_interval_in_samples: 512
   local_rank: ${oc.env:LOCAL_RANK}
   global_rank: ${oc.env:RANK}
   world_size: ${oc.env:WORLD_SIZE}
   main_rank: 0
-  train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  gradient_acc_step: 1
+  do_apply_activation_checkpointing: True
 
 checkpointing:
   checkpointing_strategy:
