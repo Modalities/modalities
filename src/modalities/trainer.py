@@ -57,6 +57,7 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
+        # TODO: remove
         epoch_done_callback: Callable[[int], None],
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
@@ -73,7 +74,7 @@ class Trainer:
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # train single batch
+            # Train single batch
             batch_loss = self._train_batch(
                 batch=batch,
                 model=model,
