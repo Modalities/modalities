@@ -71,8 +71,7 @@ class Trainer:
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         for batch_id, batch in enumerate(train_loader):
-            # Because ResumableBatchSampler enables to resume training from a specific batch, we have to add
-            # the starting position
+            # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # train single batch
             batch_loss = self._train_batch(
