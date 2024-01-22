@@ -21,7 +21,8 @@ dependencies = [
     "jq",
     "xformers",
     "class_resolver",
-    "wandb"
+    "wandb",
+    "einops>=0.7.0",
 ]
 
 [project.optional-dependencies]
