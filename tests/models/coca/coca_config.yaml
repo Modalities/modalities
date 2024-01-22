@@ -1,0 +1,57 @@
+prediction_key: logits
+vision_embd_prediciton_key: vision_embeddings
+text_embd_prediciton_key: text_embeddings
+vision_cls_prediciton_key: vision_cls
+text_cls_prediciton_key: text_cls
+vision_encoder_config:
+  sample_key: images
+  prediction_key: vision_embeddings
+  block_size: 197
+  n_classes: Null # Disable vision transformer head
+  n_layer: 12
+  n_head: 8
+  n_embd: 768
+  dropout: 0.0
+  patch_size: 16
+  patch_stride: 16
+  n_img_channels: 3
+  add_cls_token: True
+  bias: True
+text_decoder_config:
+  sample_key: input_ids
+  prediction_key: text_embeddings
+  block_size: 1025 # +1 for the class token
+  vocab_size: 50304
+  n_layer: 12
+  n_head: 12
+  ffn_hidden: 2048
+  n_embd: 768
+  dropout: 0.0
+  bias: true
+  attention:
+    attention_type: pytorch_flash_attention
+    scaling_factor: 3
+  activation: fused_swiglu
+  epsilon: 1e-5
+  weight_init:
+    mean: 0.0
+    std: 0.02
+multimodal_decoder_config:
+  sample_key: text_embeddings
+  prediction_key: logits
+  block_size: 1024
+  vocab_size: 50304
+  n_layer: 12
+  n_head: 12
+  ffn_hidden: 2048
+  n_embd: 768
+  dropout: 0.0
+  bias: true
+  attention:
+    attention_type: pytorch_flash_attention
+    scaling_factor: 3
+  activation: fused_swiglu
+  epsilon: 1e-5
+  weight_init:
+    mean: 0.0
+    std: 0.02
