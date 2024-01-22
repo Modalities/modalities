@@ -6,14 +6,14 @@ import xformers.ops as xops
 from pydantic import BaseModel
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, Block, GPTConfig, LayerNorm, TransformerMLP
+from modalities.models.gpt2.gpt2_model import ActivationType, Block, GPT2Config, LayerNorm, TransformerMLP
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import Attention
 
 
 class TextDecoder(NNModel):
-    def __init__(self, config: GPTConfig):
+    def __init__(self, config: GPT2Config):
         super().__init__()
         self.config = config
         assert config.vocab_size is not None
@@ -28,7 +28,22 @@ class TextDecoder(NNModel):
                 wte=nn.Embedding(num_embeddings=config.vocab_size, embedding_dim=config.n_embd),
                 wpe=nn.Embedding(num_embeddings=config.block_size, embedding_dim=config.n_embd),
                 drop=nn.Dropout(config.dropout),
-                h=nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
+                h=nn.ModuleList(
+                    [
+                        Block(
+                            n_embd=config.n_embd,
+                            bias=config.bias,
+                            epsilon=config.epsilon,
+                            activation=config.activation,
+                            n_head=config.n_head,
+                            attention=config.attention,
+                            dropout=config.dropout,
+                            block_size=config.block_size,
+                            ffn_hidden=config.ffn_hidden,
+                        )
+                        for _ in range(config.n_layer)
+                    ]
+                ),
             )
         )
 
@@ -68,17 +83,26 @@ class TextDecoder(NNModel):
 
 
 class MultiModalBlock(nn.Module):
-    def __init__(self, config: GPTConfig):
+    def __init__(
+        self,
+        n_embd: int,
+        bias: bool,
+        epsilon: float,
+        activation: ActivationType,
+        n_head: int,
+        dropout: float,
+        ffn_hidden: int,
+    ):
         super().__init__()
-        self.ln_1 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
-        self.attn = Attention(config.n_embd, config.n_head, config.bias, is_causal=True, use_cross_attention=True)
-        self.ln_2 = LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon)
+        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.attn = Attention(n_embd, n_head, bias, is_causal=True, use_cross_attention=True)
+        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
-        if config.activation == ActivationType.GELU:
-            self.mlp = TransformerMLP(config)
-        elif config.activation == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * config.n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(config.n_embd, hidden_dim, config.n_embd, bias=False)
+        if activation == ActivationType.GELU:
+            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+        elif activation == ActivationType.FUSED_SWIGLU:
+            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
         else:
             raise Exception("unimplemented activation")
 
@@ -89,7 +113,7 @@ class MultiModalBlock(nn.Module):
 
 
 class MultiModalDecoder(NNModel):
-    def __init__(self, config: GPTConfig):
+    def __init__(self, config: GPT2Config):
         super().__init__()
         self.config = config
         assert config.vocab_size is not None
@@ -100,7 +124,20 @@ class MultiModalDecoder(NNModel):
 
         self.transformer = nn.ModuleDict(
             dict(
-                h=nn.ModuleList([MultiModalBlock(config) for _ in range(config.n_layer)]),
+                h=nn.ModuleList(
+                    [
+                        MultiModalBlock(
+                            n_embd=config.n_embd,
+                            bias=config.bias,
+                            epsilon=config.epsilon,
+                            activation=config.activation,
+                            n_head=config.n_head,
+                            dropout=config.dropout,
+                            ffn_hidden=config.ffn_hidden,
+                        )
+                        for _ in range(config.n_layer)
+                    ]
+                ),
                 ln_f=LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon),
             )
         )
@@ -139,8 +176,8 @@ class CoCaConfig(BaseModel):
     vision_cls_prediciton_key: str
     text_cls_prediciton_key: str
     vision_encoder_config: VisionTransformerConfig
-    text_decoder_config: GPTConfig
-    multimodal_decoder_config: GPTConfig
+    text_decoder_config: GPT2Config
+    multimodal_decoder_config: GPT2Config
 
 
 class CoCa(NNModel):
