@@ -74,7 +74,7 @@ def entry_point_run_modalities(config_file_path: Path):
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).resolve().parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
@@ -128,7 +128,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).resolve().parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option(
