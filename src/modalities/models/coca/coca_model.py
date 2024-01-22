@@ -74,7 +74,7 @@ class TextDecoder(NNModel):
         pos = torch.arange(0, t + 1, dtype=torch.long, device=device)
 
         tok_emb = self.transformer.wte(input_ids)
-        tok_emb = torch.cat([self.cls_token.repeat(b, 1, 1), tok_emb], dim=1)
+        tok_emb = torch.cat([tok_emb, self.cls_token.repeat(b, 1, 1)], dim=1)
         pos_emb = self.transformer.wpe(pos)
         x = self.transformer.drop(tok_emb + pos_emb)
         for block in self.transformer.h:
@@ -212,7 +212,7 @@ class CoCa(NNModel):
     def _forward_encode_vision(self, inputs):
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediciton_key]
         # TODO instead of a class token use attention pooling
-        vision_embd, vision_cls_token = vision_embd[:, :-1, :], vision_embd[:, -1:, :]
+        vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
         return vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs):
