@@ -1,7 +1,7 @@
 from typing import Annotated, Dict, Optional
 
 import torch
-from einops import rearrange
+from einops.layers.torch import Rearrange
 from pydantic import BaseModel, Field
 from torch import nn
 
@@ -36,6 +36,7 @@ class ImagePatchEmbedding(nn.Module):
     ) -> None:
         super().__init__()
         self.conv = nn.Conv2d(n_img_channels, n_embd, kernel_size=patch_size, stride=patch_stride)
+        self.rearrange = Rearrange("b c h w -> b (h w) c")
         self.cls_token = None
         if add_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, n_embd))
@@ -43,7 +44,7 @@ class ImagePatchEmbedding(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, *_ = x.shape
         x = self.conv(x)
-        x = rearrange(x, "b c h w -> b (h w) c")
+        x = self.rearrange(x)
         if self.cls_token is not None:
             x = torch.cat([self.cls_token.repeat(B, 1, 1), x], dim=1)
         return x
