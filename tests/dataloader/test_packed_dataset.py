@@ -1,4 +1,3 @@
-from modalities.dataloader.dataloader import LLMDataLoader
 import pytest
 
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -26,8 +25,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
 def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
     ds = PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size, sample_key="input_ids")
     assert len(ds) == expected_length
-    dl = LLMDataLoader(dataloader_tag="unittest", dataset=ds)
-    retrieved_input_ids = [list(x["input_ids"]) for x in dl]
+    retrieved_input_ids = [list(packed_samples["input_ids"]) for packed_samples in ds]
     assert retrieved_input_ids == expected_output
 
 

@@ -20,6 +20,10 @@ class Dataset(TorchdataSet):
         self.block_size = block_size
         self.sample_key = sample_key
 
+    def _check_if_inbounds(self, idx: int):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
 
 class MemMapDataset(Dataset):
     def __init__(
@@ -32,6 +36,8 @@ class MemMapDataset(Dataset):
         jq_pattern: str = ".text",
     ):
         """
+        Pytorch Dataset with mmap support.
+
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
         :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
@@ -54,6 +60,7 @@ class MemMapDataset(Dataset):
         return len(self.reader)
 
     def __getitem__(self, idx: int) -> BatchEncoding:
+        self._check_if_inbounds(idx)
         return self.tokenizer(
             self.jq_filter.input_text(self.reader[idx]).first(),
             max_length=self.block_size,
@@ -117,7 +124,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         """
         PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
         irrespective of the samples' start and end position, as defined in the index.
-        Therefore, for this datset, the index is irrelevant. 
+        Therefore, for this datset, the index is irrelevant.
 
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `modalities create_packed_data` to create one based on a jsonl-file.
@@ -136,6 +143,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         return self._num_samples
 
     def __getitem__(self, idx: int) -> BatchEncoding:
+        self._check_if_inbounds(idx)
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
             mode="r",
@@ -193,6 +201,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         return len(self._index)
 
     def __getitem__(self, idx: int) -> BatchEncoding:
+        self._check_if_inbounds(idx)
         offset, length = self._index[idx]
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
