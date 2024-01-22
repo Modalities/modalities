@@ -46,13 +46,16 @@ def main() -> None:
     pass
 
 
-@main.command(name="run")
-@click.option(
+config_file_path_option = click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Path to a file with the YAML config file.",
 )
+
+
+@main.command(name="run")
+@config_file_path_option
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
@@ -62,7 +65,7 @@ def entry_point_run_modalities(config_file_path: Path):
 
 @main.command(name="generate_text")
 @click.argument("model_path", type=Path)
-@click.argument("config_path", type=Path)
+@config_file_path_option
 @click.option(
     "--tokenizer_type",
     type=TokenizerTypes,
@@ -79,9 +82,9 @@ def entry_point_run_modalities(config_file_path: Path):
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
+def entry_point_generate_text(model_path, config_file_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+    generate_text_main(model_path, config_file_path, tokenizer, max_new_tokens, chat)
 
 
 @main.command(name="create_memmap_index")
@@ -148,6 +151,21 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
     generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
     generator.run(dst_path)
+
+
+@main.command(name="convert_checkpoint")
+@config_file_path_option
+@click.option(
+    "--output_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Converted checkpoint will be written to this path.",
+)
+def convert_checkpoint(config_file_path, output_path):
+    config_dict = load_app_config_dict(config_file_path)
+    config = AppConfig.model_validate(config_dict)
+    main = Main(config)
+    main.convert_checkpoint(output_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -351,6 +369,22 @@ class Main:
         )
 
         return evaluation_result_publisher, batch_processed_publisher
+
+    def convert_checkpoint(self, output_path):
+        with self.running_env as running_env:
+            checkpointing = CheckpointingFactory.get_checkpointing(
+                resolvers=self.resolvers,
+                config=self.config.checkpointing,
+                running_env=self.running_env,
+                experiment_id=self.experiment_id,
+                num_ranks=self.config.training.world_size,
+            )
+
+            # Model and optimizer
+            wrapped_model, optimizer = self.get_model_and_optimizer(
+                config=self.config, running_env=self.running_env, checkpointing=checkpointing
+            )
+            print('test')
 
 
 if __name__ == "__main__":
