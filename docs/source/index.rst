@@ -1,4 +1,4 @@
-Welcome to Modalities's documentation!
+Welcome to Modalities' documentation!
 ======================================================================
 
 We propose a novel training framework for Multimodal Large Language Models (LLMs) that prioritizes code readability and efficiency. 
