@@ -120,8 +120,6 @@ checkpointing:
       k: -1 # -1 to save all checkpoints
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
-    config: 
-      checkpoint_path: /path/to/checkpoints
     config:
       checkpoint_path: checkpoints
       global_rank: ${oc.env:RANK}
