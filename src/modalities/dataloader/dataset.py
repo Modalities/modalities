@@ -161,7 +161,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         curr_len = 0
         block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
         for segment_offset, segment_len in tqdm(self.index_base):
-            # When the sum of of the length of the current previously seen samples doesn't
+            # When the sum of the length of the current previously seen samples doesn't
             # exceed block_size_in_bytes, we add the current segment length to the previous
             # ones and continue.
             if curr_len + segment_len < block_size_in_bytes:

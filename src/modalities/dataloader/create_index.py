@@ -9,13 +9,15 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
+from modalities.constants import DEFAULT_ENCODING
+
 
 # TODO: benchmark against pyspark
 class IndexGenerator:
     def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
         """
         Reads in a JSON file as a binary file, iterates character by character und builds up
-        the sample index (char-wisestart and end position for each JSON sample) via "\n" character positions.
+        the sample index (char-wise start and end position for each JSON sample) via "\n" character positions.
 
         :param src_file: Path to a jsonl-file.
         :param chunksize: defines the size of byte chunks that are processed via a producer-consumer approach.
@@ -59,16 +61,19 @@ class IndexGenerator:
         def process_line(last_index: int, curr_index: int):
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
-                line = np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
-                line = [c.decode("utf8") for c in line]
-                line = "".join(line)
-                json.loads(line)
+                memmapped_line = (
+                    np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
+                )
+                decoded_chars_in_line = [c.decode(DEFAULT_ENCODING) for c in memmapped_line]
+                decoded_line = "".join(decoded_chars_in_line)
+                json.loads(decoded_line)
                 self._index_map.append((last_index, segment_len))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
                     warnings.warn(f"faulty line at {last_index}-{curr_index}, skipping...")
                 else:
-                    warnings.warn(f"faulty line: {line=}")
+                    concatenated_line_for_debugging = b"".join(memmapped_line)
+                    warnings.warn(f"faulty line: {concatenated_line_for_debugging}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)

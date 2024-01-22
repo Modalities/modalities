@@ -6,6 +6,8 @@ from typing import List
 
 import numpy as np
 
+from modalities.constants import DEFAULT_ENCODING
+
 
 class BaseReader(ABC):
     @abstractmethod
@@ -60,7 +62,7 @@ class LargeFileLinesReader(BaseReader):
             try:
                 # TODO: verify why iso-8859-1 was necessary here in the path.
                 #   Maybe there was an issue with the actual loading of the jsonl-files
-                c = byte_char.decode("utf8")
+                c = byte_char.decode(DEFAULT_ENCODING)
             except Exception as exception:
                 c = ""
                 warnings.warn(f'Encountered invalid char: "{byte_char}".')
