@@ -41,3 +41,52 @@ class CLMCrossEntropyLoss(Loss):
         # Flatten the tokens
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
+
+
+class NCELoss(torch.nn.Module):
+    def __init__(self, asymm: bool, temp: float):
+        """
+        if asymm is True the calculated loss will only have negative samples w.r.t. one modalityand.
+        If this value is False negative samples are w.r.t. both modalities. temp is the temprature value.
+        """
+        super(NCELoss, self).__init__()
+        self.asymm = asymm
+        self.temp = temp
+
+    def forward(self, embedding1: torch.Tensor, embedding2: torch.Tensor, device: torch.device) -> torch.Tensor:
+        """
+        Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf by adding symmeric and asymmetric loss
+        Calculates the noise contrastive estimation loss between embeddings of two different modalities
+        :input: batch of embedding1 and embedding2 of size bxd each, device of the embeddings
+        :return: Loss tensor
+        """
+        # calculating the similarity matrix of size (bxb)
+        sim_matrix = torch.matmul(embedding1, embedding2.t()) / self.temp
+        # numerator of loss: using similarity scores for all positive pairs (e.g., image and its caption)
+        numerator = sim_matrix * torch.eye(sim_matrix.shape[0], device=device)
+        numerator = numerator.sum(dim=0).view(sim_matrix.shape[0], -1)
+        numerator = torch.logsumexp(numerator, dim=1)
+        # denominator of loss: using all similarity scores for all pairs (positive and negative)
+        if self.asymm:
+            denominator = torch.logsumexp(sim_matrix, dim=1)
+        else:
+            denominator = torch.logsumexp(torch.cat((sim_matrix, sim_matrix.permute(1, 0)), dim=1), dim=1)
+        return torch.mean(denominator - numerator)  # calculated in log space
+
+
+class AsymmNCELoss(Loss):
+    def __init__(self, prediction_key1: str, prediction_key2: str, tag: str = "AsymmNCELoss", temp: float = 1.0):
+        super().__init__(tag)
+        self.prediction_key1 = prediction_key1
+        self.prediction_key2 = prediction_key2
+        self.loss_fun = NCELoss(asymm=True, temp=temp)
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        embedding1 = forward_batch.get_predictions(self.prediction_key1)
+        embedding2 = forward_batch.get_predictions(self.prediction_key2)
+
+        shift_embedding1 = embedding1.contiguous()
+        shift_embedding2 = embedding2.contiguous()
+
+        loss = self.loss_fun(shift_embedding1, shift_embedding2, embedding1.device)
+        return loss
