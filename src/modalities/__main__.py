@@ -11,7 +11,7 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.optim import Optimizer
 from transformers import GPT2TokenizerFast
-
+from modalities.config.config import PretrainedGPTConfig
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
@@ -39,6 +39,8 @@ from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
 from modalities.utils.generate_text import main as generate_text_main
+
+from src.modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
 
 @click.group()
@@ -205,7 +207,7 @@ class Main:
             )
 
     def construct_components(
-        self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
+            self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
     ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
         # Checkpointing
 
@@ -252,8 +254,8 @@ class Main:
         #  and consider just using config.training.num_training_samples for progress Subscriber
         train_split_lengths = {
             train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
-            * config.training.world_size
-            * train_dataloader.sampler_batch_size
+                                             * config.training.world_size
+                                             * train_dataloader.sampler_batch_size
         }
 
         evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
@@ -281,7 +283,7 @@ class Main:
         return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
 
     def get_model_and_optimizer(
-        self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
+            self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
     ) -> Tuple[nn.Module, Optimizer]:
         run_mode = config.modalities_setup.run_mode
 
@@ -326,7 +328,7 @@ class Main:
         return wrapped_model, optimizer
 
     def get_logging_publishers(
-        self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
+            self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
         # Message Broker
         message_broker = MessageBroker()
@@ -379,12 +381,13 @@ class Main:
                 experiment_id=self.experiment_id,
                 num_ranks=self.config.training.world_size,
             )
-
-            # Model and optimizer
             wrapped_model, optimizer = self.get_model_and_optimizer(
                 config=self.config, running_env=self.running_env, checkpointing=checkpointing
             )
-            print('test')
+            config = PretrainedGPTConfig(self.config.model.config)
+            with wrapped_model.summon_full_params(wrapped_model):
+                model = PretrainedGPTModel(config=config, model=wrapped_model.module)
+                model.save_pretrained(output_path, safe_serialization=False)
 
 
 if __name__ == "__main__":
