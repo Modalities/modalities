@@ -6,7 +6,7 @@ text_cls_prediciton_key: text_cls
 vision_encoder_config:
   sample_key: images
   prediction_key: vision_embeddings
-  block_size: 197
+  block_size: 196
   n_classes: Null # Disable vision transformer head
   n_layer: 12
   n_head: 8
@@ -15,7 +15,7 @@ vision_encoder_config:
   patch_size: 16
   patch_stride: 16
   n_img_channels: 3
-  add_cls_token: True
+  add_cls_token: False
   bias: True
 text_decoder_config:
   sample_key: input_ids
@@ -55,3 +55,5 @@ multimodal_decoder_config:
   weight_init:
     mean: 0.0
     std: 0.02
+n_pool_head: 8
+n_vision_queries: 256
