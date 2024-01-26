@@ -175,11 +175,13 @@ class AttentionalPooling(nn.Module):
         self,
         n_embd: int,
         n_head: int,
+        bias: bool,
+        epsilon: float,
     ):
         super().__init__()
-        self.ln_1 = nn.LayerNorm(n_embd)
+        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
         self.attn = Attention(n_embd, n_head, use_cross_attention=True)
-        self.ln_2 = nn.LayerNorm(n_embd)
+        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
     def forward(self, vision_embd: torch.Tensor, vision_queries: torch.Tensor) -> torch.Tensor:
         x = self.ln_1(vision_embd)
@@ -197,8 +199,10 @@ class CoCaConfig(BaseModel):
     vision_encoder_config: VisionTransformerConfig
     text_decoder_config: GPT2Config
     multimodal_decoder_config: GPT2Config
-    n_pool_head: Annotated[int, Field(ge=1)] = 8
-    n_vision_queries: Annotated[int, Field(ge=1)] = 256  # TODO: ge?
+    n_pool_head: Annotated[int, Field(ge=1)]
+    n_vision_queries: Annotated[int, Field(ge=1)]
+    bias_attn_pool: bool
+    epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
 
 
 class CoCa(NNModel):
@@ -224,7 +228,12 @@ class CoCa(NNModel):
         self.vision_queries = nn.Parameter(
             torch.randn(config.n_vision_queries + 1, config.vision_encoder_config.n_embd)
         )
-        self.attn_pool = AttentionalPooling(n_embd=config.vision_encoder_config.n_embd, n_head=config.n_pool_head)
+        self.attn_pool = AttentionalPooling(
+            n_embd=config.vision_encoder_config.n_embd,
+            n_head=config.n_pool_head,
+            bias=config.bias_attn_pool,
+            epsilon=config.epsilon_attn_pool,
+        )
 
     def forward(self, inputs):
         vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
@@ -238,8 +247,6 @@ class CoCa(NNModel):
 
     def _forward_encode_vision(self, inputs):
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediciton_key]
-        # TODO instead of a class token use attention pooling
-        # TODO add condition for attn pooling layer
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(vision_embd, queries)
         vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
