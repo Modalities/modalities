@@ -46,8 +46,12 @@ class CLMCrossEntropyLoss(Loss):
 class NCELoss(torch.nn.Module):
     def __init__(self, asymm: bool, temp: float):
         """
-        if asymm is True the calculated loss will only have negative samples w.r.t. one modalityand.
-        If this value is False negative samples are w.r.t. both modalities. temp is the temprature value.
+        This calculates the noise contrastive estimation loss between embeddings of two different modalities
+        Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf by adding symmeric and asymmetric loss
+
+        Args:
+            asymm (bool): specifies if the loss is calculated in one direction or both directions
+            temp (float): temprature value for regulating loss
         """
         super(NCELoss, self).__init__()
         self.asymm = asymm
@@ -55,10 +59,13 @@ class NCELoss(torch.nn.Module):
 
     def forward(self, embedding1: torch.Tensor, embedding2: torch.Tensor, device: torch.device) -> torch.Tensor:
         """
-        Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf by adding symmeric and asymmetric loss
-        Calculates the noise contrastive estimation loss between embeddings of two different modalities
-        :input: batch of embedding1 and embedding2 of size bxd each, device of the embeddings
-        :return: Loss tensor
+        Args:
+            embedding1 (torch.Tensor): embeddings from modality 1 of size batch x dim
+            embedding2 (torch.Tensor): embeddings from modality 2 of size batch x dim
+            device (torch.device): torch device for calculating loss
+
+        Returns:
+            torch.Tensor: loss tensor
         """
         # calculating the similarity matrix of size (bxb)
         sim_matrix = torch.matmul(embedding1, embedding2.t()) / self.temp
@@ -76,12 +83,28 @@ class NCELoss(torch.nn.Module):
 
 class AsymmNCELoss(Loss):
     def __init__(self, prediction_key1: str, prediction_key2: str, tag: str = "AsymmNCELoss", temp: float = 1.0):
+        """
+        Asymmetric noise contrastive estimation loss
+
+        Args:
+            prediction_key1 (str): key to access embedding 1
+            prediction_key2 (str): key to access embedding 2
+            tag (str, optional): defaults to "AsymmNCELoss".
+            temp (float, optional): tempreture. Defaults to 1.0.
+        """
         super().__init__(tag)
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
         self.loss_fun = NCELoss(asymm=True, temp=temp)
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        """
+        Args:
+            forward_batch (InferenceResultBatch): data batch
+
+        Returns:
+            torch.Tensor: loss tensor
+        """
         embedding1 = forward_batch.get_predictions(self.prediction_key1)
         embedding2 = forward_batch.get_predictions(self.prediction_key2)
 
