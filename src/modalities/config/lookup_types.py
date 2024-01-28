@@ -3,6 +3,7 @@ from enum import Enum
 import torch
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
+from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
 from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from modalities.checkpointing.checkpointing_strategies import (
@@ -16,6 +17,7 @@ from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMM
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
+from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
 
 
 class LookupEnum(Enum):
@@ -27,6 +29,7 @@ class LookupEnum(Enum):
 
 class ModelTypes(LookupEnum):
     GPT2LLM = GPT2LLM
+    HuggingFacePretrainedModel = HuggingFacePretrainedModel
 
 
 class LossTypes(LookupEnum):
@@ -45,6 +48,7 @@ class SchedulerTypes(LookupEnum):
 
 class TokenizerTypes(LookupEnum):
     GPT2TokenizerFast = GPT2TokenizerFast
+    LlamaTokenizerFast = LlamaTokenizerFast
 
 
 class DatasetTypes(LookupEnum):
