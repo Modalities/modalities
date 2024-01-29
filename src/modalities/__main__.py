@@ -31,7 +31,7 @@ from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import 
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
-from modalities.logging_broker.subscriber_impl.results_subscriber import RichResultSubscriber
+from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.resolver_register import ResolverRegister
@@ -290,9 +290,7 @@ class Main:
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
         if run_mode == RunMode.WARM_START:
-            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = (
-                config.modalities_setup.settings
-            )  # type: ignore
+            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
             wrapped_model = checkpointing.load_model_checkpoint(
                 file_path=warm_start_settings.checkpoint_model_path,
                 model=model,
@@ -353,7 +351,14 @@ class Main:
                 train_split_num_samples=train_split_lengths,
                 eval_splits_num_samples=eval_split_lengths,
             )
-            evaluation_result_subscriber = RichResultSubscriber(num_ranks=config.training.world_size)
+            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
+                num_ranks=config.training.world_size,
+                project=config.wandb.project_name,
+                experiment_id=self.experiment_id,
+                mode=config.wandb.mode,
+                dir=config.wandb.dir,
+                experiment_config=config,
+            )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
             )
