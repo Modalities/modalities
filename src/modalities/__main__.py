@@ -183,6 +183,8 @@ class Main:
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
+        self.wrapped_model = None
+
     def run(self):
         with self.running_env as running_env:
             (
@@ -372,9 +374,8 @@ class Main:
         return evaluation_result_publisher, batch_processed_publisher
 
     def load_and_convert_checkpoint(self, output_path):
-        with self.running_env as running_env:
-            wrapped_model = self._get_model_from_checkpoint()
-            self._convert_checkpoint(output_path, wrapped_model)
+        self.wrapped_model = self._get_model_from_checkpoint()
+        self._convert_checkpoint(output_path, self.wrapped_model)
 
     def _get_model_from_checkpoint(self):
         with self.running_env as running_env:
