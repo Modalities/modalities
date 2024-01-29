@@ -1,8 +1,9 @@
-from enum import Enum
-from typing import Callable, Dict, Generic, TypeVar
+from abc import ABC, abstractmethod
+from typing import Dict, Generic, TypeVar
 
 import torch
 import torch.distributed as dist
+from torch._tensor import Tensor
 
 from modalities.batch import InferenceResultBatch
 from modalities.running_env.fsdp.reducer import Reducer
@@ -28,77 +29,81 @@ class Aggregator(Generic[T]):
     def __init__(self):
         self.key_to_value: Dict[T, torch.Tensor] = {}
 
+    def add_values(self, value_dict: Dict[T, torch.Tensor]):
+        for key, value in value_dict.items():
+            self.add_value(key, value)
+
     def add_value(self, key: T, value: torch.Tensor):
         if key not in self.key_to_value:
             self.key_to_value[key] = value
         else:
             self.key_to_value[key] += value
 
-    def remove_key(self, key: T):
-        self.key_to_value.pop(key)
-
+    # FIXME: Remove as we can always just instantiate a new aggregator
     def remove_keys(self):
         self.key_to_value = {}
 
+    def remove_key(self, key: T):
+        self.key_to_value.pop(key)
+
     def get_all_reduced_value(
-        self,
-        key: T,
-        reduce_operation: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM,
-        postprocessing_fun: None | Callable[[torch.Tensor], torch.Tensor] = None,
+        self, key: T, reduce_operation: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM
     ) -> torch.Tensor:
         # we clone the value so that we can always resync the value without side-effects
         cloned_value = self.key_to_value[key].clone()
-        value = Reducer.reduce(
-            tensor=cloned_value,
-            operation=reduce_operation,
-            post_processing_fun=postprocessing_fun,  # lambda t: t[0] / t[1],
-        )
+        value = Reducer.reduce(tensor=cloned_value, operation=reduce_operation)
         return value
 
 
-class StatefulMetric(Generic[T]):
-    def __init__(self, tag: str, aggregator: Aggregator[T]):
-        self.tag = tag
-        self.aggregator = aggregator
-
+class StatefulMeasureIF(Generic[T], ABC):
+    @abstractmethod
     def add_result_batch(self, result_batch: InferenceResultBatch):
-        pass
+        raise NotImplementedError
 
+    @abstractmethod
     def compute(
         self,
     ) -> torch.Tensor:
+        raise NotImplementedError
+
+
+class StatefulMeasureABC(StatefulMeasureIF):
+    def __init__(
+        self, aggregate_keys_and_init: Dict[str, torch.Tensor], reduce_ops: Dict[T, dist.ReduceOp.RedOpType]
+    ) -> None:
+        self._aggregator = Aggregator[T](initial_key_values=aggregate_keys_and_init)
+
+    def add_result(self, batch_result: InferenceResultBatch) -> None:
+        res = self._postprocess_result_batch(batch_result)
+
+        for key, value in res.items():
+            self._aggregator.add_value(key, value)
+
+    def compute(self) -> torch.Tensor:
+        synced_vals = {}
+        for key in self._aggregator:
+            synced_vals[key] = self._aggregator.get_all_reduced_value(
+                key,
+                self.reduce_ops[key],
+            )
+
+        return self._calc_measure(synced_vals)
+
+    @abstractmethod
+    def _calc_measure(self) -> float:
         pass
 
+    @abstractmethod
+    def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[T, torch.Tensor]:
+        raise NotImplementedError
 
-class AccuracyStatefulMetric:
-    class Keys(Enum):
-        tp = "TP"
-        fp = "FP"
 
-    def __init__(self, prediction_subscription_key: str, target_subscription_key: str) -> None:
-        # Non-packed validation target with generated samples of different lengths
-        # t_0 | t1  t2  t3  t4 t5  t6  EoS 0   0   0   |  <- target
-        # t_0 | t1  t2  t3  t4 t5  t6  EoS             |  <- sample 1
-        # t_0 | t1  t2  t3  t4 t5  t6  t7  t8  t9  t10 |  <- sample 2
-        # t_0 | t1  t2  t3  t4 t5  t6  t7  t8  EoS     |  <- sample 3
-        # t_0 | t1  t2  t3  t4 EoS t6  t7  t8  t9  t10 |  <- sample 4
-        #
-        # Sample 3: we calculate the accuracy metric until t7 and disregard t8 - t10
-        # Sample 4: we would calculate the accuracy by taking the misses (t6 and EoS) into account
+class PerplexityStatefulMeasure(StatefulMeasureABC):
+    def __init__(self, aggregate_keys_and_init: Dict[str, Tensor], reduce_op) -> None:
+        super().__init__(aggregate_keys_and_init, reduce_op)
 
-        self.prediction_subscription_key = prediction_subscription_key
-        self.target_subscription_key = target_subscription_key
-        self.aggregator: Aggregator = Aggregator[AccuracyStatefulMetric.Keys]()
-
-    def add_result_batch(self, result_batch: InferenceResultBatch):
-        # logic for what we want track
+    def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[T, torch.Tensor]:
         pass
 
-    def compute(
-        self,
-    ) -> torch.Tensor:
-        # logic for how we compute the metric from what we wanted to track
-        # We call get_all_reduced_value from Aggregator to sync the values
-        # across the ranks
-
+    def calc_measure() -> float:
         pass
