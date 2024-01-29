@@ -37,7 +37,7 @@ def test_run_cpu_only(
     llm_data_loader_mock.__len__ = lambda _: num_batches
 
     gym = Gym(trainer=trainer, evaluator=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
-    with patch.object(Reducer, "reduce", return_value=None) as reduce_mock:
+    with patch.object(Reducer, "reduce", return_value=sample_tensor) as reduce_mock:
         gym.run(
             model=nn_model_mock,
             optimizer=optimizer_mock,
