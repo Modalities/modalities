@@ -39,8 +39,7 @@ from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
 from modalities.utils.generate_text import main as generate_text_main
-
-from src.modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
+from modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
 
 @click.group()
@@ -167,7 +166,7 @@ def convert_checkpoint(config_file_path, output_path):
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
-    main.convert_checkpoint(output_path)
+    main.load_and_convert_checkpoint(output_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -372,7 +371,12 @@ class Main:
 
         return evaluation_result_publisher, batch_processed_publisher
 
-    def convert_checkpoint(self, output_path):
+    def load_and_convert_checkpoint(self, output_path):
+        with self.running_env as running_env:
+            wrapped_model = self._get_model_from_checkpoint()
+            self._convert_checkpoint(output_path, wrapped_model)
+
+    def _get_model_from_checkpoint(self):
         with self.running_env as running_env:
             checkpointing = CheckpointingFactory.get_checkpointing(
                 resolvers=self.resolvers,
@@ -384,10 +388,13 @@ class Main:
             wrapped_model, optimizer = self.get_model_and_optimizer(
                 config=self.config, running_env=self.running_env, checkpointing=checkpointing
             )
-            config = PretrainedGPTConfig(self.config.model.config)
-            with wrapped_model.summon_full_params(wrapped_model):
-                model = PretrainedGPTModel(config=config, model=wrapped_model.module)
-                model.save_pretrained(output_path, safe_serialization=False)
+            return wrapped_model
+
+    def _convert_checkpoint(self, output_path, wrapped_model):
+        config = PretrainedGPTConfig(self.config.model.config)
+        with wrapped_model.summon_full_params(wrapped_model):
+            model = PretrainedGPTModel(config=config, model=wrapped_model.module)
+            model.save_pretrained(output_path, safe_serialization=False)
 
 
 if __name__ == "__main__":
