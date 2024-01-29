@@ -84,7 +84,7 @@ class Trainer:
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
-            # save the batch loss
+            # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
             batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
