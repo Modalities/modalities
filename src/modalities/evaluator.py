@@ -5,6 +5,7 @@ import torch.distributed as dist
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.evaluation.measure import AggregativeMeasureFactory
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -30,8 +31,8 @@ class Evaluator:
         self,
         batch: DatasetBatch,
         model: NNModel,
-        loss_functions: List[Loss],
-        metrics: List[Metric],
+        loss_functions: List[AggregativeMeasureFactory],
+        metrics: List[AggregativeMeasureFactory],
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         with torch.no_grad():
             result_batch = model_predict_batch(model=model, batch=batch)
