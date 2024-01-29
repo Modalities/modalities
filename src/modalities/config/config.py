@@ -284,6 +284,7 @@ class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
 
+
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
         checkpoint_model_path: Path
@@ -319,7 +320,7 @@ class AppConfig(BaseModel):
     loss: LossConfig
 
 
-class PretrainedGPTConfig(PretrainedConfig):
+class HugginFaceModelConfig(PretrainedConfig):
     model_type = "modalities_gpt2"
 
     def __init__(self, config: GPT2Config = None, **kwargs):

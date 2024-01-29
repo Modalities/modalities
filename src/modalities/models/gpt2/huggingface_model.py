@@ -1,17 +1,17 @@
 from typing import Dict
 
 import torch
+import torch.nn as nn
 from transformers import PreTrainedModel
 
-from modalities.config.config import PretrainedGPTConfig
+from modalities.config.config import HugginFaceModelConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM
-import torch.nn as nn
 
 
-class PretrainedGPTModel(PreTrainedModel):
-    config_class = PretrainedGPTConfig
+class HugginFaceModel(PreTrainedModel):
+    config_class = HugginFaceModelConfig
 
-    def __init__(self, config: PretrainedGPTConfig, model: nn.Module = None):
+    def __init__(self, config: HugginFaceModelConfig, model: nn.Module = None):
         super().__init__(config)
         # TODO offloading the parameters like this is ugly
         if model is None:
