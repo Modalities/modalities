@@ -5,9 +5,9 @@ from typing import Type
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from pydantic import BaseModel, ValidationError, validator
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp import ShardingStrategy
+from pydantic import BaseModel, ValidationError, field_validator
+from torch.distributed.fsdp.api import ShardingStrategy
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 from modalities.config.lookup_types import LookupEnum
@@ -43,7 +43,7 @@ class FSDPRunningEnvConfig(BaseModel):
     sharding_strategy: ShardingStrategy
     auto_wrap_policy: AutoWrapPolicies
 
-    @validator("mixed_precision_settings", pre=True, always=True)
+    @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
         mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
             name=name, enum_type=MixedPrecisionSettings
@@ -55,11 +55,11 @@ class FSDPRunningEnvConfig(BaseModel):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
 
-    @validator("sharding_strategy", pre=True, always=True)
+    @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
-    @validator("auto_wrap_policy", pre=True, always=True)
+    @field_validator("auto_wrap_policy", mode="before")
     def parse_auto_wrap_policy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=AutoWrapPolicies)
 

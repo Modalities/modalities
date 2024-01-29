@@ -9,7 +9,7 @@ from modalities.models.gpt2.gpt2_model import (
     GPT2Config,
     WeightInitailizationConfig,
 )
-from modalities.models.gpt2.pretrained_gpt_model import HuggingFaceModel
+from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 
 
 def test_pretrained_gpt_model(tmp_path):
