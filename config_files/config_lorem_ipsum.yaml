@@ -10,7 +10,7 @@ wandb:
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
-  sequence_len: 4096
+  sequence_len: 128
   train_dataloader:
     type_hint: LLMDataLoader
     config:
