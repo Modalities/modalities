@@ -4,14 +4,14 @@ import torch
 import torch.nn as nn
 from transformers import PreTrainedModel
 
-from modalities.config.config import HugginFaceModelConfig
+from modalities.config.config import HuggingFaceModelConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 
 
-class HugginFaceModel(PreTrainedModel):
-    config_class = HugginFaceModelConfig
+class HuggingFaceModel(PreTrainedModel):
+    config_class = HuggingFaceModelConfig
 
-    def __init__(self, config: HugginFaceModelConfig, model: nn.Module = None):
+    def __init__(self, config: HuggingFaceModelConfig, model: nn.Module = None):
         super().__init__(config)
         # TODO offloading the parameters like this is ugly
         if model is None:

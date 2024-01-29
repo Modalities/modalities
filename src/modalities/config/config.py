@@ -320,7 +320,7 @@ class AppConfig(BaseModel):
     loss: LossConfig
 
 
-class HugginFaceModelConfig(PretrainedConfig):
+class HuggingFaceModelConfig(PretrainedConfig):
     model_type = "modalities_gpt2"
 
     def __init__(self, config: GPT2Config = None, **kwargs):

@@ -1,7 +1,7 @@
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
-from modalities.config.config import HugginFaceModelConfig
+from modalities.config.config import HuggingFaceModelConfig
 from modalities.models.gpt2.gpt2_model import (
     ActivationType,
     AttentionConfig,
@@ -9,7 +9,7 @@ from modalities.models.gpt2.gpt2_model import (
     GPT2Config,
     WeightInitailizationConfig,
 )
-from modalities.models.gpt2.pretrained_gpt_model import HugginFaceModel
+from modalities.models.gpt2.pretrained_gpt_model import HuggingFaceModel
 
 
 def test_pretrained_gpt_model(tmp_path):
@@ -31,15 +31,15 @@ def test_pretrained_gpt_model(tmp_path):
         prediction_key="logits",
         weight_init=WeightInitailizationConfig(mean=0, std=0.02),
     )
-    pretrained_config = HugginFaceModelConfig(config=config)
+    pretrained_config = HuggingFaceModelConfig(config=config)
 
-    model = HugginFaceModel(config=pretrained_config)
+    model = HuggingFaceModel(config=pretrained_config)
     model.save_pretrained(tmp_path)
     model = model.eval()
 
     # register config and model
-    AutoConfig.register("modalities_gpt2", HugginFaceModelConfig)
-    AutoModelForCausalLM.register(HugginFaceModelConfig, HugginFaceModel)
+    AutoConfig.register("modalities_gpt2", HuggingFaceModelConfig)
+    AutoModelForCausalLM.register(HuggingFaceModelConfig, HuggingFaceModel)
 
     # load saved model
     loaded_model = AutoModelForCausalLM.from_pretrained(tmp_path)

@@ -15,7 +15,7 @@ from modalities.activation_checkpointing import apply_activation_checkpointing_i
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, HugginFaceModelConfig, ModalitiesSetupConfig, RunMode
+from modalities.config.config import AppConfig, HuggingFaceModelConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -33,7 +33,7 @@ from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import 
 )
 from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from modalities.loss_functions import Loss
-from modalities.models.gpt2.huggingface_model import HugginFaceModel
+from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
@@ -393,9 +393,9 @@ class Main:
             return wrapped_model
 
     def _convert_checkpoint(self, output_path, wrapped_model):
-        config = HugginFaceModelConfig(self.config.model.config)
+        config = HuggingFaceModelConfig(self.config.model.config)
         with wrapped_model.summon_full_params(wrapped_model):
-            model = HugginFaceModel(config=config, model=wrapped_model.module)
+            model = HuggingFaceModel(config=config, model=wrapped_model.module)
             model.save_pretrained(output_path, safe_serialization=False)
 
 
