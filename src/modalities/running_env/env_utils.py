@@ -10,6 +10,7 @@ from torch.distributed.fsdp import MixedPrecision
 def has_bfloat_support():
     return (
         torch.version.cuda
+        and torch.cuda.is_available()
         and torch.cuda.is_bf16_supported()
         and packaging.version.parse(torch.version.cuda).release >= (11, 0)
         and dist.is_nccl_available()

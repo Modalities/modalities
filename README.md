@@ -1,7 +1,9 @@
 # Modalities
 
+
 # Getting started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
+Also, see our WIki and API reference documentation: https://modalities.github.io/modalities/
 
 # Installation
 
@@ -18,6 +20,7 @@ pip install -e .
 ```
 
 If you want to contribute, have look at `CONTRIBUTING.md`.
+
 
 
 # Usage

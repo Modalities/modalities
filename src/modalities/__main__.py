@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.optim import Optimizer
-from transformers import GPT2TokenizerFast
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
@@ -270,7 +269,7 @@ class Main:
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
 
         if run_mode == RunMode.WARM_START:
-            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings  # type: ignore
+            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
             wrapped_model = checkpointing.load_model_checkpoint(
                 file_path=warm_start_settings.checkpoint_model_path,
                 model=model,
@@ -337,7 +336,7 @@ class Main:
                 experiment_id=self.experiment_id,
                 mode=config.wandb.mode,
                 dir=config.wandb.dir,
-                experiment_config=config
+                experiment_config=config,
             )
             message_broker.add_subscriber(
                 subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
