@@ -1,7 +1,7 @@
 modalities_setup:
   run_mode: FROM_SCRATCH
   settings:
-    global_num_seen_samples: 1000
+    global_num_seen_samples: 0
 
 wandb:
   project_name: modalities
