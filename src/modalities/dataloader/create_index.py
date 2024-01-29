@@ -6,7 +6,6 @@ import threading
 import warnings
 from pathlib import Path
 
-import numpy as np
 from tqdm import tqdm
 
 from modalities.constants import DEFAULT_ENCODING
@@ -61,19 +60,16 @@ class IndexGenerator:
         def process_line(last_index: int, curr_index: int):
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
-                memmapped_line = (
-                    np.memmap(self.src_file, mode="r", offset=last_index, shape=(segment_len,)).view("S1").tolist()
-                )
-                decoded_chars_in_line = [c.decode(DEFAULT_ENCODING) for c in memmapped_line]
-                decoded_line = "".join(decoded_chars_in_line)
+                f = self.src_file.open(encoding=DEFAULT_ENCODING)
+                f.seek(last_index)
+                decoded_line = f.read(segment_len)
                 json.loads(decoded_line)
                 self._index_map.append((last_index, segment_len))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
                     warnings.warn(f"faulty line at {last_index}-{curr_index}, skipping...")
                 else:
-                    concatenated_line_for_debugging = b"".join(memmapped_line)
-                    warnings.warn(f"faulty line: {concatenated_line_for_debugging}")
+                    warnings.warn(f"faulty line: {decoded_line}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)
@@ -83,7 +79,7 @@ class IndexGenerator:
         for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
             for char_index, c in enumerate(chunk):
                 curr_index = chunk_idx * self.chunksize + char_index
-                if c == ord("\n"):
+                if c == "\n":
                     process_line(last_index, curr_index)
                     last_index = curr_index + 1
         # prevents automatically added "\n"-chars at the end of files getting interpreted as own sample
@@ -91,7 +87,7 @@ class IndexGenerator:
             process_line(last_index, curr_index + 1)
 
     def _reader_thread(self):
-        with open(self.src_file, "rb") as fin:
+        with open(self.src_file, "r", encoding=DEFAULT_ENCODING) as fin:
             while True:
                 chunk = fin.read(self.chunksize)
                 if self._exception_buffer:

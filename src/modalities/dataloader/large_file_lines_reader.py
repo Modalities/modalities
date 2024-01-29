@@ -1,10 +1,7 @@
 import pickle
-import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
-
-import numpy as np
 
 from modalities.constants import DEFAULT_ENCODING
 
@@ -58,21 +55,6 @@ class LargeFileLinesReader(BaseReader):
         return self.__read_from_raw_file(offset, sample_length_in_bytes)
 
     def __read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
-        def safe_decoder(byte_char):
-            try:
-                # TODO: verify why iso-8859-1 was necessary here in the path.
-                #   Maybe there was an issue with the actual loading of the jsonl-files
-                c = byte_char.decode(DEFAULT_ENCODING)
-            except Exception as exception:
-                c = ""
-                warnings.warn(f'Encountered invalid char: "{byte_char}".')
-                warnings.warn(f"Encountered problem: {exception}")
-            return c
-
-        string = (
-            np.memmap(self.raw_data_path, mode="r", offset=offset, shape=(sample_length_in_bytes,)).view("S1").tolist()
-        )
-        decoded_string = []
-        for c in string:
-            decoded_string.append(safe_decoder(c))
-        return "".join(decoded_string)
+        f = self.raw_data_path.open(encoding=DEFAULT_ENCODING)
+        f.seek(offset)
+        return f.read(sample_length_in_bytes)
