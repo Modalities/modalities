@@ -40,7 +40,8 @@ class GPT2Config(BaseModel):
     block_size: conint(ge=1)
     vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: conint(ge=1)
-    n_head: conint(ge=1)
+    n_head_q: conint(ge=1)
+    n_head_kv: conint(ge=1)
     n_embd: conint(ge=1)
     ffn_hidden: conint(ge=1)
     dropout: confloat(ge=0.0)
@@ -82,10 +83,10 @@ class LayerNorm(nn.Module):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self, n_head: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
+        self, n_head_q: int, n_head_kv: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
     ):
         super().__init__()
-        assert n_embd % n_head == 0
+        assert n_embd % n_head_q == 0
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
             in_features=n_embd,
@@ -103,7 +104,9 @@ class CausalSelfAttention(nn.Module):
         # regularization
         self.attn_dropout = nn.Dropout(dropout)
         self.resid_dropout = nn.Dropout(dropout)
-        self.n_head = n_head
+        self.n_head_q = n_head_q
+        self.n_head_kv = n_head_kv
+
         self.n_embd = n_embd
         self.dropout = dropout
         self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
@@ -120,9 +123,9 @@ class CausalSelfAttention(nn.Module):
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+        k = k.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh, T, hs)
+        q = q.view(B, T, self.n_head_q, C // self.n_head_q).transpose(1, 2)  # (B, nh, T, hs)
+        v = v.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh, T, hs)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
@@ -180,7 +183,8 @@ class Block(nn.Module):
         bias: bool,
         epsilon: float,
         activation: ActivationType,
-        n_head: int,
+        n_head_q: int,
+        n_head_kv: int,
         attention: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -189,7 +193,7 @@ class Block(nn.Module):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
         self.attn = CausalSelfAttention(
-            n_head=n_head, n_embd=n_embd, attention=attention, bias=bias, dropout=dropout, block_size=block_size
+            n_head_q=n_head_q, n_head_kv=n_head_kv, n_embd=n_embd, attention=attention, bias=bias, dropout=dropout, block_size=block_size
         )
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
@@ -215,7 +219,8 @@ class GPT2LLM(NNModel):
         block_size: int,
         vocab_size: int,
         n_layer: int,
-        n_head: int,
+        n_head_q: int,
+        n_head_kv: int,
         n_embd: int,
         ffn_hidden: int,
         dropout: float,
@@ -245,7 +250,8 @@ class GPT2LLM(NNModel):
                             bias=bias,
                             epsilon=epsilon,
                             activation=activation,
-                            n_head=n_head,
+                            n_head_q=n_head_q,
+                            n_head_kv=n_head_kv,
                             attention=attention,
                             dropout=dropout,
                             block_size=block_size,
