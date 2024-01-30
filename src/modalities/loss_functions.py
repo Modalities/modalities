@@ -44,18 +44,19 @@ class CLMCrossEntropyLoss(Loss):
 
 
 class NCELoss(torch.nn.Module):
-    def __init__(self, asymm: bool, temp: float):
+    def __init__(self, is_asymmetric: bool, temperature: float):
         """
         This calculates the noise contrastive estimation loss between embeddings of two different modalities
-        Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf by adding symmeric and asymmetric loss
+        Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf, https://github.com/antoine77340/MIL-NCE_HowTo100M
+        changes include adding a temperature value and the choice of calculating asymmetric loss w.r.t. one modality
 
         Args:
-            asymm (bool): specifies if the loss is calculated in one direction or both directions
-            temp (float): temprature value for regulating loss
+            is_asymmetric (bool): specifies if the loss is calculated in one direction or both directions
+            temperature (float): temperature value for regulating loss
         """
         super(NCELoss, self).__init__()
-        self.asymm = asymm
-        self.temp = temp
+        self.is_asymmetric = is_asymmetric
+        self.temperature = temperature
 
     def forward(self, embedding1: torch.Tensor, embedding2: torch.Tensor, device: torch.device) -> torch.Tensor:
         """
@@ -67,22 +68,22 @@ class NCELoss(torch.nn.Module):
         Returns:
             torch.Tensor: loss tensor
         """
-        # calculating the similarity matrix of size (bxb)
-        sim_matrix = torch.matmul(embedding1, embedding2.t()) / self.temp
+        # calculating the similarity matrix of size (batch_size x batch_size)
+        sim_matrix = torch.matmul(embedding1, embedding2.t()) / self.temperature
         # numerator of loss: using similarity scores for all positive pairs (e.g., image and its caption)
         numerator = sim_matrix * torch.eye(sim_matrix.shape[0], device=device)
         numerator = numerator.sum(dim=0).view(sim_matrix.shape[0], -1)
         numerator = torch.logsumexp(numerator, dim=1)
         # denominator of loss: using all similarity scores for all pairs (positive and negative)
-        if self.asymm:
+        if self.is_asymmetric:
             denominator = torch.logsumexp(sim_matrix, dim=1)
         else:
-            denominator = torch.logsumexp(torch.cat((sim_matrix, sim_matrix.permute(1, 0)), dim=1), dim=1)
+            denominator = torch.logsumexp(torch.cat((sim_matrix, sim_matrix.t()), dim=1), dim=1)
         return torch.mean(denominator - numerator)  # calculated in log space
 
 
 class AsymmNCELoss(Loss):
-    def __init__(self, prediction_key1: str, prediction_key2: str, tag: str = "AsymmNCELoss", temp: float = 1.0):
+    def __init__(self, prediction_key1: str, prediction_key2: str, tag: str = "AsymmNCELoss", temperature: float = 1.0):
         """
         Asymmetric noise contrastive estimation loss
 
@@ -90,12 +91,12 @@ class AsymmNCELoss(Loss):
             prediction_key1 (str): key to access embedding 1
             prediction_key2 (str): key to access embedding 2
             tag (str, optional): defaults to "AsymmNCELoss".
-            temp (float, optional): tempreture. Defaults to 1.0.
+            temperature (float, optional): temperature. Defaults to 1.0.
         """
         super().__init__(tag)
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
-        self.loss_fun = NCELoss(asymm=True, temp=temp)
+        self.loss_fun = NCELoss(is_asymmetric=True, temperature=temperature)
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         """
