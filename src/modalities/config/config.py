@@ -284,6 +284,7 @@ class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
 
+
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
         checkpoint_model_path: Path
