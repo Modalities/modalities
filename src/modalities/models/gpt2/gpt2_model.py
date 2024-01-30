@@ -1,64 +1,56 @@
 import math
-from enum import Enum
 from functools import partial
-from typing import Dict
+from typing import Dict, Tuple
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint, model_validator
 from torch.nn import functional as F
+from xformers.components.positional_embedding import RotaryEmbedding
 
+from modalities.models.gpt2.gpt2_model_config import AttentionConfig, AttentionType, ActivationType, \
+    WeightInitailizationConfig
 from modalities.models.model import NNModel
+
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
+class QueryKeyValueTransform(nn.Module):
 
-class AttentionType(str, Enum):
-    DEFAULT_ATTENTION = "default_attention"
-    PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
-
-
-class ActivationType(str, Enum):
-    GELU = "gelu"
-    FUSED_SWIGLU = "fused_swiglu"
-
-
-class AttentionConfig(BaseModel):
-    attention_type: AttentionType
-    scaling_factor: conint(ge=1)
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pass
 
 
-class WeightInitailizationConfig(BaseModel):
-    mean: confloat(ge=0.0)
-    std: confloat(ge=0.0)
+class IdentityTransform(QueryKeyValueTransform):
+
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return q, k, v
 
 
-class GPT2Config(BaseModel):
-    sample_key: str
-    prediction_key: str
-    block_size: conint(ge=1)
-    vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: conint(ge=1)
-    n_head: conint(ge=1)
-    n_embd: conint(ge=1)
-    ffn_hidden: conint(ge=1)
-    dropout: confloat(ge=0.0)
-    bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention: AttentionConfig
-    activation: ActivationType
-    epsilon: confloat(ge=0.0)
-    weight_init: WeightInitailizationConfig
+class RotaryTransform(QueryKeyValueTransform):
+    def __init__(self, n_embd: int, block_size: int):
+        self.rope = RotaryEmbedding(dim_model=n_embd)
+        self.block_size = block_size
 
-    @model_validator(mode="after")
-    def validate_sizes(self) -> "GPT2Config":
-        for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
-        ):
-            if param % 128 != 0:
-                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
-                raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
-        return self
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        q, k = self.rope(q, k)
+
+        return q, k, v
 
 
 class LayerNorm(nn.Module):
@@ -82,7 +74,14 @@ class LayerNorm(nn.Module):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self, n_head: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
+        self,
+        n_head: int,
+        n_embd: int,
+        attention: AttentionConfig,
+        bias: bool,
+        dropout: float,
+        block_size: int,
+
     ):
         super().__init__()
         assert n_embd % n_head == 0
@@ -108,6 +107,8 @@ class CausalSelfAttention(nn.Module):
         self.dropout = dropout
         self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
+        self.qkv_transforms = nn.Sequential(attention.qkv_transforms)
+
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
             self.register_buffer(
@@ -123,6 +124,8 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+
+        q, k, v = self.qkv_transform(q, k, v)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
