@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -137,7 +138,16 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=".text",
     help="jq pattern to extract the data from the json line.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
+@click.option(
+    "--num-cpus",
+    type=int,
+    show_default=True,
+    default=os.cpu_count(),
+    help="Specify the number of tokenization workers. Default is the number of available CPUs.",
+)
+def entry_point_create_packed_data(
+    src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus
+):
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
     #  This is based on its connection to the overall `AppConfig`.
@@ -145,7 +155,9 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
+    generator = PackedDataGenerator(
+        src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern, number_of_processes=num_cpus
+    )
     generator.run(dst_path)
 
 

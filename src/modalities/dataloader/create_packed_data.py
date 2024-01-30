@@ -1,7 +1,9 @@
+import multiprocessing
+import os
 import pickle
 import warnings
 from pathlib import Path
-from typing import IO
+from typing import Callable, List, Tuple
 
 import jq
 import numpy as np
@@ -9,6 +11,10 @@ from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+
+
+class EmptySampleError(RuntimeError):
+    pass
 
 
 class PackedDataGenerator:
@@ -26,6 +32,7 @@ class PackedDataGenerator:
         tokenizer: PreTrainedTokenizer,
         index_path: Path = None,
         jq_pattern: str = ".text",
+        number_of_processes: int = 60,
         max_number_of_tokens: int = None,
     ):
         """
@@ -43,13 +50,16 @@ class PackedDataGenerator:
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
+        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
+        self._encoded_eos_token_as_bytes = encoded_eos_token.to_bytes(self.TOKEN_SIZE_IN_BYTES, byteorder="big")
         self.jq_filter = jq.compile(jq_pattern)
+        self._number_of_processes = number_of_processes
         self.max_tokens = max_number_of_tokens
 
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
-        self._curr_offset = self.HEAD_SIZE_IN_BYTES
-        self._index_list = []
+        self._tokens_to_get_written = multiprocessing.Queue()
+        self._exception_buffer = []
 
     def _default_destination_path(self, destination_path: Path = None) -> Path:
         if destination_path is None:
@@ -68,31 +78,84 @@ class PackedDataGenerator:
         if dst_path.exists():
             raise ValueError(f"file already exists at destination path '{dst_path}'.")
 
-        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
-        encoded_eos_token_as_bytes = encoded_eos_token.to_bytes(self.TOKEN_SIZE_IN_BYTES, byteorder="big")
-        with dst_path.open("wb") as f:
-            # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
-            # not possible to prepend header after determining size of data section
-            f.write((0).to_bytes(self.HEAD_SIZE_IN_BYTES, byteorder="big"))
+        self._exception_buffer = []
+        try:
+            # not setting this can cause deadlocks when using hf's "FastTokenizers". See also:
+            # https://stackoverflow.com/questions/62691279/how-to-disable-tokenizers-parallelism-true-false-warning/67254879#67254879
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+            self._launch_parallelized_workers(dst_path)
+        finally:
+            os.unsetenv("TOKENIZERS_PARALLELISM")
 
-            # write data section (tokens)
-            for idx, line in tqdm(enumerate(self._reader)):
-                try:
-                    self._process_line(encoded_eos_token_as_bytes, f, line)
-                except ValueError:
-                    warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
-                except StopIteration:
-                    break
-                except Exception as exception:
-                    warnings.warn(f"could not process line: {exception=}")
+        if self._exception_buffer:
+            raise self._exception_buffer[0]
 
-            # write index
-            f.write(pickle.dumps(self._index_list))
+    def _launch_parallelized_workers(self, dst_path: Path):
+        writer = multiprocessing.Process(target=self._writer_thread(dst_path))
+        writer.start()
+        processor_threads = [
+            multiprocessing.Process(target=self._process_thread, args=(i,)) for i in range(self._number_of_processes)
+        ]
+        for p in processor_threads:
+            p.start()
+        for p in processor_threads:
+            p.join()
+        self._stop_processing()
+        writer.join()
 
-        self._update_data_length_in_pre_allocated_header(dst_path)
+    def _stop_processing(self):
+        self._tokens_to_get_written.put(None)
 
-    def _update_data_length_in_pre_allocated_header(self, dst_path: Path):
-        start_of_index_in_bytes = self._index_list[-1][0] + self._index_list[-1][1]
+    def _generator_for_tokens_to_get_written(self):
+        while True:
+            self._check_for_parallel_errors()
+            tokens = self._tokens_to_get_written.get()
+            if tokens is None:
+                break
+            yield tokens
+
+    def _check_for_parallel_errors(self):
+        if self._exception_buffer:
+            raise RuntimeError("Exception found in exception buffer. Another thread encountered a problem apparently.")
+
+    def _writer_thread(self, dst_path: Path) -> Callable:
+        def writer():
+            index_list = []
+            with dst_path.open("wb") as f:
+                # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
+                # not possible to prepend header after determining size of data section
+                f.write((0).to_bytes(self.HEAD_SIZE_IN_BYTES, byteorder="big"))
+                curr_offset = self.HEAD_SIZE_IN_BYTES
+
+                # write data section (tokens)
+                for tokens_as_bytes in tqdm(
+                    self._generator_for_tokens_to_get_written(), desc="Processed Samples", total=len(self._reader)
+                ):
+                    f.write(tokens_as_bytes)
+                    segment_length = len(tokens_as_bytes)
+                    index_list.append((curr_offset, segment_length))
+                    curr_offset += segment_length
+
+                # write index
+                f.write(pickle.dumps(index_list))
+
+            self._update_data_length_in_pre_allocated_header(dst_path, index_list)
+
+        return writer
+
+    def _process_thread(self, process_id: int):
+        self._check_for_parallel_errors()
+        for idx in range(process_id, len(self._reader), self._number_of_processes):
+            line = self._reader[idx]
+            try:
+                self._tokens_to_get_written.put(self._process_line(line))
+            except EmptySampleError:
+                warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
+            except Exception as exception:
+                warnings.warn(f"could not process line of number {idx}. Raised the following error: {exception=}")
+
+    def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
+        start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
         length_of_byte_encoded_data_section = start_of_index_in_bytes - self.HEAD_SIZE_IN_BYTES
         header_content = length_of_byte_encoded_data_section.to_bytes(self.HEAD_SIZE_IN_BYTES, byteorder="big")
         header_content = np.frombuffer(header_content, dtype="uint8")
@@ -100,22 +163,15 @@ class PackedDataGenerator:
         m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.HEAD_SIZE_IN_BYTES,))
         m[:] = header_content[:]
 
-    def _process_line(self, eos_token_as_bytes: bytes, f: IO, line: str):
+    def _process_line(self, line: str) -> bytes:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
+        if jq_retrieved_text is None:
+            raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
         tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
         if len(tokens) == 0:
-            raise ValueError("Received empty sample...")
-        token_idx = 0
-        for token in tokens:
-            token_as_bytes = token.to_bytes(self.TOKEN_SIZE_IN_BYTES, byteorder="big")
-            f.write(token_as_bytes)
-            self._total_num_of_tokens += 1
-            if self._total_num_of_tokens == self.max_tokens:
-                segment_length = (token_idx + 1) * self.TOKEN_SIZE_IN_BYTES
-                self._index_list.append((self._curr_offset, segment_length))
-                raise StopIteration
-            token_idx += 1
-        f.write(eos_token_as_bytes)
-        segment_length = (token_idx + 1) * self.TOKEN_SIZE_IN_BYTES # segment_length in bytes
-        self._index_list.append((self._curr_offset, segment_length))
-        self._curr_offset += segment_length
+            raise EmptySampleError("Received empty sample...")
+
+        def byte_converter(x):
+            return int.to_bytes(x, self.TOKEN_SIZE_IN_BYTES, byteorder="big")
+
+        return b"".join(map(byte_converter, tokens)) + self._encoded_eos_token_as_bytes
