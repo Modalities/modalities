@@ -1,3 +1,4 @@
+import math
 import multiprocessing
 import os
 import pickle
@@ -6,7 +7,6 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 import jq
-import numpy as np
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
@@ -18,13 +18,12 @@ class EmptySampleError(RuntimeError):
 
 
 class PackedDataGenerator:
-    # amount of bytes to represent tokens as integers.
-    # If the vocabulary exceeds 2^(8*`size_in_bytes`), this requires adaptation.
-    TOKEN_SIZE_IN_BYTES = 4
     # amount of bytes to represent number of all tokens in dataset.
     # If the amount exceeds 2^(8*`header_size_in_bytes`), this requires adaptation.
     # Decided to keep this constant, since a size of 8 bytes requires more data than the internet currently provides
-    HEAD_SIZE_IN_BYTES = 8
+    DATA_SECTION_LENGTH_IN_BYTES = 8
+    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = 4
+    HEADER_SIZE_IN_BYTES = DATA_SECTION_LENGTH_IN_BYTES + TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
 
     def __init__(
         self,
@@ -50,8 +49,9 @@ class PackedDataGenerator:
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
+        self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
         encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
-        self._encoded_eos_token_as_bytes = encoded_eos_token.to_bytes(self.TOKEN_SIZE_IN_BYTES, byteorder="big")
+        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self.max_tokens = max_number_of_tokens
@@ -60,6 +60,13 @@ class PackedDataGenerator:
         self._total_num_of_tokens = 0
         self._tokens_to_get_written = multiprocessing.Queue()
         self._exception_buffer = []
+
+    @staticmethod
+    def _get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
+        return math.ceil(math.log(math.log2(int_to_get_repr), 8))
+
+    def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
+        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="big", signed=False)
 
     def _default_destination_path(self, destination_path: Path = None) -> Path:
         if destination_path is None:
@@ -124,8 +131,9 @@ class PackedDataGenerator:
             with dst_path.open("wb") as f:
                 # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
                 # not possible to prepend header after determining size of data section
-                f.write((0).to_bytes(self.HEAD_SIZE_IN_BYTES, byteorder="big"))
-                curr_offset = self.HEAD_SIZE_IN_BYTES
+                f.write((0).to_bytes(self.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+                f.write(self._token_size_in_bytes.to_bytes(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big"))
+                curr_offset = self.HEADER_SIZE_IN_BYTES
 
                 # write data section (tokens)
                 for tokens_as_bytes in tqdm(
@@ -156,12 +164,13 @@ class PackedDataGenerator:
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
         start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
-        length_of_byte_encoded_data_section = start_of_index_in_bytes - self.HEAD_SIZE_IN_BYTES
-        header_content = length_of_byte_encoded_data_section.to_bytes(self.HEAD_SIZE_IN_BYTES, byteorder="big")
-        header_content = np.frombuffer(header_content, dtype="uint8")
-        # write the header content to the packed dataset file
-        m = np.memmap(dst_path, mode="r+", offset=0, shape=(self.HEAD_SIZE_IN_BYTES,))
-        m[:] = header_content[:]
+        length_of_byte_encoded_data_section = start_of_index_in_bytes - self.HEADER_SIZE_IN_BYTES
+        data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
+            self.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"
+        )
+        with dst_path.open("rb+") as fout:
+            fout.seek(0)
+            fout.write(data_section_length_in_bytes)
 
     def _process_line(self, line: str) -> bytes:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
@@ -170,8 +179,4 @@ class PackedDataGenerator:
         tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
-
-        def byte_converter(x):
-            return int.to_bytes(x, self.TOKEN_SIZE_IN_BYTES, byteorder="big")
-
-        return b"".join(map(byte_converter, tokens)) + self._encoded_eos_token_as_bytes
+        return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes

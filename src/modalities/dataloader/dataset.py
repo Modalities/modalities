@@ -12,6 +12,7 @@ from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
+from .create_packed_data import PackedDataGenerator
 
 
 class Dataset(TorchdataSet):
@@ -70,8 +71,9 @@ class MemMapDataset(Dataset):
 
 
 class PackedMemMapDatasetBase(Dataset):
-    INT_SIZE_IN_BYTES = 4
-    HEADER_SIZE_IN_BYTES = 8
+    DATA_SECTION_LENGTH_IN_BYTES = PackedDataGenerator.DATA_SECTION_LENGTH_IN_BYTES
+    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = PackedDataGenerator.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
+    HEADER_SIZE_IN_BYTES = PackedDataGenerator.HEADER_SIZE_IN_BYTES
 
     def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
         """
@@ -94,29 +96,25 @@ class PackedMemMapDatasetBase(Dataset):
                 f"Create on in advance by using `modalities create_packed_data`."
             )
 
-        # get number of total bytes in file
         with self.raw_data_path.open("rb") as f:
+            # get number of total bytes in file
             f.seek(0, os.SEEK_END)
             self.total_bytes = f.tell()
             f.seek(0)
 
-        # get number of bytes in data section
-        self.data_len = np.memmap(
-            self.raw_data_path,
-            mode="r",
-            offset=0,
-            shape=(self.HEADER_SIZE_IN_BYTES,),
-        ).view(f"S{self.HEADER_SIZE_IN_BYTES}")
-        self.data_len = int.from_bytes(self.data_len, byteorder="big")
+            # get number of bytes in data section
+            data_section_length_in_bytes = f.read(self.DATA_SECTION_LENGTH_IN_BYTES)
+            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="big")
 
-        # get index
-        self.index_base = np.memmap(
-            self.raw_data_path,
-            mode="r",
-            offset=self.HEADER_SIZE_IN_BYTES + self.data_len,
-            shape=(self.total_bytes - self.data_len - self.HEADER_SIZE_IN_BYTES,),
-        ).view(f"S{self.total_bytes-self.data_len-self.HEADER_SIZE_IN_BYTES}")
-        self.index_base = pickle.loads(self.index_base)
+            # get number of bytes for encoding a single token
+            f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
+            token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
+            self._token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
+
+            # get index
+            f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
+            pkl_encoded_index = f.read()
+            self.index_base = pickle.loads(pkl_encoded_index)
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
@@ -136,7 +134,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
 
         # get number of total tokens in file
-        total_tokens = self.data_len // self.INT_SIZE_IN_BYTES
+        total_tokens = self.data_len // self._token_size_in_bytes
         self._num_samples = total_tokens // self.block_size
 
     def __len__(self) -> int:
@@ -147,9 +145,9 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         tokens_as_byte_strings = np.memmap(
             self.raw_data_path,
             mode="r",
-            offset=self.HEADER_SIZE_IN_BYTES + idx * self.INT_SIZE_IN_BYTES * self.block_size,
-            shape=(self.INT_SIZE_IN_BYTES * self.block_size,),
-        ).view(f"S{self.INT_SIZE_IN_BYTES}")
+            offset=self.HEADER_SIZE_IN_BYTES + idx * self._token_size_in_bytes * self.block_size,
+            shape=(self._token_size_in_bytes * self.block_size,),
+        ).view(f"S{self._token_size_in_bytes}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         return BatchEncoding(data={self.sample_key: tokens})
 
@@ -159,7 +157,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         index = []
         curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
-        block_size_in_bytes = self.block_size * self.INT_SIZE_IN_BYTES
+        block_size_in_bytes = self.block_size * self._token_size_in_bytes
         for segment_offset, segment_len in tqdm(self.index_base):
             # When the sum of the length of the current previously seen samples doesn't
             # exceed block_size_in_bytes, we add the current segment length to the previous
@@ -208,6 +206,6 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
             mode="r",
             offset=offset,
             shape=(length,),
-        ).view(f"S{self.INT_SIZE_IN_BYTES}")
+        ).view(f"S{self._token_size_in_bytes}")
         tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
         return BatchEncoding(data={self.sample_key: tokens})
