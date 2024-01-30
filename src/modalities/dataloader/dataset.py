@@ -74,13 +74,20 @@ class PackedMemMapDatasetBase(Dataset):
     DATA_SECTION_LENGTH_IN_BYTES = PackedDataGenerator.DATA_SECTION_LENGTH_IN_BYTES
     TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = PackedDataGenerator.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
     HEADER_SIZE_IN_BYTES = PackedDataGenerator.HEADER_SIZE_IN_BYTES
+    np_dtype_from_num_bytes = {
+        1: np.dtype(np.uint8).newbyteorder(">"),
+        2: np.dtype(np.uint16).newbyteorder(">"),
+        4: np.dtype(np.uint32).newbyteorder(">"),
+        8: np.dtype(np.uint64).newbyteorder(">"),
+    }
 
     def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
         """
         Base class for packed memmapped datasets. The underlying dataset file has the structure:
         | header | data | index |
-        The header contains information about the length of the subsequent data sequence. The index contains
-        the tuple information (start, end) in terms of byte positions.
+        The header contains information about the length of the subsequent data sequence and the amount of bytes
+        required to represent tokens in the data section. The index contains the tuple information (start, end) in terms
+         of byte positions.
 
         :param raw_data_path: Path to a packed binary file (*.pbin).
                               Use `modalities create_packed_data` to create one based on a jsonl-file.
@@ -110,50 +117,49 @@ class PackedMemMapDatasetBase(Dataset):
             f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
             token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
             self._token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
+            try:
+                self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
+            except KeyError:
+                raise RuntimeError(
+                    f"Encountered a required token representation with {self._token_size_in_bytes},"
+                    " which is not supported. Consider using a smaller vocabulary."
+                )
 
             # get index
             f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
             pkl_encoded_index = f.read()
             self.index_base = pickle.loads(pkl_encoded_index)
 
+            # initialize memmapped data section
+            self.data = np.memmap(
+                self.raw_data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,)
+            )
 
-class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
-    def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
-        """
-        PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
-        irrespective of the samples' start and end position, as defined in the index.
-        Therefore, for this datset, the index is irrelevant.
+            self._index = self._generate_packing_index()
 
-        :param raw_data_path: Path to a packed binary file (*.pbin).
-                              Use `modalities create_packed_data` to create one based on a jsonl-file.
-        :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
-                           TODO: If this setting should support multi-modal features using separately encoded inputs,
-                            this needs to get replaced with a list of sample keys!
-        """
-        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
-
-        # get number of total tokens in file
-        total_tokens = self.data_len // self._token_size_in_bytes
-        self._num_samples = total_tokens // self.block_size
+    def _generate_packing_index(self) -> List[Tuple[int, int]]:
+        raise NotImplementedError
 
     def __len__(self) -> int:
-        return self._num_samples
+        return len(self._index)
 
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
-        tokens_as_byte_strings = np.memmap(
-            self.raw_data_path,
-            mode="r",
-            offset=self.HEADER_SIZE_IN_BYTES + idx * self._token_size_in_bytes * self.block_size,
-            shape=(self._token_size_in_bytes * self.block_size,),
-        ).view(f"S{self._token_size_in_bytes}")
-        tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
+        offset, length = self._index[idx]
+        tokens = np.frombuffer(self.data, dtype=self._token_dtype, count=length, offset=offset)
         return BatchEncoding(data={self.sample_key: tokens})
 
 
+class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
+    def _generate_packing_index(self) -> List[Tuple[int, int]]:
+        # get number of total tokens in file
+        total_tokens = self.data_len // self._token_size_in_bytes
+        num_samples = total_tokens // self.block_size
+        return [(i * self.block_size * self._token_size_in_bytes, self.block_size) for i in range(num_samples)]
+
+
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
-    def generate_megatron_index(self) -> List[Tuple[int, int]]:
+    def _generate_packing_index(self) -> List[Tuple[int, int]]:
         index = []
         curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
@@ -167,14 +173,14 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
             # If the previous and current length equals block_size_in_bytes, we add the starting index
             # and the total sequences length to the index list as a new sample.
             elif curr_len + segment_len == block_size_in_bytes:
-                index.append((curr_offset, block_size_in_bytes))
+                index.append((curr_offset, self.block_size))
                 curr_len = 0
                 curr_offset += block_size_in_bytes
             # Else case is executed when the current and previous segment length exceed the block_size.
             # In this case we set the starting point of the next sample to the end of the current sample.
             # This way, the start of a sample is never in the middle of a sentence.
             else:
-                index.append((curr_offset, block_size_in_bytes))
+                index.append((curr_offset, self.block_size))
                 if segment_len > block_size_in_bytes:
                     curr_offset += block_size_in_bytes
                     curr_len = 0
@@ -182,30 +188,3 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
-
-    def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
-        """
-        :param raw_data_path: Path to a packed binary file (*.pbin).
-                              Use `modalities create_packed_data` to create one based on a jsonl-file.
-        :param block_size: alias for max sequence length. The amount of tokens the model can handle.
-        :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
-                           TODO: If this setting should support multi-modal features using separately encoded inputs,
-                            this needs to get replaced with a list of sample keys!
-        """
-        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
-        self._index = self.generate_megatron_index()
-
-    def __len__(self) -> int:
-        return len(self._index)
-
-    def __getitem__(self, idx: int) -> BatchEncoding:
-        self._check_if_inbounds(idx)
-        offset, length = self._index[idx]
-        tokens_as_byte_strings = np.memmap(
-            self.raw_data_path,
-            mode="r",
-            offset=offset,
-            shape=(length,),
-        ).view(f"S{self._token_size_in_bytes}")
-        tokens = [int.from_bytes(token, byteorder="big") for token in tokens_as_byte_strings]
-        return BatchEncoding(data={self.sample_key: tokens})

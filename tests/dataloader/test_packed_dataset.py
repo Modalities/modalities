@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -50,8 +51,10 @@ def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer):
     start_of_jsonl_content = "0 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
     tokenized_start_of_jsonl_content = gpt2_tokenizer(start_of_jsonl_content)["input_ids"]
     packed_dataset_iterator = iter(packed_dataset)
-    assert tokenized_start_of_jsonl_content[:block_size] == next(packed_dataset_iterator)["input_ids"]
-    assert tokenized_start_of_jsonl_content[block_size : 2 * block_size] == next(packed_dataset_iterator)["input_ids"]
+    np.testing.assert_equal(tokenized_start_of_jsonl_content[:block_size], next(packed_dataset_iterator)["input_ids"])
+    np.testing.assert_equal(
+        tokenized_start_of_jsonl_content[block_size : 2 * block_size], next(packed_dataset_iterator)["input_ids"]
+    )
     assert len(packed_dataset.index_base) == 12
 
     # check validity of index section in packed dataset
