@@ -141,6 +141,11 @@ model:
     attention:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model.config.n_embd}
+            block_size: ${model.config.block_size}
     activation: gelu
     epsilon: 1e-5
     weight_init:
