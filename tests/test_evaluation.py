@@ -7,7 +7,7 @@ from modalities.models.gpt2.gpt2_model import (
     AttentionConfig,
     AttentionType,
     GPT2Config,
-    WeightInitailizationConfig,
+    WeightInitializationConfig,
 )
 from modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 
@@ -29,7 +29,7 @@ def test_pretrained_gpt_model(tmp_path):
         epsilon=1e-5,
         sample_key="input_ids",
         prediction_key="logits",
-        weight_init=WeightInitailizationConfig(mean=0, std=0.02),
+        weight_init=WeightInitializationConfig(mean=0, std=0.02),
     )
     pretrained_config = PretrainedGPTConfig(config=config)
 
