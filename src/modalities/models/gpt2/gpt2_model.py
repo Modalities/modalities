@@ -1,16 +1,19 @@
+from enum import Enum
+
 import math
 from functools import partial
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
+from pydantic import BaseModel, confloat, conint, model_validator, validator
 from torch.nn import functional as F
 from xformers.components.positional_embedding import RotaryEmbedding
 
-from modalities.models.gpt2.gpt2_model_config import AttentionConfig, AttentionType, ActivationType, \
-    WeightInitailizationConfig
+from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
+from modalities.util import parse_enum_by_name
 
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -39,6 +42,7 @@ class IdentityTransform(QueryKeyValueTransform):
 
 class RotaryTransform(QueryKeyValueTransform):
     def __init__(self, n_embd: int, block_size: int):
+        super().__init__()
         self.rope = RotaryEmbedding(dim_model=n_embd)
         self.block_size = block_size
 
@@ -51,6 +55,74 @@ class RotaryTransform(QueryKeyValueTransform):
         q, k = self.rope(q, k)
 
         return q, k, v
+
+
+class QueryKeyValueTransformType(Enum):
+    IdentityTransform = IdentityTransform
+    RotaryTransform = RotaryTransform
+
+
+class AttentionType(str, Enum):
+    DEFAULT_ATTENTION = "default_attention"
+    PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
+
+
+class ActivationType(str, Enum):
+    GELU = "gelu"
+    FUSED_SWIGLU = "fused_swiglu"
+
+
+class AttentionConfig(BaseModel):
+    class QueryKeyValueTransformConfig(BaseModel):
+        class IdentityTransformConfig(BaseModel):
+            pass
+
+        class RotaryTransformConfig(BaseModel):
+            n_embd: int = conint(ge=0)
+            block_size: int = conint(ge=0)
+
+        @validator("type_hint", pre=True, always=True)
+        def parse_sharding_strategy_by_name(cls, name):
+            return parse_enum_by_name(name=name, enum_type=QueryKeyValueTransformType)
+
+        type_hint: QueryKeyValueTransformType
+        config: RotaryTransformConfig | IdentityTransformConfig
+
+    attention_type: AttentionType
+    scaling_factor: conint(ge=1)
+    qkv_transforms: List[QueryKeyValueTransformConfig]
+
+
+class WeightInitializationConfig(BaseModel):
+    mean: confloat(ge=0.0)
+    std: confloat(ge=0.0)
+
+
+class GPT2Config(BaseModel):
+    sample_key: str
+    prediction_key: str
+    block_size: conint(ge=1)
+    vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: conint(ge=1)
+    n_head: conint(ge=1)
+    n_embd: conint(ge=1)
+    ffn_hidden: conint(ge=1)
+    dropout: confloat(ge=0.0)
+    bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention: AttentionConfig
+    activation: ActivationType
+    epsilon: confloat(ge=0.0)
+    weight_init: WeightInitializationConfig
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "GPT2Config":
+        for param, param_name in zip(
+            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+        ):
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
+        return self
 
 
 class LayerNorm(nn.Module):
@@ -107,7 +179,16 @@ class CausalSelfAttention(nn.Module):
         self.dropout = dropout
         self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
-        self.qkv_transforms = nn.Sequential(attention.qkv_transforms)
+        # TODO: inject QKVTransforms from outside
+        self.qkv_transforms = nn.Sequential(
+            nn.ModuleList(
+                [
+                    transform_config.type_hint.value(
+                        **convert_base_model_config_to_dict(transform_config.config)
+                    ) for transform_config in attention.qkv_transforms
+                ]
+            )
+        )
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -226,7 +307,7 @@ class GPT2LLM(NNModel):
         attention: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
-        weight_init: WeightInitailizationConfig,
+        weight_init: WeightInitializationConfig,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -274,7 +355,7 @@ class GPT2LLM(NNModel):
             if pn.endswith("c_proj.weight"):
                 torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
 
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):
+    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
             if module.bias is not None:
