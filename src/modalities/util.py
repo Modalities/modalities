@@ -2,14 +2,20 @@ import time
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Callable, Dict, Generic, TypeVar
+from typing import Callable, Dict, Generic, TypeVar, Type
 
 import torch
 import torch.distributed as dist
+from pydantic import ValidationError
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
 
+def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+    try:
+        return enum_type[name]
+    except KeyError:
+        raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 def get_date_of_run():
     """create date and time for file save uniqueness
