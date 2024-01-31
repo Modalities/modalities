@@ -23,6 +23,7 @@ class PositionTypes(str, Enum):
     ABSOLUTE = "ABSOLUTE"
     NOPE = "NOPE"
 
+
 class QueryKeyValueTransform(nn.Module):
 
     def forward(
@@ -186,14 +187,10 @@ class CausalSelfAttention(nn.Module):
         self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         # TODO: inject QKVTransforms from outside
-        self.qkv_transforms = nn.Sequential(
-            nn.ModuleList(
-                [
-                    transform_config.type_hint.value(
-                        **convert_base_model_config_to_dict(transform_config.config)
-                    ) for transform_config in attention.qkv_transforms
-                ]
-            )
+        self.qkv_transforms = nn.ModuleList(
+            transform_config.type_hint.value(
+                **convert_base_model_config_to_dict(transform_config.config)
+            ) for transform_config in attention.qkv_transforms
         )
 
         if not self.flash:
@@ -212,7 +209,9 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
 
-        q, k, v = self.qkv_transform(q, k, v)
+        #TODO: move logic into a function
+        for qkv_transform in self.qkv_transforms:
+            q, k, v = qkv_transform(q, k, v)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
@@ -320,6 +319,7 @@ class GPT2LLM(NNModel):
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
+        self.poe_type = poe_type
 
         assert vocab_size is not None
         assert block_size is not None
@@ -328,6 +328,9 @@ class GPT2LLM(NNModel):
         if poe_type is PositionTypes.ABSOLUTE:
             wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
+            # Using pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
+            # https://github.com/huggingface/accelerate/issues/807
+            # wpe = nn.Embedding.from_pretrained(torch.zeros(block_size, n_embd))
             wpe = nn.Identity()
         else:
             raise TypeError(f"{poe_type} not supported")
@@ -393,8 +396,14 @@ class GPT2LLM(NNModel):
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
-        x = self.transformer.drop(tok_emb + pos_emb)
+
+        if self.poe_type is PositionTypes.ABSOLUTE:
+            pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
+            tok_emb = tok_emb + pos_emb
+
+        # TODO: use drop out also without absolute position embedding?
+        x = self.transformer.drop(tok_emb)
+
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)
