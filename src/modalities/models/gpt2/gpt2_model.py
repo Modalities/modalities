@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 import math
@@ -17,6 +18,10 @@ from modalities.util import parse_enum_by_name
 
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+class PositionTypes(str, Enum):
+    ABSOLUTE = "ABSOLUTE"
+    NOPE = "NOPE"
 
 class QueryKeyValueTransform(nn.Module):
 
@@ -101,6 +106,7 @@ class WeightInitializationConfig(BaseModel):
 class GPT2Config(BaseModel):
     sample_key: str
     prediction_key: str
+    poe_type: PositionTypes
     block_size: conint(ge=1)
     vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: conint(ge=1)
@@ -296,6 +302,7 @@ class GPT2LLM(NNModel):
         self,
         sample_key: str,
         prediction_key: str,
+        poe_type: PositionTypes,
         block_size: int,
         vocab_size: int,
         n_layer: int,
@@ -317,10 +324,24 @@ class GPT2LLM(NNModel):
         assert vocab_size is not None
         assert block_size is not None
 
+        # TODO: dependency injection
+        if poe_type is PositionTypes.ABSOLUTE:
+            wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
+        elif poe_type is PositionTypes.NOPE:
+            wpe = nn.Identity()
+        else:
+            raise TypeError(f"{poe_type} not supported")
+
+        if poe_type is PositionTypes.ABSOLUTE and RotaryTransform in [
+            config.type_hint.value for config in attention.qkv_transforms
+        ]:
+            logging.warning("You are using RotaryTransform together with absolute position embeddings."
+                            " It is expected to use \"RotaryTransform\" together with \"NOPE.\"")
+
         self.transformer = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
-                wpe=nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd),
+                wpe=wpe,
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
