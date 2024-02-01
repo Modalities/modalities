@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from modalities.batch import InferenceResultBatch
-from modalities.loss_functions import AsymmNCELoss
+from modalities.loss_functions import NCELoss
 
 
 @pytest.fixture
@@ -16,6 +16,6 @@ def dummy_result_batch() -> InferenceResultBatch:
 
 # calculating asymmetric NCELoss between a batch of embeddings and itself --> zero
 @pytest.mark.parametrize("key", ["embedding"])
-def test_AsymmNCELoss_is_zero(dummy_result_batch, key):
-    loss_func = AsymmNCELoss(key, key)
+def test_asymm_NCELoss_is_zero(dummy_result_batch, key):
+    loss_func = NCELoss(prediction_key1=key, prediction_key2=key)
     assert loss_func(dummy_result_batch) <= 10e-6
