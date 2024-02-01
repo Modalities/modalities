@@ -141,7 +141,6 @@ model:
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention:
       attention_type: pytorch_flash_attention
-      scaling_factor: 3
       qkv_transforms:
         - type_hint: RotaryTransform
           config:

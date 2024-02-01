@@ -95,7 +95,6 @@ class AttentionConfig(BaseModel):
         config: RotaryTransformConfig | IdentityTransformConfig
 
     attention_type: AttentionType
-    scaling_factor: conint(ge=1)
     qkv_transforms: List[QueryKeyValueTransformConfig]
 
 
@@ -167,7 +166,8 @@ class CausalSelfAttention(nn.Module):
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
             in_features=n_embd,
-            out_features=attention.scaling_factor * n_embd,
+            # 3, because we have queries, keys, and values
+            out_features=3 * n_embd,
             bias=bias,
         )
 
@@ -328,7 +328,7 @@ class GPT2LLM(NNModel):
         if poe_type is PositionTypes.ABSOLUTE:
             wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
-            # Using pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
+            # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
             # https://github.com/huggingface/accelerate/issues/807
             # wpe = nn.Embedding.from_pretrained(torch.zeros(block_size, n_embd))
             wpe = nn.Identity()
