@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import click
 import click_pathlib
@@ -154,18 +154,28 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 
 
 @main.command(name="convert_checkpoint")
-@config_file_path_option
+@click.option(
+    "--checkpoint_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Load checkpoint from this path.",
+)
 @click.option(
     "--output_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Converted checkpoint will be written to this path.",
 )
-def convert_checkpoint(config_file_path, output_path):
+def convert_checkpoint(checkpoint_path, output_path):
+    checkpoint_path = Path(checkpoint_path)
+    config_file_path = checkpoint_path / "model_config.yaml"
+    if not config_file_path.exists():
+        raise ValueError(f"Could not find model_config.yaml in {checkpoint_path}")
+
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
-    main.load_and_convert_checkpoint(output_path)
+    main.load_and_convert_checkpoint(checkpoint_path, output_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -182,7 +192,7 @@ class Main:
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
-        self.wrapped_model = None
+        self.model = None
 
     def run(self):
         with self.running_env as running_env:
@@ -372,29 +382,21 @@ class Main:
 
         return evaluation_result_publisher, batch_processed_publisher
 
-    def load_and_convert_checkpoint(self, output_path):
-        self.wrapped_model = self._get_model_from_checkpoint()
-        self._convert_checkpoint(output_path, self.wrapped_model)
+    def load_and_convert_checkpoint(self, checkpoint_path: Path, output_path: str):
+        self.model = self._get_model_from_checkpoint(checkpoint_path)
+        self._convert_checkpoint(output_path, self.model)
 
-    def _get_model_from_checkpoint(self):
-        with self.running_env:
-            checkpointing = CheckpointingFactory.get_checkpointing(
-                resolvers=self.resolvers,
-                config=self.config.checkpointing,
-                running_env=self.running_env,
-                experiment_id=self.experiment_id,
-                num_ranks=self.config.training.world_size,
-            )
-            wrapped_model, optimizer = self.get_model_and_optimizer(
-                config=self.config, running_env=self.running_env, checkpointing=checkpointing
-            )
-            return wrapped_model
+    def _get_model_from_checkpoint(self, checkpoint_path: Path):
+        # load model on rank 0 into CPU RAM
+        model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
+        model_state = torch.load(checkpoint_path / "model.bin")
+        model.load_state_dict(model_state)
+        return model
 
-    def _convert_checkpoint(self, output_path, wrapped_model):
+    def _convert_checkpoint(self, output_path, model):
         config = HuggingFaceModelConfig(self.config.model.config)
-        with wrapped_model.summon_full_params(wrapped_model):
-            model = HuggingFaceModel(config=config, model=wrapped_model.module)
-            model.save_pretrained(output_path, safe_serialization=False)
+        model = HuggingFaceModel(config=config, model=model)
+        model.save_pretrained(output_path, safe_serialization=False)
 
 
 if __name__ == "__main__":
