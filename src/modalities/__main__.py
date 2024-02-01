@@ -14,6 +14,7 @@ from torch.optim import Optimizer
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
+from modalities.checkpointing.checkpointing_execution import PytorchToDiscCheckpointing
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
 from modalities.config.config import AppConfig, HuggingFaceModelConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
@@ -155,7 +156,7 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 
 @main.command(name="convert_checkpoint")
 @click.option(
-    "--checkpoint_path",
+    "--checkpoint_dir",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Load checkpoint from this path.",
@@ -166,16 +167,16 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     required=True,
     help="Converted checkpoint will be written to this path.",
 )
-def convert_checkpoint(checkpoint_path, output_path):
-    checkpoint_path = Path(checkpoint_path)
-    config_file_path = checkpoint_path / "model_config.yaml"
+def convert_checkpoint(checkpoint_dir, output_path):
+    checkpoint_dir = Path(checkpoint_dir)
+    config_file_path = checkpoint_dir / "model_config.yaml"
     if not config_file_path.exists():
-        raise ValueError(f"Could not find model_config.yaml in {checkpoint_path}")
+        raise ValueError(f"Could not find model_config.yaml in {checkpoint_dir}")
 
     config_dict = load_app_config_dict(config_file_path)
     config = AppConfig.model_validate(config_dict)
     main = Main(config)
-    main.load_and_convert_checkpoint(checkpoint_path, output_path)
+    main.load_and_convert_checkpoint(checkpoint_dir, output_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -386,11 +387,17 @@ class Main:
         self.model = self._get_model_from_checkpoint(checkpoint_path)
         self._convert_checkpoint(output_path, self.model)
 
-    def _get_model_from_checkpoint(self, checkpoint_path: Path):
-        # load model on rank 0 into CPU RAM
+    def _get_model_from_checkpoint(self, checkpoint_dir: Path):
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
-        model_state = torch.load(checkpoint_path / "model.bin")
-        model.load_state_dict(model_state)
+        if torch.distributed.is_initialized():
+            rank = torch.distributed.get_rank()
+        else:
+            rank = 0
+        checkpointing = PytorchToDiscCheckpointing(rank)
+        checkpoint_path = checkpoint_dir / "model.bin"
+        if not checkpoint_path.exists():
+            raise ValueError(f"Could not find model.bin in {checkpoint_path}")
+        model = checkpointing.load_model_checkpoint(model, checkpoint_path)
         return model
 
     def _convert_checkpoint(self, output_path, model):
