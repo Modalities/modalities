@@ -47,9 +47,9 @@ class IdentityTransform(QueryKeyValueTransform):
 
 
 class RotaryTransform(QueryKeyValueTransform):
-    def __init__(self, n_embd: int, block_size: int):
+    def __init__(self, n_embd: int, n_head: int, block_size: int):
         super().__init__()
-        self.rope = RotaryEmbedding(dim_model=n_embd)
+        self.rope = RotaryEmbedding(dim_model=n_embd/n_head)
         self.block_size = block_size
 
     def forward(
@@ -85,6 +85,7 @@ class AttentionConfig(BaseModel):
 
         class RotaryTransformConfig(BaseModel):
             n_embd: int = conint(ge=0)
+            n_head: int = conint(ge=0)
             block_size: int = conint(ge=0)
 
         @validator("type_hint", pre=True, always=True)
