@@ -1,14 +1,18 @@
 import dataclasses
 import os
+import json
 import pickle
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
+import numpy as np
 import torch
 from torch.optim import Optimizer
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
+
 
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing import CheckpointingIF
@@ -26,16 +30,33 @@ from modalities.trainer import Trainer
 _ROOT_DIR = Path(__file__).parents[1]
 
 
+@dataclasses.dataclass
+class DataPathCollection:
+    raw_data_path: Path
+    index_path: Path
+
+
 @pytest.fixture
 def dummy_packed_data_path(tmpdir) -> Path:
     data = b""
-    header_size_in_bytes = 8
+    data_header_size_in_bytes = 8
+    codecs_header_size_in_bytes = 8
     int_size_in_bytes = 4
+    # data and codecs
     tokens = list(range(20))
-    data += (len(tokens) * int_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="big")
+    codecs_bytes = pickle.dumps(["HfTokenizerCodec"])
+    # headers
+    data += (
+        len(tokens) * int_size_in_bytes
+    ).to_bytes(data_header_size_in_bytes, byteorder="big")
+    data += len(codecs_bytes).to_bytes(codecs_header_size_in_bytes, byteorder="big")
+    # data and codecs
     data += b"".join([t.to_bytes(int_size_in_bytes, byteorder="big") for t in tokens])
-    index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
+    data += codecs_bytes
+    # index
+    index = [(16, 24), (40, 28), (68, 12), (80, 16)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
+    # write to file
     dummy_packed_data_path = Path(tmpdir, "dummy.pbin")
     dummy_packed_data_path.write_bytes(data)
     return dummy_packed_data_path
@@ -52,12 +73,6 @@ def dummy_config(monkeypatch) -> AppConfig:
     return app_config
 
 
-@dataclasses.dataclass
-class DataPathCollection:
-    raw_data_path: Path
-    index_path: Path
-
-
 @pytest.fixture
 def dummy_data_path(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
@@ -66,6 +81,46 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
     index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
     index_path.unlink(missing_ok=True)
     return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
+
+
+@pytest.fixture
+def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:    
+
+    base_path = Path(tmpdir, "image_data")
+    img_base_path = Path(base_path, "images")
+
+    base_path.mkdir(parents=True, exist_ok=True)
+    img_base_path.mkdir(parents=True, exist_ok=True)
+
+    data_path = Path(base_path, "data.jsonl")
+    index_path = Path(base_path, "data.idx")
+    img_paths = [
+        Path(img_base_path, "img_%i.png" % i)
+        for i in range(15)
+    ]
+    # create random images and save them into the temp directory
+    for img_path in img_paths:
+        im = np.random.rand(100, 100, 3) * 255
+        im = Image.fromarray(im.astype("uint8")).convert("RGB")
+        im.save(img_path, "PNG")
+    # create the jsonl file
+    with data_path.open("w+") as f:
+        for img_path in img_paths:
+            f.write(
+                json.dumps(
+                    {
+                        "img_path": img_path.absolute().as_posix(),
+                        "text": (
+                            "This item refers to the image stored at %s"
+                            % str(img_path)
+                        )
+                    }
+                ) + "\n"
+            )
+    # create the index file to the jsonl file
+    IndexGenerator(data_path).create_index(index_path)
+
+    return DataPathCollection(raw_data_path=data_path, index_path=index_path)
 
 
 @pytest.fixture
