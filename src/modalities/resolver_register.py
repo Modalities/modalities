@@ -10,6 +10,7 @@ from transformers import PreTrainedTokenizer
 from modalities.checkpointing.checkpointing import CheckpointingExecutionIF, CheckpointingStrategyIF
 from modalities.config.config import AppConfig, OptimizerTypes, SchedulerTypes
 from modalities.config.lookup_types import (
+    LookupEnum,
     BatchSamplerTypes,
     CheckpointingExectionTypes,
     CheckpointingStrategyTypes,
@@ -20,7 +21,9 @@ from modalities.config.lookup_types import (
     ModelTypes,
     SamplerTypes,
     TokenizerTypes,
+    CodecTypes
 )
+from modalities.dataloader.codecs import Codec
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.loss_functions import CLMCrossEntropyLoss, Loss
@@ -28,120 +31,129 @@ from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM, NNModel
 from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 
-
+# TODO: this should be a singleton
 class ResolverRegister:
-    def __init__(self, config: AppConfig) -> None:
-        self._resolver_register: Dict[str, ClassResolver] = self._create_resolver_register(config=config)
 
-    def build_component_by_config(self, config: BaseModel, extra_kwargs: Dict = {}) -> Any:
+    # TODO: args and kwargs only to be backwards compatible
+    #       older versions required the appconfig as argument
+    def __init__(self, *args, **kwargs):
+        self._resolver_register = self._build_resolver_register()
+    
+    def build_component_by_key_query(
+        self, register_key: str, type_hint: str, extra_kwargs: Dict = {}
+    ) -> Any:
+        raise NotImplementedError
+    
+    def build_component_by_config(
+        self, config: BaseModel, extra_kwargs: Dict[str, Any] = {}
+    ) -> Any:
+
         assert (
             "type_hint" in config.model_fields.keys()
         ), f"Field 'type_hint' missing but needed for initalisation in {config}"
+        
+        assert (
+            "config" in config.model_fields.keys()
+        ), f"Field 'config' missing but needed for initalisation in {config}"
 
-        kwargs = {key: getattr(config.config, key) for key in config.config.model_dump().keys()}
-        kwargs.update(extra_kwargs)  # allow override via extra_kwargs, to add nested objects
+        kwargs = extra_kwargs.copy()
+
+        for key in config.config.model_fields.keys():
+            # get the value corresponding to the key
+            # prefer the extra keyword arguments when both specified
+            val = getattr(config.config, key)
+            val = kwargs.get(key, val)
+
+            # handle nested components
+            if (
+                isinstance(val, BaseModel) and
+                "type_hint" in val.model_fields and
+                "config" in val.model_fields
+            ):
+                kwargs[key] = self.build_component_by_config(val)
+
+            else:
+                kwargs[key] = val
+
         return self._build_component(
-            register_key=config.type_hint,
+            register_key=type(config.type_hint),
             register_query=config.type_hint.name,
             extra_kwargs=kwargs,
         )
-
-    def build_component_by_key_query(self, register_key: str, type_hint: str, extra_kwargs: Dict = {}) -> Any:
-        return self._build_component(register_key=register_key, register_query=type_hint, extra_kwargs=extra_kwargs)
-
-    def _build_component(self, register_key: str, register_query: str, extra_kwargs: Dict = {}):
+    
+    def _build_component(
+        self,
+        register_key: LookupEnum,
+        register_query: str,
+        extra_kwargs: Dict[str, Any] = {}
+    ):
+        assert register_key in self._resolver_register
         return self._resolver_register[register_key].make(
             query=register_query,
             pos_kwargs=extra_kwargs,
         )
 
-    def _find_values_with_key_in_nested_structure(self, nested_structure: Dict, key: str) -> List[Any]:
-        found_values = []
-        for k, v in nested_structure.items():
-            if k == key:
-                found_values.append(v)
-            elif isinstance(v, dict):
-                found_values.extend(self._find_values_with_key_in_nested_structure(v, key))
-        return found_values
-
-    def _create_resolver_register(self, config: AppConfig) -> Dict[str, ClassResolver]:
-        set(self._find_values_with_key_in_nested_structure(nested_structure=config.model_dump(), key="type_hint"))
-        resolvers = {
-            config.running_env.type_hint: ClassResolver(
+    def _build_resolver_register(self) -> List[LookupEnum]:
+        return {
+            RunningEnvTypes: ClassResolver(
                 [t.value for t in RunningEnvTypes],
                 base=RunningEnv,
                 default=FSDPRunningEnv,
             ),
-            config.model.type_hint: ClassResolver(
+            ModelTypes: ClassResolver(
                 [t.value for t in ModelTypes],
                 base=NNModel,
                 default=GPT2LLM,
             ),
-            config.optimizer.type_hint: ClassResolver(
+            OptimizerTypes: ClassResolver(
                 [t.value for t in OptimizerTypes],
                 base=optim.Optimizer,
                 default=optim.AdamW,
             ),
-            config.scheduler.type_hint: ClassResolver(
+            SchedulerTypes: ClassResolver(
                 [t.value for t in SchedulerTypes],
                 base=optim.lr_scheduler.LRScheduler,
                 default=optim.lr_scheduler.StepLR,
             ),
-            config.loss.type_hint: ClassResolver(
+            LossTypes: ClassResolver(
                 [t.value for t in LossTypes],
                 base=Loss,
                 default=CLMCrossEntropyLoss,
             ),
-            **{
-                sampler_type: ClassResolver(
-                    classes=[t.value for t in SamplerTypes],
-                    base=Sampler,
-                    default=DistributedSampler,
-                )
-                for sampler_type in SamplerTypes
-            },
-            **{
-                batch_sampler_type: ClassResolver(
-                    classes=[t.value for t in BatchSamplerTypes],
-                    base=BatchSampler,
-                    default=BatchSampler,
-                )
-                for batch_sampler_type in BatchSamplerTypes
-            },
-            **{
-                dataloader_type: ClassResolver(
-                    [t.value for t in DataloaderTypes],
-                    base=DataLoader,
-                    default=LLMDataLoader,
-                )
-                for dataloader_type in DataloaderTypes
-            },
-            **{
-                dataset_type: ClassResolver([t.value for t in DatasetTypes], base=Dataset)
-                for dataset_type in DatasetTypes
-            },
-            **{
-                collator_type: ClassResolver([t.value for t in CollatorTypes], base=GPT2LLMCollator)
-                for collator_type in CollatorTypes
-            },
-            **{
-                tokenizer_type: ClassResolver([t.value for t in TokenizerTypes], base=PreTrainedTokenizer)
-                for tokenizer_type in TokenizerTypes
-            },
-            **{
-                checkpointing_strategy_type: ClassResolver(
-                    [t.value for t in CheckpointingStrategyTypes], base=CheckpointingStrategyIF
-                )
-                for checkpointing_strategy_type in CheckpointingStrategyTypes
-            },
-            **{
-                checkpointing_execution_type: ClassResolver(
-                    [t.value for t in CheckpointingExectionTypes], base=CheckpointingExecutionIF
-                )
-                for checkpointing_execution_type in CheckpointingExectionTypes
-            },
+            SamplerTypes: ClassResolver(
+                classes=[t.value for t in SamplerTypes],
+                base=Sampler,
+                default=DistributedSampler,
+            ),
+            BatchSamplerTypes: ClassResolver(
+                classes=[t.value for t in BatchSamplerTypes],
+                base=BatchSampler,
+                default=BatchSampler,
+            ),
+            DataloaderTypes: ClassResolver(
+                [t.value for t in DataloaderTypes],
+                base=DataLoader,
+                default=LLMDataLoader,
+            ),
+            DatasetTypes: ClassResolver(
+                [t.value for t in DatasetTypes], base=Dataset
+            ),
+            CollatorTypes: ClassResolver(
+                [t.value for t in CollatorTypes], base=GPT2LLMCollator
+            ),
+            TokenizerTypes: ClassResolver(
+                [t.value for t in TokenizerTypes], base=PreTrainedTokenizer
+            ),
+            CodecTypes: ClassResolver(
+                [t.value for t in CodecTypes], base=Codec
+            ),
+            CheckpointingStrategyTypes: ClassResolver(
+                [t.value for t in CheckpointingStrategyTypes],
+                base=CheckpointingStrategyIF
+            ),
+            # TODO: fix type in execution
+            CheckpointingExectionTypes: ClassResolver(
+                [t.value for t in CheckpointingExectionTypes],
+                base=CheckpointingExecutionIF
+            )
         }
-        return resolvers
-
-    def add_resolver(self, resolver_key: str, resolver: ClassResolver):
-        self._resolver_register[resolver_key] = resolver
