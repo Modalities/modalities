@@ -15,7 +15,7 @@ from modalities.activation_checkpointing import apply_activation_checkpointing_i
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
+from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode, PreparationAppConfig
 from modalities.config.lookup_types import TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -104,6 +104,7 @@ def entry_point_create_memmap_index(src_path, index_path):
 
 @main.command(name="create_packed_data")
 @click.argument("src_path", type=Path)
+@click.argument("config_file_path", type=Path)
 @click.option(
     "--dst_path",
     type=str,
@@ -111,41 +112,27 @@ def entry_point_create_memmap_index(src_path, index_path):
     help="output path for packed data file. will use parent directory of src_path if none.",
 )
 @click.option(
-    "--index_path",
+    "--idx_path",
     type=Path,
     default=None,
     help="input path for index. will search in parent directory of src_path if none.",
 )
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option(
-    "--jq_pattern",
-    type=str,
-    show_default=True,
-    default=".text",
-    help="jq pattern to extract the data from the json line.",
-)
-def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
-    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
-    #  we can currently not rely on the existing class resolver.
-    #  This is based on its connection to the overall `AppConfig`.
-    #  One would requires an object of it to instantiate the ResolverRegistry.
-    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
-    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
+def entry_point_create_packed_data(src_path, config_file_path, dst_path, idx_path):
+
+    config_dict = load_app_config_dict(config_file_path)
+    config = PreparationAppConfig.model_validate(config_dict)
+    # build codec components
+    resolvers = ResolverRegister()
+    codecs = {
+        f.jq_pattern: resolvers.build_component_by_config(f.codec)
+        for f in config.features
+    }
+    # generate packed data
+    generator = PackedDataGenerator(
+        codecs,
+        src_path=src_path,
+        idx_path=idx_path,
+    )
     generator.run(dst_path)
 
 
