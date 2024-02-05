@@ -20,6 +20,7 @@ from modalities.config.lookup_types import (
     SamplerTypes,
     SchedulerTypes,
     TokenizerTypes,
+    ValidationMeasureFactoryTypes,
 )
 from modalities.config.types import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2Config
@@ -150,6 +151,11 @@ class CLMCrossEntropyLossConfig(BaseModel):
 
 class LossConfig(BaseModel):
     type_hint: LossTypes
+    config: CLMCrossEntropyLossConfig
+
+
+class ValidationMeasureFactoryConfig(BaseModel):
+    type_hint: ValidationMeasureFactoryTypes
     config: CLMCrossEntropyLossConfig
 
 
@@ -317,6 +323,7 @@ class AppConfig(BaseModel):
     checkpointing: CheckpointingConfig
     wandb: WandbConfig
     loss: LossConfig
+    validation_measure_factories: List[ValidationMeasureFactoryConfig]
 
 
 class PretrainedGPTConfig(PretrainedConfig):

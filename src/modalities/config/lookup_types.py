@@ -1,4 +1,6 @@
 from enum import Enum
+from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
+from modalities.evaluation.perplexity import AggregativePerplexityFactory
 
 import torch
 from torch.utils.data import BatchSampler, DistributedSampler
@@ -31,6 +33,11 @@ class ModelTypes(LookupEnum):
 
 class LossTypes(LookupEnum):
     CLMCrossEntropyLoss = CLMCrossEntropyLoss
+
+
+class ValidationMeasureFactoryTypes(LookupEnum):
+    AggregativeCLMCrossEntropyLossFactory = AggregativeCLMCrossEntropyLossFactory
+    AggregativePerplexityFactory = AggregativePerplexityFactory
 
 
 class OptimizerTypes(LookupEnum):
