@@ -55,8 +55,8 @@ def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer):
     np.testing.assert_equal(
         tokenized_start_of_jsonl_content[block_size : 2 * block_size], next(packed_dataset_iterator)["input_ids"]
     )
-    assert len(packed_dataset.index_base) == 12
+    assert len(packed_dataset._embedded_stream_data.index_base) == 12
 
     # check validity of index section in packed dataset
-    for idx, (offset, entry_length) in enumerate(packed_dataset.index_base[:-1]):
-        assert offset + entry_length == packed_dataset.index_base[idx + 1][0]
+    for idx, (offset, entry_length) in enumerate(packed_dataset._embedded_stream_data.index_base[:-1]):
+        assert offset + entry_length == packed_dataset._embedded_stream_data.index_base[idx + 1][0]

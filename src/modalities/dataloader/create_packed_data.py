@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 import jq
+import numpy as np
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
@@ -18,13 +19,6 @@ class EmptySampleError(RuntimeError):
 
 
 class PackedDataGenerator:
-    # amount of bytes to represent number of all tokens in dataset.
-    # If the amount exceeds 2^(8*`header_size_in_bytes`), this requires adaptation.
-    # Decided to keep this constant, since a size of 8 bytes requires more data than the internet currently provides
-    DATA_SECTION_LENGTH_IN_BYTES = 8
-    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = 4
-    HEADER_SIZE_IN_BYTES = DATA_SECTION_LENGTH_IN_BYTES + TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
-
     def __init__(
         self,
         src_path: Path,
@@ -126,9 +120,13 @@ class PackedDataGenerator:
             with dst_path.open("wb") as f:
                 # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
                 # not possible to prepend header after determining size of data section
-                f.write((0).to_bytes(self.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
-                f.write(self._token_size_in_bytes.to_bytes(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big"))
-                curr_offset = self.HEADER_SIZE_IN_BYTES
+                f.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+                f.write(
+                    self._token_size_in_bytes.to_bytes(
+                        EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big"
+                    )
+                )
+                curr_offset = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
 
                 # write data section (tokens)
                 for tokens_as_bytes in tqdm(
@@ -160,9 +158,9 @@ class PackedDataGenerator:
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
         start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
-        length_of_byte_encoded_data_section = start_of_index_in_bytes - self.HEADER_SIZE_IN_BYTES
+        length_of_byte_encoded_data_section = start_of_index_in_bytes - EmbeddedStreamData.HEADER_SIZE_IN_BYTES
         data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
-            self.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"
+            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"
         )
         with dst_path.open("rb+") as fout:
             fout.seek(0)
@@ -176,3 +174,38 @@ class PackedDataGenerator:
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
         return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
+
+
+class EmbeddedStreamData:
+    # amount of bytes to represent number of all tokens in dataset.
+    # If the amount exceeds 2^(8*`header_size_in_bytes`), this requires adaptation.
+    # Decided to keep this constant, since a size of 8 bytes requires more data than the internet currently provides
+    DATA_SECTION_LENGTH_IN_BYTES = 8
+    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = 4
+    HEADER_SIZE_IN_BYTES = DATA_SECTION_LENGTH_IN_BYTES + TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
+
+    def __init__(self, data_path: Path):
+        self._data_path = data_path
+        if not self._data_path.is_file():
+            raise FileNotFoundError(
+                f"Packed Data was not found at {self._data_path}."
+                f"Create on in advance by using `modalities create_packed_data`."
+            )
+
+        with self._data_path.open("rb") as f:
+            # get number of bytes in data section
+            data_section_length_in_bytes = f.read(self.DATA_SECTION_LENGTH_IN_BYTES)
+            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="big")
+
+            # get number of bytes for encoding a single token
+            f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
+            token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
+            self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
+
+            # get index
+            f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
+            pkl_encoded_index = f.read()
+            self.index_base = pickle.loads(pkl_encoded_index)
+
+            # initialize memmapped data section
+            self.data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))

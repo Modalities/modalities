@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -12,7 +10,7 @@ from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import PackedDataGenerator
+from .create_packed_data import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):
@@ -71,9 +69,9 @@ class MemMapDataset(Dataset):
 
 
 class PackedMemMapDatasetBase(Dataset):
-    DATA_SECTION_LENGTH_IN_BYTES = PackedDataGenerator.DATA_SECTION_LENGTH_IN_BYTES
-    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = PackedDataGenerator.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
-    HEADER_SIZE_IN_BYTES = PackedDataGenerator.HEADER_SIZE_IN_BYTES
+    DATA_SECTION_LENGTH_IN_BYTES = EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES
+    TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
+    HEADER_SIZE_IN_BYTES = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
     np_dtype_from_num_bytes = {
         1: np.dtype(np.uint8).newbyteorder(">"),
         2: np.dtype(np.uint16).newbyteorder(">"),
@@ -97,45 +95,16 @@ class PackedMemMapDatasetBase(Dataset):
                             this needs to get replaced with a list of sample keys!
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
-        if not self.raw_data_path.is_file():
-            raise FileNotFoundError(
-                f"Packed Data was not found at {self.raw_data_path}."
-                f"Create on in advance by using `modalities create_packed_data`."
+        self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
+        self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
+        try:
+            self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
+        except KeyError:
+            raise RuntimeError(
+                f"Encountered a required token representation with {self._token_size_in_bytes},"
+                " which is not supported. Consider using a smaller vocabulary."
             )
-
-        with self.raw_data_path.open("rb") as f:
-            # get number of total bytes in file
-            f.seek(0, os.SEEK_END)
-            self.total_bytes = f.tell()
-            f.seek(0)
-
-            # get number of bytes in data section
-            data_section_length_in_bytes = f.read(self.DATA_SECTION_LENGTH_IN_BYTES)
-            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="big")
-
-            # get number of bytes for encoding a single token
-            f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
-            token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
-            self._token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
-            try:
-                self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
-            except KeyError:
-                raise RuntimeError(
-                    f"Encountered a required token representation with {self._token_size_in_bytes},"
-                    " which is not supported. Consider using a smaller vocabulary."
-                )
-
-            # get index
-            f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
-            pkl_encoded_index = f.read()
-            self.index_base = pickle.loads(pkl_encoded_index)
-
-            # initialize memmapped data section
-            self.data = np.memmap(
-                self.raw_data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,)
-            )
-
-            self._index = self._generate_packing_index()
+        self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
         raise NotImplementedError
@@ -146,14 +115,14 @@ class PackedMemMapDatasetBase(Dataset):
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
         offset, length = self._index[idx]
-        tokens = np.frombuffer(self.data, dtype=self._token_dtype, count=length, offset=offset)
+        tokens = np.frombuffer(self._embedded_stream_data.data, dtype=self._token_dtype, count=length, offset=offset)
         return BatchEncoding(data={self.sample_key: tokens})
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
         # get number of total tokens in file
-        total_tokens = self.data_len // self._token_size_in_bytes
+        total_tokens = self._embedded_stream_data.data_len // self._token_size_in_bytes
         num_samples = total_tokens // self.block_size
         return [(i * self.block_size * self._token_size_in_bytes, self.block_size) for i in range(num_samples)]
 
@@ -164,7 +133,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
         block_size_in_bytes = self.block_size * self._token_size_in_bytes
-        for segment_offset, segment_len in tqdm(self.index_base):
+        for segment_offset, segment_len in tqdm(self._embedded_stream_data.index_base):
             # When the sum of the length of the current previously seen samples doesn't
             # exceed block_size_in_bytes, we add the current segment length to the previous
             # ones and continue.
