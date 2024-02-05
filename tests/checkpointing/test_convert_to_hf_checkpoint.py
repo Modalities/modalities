@@ -39,20 +39,20 @@ def device():
 def test_convert_to_hf_checkpoint(tmp_path, config, checkpoint_dir, device):
     # load test checkpoint
     main = Main(config)
-    hugging_face_model = main.load_and_convert_checkpoint(checkpoint_dir, tmp_path)
+    pytorch_model = main.load_and_convert_checkpoint(checkpoint_dir, tmp_path)
     # register config and model
     AutoConfig.register("modalities_gpt2", HuggingFaceModelConfig)
     AutoModelForCausalLM.register(HuggingFaceModelConfig, HuggingFaceModel)
-    model.eval()
-    model = model.to(device)
+    pytorch_model.eval()
+    pytorch_model = pytorch_model.to(device)
     # check that model before and after loading return the same output
     test_tensor = torch.randint(10, size=(5, 10))
     test_tensor = test_tensor.to(device)
-    output_before_loading = model.forward({"input_ids": test_tensor})["logits"]
+    output_before_loading = pytorch_model.forward({"input_ids": test_tensor})["logits"]
     # load saved model
-    loaded_model = AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=model.lm_head.weight.dtype)
-    loaded_model = loaded_model.to(device)
-    assert loaded_model.dtype == model.lm_head.weight.dtype
-    loaded_model.eval()
-    output_after_loading = loaded_model.forward(test_tensor)
+    hf_model = AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=pytorch_model.lm_head.weight.dtype)
+    hf_model = hf_model.to(device)
+    assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
+    hf_model.eval()
+    output_after_loading = hf_model.forward(test_tensor)
     assert (output_after_loading == output_before_loading).all()
