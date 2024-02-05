@@ -39,8 +39,7 @@ def device():
 def test_convert_to_hf_checkpoint(tmp_path, config, checkpoint_dir, device):
     # load test checkpoint
     main = Main(config)
-    main.load_and_convert_checkpoint(checkpoint_dir, tmp_path)
-    model = main.model
+    hugging_face_model = main.load_and_convert_checkpoint(checkpoint_dir, tmp_path)
     # register config and model
     AutoConfig.register("modalities_gpt2", HuggingFaceModelConfig)
     AutoModelForCausalLM.register(HuggingFaceModelConfig, HuggingFaceModel)
