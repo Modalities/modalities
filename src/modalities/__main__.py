@@ -162,21 +162,30 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     help="Load pytorch checkpoint from this directory.",
 )
 @click.option(
+    "--input_pytorch_config_name",
+    type=str,
+    required=False,
+    default="model_config.yaml",
+    help="Name of the config file for the input pytorch checkpoint, "
+         "which must be located in input_pytorch_checkpoint_dir.",
+)
+@click.option(
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Converted hf checkpoint will be written to this directory.",
 )
-def convert_checkpoint(checkpoint_dir, output_path):
-    checkpoint_dir = Path(checkpoint_dir)
-    config_file_path = checkpoint_dir / "model_config.yaml"
-    if not config_file_path.exists():
-        raise ValueError(f"Could not find model_config.yaml in {checkpoint_dir}")
+def convert_pytorch_to_hf_checkpoint(input_pytorch_checkpoint_dir, input_pytorch_config_name, output_hf_checkpoint_dir):
+    input_pytorch_checkpoint_dir = Path(input_pytorch_checkpoint_dir)
+    input_pytorch_config_file_path = input_pytorch_checkpoint_dir / input_pytorch_config_name
+    if not input_pytorch_config_file_path.exists():
+        raise ValueError(f"Could not find {input_pytorch_config_name} in {input_pytorch_checkpoint_dir}")
 
-    config_dict = load_app_config_dict(config_file_path)
+    config_dict = load_app_config_dict(input_pytorch_config_file_path)
     config = AppConfig.model_validate(config_dict)
+    logging.info(f"Config\n{config}")
     main = Main(config)
-    main.load_and_convert_checkpoint(checkpoint_dir, output_path)
+    main.load_and_convert_checkpoint(input_pytorch_checkpoint_dir, output_hf_checkpoint_dir)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
