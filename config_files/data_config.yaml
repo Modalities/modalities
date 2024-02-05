@@ -1,0 +1,15 @@
+features:
+  - jq_pattern: .cls
+    codec:
+      type_hint: HfTokenizerCodec
+      config:
+        add_eos_token: true
+        tokenizer:
+          type_hint: GPT2TokenizerFast
+          config:
+            tokenizer_file: ./data/tokenizer/tokenizer.json
+  - jq_pattern: .img_path
+    codec:
+      type_hint: PillowImageCodec
+      config:
+        save_format: png

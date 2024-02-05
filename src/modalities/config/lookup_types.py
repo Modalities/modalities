@@ -17,6 +17,11 @@ from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 
+from modalities.dataloader.codecs import (
+    HfTokenizerCodec,
+    PillowImageCodec
+)
+
 
 class LookupEnum(Enum):
     @classmethod
@@ -45,6 +50,11 @@ class SchedulerTypes(LookupEnum):
 
 class TokenizerTypes(LookupEnum):
     GPT2TokenizerFast = GPT2TokenizerFast
+
+
+class CodecTypes(LookupEnum):
+    HfTokenizerCodec = HfTokenizerCodec
+    PillowImageCodec = PillowImageCodec
 
 
 class DatasetTypes(LookupEnum):
