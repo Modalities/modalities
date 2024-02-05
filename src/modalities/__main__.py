@@ -72,7 +72,15 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
     generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
 
 
-@main.command(name="create_memmap_index")
+@main.group(name="data")
+def data():
+    """
+    Collection of utilities to preprocess, analyse and modify training data.
+    """
+    pass
+
+
+@data.command(name="create_raw_index")
 @click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
@@ -80,7 +88,13 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_create_memmap_index(src_path, index_path):
+def entry_point_data_create_raw_index(src_path, index_path):
+    """
+    Utility for indexing a large jsonl-file's content.
+    Background is the ability to further process the respective file without loading it,
+    while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
+    It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
+    """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
@@ -91,7 +105,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     generator.create_index(index_path)
 
 
-@main.command(name="create_packed_data")
+@data.command(name="pack_encoded_data")
 @click.argument("src_path", type=Path)
 @click.option(
     "--dst_path",
@@ -133,9 +147,14 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=os.cpu_count(),
     help="Specify the number of tokenization workers. Default is the number of available CPUs.",
 )
-def entry_point_create_packed_data(
-    src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus
-):
+def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus):
+    """
+    Utility to encode an indexed, large jsonl-file.
+
+    (see also `create_index` for more information)
+    Returns .pbin-file, which can be inserted into a training process directly
+    and does not require its original jsonl-file or the respective index file anymore.
+    """
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
     #  This is based on its connection to the overall `AppConfig`.

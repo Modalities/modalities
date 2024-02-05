@@ -29,7 +29,7 @@ class LargeFileLinesReader(BaseReader):
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
         if not self.index_path.is_file():
-            raise FileNotFoundError("Index file does not exist. Use `modalities create_memmap_index` to create one.")
+            raise FileNotFoundError("Index file does not exist. Use `modalities data create_raw_index` to create one.")
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)

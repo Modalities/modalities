@@ -192,7 +192,7 @@ class EmbeddedStreamData:
         if not self._data_path.is_file():
             raise FileNotFoundError(
                 f"Packed Data was not found at {self._data_path}."
-                f"Create on in advance by using `modalities create_packed_data`."
+                f"Create on in advance by using `modalities data pack_encoded_data`."
             )
 
         with self._data_path.open("rb") as f:

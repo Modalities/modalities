@@ -88,7 +88,7 @@ class PackedMemMapDatasetBase(Dataset):
          of byte positions.
 
         :param raw_data_path: Path to a packed binary file (*.pbin).
-                              Use `modalities create_packed_data` to create one based on a jsonl-file.
+                              Use `modalities data pack_encoded_data` to create one based on a jsonl-file.
         :param block_size: alias for max sequence length. The amount of tokens the model can handle.
         :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
                            TODO: If this setting should support multi-modal features using separately encoded inputs,
