@@ -1,10 +1,10 @@
 from torch.utils.data.dataset import Dataset
 
 from modalities.config.config import DataLoaderConfig, DatasetConfig
+from modalities.config.resolver_register import ResolverRegister
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.resolver_register import ResolverRegister
 
 
 class OpenGPTXDatasetWrapper(Dataset):

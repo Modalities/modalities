@@ -15,7 +15,7 @@ from torch.nn import functional as F
 from transformers import PreTrainedTokenizer
 
 from modalities.config.config import AppConfig
-from modalities.resolver_register import ResolverRegister
+from modalities.config.resolver_register import ResolverRegister
 
 chat_prefix = """
 This is a converstation between a user and a helpful bot, which answers the user's questsions as good as possible.

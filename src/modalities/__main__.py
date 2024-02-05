@@ -17,6 +17,7 @@ from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingI
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
 from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
+from modalities.config.resolver_register import ResolverRegister
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -33,7 +34,6 @@ from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import 
 )
 from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from modalities.loss_functions import Loss
-from modalities.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_date_of_run

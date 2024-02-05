@@ -156,7 +156,7 @@ class LossConfig(BaseModel):
 
 class TrainingConfig(BaseModel):
     # TODO: use this in Progress Logging
-    global_num_training_samples: conint(gt=0)
+    # global_num_training_samples: conint(gt=0)
     callback_interval_in_samples: conint(gt=0)
     process_group_backend: ProcessGroupBackendType
     local_rank: conint(ge=0)
@@ -176,13 +176,13 @@ class TrainingConfig(BaseModel):
     def global_train_batch_size(self):
         return self.local_train_batch_size * self.world_size
 
-    @property
-    def local_num_train_samples(self):
-        exact = self.global_num_training_samples / self.world_size
-        ret = self.global_num_training_samples // self.world_size
-        if exact != ret:
-            print(f"Calculated local_num_training_samples is not an integer. Clipping {exact} to {ret} ")
-        return ret
+    # @property
+    # def local_num_train_samples(self):
+    #     exact = self.global_num_training_samples / self.world_size
+    #     ret = self.global_num_training_samples // self.world_size
+    #     if exact != ret:
+    #         print(f"Calculated local_num_training_samples is not an integer. Clipping {exact} to {ret} ")
+    #     return ret
 
     @property
     def local_num_seen_train_samples(self):
@@ -200,13 +200,13 @@ class TrainingConfig(BaseModel):
             print(f"Calculated skip_num_local_train_batches is not an integer. Clipping {exact} to {ret} ")
         return ret
 
-    @property
-    def num_training_batches(self) -> int:
-        exact = self.global_num_training_samples / self.local_train_micro_batch_size
-        ret = self.global_num_training_samples // self.local_train_micro_batch_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-        return ret
+    # @property
+    # def num_training_batches(self) -> int:
+    #     exact = self.global_num_training_samples / self.local_train_micro_batch_size
+    #     ret = self.global_num_training_samples // self.local_train_micro_batch_size
+    #     if exact != ret:
+    #         warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
+    #     return ret
 
     @property
     def callback_interval_in_batches_per_rank(self):
