@@ -410,7 +410,7 @@ class Main:
 
     def _convert_checkpoint(self, output_path: Union[str, Path], model: nn.Module):
         config = HuggingFaceModelConfig(self.config.model.config)
-        model = HuggingFaceModel(config=config, model=model)
+        hugging_face_model = HuggingFaceModel(config=config, model=model)
         model.save_pretrained(output_path, safe_serialization=False)
 
 
