@@ -60,8 +60,6 @@ class Trainer:
             thoughput_aggregator.stop(len(batch))
             # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
-            # TODO the current CLMCrossEntropyLoss uses reduction=mean as default;
-            #  so normalizing by len(batch) is wrong, should be by number of batches
             cummulated_loss[1] += len(batch)
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,

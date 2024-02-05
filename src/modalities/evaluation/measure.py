@@ -11,13 +11,11 @@ from modalities.evaluation.aggregator import Aggregator, KeyType
 
 
 class AggregativeMeasureFactory(Generic[KeyType]):
-
     def create(self, local_rank: int) -> AggregativeMeasure:
         raise NotImplementedError
 
 
 class AggregativeMeasure(Generic[KeyType], ABC):
-
     def __init__(
         self,
         aggregate_keys: List[KeyType],
@@ -25,7 +23,10 @@ class AggregativeMeasure(Generic[KeyType], ABC):
         tag: str,
         local_rank: int,
     ) -> None:
-        self._device = torch.device(local_rank)
+        if torch.cuda.is_available():
+            self._device = torch.device(local_rank)
+        else:
+            self._device = "cpu"
         self._aggregator = Aggregator[KeyType](
             initial_values={k: torch.zeros(1).to(self._device) for k in aggregate_keys}
         )

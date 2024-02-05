@@ -3,11 +3,13 @@ import unittest
 from typing import List, Tuple
 from unittest.mock import MagicMock, call
 
+import pytest
 import torch
 
 from modalities.batch import DatasetBatch
 from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
 from modalities.evaluator import Evaluator
+from tests.conftest import set_env_cpu
 
 
 class MockAggregativeMeasureFactory(AggregativeMeasureFactory):
@@ -21,7 +23,8 @@ class MockAggregativeMeasureFactory(AggregativeMeasureFactory):
         return measure_mock
 
 
-def test_evaluate_cpu(monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_cpu(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     batches = _prepare_test_batches(llm_data_loader_mock)
 
     measure_factory = MockAggregativeMeasureFactory()
@@ -43,9 +46,8 @@ def test_evaluate_cpu(monkeypatch, nn_model_mock, llm_data_loader_mock, progress
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
 
 
-def test_evaluate_builds_in_all_loss_factories(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_builds_in_all_loss_factories(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
@@ -53,9 +55,8 @@ def test_evaluate_builds_in_all_loss_factories(
     assert len(loss_factories[0].created_mocks) == len(loss_factories)
 
 
-def test_evaluate_calls_add_for_all_losses_and_batches(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_calls_add_for_all_losses_and_batches(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
@@ -64,9 +65,8 @@ def test_evaluate_calls_add_for_all_losses_and_batches(
     unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(loss_factories))
 
 
-def test_evaluate_calls_compute_on_all_losses(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_calls_compute_on_all_losses(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
@@ -75,9 +75,8 @@ def test_evaluate_calls_compute_on_all_losses(
     unittest.TestCase().assertListEqual(compute_call_counts, [1] * len(loss_factories))
 
 
-def test_evaluate_builds_in_all_metrics_factories(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_builds_in_all_metrics_factories(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
@@ -85,9 +84,8 @@ def test_evaluate_builds_in_all_metrics_factories(
     assert len(metric_factories[0].created_mocks) == len(metric_factories)
 
 
-def test_evaluate_calls_add_for_all_metrics_and_batches(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_calls_add_for_all_metrics_and_batches(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
@@ -96,9 +94,8 @@ def test_evaluate_calls_add_for_all_metrics_and_batches(
     unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(metric_factories))
 
 
-def test_evaluate_calls_compute_on_all_metrics(
-    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+@pytest.mark.usefixtures(set_env_cpu.__name__)
+def test_evaluate_calls_compute_on_all_metrics(nn_model_mock, llm_data_loader_mock, progress_publisher_mock):
     num_batches = 4
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock

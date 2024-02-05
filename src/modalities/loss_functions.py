@@ -24,7 +24,7 @@ class Loss(ABC):
 
 
 class CLMCrossEntropyLoss(Loss):
-    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss", reduction: str = "mean"):
+    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss", reduction: str = "sum"):
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
