@@ -398,9 +398,8 @@ class Main:
     def _get_model_from_checkpoint(self, checkpoint_dir: Path):
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
         if torch.distributed.is_initialized():
-            rank = torch.distributed.get_rank()
-        else:
-            rank = 0
+            raise NotImplementedError("Checkpoint conversion is only implemented for non-distributed environments")
+        rank = 0
         checkpointing = PytorchToDiscCheckpointing(rank)
         checkpoint_path = checkpoint_dir / "model.bin"
         if not checkpoint_path.exists():
