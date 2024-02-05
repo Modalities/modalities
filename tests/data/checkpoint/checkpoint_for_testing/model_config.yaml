@@ -32,7 +32,7 @@ data:
       dataset:
         type_hint: PackedMemMapDatasetContinuous
         config: 
-          raw_data_path: /home/richard-rutmann/s3/projects/remote_projects/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_train.pbin
+          raw_data_path: ../../../../src/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_train.pbin
           block_size: ${data.sequence_len}
           sample_key: ${data.sample_key}
       collate_fn:
@@ -61,7 +61,7 @@ data:
         dataset:
           type_hint: PackedMemMapDatasetContinuous
           config: 
-            raw_data_path: /home/richard-rutmann/s3/projects/remote_projects/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_test.pbin
+            raw_data_path: ../../../../src/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_test.pbin
             block_size: ${data.sequence_len}
             sample_key: ${data.sample_key}
         collate_fn:
@@ -91,7 +91,7 @@ checkpointing:
   checkpointing_execution:
     type_hint: FSDPToDiscCheckpointing
     config: 
-      checkpoint_path: /home/richard-rutmann/s3/models/llm_gym/test/checkpoints
+      checkpoint_path: ./
       global_rank: ${oc.env:RANK}
 
 running_env:
