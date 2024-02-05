@@ -202,8 +202,6 @@ class Main:
         self.resolvers = ResolverRegister(config=config)
         self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
 
-        self.model = None
-
     def run(self):
         with self.running_env as running_env:
             (
@@ -393,8 +391,9 @@ class Main:
         return evaluation_result_publisher, batch_processed_publisher
 
     def load_and_convert_checkpoint(self, checkpoint_path: Path, output_path: str):
-        self.model = self._get_model_from_checkpoint(checkpoint_path)
-        self._convert_checkpoint(output_path, self.model)
+        model = self._get_model_from_checkpoint(checkpoint_path)
+        self._convert_checkpoint(output_path, model)
+        return model
 
     def _get_model_from_checkpoint(self, checkpoint_dir: Path):
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
