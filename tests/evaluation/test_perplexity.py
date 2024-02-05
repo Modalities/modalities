@@ -1,5 +1,6 @@
 import pytest
-from torch import tensor
+import torch
+import torch.nn as nn
 
 from modalities.batch import InferenceResultBatch
 from modalities.evaluation.perplexity import AggregativePerplexity
@@ -17,13 +18,13 @@ def aggregative_perplexity() -> AggregativePerplexity:
 
 @pytest.fixture
 def batch_size_one_data() -> InferenceResultBatch:
-    target_tensor = tensor(
+    target_tensor = torch.tensor(
         [
             [0, 1, 2, 0, 1],
         ]
     )
 
-    prediction_tensor = tensor(
+    prediction_tensor = torch.tensor(
         [
             [
                 [1.3151, -0.9029, 0.0504],
@@ -40,14 +41,25 @@ def batch_size_one_data() -> InferenceResultBatch:
     )
 
 
+@pytest.fixture
+def expected_perplexity(batch_size_one_data: InferenceResultBatch) -> float:
+    target_tensor = batch_size_one_data.targets["target_ids"]
+    predictions = batch_size_one_data.predictions["logits"]
+
+    all_log_probs = nn.LogSoftmax(dim=-1)(predictions)
+    target_indices = target_tensor.unsqueeze(dim=-1)
+    target_log_probs = torch.gather(all_log_probs, -1, target_indices)
+    exponent = target_log_probs.sum() / target_log_probs.shape[-2] * -1.0
+    return exponent.exp().item()
+
+
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_perplexity_computed_correctly_batch_size_one(
-    aggregative_perplexity: AggregativePerplexity, batch_size_one_data: InferenceResultBatch
+    aggregative_perplexity: AggregativePerplexity, batch_size_one_data: InferenceResultBatch, expected_perplexity: float
 ):
     aggregative_perplexity.add(batch_result=batch_size_one_data)
-    aggregative_perplexity.compute()
-    ...
-    # assert 1 == perplexity
+    perplexity = aggregative_perplexity.compute().item()
+    assert perplexity == expected_perplexity
 
 
 def test_perplexity_computed_correctly_batch_size_greater_one():
