@@ -154,18 +154,18 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     generator.run(dst_path)
 
 
-@main.command(name="convert_checkpoint")
+@main.command(name="convert_pytorch_to_hf_checkpoint")
 @click.option(
-    "--checkpoint_dir",
-    type=click_pathlib.Path(exists=False),
+    "--input_pytorch_checkpoint_dir",
+    type=click_pathlib.Path(exists=True),
     required=True,
-    help="Load checkpoint from this path.",
+    help="Load pytorch checkpoint from this directory.",
 )
 @click.option(
-    "--output_path",
+    "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
     required=True,
-    help="Converted checkpoint will be written to this path.",
+    help="Converted hf checkpoint will be written to this directory.",
 )
 def convert_checkpoint(checkpoint_dir, output_path):
     checkpoint_dir = Path(checkpoint_dir)
