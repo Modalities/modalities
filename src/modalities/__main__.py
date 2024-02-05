@@ -14,7 +14,7 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import PackedDataGenerator
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
@@ -170,6 +170,31 @@ def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type
         number_of_processes=num_cpus,
     )
     generator.run(dst_path)
+
+
+@data.command(name="merge_packed_data")
+@click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
+@click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
+def entry_point_merge_packed_data(src_paths, target_path):
+    """
+    Utility for merging different pbin-files into one.
+    This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
+    that the overall process was done in chunks.
+    It is important that the same tokenizer got used for all chunks.
+
+    Specify an arbitrary amount of pbin-files and/or directory containing such as input.
+    """
+    input_files = []
+    for p in src_paths:
+        p: Path
+        if p.is_file():
+            input_files.append(p)
+        elif p.is_dir():
+            input_files.extend(p.glob("**/*.pbin"))
+        else:
+            raise ValueError(f"{p} is neither a directory nor a file.")
+    embedded_datasets = list(map(EmbeddedStreamData, input_files))
+    join_embedded_stream_data(embedded_datasets, target_path)
 
 
 class Main:
