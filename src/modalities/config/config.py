@@ -324,7 +324,7 @@ class HuggingFaceModelConfig(PretrainedConfig):
     model_type = "modalities_gpt2"
 
     def __init__(self, config: GPT2Config = None, **kwargs):
-        if type(config) == dict:
+        if isinstance(config, dict):
             config = GPT2Config(**config)
         self.config = config
 
