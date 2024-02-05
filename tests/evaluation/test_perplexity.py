@@ -1,4 +1,5 @@
 import pytest
+import torch.distributed as dist
 from torch import tensor
 
 from modalities.batch import InferenceResultBatch
@@ -10,6 +11,7 @@ def aggregative_perplexity() -> AggregativePerplexity:
     return AggregativePerplexity(
         prediction_key="logits",
         target_key="target_ids",
+        local_rank=0,
     )
 
 
@@ -41,10 +43,11 @@ def batch_size_one_data() -> InferenceResultBatch:
 def test_perplexity_computed_correctly_batch_size_one(
     aggregative_perplexity: AggregativePerplexity, batch_size_one_data: InferenceResultBatch
 ):
+    # dist.init_process_group()  # FIXME how to do this for tests?
+
     aggregative_perplexity.add(batch_result=batch_size_one_data)
     perplexity = aggregative_perplexity.compute()
     assert 1 == perplexity
 
 
-def test_perplexity_computed_correctly_batch_size_greater_one():
-    ...
+def test_perplexity_computed_correctly_batch_size_greater_one(): ...

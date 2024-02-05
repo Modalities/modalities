@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Dict
 
 import torch
+import torch.distributed as dist
 
 from modalities.batch import InferenceResultBatch
 from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
@@ -16,8 +17,14 @@ class LossKeys(Enum):
 
 
 class AggregativeCLMCrossEntropyLoss(AggregativeMeasure[LossKeys]):
-    def __init__(self, target_key: str, prediction_key: str) -> None:
-        super().__init__(aggregate_keys=list(LossKeys), reduce_ops={})
+
+    def __init__(self, target_key: str, prediction_key: str, local_rank: int) -> None:
+        super().__init__(
+            aggregate_keys=list(LossKeys),
+            reduce_ops={k: dist.ReduceOp.SUM for k in LossKeys},
+            tag="CLMCrossEntropyLoss",
+            local_rank=local_rank,
+        )
         self._loss = CLMCrossEntropyLoss(target_key=target_key, prediction_key=prediction_key, reduction="sum")
 
     def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[LossKeys, torch.Tensor]:
@@ -27,8 +34,8 @@ class AggregativeCLMCrossEntropyLoss(AggregativeMeasure[LossKeys]):
             LossKeys.NUM_SAMPLES: torch.tensor(len(batch_result)),
         }
 
-    def _calc_measure(self, values: Dict[LossKeys, torch.Tensor]) -> float:
-        return values[LossKeys.CLM_CROSS_ENTROPY].item() / values[LossKeys.NUM_SAMPLES].item()
+    def _calc_measure(self, values: Dict[LossKeys, torch.Tensor]) -> torch.Tensor:
+        return values[LossKeys.CLM_CROSS_ENTROPY] / values[LossKeys.NUM_SAMPLES]
 
 
 class AggregativeCLMCrossEntropyLossFactory(AggregativeMeasureFactory[LossKeys]):
@@ -36,8 +43,9 @@ class AggregativeCLMCrossEntropyLossFactory(AggregativeMeasureFactory[LossKeys])
         self._target_key = target_key
         self._prediction_key = prediction_key
 
-    def create(self) -> AggregativeMeasure:
+    def create(self, local_rank: int) -> AggregativeMeasure:
         return AggregativeCLMCrossEntropyLoss(
             target_key=self._target_key,
             prediction_key=self._prediction_key,
+            local_rank=local_rank,
         )

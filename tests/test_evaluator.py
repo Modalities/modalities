@@ -1,18 +1,27 @@
 import os
-from typing import List
+import unittest
+from typing import List, Tuple
 from unittest.mock import MagicMock, call
 
 import torch
 
 from modalities.batch import DatasetBatch
+from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
 from modalities.evaluator import Evaluator
-from modalities.loss_functions import Loss
-from modalities.metrics import Metric
 
 
-def test_evaluate_cpu(
-    monkeypatch, nn_model_mock, loss_mock, metric_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
+class MockAggregativeMeasureFactory(AggregativeMeasureFactory):
+    def __init__(self):
+        self.created_mocks = []
+
+    def create(self, local_rank: int) -> AggregativeMeasure:
+        measure_mock = MagicMock(spec=AggregativeMeasure)
+        measure_mock.compute.return_value = 0.0
+        self.created_mocks.append(measure_mock)
+        return measure_mock
+
+
+def test_evaluate_cpu(monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu):
     batches = _prepare_test_batches(llm_data_loader_mock)
 
     evaluator = Evaluator(
@@ -21,63 +30,108 @@ def test_evaluate_cpu(
         evaluation_result_publisher=progress_publisher_mock,
     )
 
+    measure_factory = MockAggregativeMeasureFactory()
+
     evaluator.evaluate(
         model=nn_model_mock,
         data_loaders=[llm_data_loader_mock],
-        loss_functions=[loss_mock],
-        metrics=[metric_mock],
+        loss_factories=[measure_factory],
+        metric_factories=[measure_factory],
         global_train_sample_id=0,
         local_sample_id_to_global_sample_id=lambda i: i,
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
 
 
-def test_evaluate_calls_all_losses(
-    monkeypatch, nn_model_mock, loss_mock, metric_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+def test_evaluate_builds_in_all_loss_factories(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
 ):
-    _prepare_test_batches(llm_data_loader_mock)
+    num_batches = 4
+    loss_factories, _ = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    assert len(loss_factories[0].created_mocks) == len(loss_factories)
+
+
+def test_evaluate_calls_add_for_all_losses_and_batches(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+):
+    num_batches = 4
+    loss_factories, _ = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    add_call_counts = [loss.add.call_count for loss in loss_factories[0].created_mocks]
+    unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(loss_factories))
+
+
+def test_evaluate_calls_compute_on_all_losses(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+):
+    num_batches = 4
+    loss_factories, _ = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    compute_call_counts = [loss.compute.call_count for loss in loss_factories[0].created_mocks]
+    unittest.TestCase().assertListEqual(compute_call_counts, [1] * len(loss_factories))
+
+
+def test_evaluate_builds_in_all_metrics_factories(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+):
+    num_batches = 4
+    _, metric_factories = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    assert len(metric_factories[0].created_mocks) == len(metric_factories)
+
+
+def test_evaluate_calls_add_for_all_metrics_and_batches(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+):
+    num_batches = 4
+    _, metric_factories = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    add_call_counts = [loss.add.call_count for loss in metric_factories[0].created_mocks]
+    unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(metric_factories))
+
+
+def test_evaluate_calls_compute_on_all_metrics(
+    monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
+):
+    num_batches = 4
+    _, metric_factories = _run_loss_and_metrics_test(
+        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+    )
+    compute_call_counts = [loss.compute.call_count for loss in metric_factories[0].created_mocks]
+    unittest.TestCase().assertListEqual(compute_call_counts, [1] * len(metric_factories))
+
+
+def _run_loss_and_metrics_test(
+    num_batches: int, llm_data_loader_mock, nn_model_mock, progress_publisher_mock
+) -> Tuple[List[MockAggregativeMeasureFactory], List[MockAggregativeMeasureFactory]]:
+    loss_factory = MockAggregativeMeasureFactory()
+    metric_factory = MockAggregativeMeasureFactory()
+    loss_factories = [loss_factory] * 3
+    metric_factories = [metric_factory] * 5
+
+    _prepare_test_batches(llm_data_loader_mock, num_batches=num_batches)
 
     evaluator = Evaluator(
-        local_rank=int(os.getenv("LOCAL_RANK")),
+        local_rank=int(os.getenv("LOCAL_RANK", 0)),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 
-    other_loss_mock = MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
-
     evaluator.evaluate(
         model=nn_model_mock,
         data_loaders=[llm_data_loader_mock],
-        loss_functions=[loss_mock, loss_mock, other_loss_mock],
-        metrics=[metric_mock],
+        loss_factories=loss_factories,
+        metric_factories=metric_factories,
         global_train_sample_id=0,
         local_sample_id_to_global_sample_id=lambda i: i,
     )
-    assert loss_mock.call_count == 4 * 2
-
-
-def test_evaluate_calls_all_metrics(
-    monkeypatch, nn_model_mock, loss_mock, metric_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu
-):
-    _prepare_test_batches(llm_data_loader_mock)
-
-    evaluator = Evaluator(
-        local_rank=int(os.getenv("LOCAL_RANK")),
-        batch_progress_publisher=progress_publisher_mock,
-        evaluation_result_publisher=progress_publisher_mock,
-    )
-
-    other_metric_mock = MagicMock(spec=Metric, return_value=torch.rand(1, requires_grad=True))
-
-    evaluator.evaluate(
-        model=nn_model_mock,
-        data_loaders=[llm_data_loader_mock],
-        loss_functions=[loss_mock],
-        metrics=[metric_mock, metric_mock, other_metric_mock],
-        global_train_sample_id=0,
-        local_sample_id_to_global_sample_id=lambda i: i,
-    )
-    assert metric_mock.call_count == 4 * 2
+    return loss_factories, metric_factories
 
 
 def _prepare_test_batches(

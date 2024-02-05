@@ -20,7 +20,6 @@ from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
-from modalities.metrics import Metric
 from modalities.models.model import NNModel
 from modalities.trainer import Trainer
 
@@ -106,11 +105,6 @@ def optimizer_mock():
 @pytest.fixture(scope="function")
 def loss_mock():
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
-
-
-@pytest.fixture(scope="function")
-def metric_mock():
-    return MagicMock(spec=Metric, return_value=torch.rand(1, requires_grad=False))
 
 
 @pytest.fixture(scope="function")
