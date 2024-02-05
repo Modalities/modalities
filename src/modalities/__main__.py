@@ -408,7 +408,7 @@ class Main:
         model = checkpointing.load_model_checkpoint(model, checkpoint_path)
         return model
 
-    def _convert_checkpoint(self, output_path, model):
+    def _convert_checkpoint(self, output_path: Union[str, Path], model: nn.Module):
         config = HuggingFaceModelConfig(self.config.model.config)
         model = HuggingFaceModel(config=config, model=model)
         model.save_pretrained(output_path, safe_serialization=False)
