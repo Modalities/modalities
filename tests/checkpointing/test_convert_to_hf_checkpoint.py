@@ -8,12 +8,16 @@ from transformers import AutoConfig, AutoModelForCausalLM
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.config.config import AppConfig, HuggingFaceModelConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
-from tests.conftest import torch_distributed_cleanup
 
 
 @pytest.fixture
 def checkpoint_dir():
     return Path(os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkpoint", "checkpoint_for_testing"))
+
+
+@pytest.fixture
+def checkpoint_path(checkpoint_dir):
+    return checkpoint_dir / "model.bin"
 
 
 @pytest.fixture
@@ -36,10 +40,10 @@ def device():
     return "cpu"
 
 
-def test_convert_to_hf_checkpoint(tmp_path, config, checkpoint_dir, device):
+def test_convert_to_hf_checkpoint(tmp_path, config, checkpoint_path, device):
     # load test checkpoint
     main = Main(config)
-    pytorch_model = main.load_and_convert_checkpoint(checkpoint_dir, tmp_path)
+    pytorch_model = main.load_and_convert_checkpoint(checkpoint_path, tmp_path)
     # register config and model
     AutoConfig.register("modalities_gpt2", HuggingFaceModelConfig)
     AutoModelForCausalLM.register(HuggingFaceModelConfig, HuggingFaceModel)
