@@ -6,7 +6,7 @@ from torch.optim import Optimizer
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.evaluation.throughput_aggregator import start_throughput_measurement
+from modalities.evaluation.throughput_aggregator import ThroughputAggregator, start_throughput_measurement
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -27,24 +27,6 @@ class Trainer:
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_step = gradient_acc_step
 
-    def _train_batch(
-        self,
-        batch: DatasetBatch,
-        model: NNModel,
-        optimizer: Optimizer,
-        loss_fun: Loss,
-        batch_id: int,
-        data_loader: LLMDataLoader,
-    ) -> torch.Tensor:
-        result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch) / self.gradient_acc_step
-        loss.backward()
-
-        if (batch_id + 1) % self.gradient_acc_step == 0 or (batch_id + 1) == len(data_loader):
-            optimizer.step()
-            optimizer.zero_grad()
-        return loss
-
     def train(
         self,
         model: NNModel,
@@ -63,6 +45,7 @@ class Trainer:
         batch: DatasetBatch
         # TODO: why do we need a barrier here?
         dist.barrier()
+
         for thoughput_aggregator, (batch_id, batch) in start_throughput_measurement(enumerate(train_loader)):
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
@@ -77,6 +60,8 @@ class Trainer:
             thoughput_aggregator.stop(len(batch))
             # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
+            # TODO the current CLMCrossEntropyLoss uses reduction=mean as default;
+            #  so normalizing by len(batch) is wrong, should be by number of batches
             cummulated_loss[1] += len(batch)
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -89,36 +74,72 @@ class Trainer:
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
-                    synced_num_samples_per_second = thoughput_aggregator.compute_samples_per_second(self.local_rank)
-                    thoughput_aggregator.reset()
-                    # TODO: insert reducer from outside so Trainer is independent of FSDP
-                    train_loss = Reducer.reduce(
-                        tensor=cummulated_loss,
-                        operation=dist.ReduceOp.SUM,
-                        post_processing_fun=lambda t: t[0] / t[1],
-                    )
                     local_train_sample_id = Trainer._get_local_sample_id(
                         batch_id=local_train_batch_id, batch_size=train_loader.sampler_batch_size
                     )
-
-                    global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
-
-                    evaluation_result = EvaluationResultBatch(
-                        losses={loss_fun.tag: train_loss},
-                        # TODO: hardcoded metric key
-                        throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
-                        dataloader_tag=train_loader.dataloader_tag,
-                        global_train_sample_id=global_train_sample_id,
-                    )
-                    self._publish_evaluation_result(
-                        evaluation_result_publisher=self.evaluation_result_publisher,
-                        evaluation_result=evaluation_result,
+                    self._compute_publish_loss_and_throughput(
+                        train_loader.dataloader_tag,
+                        loss_fun.tag,
+                        local_sample_id_to_global_sample_id,
+                        cummulated_loss,
+                        thoughput_aggregator,
+                        local_train_sample_id,
                     )
                     epoch_done_callback(local_train_sample_id=local_train_sample_id)
                     model.train()
 
                 # TODO early stopping
                 cummulated_loss = self._reset_loss()
+
+    def _train_batch(
+        self,
+        batch: DatasetBatch,
+        model: NNModel,
+        optimizer: Optimizer,
+        loss_fun: Loss,
+        batch_id: int,
+        data_loader: LLMDataLoader,
+    ) -> torch.Tensor:
+        result_batch = model_predict_batch(model=model, batch=batch)
+        loss = loss_fun(result_batch) / self.gradient_acc_step
+        loss.backward()
+
+        if (batch_id + 1) % self.gradient_acc_step == 0 or (batch_id + 1) == len(data_loader):
+            optimizer.step()
+            optimizer.zero_grad()
+        return loss
+
+    def _compute_publish_loss_and_throughput(
+        self,
+        train_loader_tag: str,
+        loss_fun_tag: str,
+        local_sample_id_to_global_sample_id: Callable[[int], int],
+        cummulated_loss: torch.Tensor,
+        thoughput_aggregator: ThroughputAggregator,
+        local_train_sample_id: int,
+    ):
+        synced_num_samples_per_second = thoughput_aggregator.compute_samples_per_second(self.local_rank)
+        thoughput_aggregator.reset()
+        # TODO: insert reducer from outside so Trainer is independent of FSDP
+        train_loss = Reducer.reduce(
+            tensor=cummulated_loss,
+            operation=dist.ReduceOp.SUM,
+            post_processing_fun=lambda t: t[0] / t[1],
+        )
+
+        global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
+
+        evaluation_result = EvaluationResultBatch(
+            losses={loss_fun_tag: train_loss},
+            # TODO: hardcoded metric key
+            throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
+            dataloader_tag=train_loader_tag,
+            global_train_sample_id=global_train_sample_id,
+        )
+        self._publish_evaluation_result(
+            evaluation_result_publisher=self.evaluation_result_publisher,
+            evaluation_result=evaluation_result,
+        )
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.

@@ -24,19 +24,19 @@ class MockAggregativeMeasureFactory(AggregativeMeasureFactory):
 def test_evaluate_cpu(monkeypatch, nn_model_mock, llm_data_loader_mock, progress_publisher_mock, set_env_cpu):
     batches = _prepare_test_batches(llm_data_loader_mock)
 
+    measure_factory = MockAggregativeMeasureFactory()
+
     evaluator = Evaluator(
         local_rank=int(os.getenv("LOCAL_RANK")),
+        loss_factories=[measure_factory],
+        metric_factories=[measure_factory],
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 
-    measure_factory = MockAggregativeMeasureFactory()
-
     evaluator.evaluate(
         model=nn_model_mock,
         data_loaders=[llm_data_loader_mock],
-        loss_factories=[measure_factory],
-        metric_factories=[measure_factory],
         global_train_sample_id=0,
         local_sample_id_to_global_sample_id=lambda i: i,
     )
@@ -119,6 +119,8 @@ def _run_loss_and_metrics_test(
 
     evaluator = Evaluator(
         local_rank=int(os.getenv("LOCAL_RANK", 0)),
+        loss_factories=loss_factories,
+        metric_factories=metric_factories,
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
@@ -126,8 +128,6 @@ def _run_loss_and_metrics_test(
     evaluator.evaluate(
         model=nn_model_mock,
         data_loaders=[llm_data_loader_mock],
-        loss_factories=loss_factories,
-        metric_factories=metric_factories,
         global_train_sample_id=0,
         local_sample_id_to_global_sample_id=lambda i: i,
     )

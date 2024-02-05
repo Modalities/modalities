@@ -15,10 +15,14 @@ class Evaluator:
     def __init__(
         self,
         local_rank: int,
+        loss_factories: List[AggregativeMeasureFactory],
+        metric_factories: List[AggregativeMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
     ) -> None:
         self.local_rank = local_rank
+        self._loss_factories = loss_factories
+        self._metric_factories = metric_factories
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
 
@@ -26,8 +30,6 @@ class Evaluator:
         self,
         model: NNModel,
         data_loaders: List[LLMDataLoader],
-        loss_factories: List[AggregativeMeasureFactory],
-        metric_factories: List[AggregativeMeasureFactory],
         global_train_sample_id: int,
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ) -> Dict[str, EvaluationResultBatch]:
@@ -39,14 +41,12 @@ class Evaluator:
                 global_train_sample_id=global_train_sample_id,
                 global_dataset_sample_id=-1,
                 dataloader_tag=data_loader.dataloader_tag,
-            )
+            )  # TODO why is this in the beginning of the for loop, not at the end?
 
             with ThroughputAggregationContext(len(data_loader), self.local_rank) as thoughput_agg:
                 total_losses, total_metrics = self._process_batches_in_data_loader(
                     model=model,
                     data_loader=data_loader,
-                    loss_factories=loss_factories,
-                    metric_factories=metric_factories,
                     global_train_sample_id=global_train_sample_id,
                     local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
                 )
@@ -76,13 +76,11 @@ class Evaluator:
         self,
         model: NNModel,
         data_loader: LLMDataLoader,
-        loss_factories: List[AggregativeMeasureFactory],
-        metric_factories: List[AggregativeMeasureFactory],
         global_train_sample_id: int,
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
-        losses = [f.create(self.local_rank) for f in loss_factories]
-        metrics = [f.create(self.local_rank) for f in metric_factories]
+        losses = [f.create(self.local_rank) for f in self._loss_factories]
+        metrics = [f.create(self.local_rank) for f in self._metric_factories]
 
         for batch_id, batch in enumerate(data_loader):
             self.evaluate_batch(
@@ -103,7 +101,7 @@ class Evaluator:
                 dataloader_tag=data_loader.dataloader_tag,
             )
 
-        return {l: l.compute() for l in losses}, {m: m.compute() for m in metrics}
+        return {loss: loss.compute() for loss in losses}, {metric: metric.compute() for metric in metrics}
 
     def evaluate_batch(
         self,
