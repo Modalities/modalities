@@ -1,33 +1,11 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from pathlib import Path
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
-from pydantic import BaseModel
-
-# yaml example for AppConfig
-example_app_config_yaml = """
-comp_w:
-    type_hint: CompW
-    config:
-        val_0: "some value"
-    instance_key: "comp_w_instance"
-
-comp_z:
-    type_hint: CompZ
-    config:
-        val_3: "some other value"
-        comp_y_config:
-            type_hint: CompY
-            config:
-                val_2: "yet another value"
-                comp_x_config:
-                    type_hint: CompX
-                    config:
-                        val_1: "final value"
-                comp_w_config:
-                    type_hint: CompW
-                    reference_key: "comp_w_instance" 
-"""
-
+from omegaconf import OmegaConf
+from pydantic import BaseModel, validator
 
 # ==========COMPONTENTS==========
 
@@ -54,19 +32,6 @@ class CompZ:
         self.comp_y = comp_y
 
 
-# ======COMPONENT=ENUMS======
-
-
-class Components1Enum(Enum):
-    CompW = CompW
-    CompX = CompX
-
-
-class Components2Enum(Enum):
-    CompY = CompY
-    CompZ = CompZ
-
-
 # ==========COMPONENT=CONFIGS==========
 
 T = TypeVar("T")
@@ -74,10 +39,15 @@ U = TypeVar("U")
 
 
 # Wrapping Configs
-class ComponentConfig(Generic[T, U], BaseModel):
-    type_hint: T
+class ComponentConfig(BaseModel, Generic[T, U]):
+    type_hint: Type[T]
     config: Optional[U] = None
-    instance_key: Optional[str] = None
+
+    # @validator('type_hint', pre=True, always=True)
+    # def validate_type_hint(cls, v):
+    #     if not isinstance(v, type):
+    #         raise ValueError("type_hint must be a type")
+    #     return v
 
 
 class PassType(Enum):
@@ -103,21 +73,36 @@ class CompXConfig(BaseModel):
 
 class CompYConfig(BaseModel):
     val_2: str
-    comp_x_config: ComponentConfig[Components1Enum.CompX, CompXConfig] | ReferenceConfig
-    comp_w_config: ComponentConfig[Components1Enum.CompW, CompWConfig] | ReferenceConfig
+    comp_x_config: ComponentConfig[Components1Enum, CompXConfig] | ReferenceConfig
+    comp_w_config: ComponentConfig[Components1Enum.COMP_W, CompWConfig] | ReferenceConfig
 
 
 class CompZConfig(BaseModel):
     val_3: str
-    comp_y_config: ComponentConfig[Components2Enum.CompY, CompYConfig] | ReferenceConfig
+    comp_y_config: ComponentConfig[Components2Enum.COMP_Y, CompYConfig] | ReferenceConfig
 
 
-# Entry Config
+# ======COMPONENT=ENUMS======
 
 
-class AppConfig(BaseModel):
-    comp_w: ComponentConfig[Components1Enum.CompW, CompWConfig] | ReferenceConfig
-    comp_z: ComponentConfig[Components2Enum.CompZ, CompZConfig] | ReferenceConfig
+class Components1ConfigEnum(Enum):
+    COMP_W = CompWConfig
+    COMP_X = CompXConfig
+
+
+class Components1Enum(Enum):
+    # COMP_W = CompW, CompWConfig
+    COMP_X = (CompX, CompXConfig)
+
+
+class Components2ConfigEnum(Enum):
+    COMP_Y = CompYConfig
+    COMP_Z = CompZConfig
+
+
+class Components2Enum(Enum):
+    COMP_Y = (CompY, CompYConfig)
+    COMP_Z = (CompZ, CompZConfig)
 
 
 # ==========RESOLVER=REGISTER==========
@@ -125,11 +110,18 @@ class AppConfig(BaseModel):
 
 class ResolverRegister:
     def __init__(self) -> None:
-        # we don't need to register the types, as they are already stored in the
-        # type_hint field of the ComponentConfig
-        pass
+        self._component_type_registry: Dict[str, Type] = {}
+        self._config_type_registry: Dict[str, Type] = {}
 
-    def verify_integrity(self, app_config: AppConfig) -> None:
+    def _build_component_by_config_dict(self, config_dict: Dict) -> Any:
+        def _build_component_config(config: Dict) -> ComponentConfig:
+            component_type_hint = self._component_type_registry[config["type_hint"]]
+            config_type_hint = self._config_type_registry[config["type_hint"]]
+
+            config = ComponentConfig[component_type_hint, config_type_hint].model_validate(config_dict)
+            return config
+
+    def verify_integrity(self, app_config: Dict) -> None:
         # enforce all instance_keys to be unique
         # otherwise, there will be a reference mismatch when building the components
         # check that there are no reference loops, e.g., component a references
@@ -137,7 +129,7 @@ class ResolverRegister:
         pass
 
     @staticmethod
-    def build_components(app_config: AppConfig, component_names: List[str]) -> Dict[str, Any]:
+    def build_components(app_config: Dict, component_names: List[str]) -> Dict[str, Any]:
         for config in app_config:
             ResolverRegister.build_component_by_config(config)
 
@@ -154,3 +146,58 @@ class ResolverRegister:
         else:
             # instantiate component
             pass
+
+
+class AppConfig(BaseModel):
+    __root__: Dict  #  Dict[str, Union[Cat, Dog, Bird]]
+
+    # Custom validator to check each item in the dictionary
+    @validator("__root__", pre=True, each_item=True)
+    def validate_pets(cls, v, values, **kwargs):
+        if isinstance(v, dict):
+            # Attempt to parse the dictionary into one of the pet models
+            for PetModel in []:  # (Cat, Dog, Bird):
+                try:
+                    return PetModel(**v)
+                except ValueError:
+                    continue
+            raise ValueError(f"Value does not match any pet model: {v}")
+        return v
+
+    # To interact with the model as a dictionary
+    def __getitem__(self, item):
+        return self.__root__[item]
+
+    def __setitem__(self, key, value):
+        self.__root__[key] = value
+
+    def __iter__(self):
+        return iter(self.__root__)
+
+    def keys(self):
+        return self.__root__.keys()
+
+    def values(self):
+        return self.__root__.values()
+
+    def items(self):
+        return self.__root__.items()
+
+
+def load_app_config_dict(config_file_path: Path) -> Dict:
+    cfg = OmegaConf.load(config_file_path)
+    return OmegaConf.to_container(cfg, resolve=True)
+
+
+# ==========MAIN==========
+if __name__ == "__main__":
+    config_dict = load_app_config_dict(
+        config_file_path=Path("/raid/s3/opengptx/max_lue/modalities/src/modalities/config/config.yaml")
+    )
+    comp_w_2_config = config_dict["comp_w_2_config"]
+    type_hint_string = comp_w_2_config["type_hint"]
+
+    comp_cls, config_cls = Components1Enum.COMP_W.value
+    config = config_cls(val_0="some value")
+    obj = comp_cls(**config.model_dump())
+    print(obj.val_0)
