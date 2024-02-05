@@ -5,7 +5,7 @@ from modalities.checkpointing.checkpointing import (
     CheckpointingStrategyIF,
 )
 from modalities.config.config import CheckpointingConfig
-from modalities.resolver_register import ResolverRegister
+from modalities.config.resolver_register import ResolverRegister
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 
 
