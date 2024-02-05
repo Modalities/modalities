@@ -1,10 +1,11 @@
+import logging
 import math
 import multiprocessing
 import os
 import pickle
 import warnings
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable, Iterator, List, Tuple
 
 import jq
 import numpy as np
@@ -12,6 +13,8 @@ from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+
+logger = logging.getLogger(__name__)
 
 
 class EmptySampleError(RuntimeError):
@@ -209,3 +212,42 @@ class EmbeddedStreamData:
 
             # initialize memmapped data section
             self.data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))
+
+
+def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file: Path, chunk_size: int = 2048):
+    if target_file.exists():
+        raise FileExistsError(f'Target File at "{target_file}" exists!')
+    data_len = sum(d.data_len for d in stream_data)
+    assert len({d.token_size_in_bytes for d in stream_data}) == 1, (
+        "Found different token representation sizes. This could indicate the usage of different tokenizers. "
+        "Not supported!"
+    )
+    token_size_in_bytes = stream_data[0].token_size_in_bytes
+
+    num_data_chunks = sum(math.ceil(d.data_len / chunk_size) for d in stream_data)
+    data_stream_generator = (d.data[i : i + chunk_size] for d in stream_data for i in range(0, d.data_len, chunk_size))
+
+    num_entries = sum(len(d.index_base) for d in stream_data)
+
+    def index_stream_generator() -> Iterator[Tuple[int, int]]:
+        curr_offset = 0
+        for embedded_stream_data in stream_data:
+            for entry_offset, segment_length in embedded_stream_data.index_base:
+                yield entry_offset + curr_offset, segment_length
+            curr_offset += embedded_stream_data.data_len
+            curr_offset -= embedded_stream_data.HEADER_SIZE_IN_BYTES
+
+    with target_file.open("wb") as fout:
+        fout.write(data_len.to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+        fout.write(
+            token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big")
+        )
+        for data_chunk in tqdm(data_stream_generator, total=num_data_chunks, desc="Writing Data Chunks..."):
+            fout.write(data_chunk)
+
+        joint_index = [entry for entry in tqdm(index_stream_generator(), total=num_entries, desc="Concatenating Index")]
+        pickled_index = pickle.dumps(joint_index)
+        pickled_index_as_chunks = (pickled_index[i : i + chunk_size] for i in range(0, len(pickled_index), chunk_size))
+        num_index_chunks = math.ceil(len(pickled_index) / chunk_size)
+        for index_chunk in tqdm(pickled_index_as_chunks, total=num_index_chunks, desc="Writing Index Chunks..."):
+            fout.write(index_chunk)
