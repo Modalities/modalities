@@ -5,7 +5,7 @@ modalities_setup:
 
 wandb:
   project_name: modalities
-  mode: ONLINE
+  mode: OFFLINE
 
 data:
   sample_key: "input_ids"
@@ -121,7 +121,7 @@ running_env:
   config:
     process_group_backend: ${training.process_group_backend}
     local_rank: ${oc.env:LOCAL_RANK}
-    mixed_precision_settings: BF_16
+    mixed_precision_settings: FP_16
     sharding_strategy: FULL_SHARD
     auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
 

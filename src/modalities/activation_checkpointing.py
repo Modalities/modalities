@@ -11,14 +11,14 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataP
 from modalities.models.gpt2.gpt2_model import Block
 
 
-def is_module_to_apply_activation_checkpointing(submodule: torch.nn.Module):
+def is_module_to_apply_activation_checkpointing(submodule: torch.nn.Module) -> bool:
     return isinstance(submodule, Block)
 
 
-def apply_activation_checkpointing_inplace(model: torch.nn.Module) -> None:
+def apply_activation_checkpointing_inplace(model: torch.nn.Module):
     assert isinstance(model, FSDP), "activation checkpointing can only be applied to FSDP wrapped models!"
-    non_reentrant_wrapper = partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=True)
+    non_reentrant_wrapper = partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=False)
 
-    return apply_activation_checkpointing(
+    apply_activation_checkpointing(
         model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=is_module_to_apply_activation_checkpointing
     )

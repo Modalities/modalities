@@ -52,6 +52,7 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
+        # TODO: remove
         epoch_done_callback: Callable[[int], None],
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
@@ -60,10 +61,11 @@ class Trainer:
 
         # batch loop
         batch: DatasetBatch
+        # TODO: why do we need a barrier here?
         dist.barrier()
         for thoughput_aggregator, (batch_id, batch) in start_throughput_measurement(enumerate(train_loader)):
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # train single batch
+            # Train single batch
             batch_loss = self._train_batch(
                 batch=batch,
                 model=model,
@@ -73,7 +75,7 @@ class Trainer:
                 data_loader=train_loader,
             )
             thoughput_aggregator.stop(len(batch))
-            # save the batch loss
+            # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
             self._publish_progress(
