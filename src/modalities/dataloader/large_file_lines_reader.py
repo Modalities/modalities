@@ -16,7 +16,6 @@ class BaseReader(ABC):
         raise NotImplementedError
 
 
-# TODO: benchmark tokenized version vs plain text version (regarding speed and storage consumption)
 class LargeFileLinesReader(BaseReader):
     def __init__(self, raw_data_path: Path, index_path: Path = None):
         """
