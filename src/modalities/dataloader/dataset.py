@@ -11,6 +11,7 @@ from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
 
+from ..constants import DEFAULT_ENCODING
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import PackedDataGenerator
 
@@ -35,6 +36,7 @@ class MemMapDataset(Dataset):
         sample_key: str,
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
+        encoding: str = DEFAULT_ENCODING,
     ):
         """
         Pytorch Dataset with mmap support.
@@ -53,7 +55,7 @@ class MemMapDataset(Dataset):
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
 
-        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
+        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path, encoding=encoding)
         self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer = tokenizer
 

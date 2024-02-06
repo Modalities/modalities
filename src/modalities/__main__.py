@@ -18,6 +18,7 @@ from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingI
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
 from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
+from modalities.constants import DEFAULT_ENCODING
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -92,14 +93,15 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_create_memmap_index(src_path, index_path):
+@click.option("--encoding", type=str, default=DEFAULT_ENCODING, help="choose an encoding aligned with your input data.")
+def entry_point_create_memmap_index(src_path, index_path, encoding):
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
 
     print(f"reading raw data from {src_path}")
     print(f"writing index to {index_path}")
-    generator = IndexGenerator(src_path)
+    generator = IndexGenerator(src_path, encoding=encoding)
     generator.create_index(index_path)
 
 
@@ -145,8 +147,9 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=os.cpu_count(),
     help="Specify the number of tokenization workers. Default is the number of available CPUs.",
 )
+@click.option("--encoding", type=str, default=DEFAULT_ENCODING, help="choose an encoding aligned with your input data.")
 def entry_point_create_packed_data(
-    src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus
+    src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus, encoding
 ):
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
@@ -156,7 +159,12 @@ def entry_point_create_packed_data(
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
     generator = PackedDataGenerator(
-        src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern, number_of_processes=num_cpus
+        src_path,
+        index_path=index_path,
+        tokenizer=tokenizer,
+        jq_pattern=jq_pattern,
+        number_of_processes=num_cpus,
+        encoding=encoding,
     )
     generator.run(dst_path)
 

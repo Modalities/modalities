@@ -11,9 +11,10 @@ from tqdm import tqdm
 from modalities.constants import DEFAULT_ENCODING
 
 
-# TODO: benchmark against pyspark
 class IndexGenerator:
-    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
+    def __init__(
+        self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False, encoding=DEFAULT_ENCODING
+    ):
         """
         Reads in a JSON file as a binary file, iterates character by character und builds up
         the sample index (char-wise start and end position for each JSON sample) via "\n" character positions.
@@ -23,11 +24,13 @@ class IndexGenerator:
                           The producer reads chunks from the `src_file`, while the consumer creates index entries.
         :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
                                     Otherwise, the index generation fails with an exception.
+        :param encoding: expected encoding of input jsonl file
         """
         self.src_file = src_file
         self.chunksize = chunksize
+        self._encoding = encoding
         self.drop_faulty_entries = drop_faulty_entries
-        with self.src_file.open(mode="r", encoding="utf-8") as fin:
+        with self.src_file.open(mode="r", encoding=self._encoding) as fin:
             fin.seek(0, os.SEEK_END)
             num_chars = fin.tell()
         self.num_chunks = num_chars // self.chunksize
@@ -73,7 +76,7 @@ class IndexGenerator:
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)
 
-        f = self.src_file.open(encoding=DEFAULT_ENCODING)
+        f = self.src_file.open(encoding=self._encoding)
         self._index_map = []
         last_index = 0
         for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
@@ -87,7 +90,7 @@ class IndexGenerator:
             process_line(last_index, curr_index + 1)
 
     def _reader_thread(self):
-        with open(self.src_file, "r", encoding=DEFAULT_ENCODING) as fin:
+        with open(self.src_file, "r", encoding=self._encoding) as fin:
             while True:
                 chunk = fin.read(self.chunksize)
                 if self._exception_buffer:
