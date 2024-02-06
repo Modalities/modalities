@@ -59,19 +59,19 @@ measure_modalities_iteration
 ## Results
 
 
-| Evaluation Aspect    | Implementation | Required Time | # Samples in Data |
-|----------------------|----------------|---------------|-------------------|
-| preparation speed    | MegatronLM     | `0m16,965s`   | `20000(OWT)`      |
-| preparation speed    | Modalities     | `0m18,952s`   | `20000(OWT)`      |
-| preparation speed    | MegatronLM     | `2m11,856s`   | `200000(OWT)`     |
-| preparation speed    | Modalities     | `1m42,943s`   | `200000(OWT)`     |
-| initialization speed | MegatronLM     | `19.3 msec`   | `20000(OWT)`      |
-| initialization speed | Modalities     | `5.85 msec`   | `20000(OWT)`      |
-| initialization speed | MegatronLM     | `180 msec `   | `200000(OWT)`     |
-| initialization speed | Modalities     | `58 msec`     | `200000(OWT)`     |
-| iteration speed      | MegatronLM     | `52.4 msec`   | `20000(OWT)`      |
-| iteration speed      | Modalities     | `66.8 msec`   | `20000(OWT)`      | 
-| iteration speed      | MegatronLM     | `426 msec `   | `200000(OWT)`     |
-| iteration speed      | Modalities     | `545 msec`    | `200000(OWT)`     |
+| Evaluation Aspect    | Implementation | Required Time      | # Samples in Data |
+|----------------------|----------------|:------------------:|-------------------|
+| preparation speed    | MegatronLM     | `0 min 16.965 sec` | `20000(OWT)`      |
+| preparation speed    | Modalities     | `0 min 18.952 sec` | `20000(OWT)`      |
+| preparation speed    | MegatronLM     | `2 min 11.856 sec` | `200000(OWT)`     |
+| preparation speed    | Modalities     | `1 min 42.943 sec` | `200000(OWT)`     |
+| initialization speed | MegatronLM     | `19.3 msec`        | `20000(OWT)`      |
+| initialization speed | Modalities     | `5.85 msec`        | `20000(OWT)`      |
+| initialization speed | MegatronLM     | `180 msec `        | `200000(OWT)`     |
+| initialization speed | Modalities     | `58 msec`          | `200000(OWT)`     |
+| iteration speed      | MegatronLM     | `52.4 msec`        | `20000(OWT)`      |
+| iteration speed      | Modalities     | `66.8 msec`        | `20000(OWT)`      | 
+| iteration speed      | MegatronLM     | `426 msec `        | `200000(OWT)`     |
+| iteration speed      | Modalities     | `545 msec`         | `200000(OWT)`     |
 
 
