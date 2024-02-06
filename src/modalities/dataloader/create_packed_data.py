@@ -31,7 +31,7 @@ class PackedDataGenerator:
         tokenizer: PreTrainedTokenizer,
         index_path: Path = None,
         jq_pattern: str = ".text",
-        number_of_processes: int = 60,
+        number_of_processes: int = os.cpu_count(),
         max_number_of_tokens: int = None,
     ):
         """
