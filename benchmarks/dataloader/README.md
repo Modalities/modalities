@@ -46,6 +46,15 @@ measure_modalities_iteration
 > https://github.com/OpenGPTX/opengptx_data/tree/docs/modalities-vs-megatronlm-dl and look at the `launch_benchmark.sh`
 > script.
 
+#### Glossary
+
+* **preparation:** refers here to the task of turning raw data (e.g. jsonl encoded text) into a binary file,
+  which is loadable later for training. 
+  For MegatronLM this means tokenizing and packing everything according to their defined format.
+  For Modalities it means, indexing the raw data and packing it afterwards as token-ids.
+* **initialization:** refers to the process of initializing a python object, 
+  which represents the respective dataset (mostly represented via the `torch.Dataset`-interface)
+* **iteration:** refers to process of iterating over the respective datasets - once sequentially and once shuffled.
 
 ## Results
 
