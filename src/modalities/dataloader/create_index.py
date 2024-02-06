@@ -69,7 +69,7 @@ class IndexGenerator:
                 if self.drop_faulty_entries:
                     warnings.warn(f"faulty line at {last_index}-{curr_index}, skipping...")
                 else:
-                    warnings.warn(f"faulty line: {decoded_line}")
+                    warnings.warn(f"faulty line: {decoded_line=}")
                     err = ValueError(f"faulty line at {last_index}-{curr_index}")
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)
