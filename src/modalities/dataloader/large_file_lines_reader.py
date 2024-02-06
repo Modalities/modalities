@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from modalities.constants import DEFAULT_ENCODING
-
 
 class BaseReader(ABC):
     @abstractmethod
@@ -17,18 +15,16 @@ class BaseReader(ABC):
 
 
 class LargeFileLinesReader(BaseReader):
-    def __init__(self, raw_data_path: Path, index_path: Path = None, encoding: str = DEFAULT_ENCODING):
+    def __init__(self, raw_data_path: Path, index_path: Path = None):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param index_path: Path to an index file, which indicates the start character/byte position
                            and length of samples given in `raw_data_path`.
                            If not defined, an index next to `raw_data_path` is picked,
                            by replacing its suffix with ".idx".
-        :param encoding: expected encoding of input jsonl file
         """
         self.raw_data_path = raw_data_path
         self.index_path = self.default_index_path(self.raw_data_path, index_path)
-        self._encoding = encoding
 
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
@@ -56,6 +52,6 @@ class LargeFileLinesReader(BaseReader):
         return self.__read_from_raw_file(offset, sample_length_in_bytes)
 
     def __read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
-        f = self.raw_data_path.open(encoding=self._encoding)
+        f = self.raw_data_path.open()
         f.seek(offset)
         return f.read(sample_length_in_bytes)

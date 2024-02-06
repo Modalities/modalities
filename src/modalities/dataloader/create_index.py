@@ -8,13 +8,9 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from modalities.constants import DEFAULT_ENCODING
-
 
 class IndexGenerator:
-    def __init__(
-        self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False, encoding=DEFAULT_ENCODING
-    ):
+    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
         """
         Reads in a JSON file as a binary file, iterates character by character und builds up
         the sample index (char-wise start and end position for each JSON sample) via "\n" character positions.
@@ -24,18 +20,15 @@ class IndexGenerator:
                           The producer reads chunks from the `src_file`, while the consumer creates index entries.
         :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
                                     Otherwise, the index generation fails with an exception.
-        :param encoding: expected encoding of input jsonl file
         """
         self.src_file = src_file
         self.chunksize = chunksize
-        self._encoding = encoding
         self.drop_faulty_entries = drop_faulty_entries
-        with self.src_file.open(mode="r", encoding=self._encoding) as fin:
+        with self.src_file.open(mode="r") as fin:
             fin.seek(0, os.SEEK_END)
-            num_chars = fin.tell()
-        self.num_chunks = num_chars // self.chunksize
-        self.reminder = num_chars % self.chunksize
-        self._chunk_queue = queue.Queue()
+            self._total_num_chars = fin.tell()
+        self.num_chunks = self._total_num_chars // self.chunksize
+        self._queue_of_raw_lines = queue.Queue()
         self._index_map = []
         self._exception_buffer = []
 
@@ -55,49 +48,41 @@ class IndexGenerator:
     def _indexer_thread(self):
         def queue_generator():
             while True:
-                chunk = self._chunk_queue.get()
-                if chunk is None:
+                line = self._queue_of_raw_lines.get()
+                if line is None:
                     break
-                yield chunk
+                yield line
 
-        def process_line(last_index: int, curr_index: int):
-            segment_len = curr_index - last_index
+        def parse_line_as_json(line_start_idx: int, line: str):
             try:  # check if line is a valid json
-                f.seek(last_index)
-                decoded_line = f.read(segment_len)
-                json.loads(decoded_line)
-                self._index_map.append((last_index, segment_len))
+                json.loads(line)
+                self._index_map.append((line_start_idx, len(line)))
             except Exception as low_level_err:
                 if self.drop_faulty_entries:
-                    warnings.warn(f"faulty line at {last_index}-{curr_index}, skipping...")
+                    warnings.warn(f'faulty line "{line}", skipping...')
                 else:
-                    warnings.warn(f"faulty line: {decoded_line=}")
-                    err = ValueError(f"faulty line at {last_index}-{curr_index}")
+                    err = ValueError(f'faulty line "{line}", skipping...')
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)
 
-        f = self.src_file.open(encoding=self._encoding)
         self._index_map = []
-        last_index = 0
-        for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
-            for char_index, c in enumerate(chunk):
-                curr_index = chunk_idx * self.chunksize + char_index
-                if c == "\n":
-                    process_line(last_index, curr_index)
-                    last_index = curr_index + 1
-        # prevents automatically added "\n"-chars at the end of files getting interpreted as own sample
-        if curr_index >= last_index:
-            process_line(last_index, curr_index + 1)
+        for line_start_idx, line in tqdm(queue_generator(), desc="Processed Lines"):
+            self._check_for_parallel_errors()
+            parse_line_as_json(line_start_idx, line)
 
     def _reader_thread(self):
-        with open(self.src_file, "r", encoding=self._encoding) as fin:
+        with open(self.src_file, "r") as fin:
             while True:
-                chunk = fin.read(self.chunksize)
-                if self._exception_buffer:
-                    raise RuntimeError(
-                        "Exception found in exception buffer. Probably the indexer thread ran into an error..."
-                    )
-                if not chunk:
+                cursor = fin.tell()
+                line = fin.readline()
+                self._check_for_parallel_errors()
+                if fin.tell() == self._total_num_chars:
+                    self._queue_of_raw_lines.put((cursor, line))
                     break
-                self._chunk_queue.put(chunk)
-        self._chunk_queue.put(None)
+                line_without_newline_char = line[:-1]
+                self._queue_of_raw_lines.put((cursor, line_without_newline_char))
+        self._queue_of_raw_lines.put(None)
+
+    def _check_for_parallel_errors(self):
+        if self._exception_buffer:
+            raise RuntimeError("Exception found in exception buffer. Another thread encountered a problem apparently.")

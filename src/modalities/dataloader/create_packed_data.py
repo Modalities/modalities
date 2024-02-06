@@ -10,7 +10,6 @@ import jq
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
-from modalities.constants import DEFAULT_ENCODING
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
@@ -32,7 +31,6 @@ class PackedDataGenerator:
         tokenizer: PreTrainedTokenizer,
         index_path: Path = None,
         jq_pattern: str = ".text",
-        encoding: str = DEFAULT_ENCODING,
         number_of_processes: int = os.cpu_count(),
     ):
         """
@@ -53,7 +51,7 @@ class PackedDataGenerator:
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
-        self._reader = LargeFileLinesReader(src_path, index_path=index_path, encoding=encoding)
+        self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
         self._tokens_write_queue = multiprocessing.Queue()
         self._exception_buffer = []
