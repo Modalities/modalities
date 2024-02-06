@@ -85,9 +85,3 @@ for i in random_indices:
   dataset[i]
 "
 }
-
-
-echo "MegatronLM:"
-measure_megatronLM_iteration
-echo "Modalities:"
-measure_modalities_iteration
