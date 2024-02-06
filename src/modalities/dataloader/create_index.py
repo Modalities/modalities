@@ -60,7 +60,6 @@ class IndexGenerator:
         def process_line(last_index: int, curr_index: int):
             segment_len = curr_index - last_index
             try:  # check if line is a valid json
-                f = self.src_file.open(encoding=DEFAULT_ENCODING)
                 f.seek(last_index)
                 decoded_line = f.read(segment_len)
                 json.loads(decoded_line)
@@ -74,6 +73,7 @@ class IndexGenerator:
                     err.__cause__ = low_level_err
                     self._exception_buffer.append(err)
 
+        f = self.src_file.open(encoding=DEFAULT_ENCODING)
         self._index_map = []
         last_index = 0
         for chunk_idx, chunk in tqdm(enumerate(queue_generator()), desc="Processed Chunks", total=self.num_chunks):
