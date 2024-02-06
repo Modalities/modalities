@@ -32,7 +32,6 @@ class PackedDataGenerator:
         index_path: Path = None,
         jq_pattern: str = ".text",
         number_of_processes: int = os.cpu_count(),
-        max_number_of_tokens: int = None,
     ):
         """
         Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.
@@ -44,8 +43,6 @@ class PackedDataGenerator:
         :param tokenizer: PretrainedTokenizer object, which is used to pre-tokenize the provided data in `src_path`.
                           Tokenization is necessary to work on final lengths of token sequences.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
-        :param max_number_of_tokens: Limit the total amount of tokens in the packed dataset.
-                                     If not specified, the whole data is packed into the dataset.
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
@@ -54,8 +51,6 @@ class PackedDataGenerator:
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
-        self.max_tokens = max_number_of_tokens
-
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
         self._tokens_write_queue = multiprocessing.Queue()
