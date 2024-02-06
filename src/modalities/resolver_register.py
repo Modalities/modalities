@@ -1,4 +1,6 @@
 from typing import Any, Dict, List
+from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
+from modalities.evaluation.measure import AggregativeMeasureFactory
 
 import torch.optim as optim
 from class_resolver import ClassResolver
@@ -20,6 +22,7 @@ from modalities.config.lookup_types import (
     ModelTypes,
     SamplerTypes,
     TokenizerTypes,
+    ValidationMeasureFactoryTypes,
 )
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
@@ -92,6 +95,14 @@ class ResolverRegister:
                 base=Loss,
                 default=CLMCrossEntropyLoss,
             ),
+            **{
+                validation_measure_factories_type: ClassResolver(
+                    [t.value for t in ValidationMeasureFactoryTypes],
+                    base=AggregativeMeasureFactory,
+                    default=AggregativeCLMCrossEntropyLossFactory,
+                )
+                for validation_measure_factories_type in ValidationMeasureFactoryTypes
+            },
             **{
                 sampler_type: ClassResolver(
                     classes=[t.value for t in SamplerTypes],
