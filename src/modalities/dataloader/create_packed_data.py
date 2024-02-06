@@ -58,7 +58,7 @@ class PackedDataGenerator:
 
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
-        self._tokens_to_get_written = multiprocessing.Queue()
+        self._tokens_write_queue = multiprocessing.Queue()
         self._exception_buffer = []
 
     @staticmethod
@@ -111,12 +111,12 @@ class PackedDataGenerator:
         writer.join()
 
     def _stop_processing(self):
-        self._tokens_to_get_written.put(None)
+        self._tokens_write_queue.put(None)
 
     def _generator_for_tokens_to_get_written(self):
         while True:
             self._check_for_parallel_errors()
-            tokens = self._tokens_to_get_written.get()
+            tokens = self._tokens_write_queue.get()
             if tokens is None:
                 break
             yield tokens
@@ -156,7 +156,7 @@ class PackedDataGenerator:
         for idx in range(process_id, len(self._reader), self._number_of_processes):
             line = self._reader[idx]
             try:
-                self._tokens_to_get_written.put(self._process_line(line))
+                self._tokens_write_queue.put(self._process_line(line))
             except EmptySampleError:
                 warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
             except Exception as exception:
