@@ -208,16 +208,30 @@ class CoCaConfig(BaseModel):
 class CoCa(NNModel):
     """Contrastive Captioner"""
 
-    def __init__(self, config: CoCaConfig) -> None:
+    def __init__(
+        self,
+        prediction_key: str,
+        vision_cls_prediciton_key: str,
+        text_cls_prediciton_key: str,
+        vision_embd_prediciton_key: str,
+        text_embd_prediciton_key: str,
+        n_vision_queries: int,
+        n_pool_head: int,
+        bias_attn_pool: bool,
+        epsilon_attn_pool: float,
+        vision_encoder_config: VisionTransformerConfig,
+        text_decoder_config: GPT2Config,
+        multimodal_decoder_config: GPT2Config,
+    ) -> None:
         super().__init__()
-        self.prediction_key = config.prediction_key
-        self.vision_cls_prediciton_key = config.vision_cls_prediciton_key
-        self.text_cls_prediciton_key = config.text_cls_prediciton_key
-        self.vision_embd_prediciton_key = config.vision_embd_prediciton_key
-        self.text_embd_prediciton_key = config.text_embd_prediciton_key
-        self.vision_encoder = VisionTransformer(config.vision_encoder_config)
-        self.text_decoder = TextDecoder(config.text_decoder_config)
-        self.multimodal_decoder = MultiModalDecoder(config.multimodal_decoder_config)
+        self.prediction_key = prediction_key
+        self.vision_cls_prediciton_key = vision_cls_prediciton_key
+        self.text_cls_prediciton_key = text_cls_prediciton_key
+        self.vision_embd_prediciton_key = vision_embd_prediciton_key
+        self.text_embd_prediciton_key = text_embd_prediciton_key
+        self.vision_encoder = VisionTransformer(vision_encoder_config)
+        self.text_decoder = TextDecoder(text_decoder_config)
+        self.multimodal_decoder = MultiModalDecoder(multimodal_decoder_config)
 
         # TODO Validate if weight tying is useful for coca
         self.text_decoder.transformer.wte.weight = (
@@ -225,14 +239,12 @@ class CoCa(NNModel):
         )  # https://paperswithcode.com/method/weight-tying
 
         # vision_queries: 256 queries for multimodal cross attention and 1 as vision cls token for contrastive learning
-        self.vision_queries = nn.Parameter(
-            torch.randn(config.n_vision_queries + 1, config.vision_encoder_config.n_embd)
-        )
+        self.vision_queries = nn.Parameter(torch.randn(n_vision_queries + 1, vision_encoder_config.n_embd))
         self.attn_pool = AttentionalPooling(
-            n_embd=config.vision_encoder_config.n_embd,
-            n_head=config.n_pool_head,
-            bias=config.bias_attn_pool,
-            epsilon=config.epsilon_attn_pool,
+            n_embd=vision_encoder_config.n_embd,
+            n_head=n_pool_head,
+            bias=bias_attn_pool,
+            epsilon=epsilon_attn_pool,
         )
 
     def forward(self, inputs):
