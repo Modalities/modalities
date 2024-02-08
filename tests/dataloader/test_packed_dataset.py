@@ -2,9 +2,10 @@ import json
 import pytest
 
 from PIL import Image
-import numpy.testing
 
-from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec
+import numpy as np
+import numpy.testing
+from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec, TorchaudioAudioCodec
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataset import PackedMemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 
@@ -136,9 +137,34 @@ def test_packed_image_dataset(indexed_dummy_image_data_path):
             numpy.testing.assert_allclose(src_img, item["img"])
 
 
-def test_packed_multimodal_dataset(
-    indexed_dummy_image_data_path, gpt2_tokenizer
-):
+def test_packed_audio_dataset(indexed_dummy_audio_data_path):
+    # create packed data file
+    packed_generator = PackedDataGenerator(
+        src_path=indexed_dummy_audio_data_path.raw_data_path,
+        idx_path=indexed_dummy_audio_data_path.index_path,
+        codecs={".feat_path": TorchaudioAudioCodec()},
+    )
+    # get destination path
+    default_packed_dataset_path = packed_generator._default_destination_path()
+    assert not default_packed_dataset_path.is_file()
+    # create packed dataset file
+    packed_generator.run()
+
+    # read dataset
+    ds = PackedMemMapDataset(
+        default_packed_dataset_path,
+        sample_keys=["feat"],
+    )
+    # read the jsonl to get the source feature paths
+    with indexed_dummy_audio_data_path.raw_data_path.open("r") as f:
+        src_data = list(map(json.loads, f.read().strip().split("\n")))
+    # compare source features with dataset content
+    for src, item in zip(src_data, ds, strict=True):
+        log_mel_spec = np.load(src["feat_path"])
+        numpy.testing.assert_allclose(log_mel_spec, item["feat"])
+
+
+def test_packed_multimodal_dataset(indexed_dummy_image_data_path, gpt2_tokenizer):
     # create packed data file
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_image_data_path.raw_data_path,

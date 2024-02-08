@@ -21,7 +21,10 @@ dependencies = [
     "jq",
     "xformers",
     "class_resolver",
-    "wandb"
+    "wandb", 
+    "scipy",
+    "torchaudio",
+    "pillow",
 ]
 
 [project.optional-dependencies]

@@ -62,10 +62,14 @@ class CodecConfig(BaseModel):
     class PillowImageCodecConfig(BaseModel):
         save_format: str = "png"
 
+    class TorchaudioAudioCodec(BaseModel):
+        pass
+
     type_hint: CodecTypes
     config: Union[
         HfTokenizerCodecConfig,
-        PillowImageCodecConfig
+        PillowImageCodecConfig,
+        TorchaudioAudioCodec,
     ] = Field(union_mode="left_to_right")
 
 

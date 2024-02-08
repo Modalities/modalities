@@ -19,7 +19,8 @@ from modalities.models.gpt2.gpt2_model import GPT2LLM
 
 from modalities.dataloader.codecs import (
     HfTokenizerCodec,
-    PillowImageCodec
+    PillowImageCodec, 
+    TorchaudioAudioCodec,
 )
 
 
@@ -55,6 +56,7 @@ class TokenizerTypes(LookupEnum):
 class CodecTypes(LookupEnum):
     HfTokenizerCodec = HfTokenizerCodec
     PillowImageCodec = PillowImageCodec
+    TorchaudioAudioCodec = TorchaudioAudioCodec
 
 
 class DatasetTypes(LookupEnum):
