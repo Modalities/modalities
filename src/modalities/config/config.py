@@ -22,6 +22,7 @@ from modalities.config.lookup_types import (
     TokenizerTypes,
 )
 from modalities.config.types import ProcessGroupBackendType
+from modalities.models.coca.coca_model import CoCaConfig
 from modalities.models.gpt2.gpt2_model import GPT2Config
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModelConfig
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
@@ -121,8 +122,14 @@ class CollatorConfig(BaseModel):
         sample_key: str
         target_key: str
 
+    class CoCaCollatorConfig(BaseModel):
+        sample_keys: List[str]
+        target_keys: List[str]
+        text_sample_key: str
+        text_target_key: str
+
     type_hint: CollatorTypes
-    config: GPT2LLMCollatorConfig
+    config: GPT2LLMCollatorConfig | CoCaCollatorConfig
 
 
 class DataLoaderConfig(BaseModel):
@@ -146,7 +153,7 @@ class DataConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type_hint: ModelTypes
-    config: HuggingFacePretrainedModelConfig | GPT2Config
+    config: HuggingFacePretrainedModelConfig | GPT2Config | CoCaConfig
 
 
 class CLMCrossEntropyLossConfig(BaseModel):

@@ -19,6 +19,8 @@ from modalities.dataloader.dataset import (
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.models.coca.coca_model import CoCa
+from modalities.models.coca.collator import CoCaCollator
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
@@ -27,6 +29,7 @@ from modalities.models.huggingface.huggingface_models import HuggingFacePretrain
 class ModelTypes(LookupEnum):
     GPT2LLM = GPT2LLM
     HuggingFacePretrainedModel = HuggingFacePretrainedModel
+    CoCa = CoCa
 
 
 class LossTypes(LookupEnum):
@@ -69,6 +72,7 @@ class BatchSamplerTypes(LookupEnum):
 
 class CollatorTypes(LookupEnum):
     GPT2LLMCollator = GPT2LLMCollator
+    CoCaCollator = CoCaCollator
 
 
 class DataloaderTypes(LookupEnum):
