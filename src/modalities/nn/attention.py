@@ -1,6 +1,7 @@
 import math
 from typing import Optional
 
+import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
@@ -12,6 +13,7 @@ class Attention(nn.Module):
         n_head: int = 8,
         bias: bool = True,
         dropout: float = 0.0,
+        block_size: int = 1024,
         use_flash: bool = True,
         is_causal: bool = False,
         use_cross_attention: bool = False,
@@ -32,6 +34,10 @@ class Attention(nn.Module):
 
         if not self.use_flash:
             self.attn_dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
+            self.register_buffer(
+                "bias",
+                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
+            )
         self.resid_dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x: Tensor, context: Optional[Tensor] = None) -> Tensor:
