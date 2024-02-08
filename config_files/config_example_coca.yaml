@@ -1,0 +1,205 @@
+modalities_setup:
+  run_mode: FROM_SCRATCH
+  settings:
+    global_num_seen_samples: 0
+
+wandb:
+  project_name: modalities
+  mode: OFFLINE
+
+data:
+  sample_key: "input_ids"
+  target_key: "target_ids"
+  sequence_len: 128
+  train_dataloader:
+    type_hint: LLMDataLoader
+    config:
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+      dataloader_tag: "train"
+      dataset:
+        type_hint: DummyDataset
+        config:
+          num_samples: 4
+          sample_definition:
+            - - images
+              - [3, 224, 224]
+              - float
+            - - input_ids
+              - [1024]
+              - int
+      batch_sampler:
+        type_hint: BatchSampler
+        config:
+          batch_size: 3
+          drop_last: false
+          sampler:
+            type_hint: DistributedSampler
+            config:
+              rank: ${training.global_rank}
+              num_replicas: ${training.world_size}
+              shuffle: true
+      collate_fn:
+        type_hint: CoCaCollator
+        config:
+          sample_keys:
+            - "images"
+            - ${data.sample_key}
+          target_keys: []
+          text_sample_key: ${data.sample_key}
+          text_target_key: ${data.target_key}
+  eval_dataloaders:
+    - type_hint: LLMDataLoader
+      config:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "val"
+        dataset: ${data.train_dataloader.config.dataset}
+        batch_sampler:
+          type_hint: BatchSampler
+          config:
+            batch_size: 3
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.global_rank}
+                num_replicas: ${training.world_size}
+                shuffle: true
+        collate_fn: ${data.train_dataloader.config.collate_fn}
+    - type_hint: LLMDataLoader
+      config:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "test"
+        dataset: ${data.train_dataloader.config.dataset}
+        batch_sampler:
+          type_hint: BatchSampler
+          config:
+            batch_size: 3
+            drop_last: false
+            sampler:
+              type_hint: DistributedSampler
+              config:
+                rank: ${training.global_rank}
+                num_replicas: ${training.world_size}
+                shuffle: true
+        collate_fn: ${data.train_dataloader.config.collate_fn}
+
+training:
+  process_group_backend: "nccl"
+  global_num_training_samples: 12
+  callback_interval_in_samples: 6
+  local_rank: ${oc.env:LOCAL_RANK}
+  global_rank: ${oc.env:RANK}
+  world_size: ${oc.env:WORLD_SIZE}
+  main_rank: 0
+  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
+  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
+  gradient_acc_step: 1
+  do_apply_activation_checkpointing: True
+
+checkpointing:
+  checkpointing_strategy:
+    type_hint: SaveKMostRecentCheckpointsStrategy
+    config:
+      k: -1 # -1 to save all checkpoints
+  checkpointing_execution:
+    type_hint: FSDPToDiscCheckpointing
+    config:
+      checkpoint_path: data/checkpoints
+      global_rank: ${oc.env:RANK}
+
+loss:
+  type_hint: CLMCrossEntropyLoss
+  config:
+    target_key: target_ids
+    prediction_key: ${model.config.prediction_key}
+
+running_env:
+  type_hint: FSDPRunningEnv
+  config:
+    process_group_backend: ${training.process_group_backend}
+    local_rank: ${oc.env:LOCAL_RANK}
+    mixed_precision_settings: FP_16
+    sharding_strategy: FULL_SHARD
+    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+
+model:
+  type_hint: CoCa
+  config:
+    prediction_key: logits
+    vision_embd_prediciton_key: vision_embeddings
+    text_embd_prediciton_key: text_embeddings
+    vision_cls_prediciton_key: vision_cls
+    text_cls_prediciton_key: text_cls
+    vision_encoder_config:
+      sample_key: images
+      prediction_key: vision_embeddings
+      block_size: 196
+      n_classes: Null # Disable vision transformer head
+      n_layer: 12
+      n_head: 12
+      n_embd: 768
+      dropout: 0.0
+      patch_size: 16
+      patch_stride: 16
+      n_img_channels: 3
+      add_cls_token: False
+      bias: True
+    text_decoder_config:
+      sample_key: input_ids
+      prediction_key: text_embeddings
+      block_size: 1025 # +1 for the class token
+      vocab_size: 50304
+      n_layer: 12
+      n_head: 12
+      ffn_hidden: 2048
+      n_embd: 768
+      dropout: 0.0
+      bias: true
+      attention:
+        attention_type: default_attention
+        scaling_factor: 3
+      activation: fused_swiglu
+      epsilon: 1e-5
+      weight_init:
+        mean: 0.0
+        std: 0.02
+    multimodal_decoder_config:
+      sample_key: text_embeddings
+      prediction_key: logits
+      block_size: 1024
+      vocab_size: 50304
+      n_layer: 12
+      n_head: 12
+      ffn_hidden: 2048
+      n_embd: 768
+      dropout: 0.0
+      bias: true
+      attention:
+        attention_type: default_attention
+        scaling_factor: 3
+      activation: fused_swiglu
+      epsilon: 1e-5
+      weight_init:
+        mean: 0.0
+        std: 0.02
+    n_pool_head: 8
+    n_vision_queries: 256
+    bias_attn_pool: False
+    epsilon_attn_pool: 1e-5
+
+scheduler:
+  type_hint: StepLR
+  config:
+    step_size: 1
+    gamma: 0.1
+
+optimizer:
+  type_hint: AdamW
+  config:
+    lr: 0.0001
