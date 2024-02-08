@@ -14,7 +14,7 @@ class Attention(nn.Module):
         bias: bool = True,
         dropout: float = 0.0,
         block_size: int = 1024,
-        use_flash: bool = True,
+        use_flash: bool = False,
         is_causal: bool = False,
         use_cross_attention: bool = False,
     ):
