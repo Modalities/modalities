@@ -14,7 +14,8 @@ from modalities.running_env.fsdp.reducer import Reducer
 
 def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
     try:
-        return enum_type[name]
+        val = enum_type[name]
+        return val
     except KeyError:
         raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
