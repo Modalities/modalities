@@ -96,7 +96,7 @@ class MultiModalBlock(nn.Module):
     ):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = Attention(n_embd, n_head, bias, is_causal=True, use_cross_attention=True)
+        self.attn = Attention(n_embd, n_head, bias, is_causal=False, use_cross_attention=True)
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
         if activation == ActivationType.GELU:
