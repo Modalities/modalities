@@ -10,7 +10,12 @@ from modalities.checkpointing.checkpointing_strategies import (
 )
 from modalities.config.lookup_enum import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
-from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from modalities.dataloader.dataset import (
+    DummyDataset,
+    MemMapDataset,
+    PackedMemMapDatasetContinuous,
+    PackedMemMapDatasetMegatron,
+)
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from modalities.loss_functions import CLMCrossEntropyLoss
@@ -44,6 +49,7 @@ class TokenizerTypes(LookupEnum):
 
 
 class DatasetTypes(LookupEnum):
+    DummyDataset = DummyDataset
     MemMapDataset = MemMapDataset
     PackedMemMapDatasetContinuous = PackedMemMapDatasetContinuous
     PackedMemMapDatasetMegatron = PackedMemMapDatasetMegatron
