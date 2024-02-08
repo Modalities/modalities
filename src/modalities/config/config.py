@@ -2,7 +2,7 @@ import json
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 from transformers import PretrainedConfig
@@ -53,6 +53,10 @@ class TokenizerConfig(BaseModel):
 
 
 class DatasetConfig(BaseModel):
+    class DummyDatasetConfig(BaseModel):
+        num_samples: int
+        sample_definition: List[Tuple[str, Tuple, str]]
+
     class MemMapDatasetConfig(BaseModel):
         raw_data_path: FilePath
         index_path: Optional[FilePath] = None
@@ -83,6 +87,7 @@ class DatasetConfig(BaseModel):
 
     type_hint: DatasetTypes
     config: Union[
+        DummyDatasetConfig,
         MemMapDatasetConfig,
         OpenGPTXMMapDatasetConfig,
         PackedMemMapDatasetContinuousConfig,
