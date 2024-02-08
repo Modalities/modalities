@@ -124,6 +124,48 @@ def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
 
 
 @pytest.fixture
+def indexed_dummy_audio_data_path(
+    tmpdir,
+) -> DataPathCollection:
+    base_path = Path(tmpdir, "audio_data")
+    feature_base_path = Path(base_path, "features")
+
+    base_path.mkdir(parents=True, exist_ok=True)
+    feature_base_path.mkdir(parents=True, exist_ok=True)
+
+    data_path = Path(base_path, "data.jsonl")
+    index_path = Path(base_path, "data.idx")
+    feat_paths = [Path(feature_base_path, "feats_%i.npy" % i) for i in range(15)]
+
+    N_MEL_BINS = 80
+    N_TIME_STEPS = 1_600
+    # create random spectrograms and save them into the temp directory
+    for feat_path in feat_paths:
+        log_mel_spec = np.random.rand(N_TIME_STEPS, N_MEL_BINS)
+        np.save(
+            feat_path,
+            log_mel_spec,
+        )
+    # create the jsonl file
+    with data_path.open("w+") as f:
+        for feat_path in feat_paths:
+            f.write(
+                json.dumps(
+                    {
+                        "feat_path": feat_path.absolute().as_posix(),
+                        "text": ("This item refers to the spectrogram stored at %s" % 
+                        str(feat_path)),
+                    }
+                )
+                + "\n"
+            )
+    # create the index file to the jsonl file
+    IndexGenerator(data_path).create_index(index_path)
+
+    return DataPathCollection(raw_data_path=data_path, index_path=index_path)
+
+
+@pytest.fixture
 def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
     index_generator.create_index(dummy_data_path.index_path)
