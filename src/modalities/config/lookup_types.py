@@ -1,5 +1,3 @@
-from enum import Enum
-
 import torch
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
@@ -10,6 +8,7 @@ from modalities.checkpointing.checkpointing_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.config.lookup_enum import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
@@ -18,13 +17,6 @@ from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
-
-
-class LookupEnum(Enum):
-    @classmethod
-    def _missing_(cls, value: str) -> type:
-        """constructs Enum by member name, if not constructable by value"""
-        return cls.__dict__[value]
 
 
 class ModelTypes(LookupEnum):
