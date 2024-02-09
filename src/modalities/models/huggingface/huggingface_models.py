@@ -1,13 +1,12 @@
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
 
+from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
-from modalities.util import parse_enum_by_name
 
 # Huggingface Model dependencies
 #
@@ -22,7 +21,7 @@ from modalities.util import parse_enum_by_name
 #           <- LlamaForSequenceClassification    The LLaMa transformer with a sequence classif. head on top (lin. layer)
 
 
-class HuggingFaceModelTypes(Enum):
+class HuggingFaceModelTypes(LookupEnum):
     AutoModelForCausalLM = AutoModelForCausalLM
     AutoModelForMaskedLM = AutoModelForMaskedLM
 
@@ -31,13 +30,10 @@ class HuggingFacePretrainedModelConfig(BaseModel):
     model_type: HuggingFaceModelTypes
     model_name: Path
     prediction_key: str
+    huggingface_prediction_subscription_key: str
     sample_key: str
     model_args: Optional[Any] = None
     kwargs: Optional[Any] = None
-
-    @validator("model_type", pre=True, always=True)
-    def parse_sharding_strategy_by_name(cls, name):
-        return parse_enum_by_name(name=name, enum_type=HuggingFaceModelTypes)
 
 
 class HuggingFacePretrainedModel(NNModel):
@@ -46,6 +42,7 @@ class HuggingFacePretrainedModel(NNModel):
         model_type: HuggingFaceModelTypes,
         model_name: str,
         prediction_key: str,
+        huggingface_prediction_subscription_key: str,
         sample_key: str,
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
@@ -56,10 +53,9 @@ class HuggingFacePretrainedModel(NNModel):
         if kwargs is None:
             kwargs = {}
         self.prediction_key = prediction_key
+        self.huggingface_prediction_subscription_key = huggingface_prediction_subscription_key
         self.sample_key = sample_key
 
-        # TODO this would be perfect for a factory design, however the resovler register currently does not
-        # support functions instead of classes within enums.
         # NOTE: If the model needs to be downloaded, it is NOT necessary to guard the access for rank 0.
         # This is taken care of internally in huggingface hub see:
         # https://github.com/huggingface/huggingface_hub/blob/3788f537b10c7d02149d6bf017d2ce19885f90a2/src/huggingface_hub/file_download.py#L1457
@@ -69,7 +65,7 @@ class HuggingFacePretrainedModel(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         output = self.huggingface_model.forward(inputs[self.sample_key])
-        return {self.prediction_key: output.logits}
+        return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
 
     @property
     def fsdp_block_names(self) -> List[str]:
@@ -82,5 +78,7 @@ if __name__ == "__main__":
         model_type=HuggingFaceModelTypes.AutoModelForCausalLM,
         model_name="epfl-llm/meditron-7b",
         prediction_key="logits",
+        huggingface_prediction_subscription_key="logits",
+        sample_key="input_ids",
     )
     print(model)
