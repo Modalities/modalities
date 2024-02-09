@@ -58,6 +58,7 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
+        # TODO: remove
         epoch_done_callback: Callable[[int], None],
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
@@ -67,12 +68,14 @@ class Trainer:
 
         # batch loop
         batch: DatasetBatch
+        # TODO: why do we need a barrier here?
         dist.barrier()
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         for batch_id, batch in enumerate(train_loader):
+            # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # train single batch
+            # Train single batch
             batch_loss = self._train_batch(
                 batch=batch,
                 model=model,
@@ -82,7 +85,7 @@ class Trainer:
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
-            # save the batch loss
+            # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
             batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
