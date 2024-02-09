@@ -50,6 +50,7 @@ def nce_loss(
     This implementation calculates the noise contrastive estimation loss between embeddings of two different modalities
     Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf, https://github.com/antoine77340/MIL-NCE_HowTo100M
     changes include adding a temperature value and the choice of calculating asymmetric loss w.r.t. one modality
+    This implementation is adapted to contrastive loss from CoCa model https://arxiv.org/pdf/2205.01917.pdf
 
     Args:
         embedding1 (torch.Tensor): embeddings from modality 1 of size batch_size x embed_dim.
@@ -67,11 +68,13 @@ def nce_loss(
     numerator = sim_matrix * torch.eye(sim_matrix.shape[0], device=device)
     numerator = numerator.sum(dim=0).view(sim_matrix.shape[0], -1)
     numerator = torch.logsumexp(numerator, dim=1)
-    # denominator of loss: using all similarity scores for all pairs (positive and negative)
     if is_asymmetric:
+        # denominator of loss: using all similarity scores for all pairs (positive and negative)
         denominator = torch.logsumexp(sim_matrix, dim=1)
     else:
-        denominator = torch.logsumexp(torch.cat((sim_matrix, sim_matrix.t()), dim=1), dim=1)
+        # calculate bidirectional loss
+        numerator *= 2
+        denominator = torch.logsumexp(sim_matrix, dim=1) + torch.logsumexp(sim_matrix.t(), dim=1)
     return torch.mean(denominator - numerator)  # calculated in log space
 
 
