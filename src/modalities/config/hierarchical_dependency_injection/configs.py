@@ -42,6 +42,26 @@ class CompConfigABC(BaseModel, ABC):
         return key
 
 
+class PassType(Enum):
+    BY_VALUE = "by_value"
+    BY_REFERENCE = "by_reference"
+
+
+class ReferenceConfig(BaseModel):
+    instance_key: str
+    pass_type: PassType
+
+    @validator("pass_type", pre=True)
+    def _string_to_enum(cls, key: str):
+        if isinstance(key, str):
+            try:
+                key = PassType[key]
+            except KeyError as e:
+                raise ValueError(f"{key} is not a valid PassType") from e
+            return key
+        return key
+
+
 class CompVConfig(CompConfigABC):
     type_hint: Literal[ComponentTypes.COMP_V]
     val_v: str
