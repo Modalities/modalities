@@ -5,7 +5,7 @@ from typing import Annotated, Any, List, Literal
 from pydantic import BaseModel, GetCoreSchemaHandler, validator
 from pydantic_core import core_schema
 
-from modalities.config.hierarchical_instantiation.components import ComponentTypes, ComponentVWIF
+from tests.config.hierarchical_instantiation.components import ComponentTypes, ComponentVWIF
 
 
 class PydanticComponentIF:
