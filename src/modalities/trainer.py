@@ -21,11 +21,13 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_step: int,
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_step = gradient_acc_step
+        self._throughput_aggregator_factory = throughput_aggregator_factory
 
     def train(
         self,
@@ -46,7 +48,9 @@ class Trainer:
         # TODO: why do we need a barrier here?
         dist.barrier()
 
-        for thoughput_aggregator, (batch_id, batch) in start_throughput_measurement(enumerate(train_loader)):
+        for thoughput_aggregator, (batch_id, batch) in start_throughput_measurement(
+            enumerate(train_loader), self._throughput_aggregator_factory
+        ):
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
             batch_loss = self._train_batch(

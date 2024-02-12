@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from types import TracebackType
-from typing import Any, Iterable, Tuple, TypeVar
+from typing import Any, Callable, Iterable, Tuple, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -19,8 +19,10 @@ class ThroughputAggregationKeys(Enum):
 T = TypeVar("T", bound=Any)
 
 
-def start_throughput_measurement(iterable: Iterable[T]) -> Iterable[Tuple[ThroughputAggregator, T]]:
-    a = ThroughputAggregator()
+def start_throughput_measurement(
+    iterable: Iterable[T], throughput_aggregatgor_factory: Callable[[], ThroughputAggregator]
+) -> Iterable[Tuple[ThroughputAggregator, T]]:
+    a = throughput_aggregatgor_factory()
     a.start()
     for e in iterable:
         yield a, e
@@ -60,16 +62,22 @@ class ThroughputAggregator:
 
 
 class ThroughputAggregationContext:
-    def __init__(self, num_samples: int, local_rank: int) -> None:
+    def __init__(
+        self,
+        num_samples: int,
+        local_rank: int,
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
+    ) -> None:
         self._local_rank = local_rank
         self._num_samples = num_samples
+        self._throughput_aggregator_factory = throughput_aggregator_factory
 
     @property
     def samples_per_second(self) -> torch.Tensor:
         return self._samples_per_second
 
     def __enter__(self):
-        self._agg = ThroughputAggregator()
+        self._agg = self._throughput_aggregator_factory()
         self._agg.start()
         return self
 

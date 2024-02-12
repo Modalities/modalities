@@ -17,6 +17,7 @@ from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.samplers import ResumableBatchSampler
+from modalities.evaluation.throughput_aggregator import ThroughputAggregator
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -118,12 +119,18 @@ def progress_publisher_mock():
 
 
 @pytest.fixture(scope="function")
-def trainer(progress_publisher_mock):
+def throughput_aggregator_mock():
+    return MagicMock(spec=ThroughputAggregator)
+
+
+@pytest.fixture(scope="function")
+def trainer(progress_publisher_mock, throughput_aggregator_mock):
     return Trainer(
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_step=1,
+        throughput_aggregator_factory=lambda: throughput_aggregator_mock,
     )
 
 

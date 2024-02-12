@@ -5,7 +5,7 @@ import torch
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
-from modalities.evaluation.throughput_aggregator import ThroughputAggregationContext
+from modalities.evaluation.throughput_aggregator import ThroughputAggregationContext, ThroughputAggregator
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import NNModel, model_predict_batch
@@ -19,12 +19,14 @@ class Evaluator:
         metric_factories: List[AggregativeMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator],
     ) -> None:
         self.local_rank = local_rank
         self._loss_factories = loss_factories
         self._metric_factories = metric_factories
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
+        self._throughput_aggregator_factory = throughput_aggregator_factory
 
     def evaluate(
         self,
@@ -43,7 +45,9 @@ class Evaluator:
                 dataloader_tag=data_loader.dataloader_tag,
             )  # TODO why is this in the beginning of the for loop, not at the end?
 
-            with ThroughputAggregationContext(len(data_loader), self.local_rank) as thoughput_agg:
+            with ThroughputAggregationContext(
+                len(data_loader), self.local_rank, self._throughput_aggregator_factory
+            ) as thoughput_agg:
                 total_losses, total_metrics = self._process_batches_in_data_loader(
                     model=model,
                     data_loader=data_loader,

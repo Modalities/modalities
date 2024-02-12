@@ -12,12 +12,11 @@ from modalities.loss_functions import CLMCrossEntropyLoss
 
 
 class PerplexityKeys(Enum):
-    PERPLEXITY = "perplexity"
+    LOSS = "loss"
     NUM_SAMPLES = "num_samples"
 
 
 class AggregativePerplexity(AggregativeMeasure[PerplexityKeys]):
-
     def __init__(self, target_key: str, prediction_key: str, local_rank: int) -> None:
         super().__init__(
             aggregate_keys=list(PerplexityKeys),
@@ -30,12 +29,12 @@ class AggregativePerplexity(AggregativeMeasure[PerplexityKeys]):
     def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[PerplexityKeys, torch.Tensor]:
         loss = self._loss(batch_result)
         return {
-            PerplexityKeys.PERPLEXITY: torch.exp(loss).sum(),
+            PerplexityKeys.LOSS: loss.sum(),
             PerplexityKeys.NUM_SAMPLES: torch.tensor(len(batch_result)),
         }
 
     def _calc_measure(self, values: Dict[PerplexityKeys, torch.Tensor]) -> torch.Tensor:
-        return values[PerplexityKeys.PERPLEXITY] / values[PerplexityKeys.NUM_SAMPLES]
+        return torch.exp(values[PerplexityKeys.LOSS] / values[PerplexityKeys.NUM_SAMPLES])
 
 
 class AggregativePerplexityFactory(AggregativeMeasureFactory[PerplexityKeys]):
