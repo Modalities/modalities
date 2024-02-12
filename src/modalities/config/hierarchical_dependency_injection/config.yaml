@@ -2,7 +2,6 @@ comp_z_1:
     type_hint: COMP_Z
     val_z: "some value"
 
-
 comp_x_1:
     type_hint: COMP_X
     val_x: "some other value X"
@@ -18,8 +17,5 @@ comp_y_1:
           val_w: "some other value w"
         - type_hint: COMP_V
           val_v: "some other value v"
-        - type_hint: COMP_X
-          val_x: "some other value x"
-          single_dependency:
-            type_hint: COMP_W
-            val_w: "some other value w"
+        - instance_key: comp_x_1
+          pass_type: BY_REFERENCE
