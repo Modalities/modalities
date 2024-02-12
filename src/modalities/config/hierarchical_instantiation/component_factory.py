@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 from omegaconf import OmegaConf
 from pydantic import RootModel
 
-from modalities.config.hierarchical_dependency_injection.configs import (
+from modalities.config.hierarchical_instantiation.configs import (
     CompConfigABC,
     CompVConfig,
     CompWConfig,
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         return config_dict
 
     config_file_path = Path(
-        "/raid/s3/opengptx/max_lue/modalities/src/modalities/config/hierarchical_dependency_injection/config.yaml"
+        "/raid/s3/opengptx/max_lue/modalities/src/modalities/config/hierarchical_instantiation/config.yaml"
     )
     comp_config_types = Union[CompVConfig, CompWConfig, CompXConfig, CompYConfig, CompZConfig, ReferenceConfig]
     component_names = ["comp_z_1", "comp_x_1", "comp_y_1"]
