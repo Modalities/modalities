@@ -1,0 +1,11 @@
+comp_y_1:
+    type_hint: COMP_Y
+    val_y: "some other value y"
+    multi_dependency:
+        - type_hint: COMP_W
+          val_w: "some other value w"
+        - type_hint: COMP_V
+          val_v: "some other value v"
+        - instance_key: comp_x_1
+          pass_type: BY_REFERENCE
+
