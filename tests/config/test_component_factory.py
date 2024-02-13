@@ -41,6 +41,24 @@ def test_backward_reference(config_file_path: Path):
 @pytest.mark.parametrize(
     "config_file_path",
     [
+        Path("tests/config/test_configs/config_non_existing_reference.yaml"),
+    ],
+)
+def test_non_existing_reference(config_file_path: Path):
+    comp_config_types = Union[CompXConfig, CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    component_names = ["comp_x_1", "comp_y_1"]
+
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+
+    with pytest.raises(KeyError):
+        ComponentFactory.build_config(
+            config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        )
+
+
+@pytest.mark.parametrize(
+    "config_file_path",
+    [
         Path("tests/config/test_configs/config_hierarchical_list_component.yaml"),
     ],
 )
