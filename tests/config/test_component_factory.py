@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 
 from modalities.config.component_factory import ComponentFactory
 from tests.config.components import ComponentV, ComponentW, ComponentY
-from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, ReferenceConfig
+from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, CustomComp1Config, ReferenceConfig
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -99,3 +99,22 @@ def test_component_filter(config_file_path: Path):
         components = ComponentFactory.build_config(
             config_dict=config_dict, config_types=comp_config_types, component_names=component_names
         )
+
+
+@pytest.mark.parametrize(
+    "config_file_path",
+    [
+        Path("tests/config/test_configs/config_custom_component.yaml"),
+    ],
+)
+def test_custom_component(config_file_path: Path):
+    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = comp_config_types | CustomComp1Config
+    component_names = ["custom_comp_1"]
+
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+
+    components = ComponentFactory.build_config(
+        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+    )
+    assert "custom_comp_1" in components

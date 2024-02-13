@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List
 
 
-class ComponentVWIF:
+class Component_V_W_X_IF:
     def print(self) -> None:
         print("ComponentIF")
 
@@ -10,12 +10,12 @@ class ComponentVWIF:
 # Dependencies
 
 
-class ComponentV(ComponentVWIF):
+class ComponentV(Component_V_W_X_IF):
     def __init__(self, val_v: str) -> None:
         self.val_v = val_v
 
 
-class ComponentW(ComponentVWIF):
+class ComponentW(Component_V_W_X_IF):
     def __init__(self, val_w: str) -> None:
         self.val_w = val_w
 
@@ -23,14 +23,14 @@ class ComponentW(ComponentVWIF):
 # Components
 
 
-class ComponentX(ComponentVWIF):
-    def __init__(self, val_x: str, single_dependency: ComponentVWIF) -> None:
+class ComponentX(Component_V_W_X_IF):
+    def __init__(self, val_x: str, single_dependency: Component_V_W_X_IF) -> None:
         self.val_x = val_x
         self.single_dependency = single_dependency
 
 
 class ComponentY:
-    def __init__(self, val_y: str, multi_dependency: List[ComponentVWIF]) -> None:
+    def __init__(self, val_y: str, multi_dependency: List[Component_V_W_X_IF]) -> None:
         self.val_y = val_y
         self.multi_dependency = multi_dependency
 
@@ -46,3 +46,19 @@ class ComponentTypes(Enum):
     COMP_X = ComponentX
     COMP_Y = ComponentY
     COMP_Z = ComponentZ
+
+
+class CustomComponent1:
+    def __init__(self, val_1: str) -> None:
+        self.val_1 = val_1
+
+
+class CustomComponent2:
+    def __init__(self, val_2: str, comp_z_dependency: ComponentZ) -> None:
+        self.val_2 = val_2
+        self.comp_z_dependency = comp_z_dependency
+
+
+class CustomComponentTypes(Enum):
+    CUSTOM_COMP_1 = CustomComponent1
+    CUSTOM_COMP_2 = CustomComponent2

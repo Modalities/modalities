@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Union
 
 from pydantic import RootModel
 
-from modalities.config.config import CompConfigABC
+from modalities.config.config_new import CompConfigABC
 
 
 class ComponentFactory:
