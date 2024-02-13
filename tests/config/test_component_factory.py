@@ -5,6 +5,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from modalities.config.component_factory import ComponentFactory
+from tests.config.components import ComponentV, ComponentW, ComponentY
 from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, ReferenceConfig
 
 
@@ -35,3 +36,24 @@ def test_backward_reference(config_file_path: Path):
     assert components["comp_x_1"].single_dependency != components["comp_y_1"].multi_dependency[0]
     # make sure that the reference is identical, since we are referencing comp_x_1 in the multi depencency of comp_y_1
     assert components["comp_x_1"] == components["comp_y_1"].multi_dependency[2]
+
+
+@pytest.mark.parametrize(
+    "config_file_path",
+    [
+        Path("tests/config/test_configs/config_hierarchical_list_component.yaml"),
+    ],
+)
+def test_hierarchical_component_instantiation(config_file_path: Path):
+    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    component_names = ["comp_y_1"]
+
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+
+    components = ComponentFactory.build_config(
+        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+    )
+
+    assert isinstance(components["comp_y_1"].multi_dependency[0], ComponentW)
+    assert isinstance(components["comp_y_1"].multi_dependency[1], ComponentV)
+    assert isinstance(components["comp_y_1"], ComponentY)
