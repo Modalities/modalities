@@ -57,3 +57,27 @@ def test_hierarchical_component_instantiation(config_file_path: Path):
     assert isinstance(components["comp_y_1"].multi_dependency[0], ComponentW)
     assert isinstance(components["comp_y_1"].multi_dependency[1], ComponentV)
     assert isinstance(components["comp_y_1"], ComponentY)
+
+
+@pytest.mark.parametrize(
+    "config_file_path",
+    [
+        Path("tests/config/test_configs/config_hierarchical_list_component.yaml"),
+    ],
+)
+def test_component_filter(config_file_path: Path):
+    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    component_names = ["comp_y_1"]
+
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+
+    components = ComponentFactory.build_config(
+        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+    )
+    assert "comp_y_1" in components
+
+    component_names += "abc"
+    with pytest.raises(KeyError):
+        components = ComponentFactory.build_config(
+            config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        )
