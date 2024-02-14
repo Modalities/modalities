@@ -23,7 +23,7 @@ def test_backward_reference(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
     components = ComponentFactory.build_config(
-        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
     )
 
     # make sure that the reference is not identical, despite both being of type COMP_W
@@ -46,7 +46,7 @@ def test_non_existing_reference(config_file_path: Path):
 
     with pytest.raises(KeyError):
         ComponentFactory.build_config(
-            config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+            config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
         )
 
 
@@ -63,7 +63,7 @@ def test_hierarchical_component_instantiation(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
     components = ComponentFactory.build_config(
-        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
     )
 
     assert isinstance(components["comp_y_1"].multi_dependency[0], ComponentW)
@@ -84,14 +84,14 @@ def test_component_filter(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
     components = ComponentFactory.build_config(
-        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
     )
     assert "comp_y_1" in components
 
     component_names += "abc"
     with pytest.raises(KeyError):
         components = ComponentFactory.build_config(
-            config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+            config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
         )
 
 
@@ -109,6 +109,6 @@ def test_custom_component(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
     components = ComponentFactory.build_config(
-        config_dict=config_dict, config_types=comp_config_types, component_names=component_names
+        config_dict=config_dict, custom_config_types=comp_config_types, component_names=component_names
     )
     assert "custom_comp_1" in components

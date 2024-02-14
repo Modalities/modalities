@@ -8,15 +8,19 @@ from modalities.config.config_new import CompConfigABC
 
 class ComponentFactory:
     @staticmethod
-    def build_config(config_dict: Dict, config_types: List[Type], component_names: List[str]) -> Dict[str, Any]:
-        def _get_all_supported_config_types(config_types: List[Type]) -> Tuple[Type]:
-            intersection = set(ALL_COMPONENT_CONFIG_TYPES).intersection(config_types)
+    def build_config(
+        config_dict: Dict, component_names: List[str], custom_config_types: List[Type] = None
+    ) -> Dict[str, Any]:
+        def _get_all_supported_config_types(custom_config_types: List[Type]) -> Tuple[Type]:
+            intersection = set(ALL_COMPONENT_CONFIG_TYPES).intersection(custom_config_types)
             if len(intersection) > 0:
                 raise ValueError(f"Types {intersection} already exist in the ALL_COMPONENT_TYPES")
-            supported_types = tuple(list(ALL_COMPONENT_CONFIG_TYPES) + list(config_types))
+            supported_types = tuple(list(ALL_COMPONENT_CONFIG_TYPES) + list(custom_config_types))
             return supported_types
 
-        all_config_types = _get_all_supported_config_types(config_types)
+        if custom_config_types is None:
+            custom_config_types = []
+        all_config_types = _get_all_supported_config_types(custom_config_types)
 
         components, _ = ComponentFactory._build_component(
             current_component_config=config_dict,
