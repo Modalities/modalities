@@ -46,19 +46,3 @@ class ComponentTypes(Enum):
     COMP_X = ComponentX
     COMP_Y = ComponentY
     COMP_Z = ComponentZ
-
-
-class CustomComponent1:
-    def __init__(self, val_1: str) -> None:
-        self.val_1 = val_1
-
-
-class CustomComponent2:
-    def __init__(self, val_2: str, comp_z_dependency: ComponentZ) -> None:
-        self.val_2 = val_2
-        self.comp_z_dependency = comp_z_dependency
-
-
-class CustomComponentTypes(Enum):
-    CUSTOM_COMP_1 = CustomComponent1
-    CUSTOM_COMP_2 = CustomComponent2

@@ -6,7 +6,8 @@ from omegaconf import OmegaConf
 
 from modalities.config.component_factory import ComponentFactory
 from tests.config.components import ComponentV, ComponentW, ComponentY
-from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, CustomComp1Config, ReferenceConfig
+from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, ReferenceConfig
+from tests.config.custom_components import CustomComp1Config
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
