@@ -1,18 +1,28 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Type, Union
 
 from pydantic import RootModel
 
+from modalities.config import ALL_COMPONENT_CONFIG_TYPES
 from modalities.config.config_new import CompConfigABC
 
 
 class ComponentFactory:
     @staticmethod
-    def build_config(config_dict: Dict, config_types, component_names: List[str]) -> Dict[str, Any]:
+    def build_config(config_dict: Dict, config_types: List[Type], component_names: List[str]) -> Dict[str, Any]:
+        def _get_all_supported_config_types(config_types: List[Type]) -> Tuple[Type]:
+            intersection = set(ALL_COMPONENT_CONFIG_TYPES).intersection(config_types)
+            if len(intersection) > 0:
+                raise ValueError(f"Types {intersection} already exist in the ALL_COMPONENT_TYPES")
+            supported_types = tuple(list(ALL_COMPONENT_CONFIG_TYPES) + list(config_types))
+            return supported_types
+
+        all_config_types = _get_all_supported_config_types(config_types)
+
         components, _ = ComponentFactory._build_component(
             current_component_config=config_dict,
             component_config=config_dict,
             top_level_components={},
-            config_types=config_types,
+            config_types=all_config_types,
             traversal_path=[],
         )
         return {name: components[name] for name in component_names}
@@ -21,7 +31,7 @@ class ComponentFactory:
     def _build_component(
         current_component_config: Union[Dict, List, Any],
         component_config: Union[Dict, List, Any],
-        config_types,
+        config_types: Tuple[Type],
         top_level_components: Dict[str, Any],
         traversal_path: List,
     ) -> Any:
@@ -111,8 +121,8 @@ class ComponentFactory:
         return {"instance_key", "pass_type"} == config_dict.keys()
 
     @staticmethod
-    def _instantiate_component_config(config_dict: Dict, config_types) -> CompConfigABC:
-        comp_config = RootModel[config_types].model_validate(config_dict, strict=True).root
+    def _instantiate_component_config(config_dict: Dict, config_types: Tuple[Type]) -> CompConfigABC:
+        comp_config = RootModel[Union[config_types]].model_validate(config_dict, strict=True).root
         return comp_config
 
     @staticmethod

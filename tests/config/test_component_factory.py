@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Union
 
 import pytest
 
@@ -18,7 +17,7 @@ from tests.config.custom_components import CustomComp1Config
     ],
 )
 def test_backward_reference(config_file_path: Path):
-    comp_config_types = Union[CompXConfig, CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = [CompXConfig, CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
     component_names = ["comp_x_1", "comp_y_1"]
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
@@ -40,7 +39,7 @@ def test_backward_reference(config_file_path: Path):
     ],
 )
 def test_non_existing_reference(config_file_path: Path):
-    comp_config_types = Union[CompXConfig, CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = [CompXConfig, CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
     component_names = ["comp_x_1", "comp_y_1"]
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
@@ -58,7 +57,7 @@ def test_non_existing_reference(config_file_path: Path):
     ],
 )
 def test_hierarchical_component_instantiation(config_file_path: Path):
-    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = [CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
     component_names = ["comp_y_1"]
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
@@ -79,7 +78,7 @@ def test_hierarchical_component_instantiation(config_file_path: Path):
     ],
 )
 def test_component_filter(config_file_path: Path):
-    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = [CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
     component_names = ["comp_y_1"]
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
@@ -103,8 +102,8 @@ def test_component_filter(config_file_path: Path):
     ],
 )
 def test_custom_component(config_file_path: Path):
-    comp_config_types = Union[CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
-    comp_config_types = comp_config_types | CustomComp1Config
+    comp_config_types = [CompYConfig, CompWConfig, CompVConfig, ReferenceConfig]
+    comp_config_types = comp_config_types + [CustomComp1Config]
     component_names = ["custom_comp_1"]
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
