@@ -8,13 +8,6 @@ from modalities.config.config_new import CompConfigABC
 class ComponentFactory:
     @staticmethod
     def build_config(config_dict: Dict, config_types, component_names: List[str]) -> Dict[str, Any]:
-        component_dict = ComponentFactory._build_components(
-            config_dict=config_dict, config_types=config_types, component_names=component_names
-        )
-        return component_dict
-
-    @staticmethod
-    def _build_components(config_dict: Dict, config_types, component_names: List[str]) -> Dict[str, Any]:
         components, _ = ComponentFactory._build_component(
             current_component_config=config_dict,
             component_config=config_dict,
