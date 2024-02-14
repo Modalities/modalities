@@ -1,19 +1,13 @@
 from pathlib import Path
-from typing import Dict, Union
+from typing import Union
 
 import pytest
-from omegaconf import OmegaConf
 
+from modalities.__main__ import load_app_config_dict
 from modalities.config.component_factory import ComponentFactory
 from tests.config.components import ComponentV, ComponentW, ComponentY
 from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig, ReferenceConfig
 from tests.config.custom_components import CustomComp1Config
-
-
-def load_app_config_dict(config_file_path: Path) -> Dict:
-    cfg = OmegaConf.load(config_file_path)
-    config_dict = OmegaConf.to_container(cfg, resolve=True)
-    return config_dict
 
 
 @pytest.mark.parametrize(
