@@ -1,41 +1,28 @@
-from typing import Any, Dict, List, Tuple, Type, Union
+from typing import Any, Dict, List, Union
 
-from pydantic import RootModel
+from pydantic import BaseModel
 
-from modalities.config import ALL_COMPONENT_CONFIG_TYPES
-from modalities.config.config_new import CompConfigABC
+from modalities.registry.registry import Registry
 
 
 class ComponentFactory:
-    @staticmethod
-    def build_config(
-        config_dict: Dict, component_names: List[str], custom_config_types: List[Type] = None
-    ) -> Dict[str, Any]:
-        def _get_all_supported_config_types(custom_config_types: List[Type]) -> Tuple[Type]:
-            intersection = set(ALL_COMPONENT_CONFIG_TYPES).intersection(custom_config_types)
-            if len(intersection) > 0:
-                raise ValueError(f"Types {intersection} already exist in the ALL_COMPONENT_TYPES")
-            supported_types = tuple(list(ALL_COMPONENT_CONFIG_TYPES) + list(custom_config_types))
-            return supported_types
+    def __init__(self, config_registry: Registry, component_registry: Registry) -> None:
+        self.config_registry = config_registry
+        self.component_registry = component_registry
 
-        if custom_config_types is None:
-            custom_config_types = []
-        all_config_types = _get_all_supported_config_types(custom_config_types)
-
-        components, _ = ComponentFactory._build_component(
+    def build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
+        components, _ = self._build_component(
             current_component_config=config_dict,
             component_config=config_dict,
             top_level_components={},
-            config_types=all_config_types,
             traversal_path=[],
         )
         return {name: components[name] for name in component_names}
 
-    @staticmethod
     def _build_component(
+        self,
         current_component_config: Union[Dict, List, Any],
         component_config: Union[Dict, List, Any],
-        config_types: Tuple[Type],
         top_level_components: Dict[str, Any],
         traversal_path: List,
     ) -> Any:
@@ -50,10 +37,9 @@ class ComponentFactory:
             # We first traverse the config for possible sub components that need to build beforehand.
             materialized_component_config = {}
             for sub_entity_key, sub_component_config_dict in current_component_config.items():
-                materialized_component_config[sub_entity_key], top_level_components = ComponentFactory._build_component(
+                materialized_component_config[sub_entity_key], top_level_components = self._build_component(
                     current_component_config=sub_component_config_dict,
                     component_config=component_config,
-                    config_types=config_types,
                     top_level_components=top_level_components,
                     traversal_path=traversal_path + [sub_entity_key],
                 )
@@ -61,11 +47,17 @@ class ComponentFactory:
             # if the config is component_config then we instantiate the component
             if ComponentFactory._is_component_config(config_dict=current_component_config):
                 # instantiate component config
-                current_component_config = ComponentFactory._instantiate_component_config(
-                    config_dict=materialized_component_config, config_types=config_types
+                component_key = current_component_config["component_key"]
+                variant_key = current_component_config["variant_key"]
+                current_component_config = self._instantiate_component_config(
+                    component_key=component_key,
+                    variant_key=variant_key,
+                    config_dict=materialized_component_config["config"],
                 )
                 # instantiate component
-                component = ComponentFactory._instantiate_component(component_config=current_component_config)
+                component = self._instantiate_component(
+                    component_key=component_key, variant_key=variant_key, component_config=current_component_config
+                )
                 print(" -> ".join(traversal_path) + ":", component)
 
                 # if the component is a top level component, then we add it to the top level components dictionary
@@ -80,10 +72,9 @@ class ComponentFactory:
             if ComponentFactory._is_reference_config(config_dict=current_component_config):
                 referenced_entity_key = current_component_config["instance_key"]
                 if referenced_entity_key not in top_level_components:
-                    materialized_referenced_component, top_level_components = ComponentFactory._build_component(
+                    materialized_referenced_component, top_level_components = self._build_component(
                         current_component_config=component_config[referenced_entity_key],
                         component_config=component_config[referenced_entity_key],
-                        config_types=config_types,
                         top_level_components=top_level_components,
                         traversal_path=[referenced_entity_key],
                     )
@@ -99,10 +90,9 @@ class ComponentFactory:
         elif isinstance(current_component_config, list):
             materialized_component_configs = []
             for sub_entity_key, sub_component_config in enumerate(current_component_config):
-                materialized_component_config, top_level_components = ComponentFactory._build_component(
+                materialized_component_config, top_level_components = self._build_component(
                     current_component_config=sub_component_config,
                     component_config=component_config,
-                    config_types=config_types,
                     top_level_components=top_level_components,
                     traversal_path=traversal_path + [str(sub_entity_key)],
                 )
@@ -117,20 +107,19 @@ class ComponentFactory:
     @staticmethod
     def _is_component_config(config_dict: Dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
-        return "type_hint" in config_dict.keys()
+        return "component_key" in config_dict.keys()
 
     @staticmethod
     def _is_reference_config(config_dict: Dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return {"instance_key", "pass_type"} == config_dict.keys()
 
-    @staticmethod
-    def _instantiate_component_config(config_dict: Dict, config_types: Tuple[Type]) -> CompConfigABC:
-        comp_config = RootModel[Union[config_types]].model_validate(config_dict, strict=True).root
+    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
+        component_config_type: BaseModel = self.config_registry.get_entity(component_key, variant_key)
+        comp_config = component_config_type.model_validate(config_dict, strict=True)
         return comp_config
 
-    @staticmethod
-    def _instantiate_component(component_config: CompConfigABC) -> Any:
-        component_type = component_config.type_hint.value
-        component = component_type(**component_config.model_dump(exclude=["type_hint"]))
+    def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
+        component_type = self.component_registry.get_entity(component_key, variant_key)
+        component = component_type(**component_config.model_dump())
         return component
