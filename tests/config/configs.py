@@ -1,6 +1,6 @@
 from abc import ABC
 from enum import Enum
-from typing import Annotated, Any, List, Literal
+from typing import Annotated, Any, List
 
 from pydantic import BaseModel, GetCoreSchemaHandler, validator
 from pydantic_core import core_schema
@@ -42,48 +42,43 @@ class CompConfigABC(BaseModel, ABC):
         return key
 
 
-class PassType(Enum):
-    BY_VALUE = "by_value"
-    BY_REFERENCE = "by_reference"
+# class PassType(Enum):
+#     BY_VALUE = "by_value"
+#     BY_REFERENCE = "by_reference"
 
 
-class ReferenceConfig(BaseModel):
-    instance_key: str
-    pass_type: PassType
+# class ReferenceConfig(BaseModel):
+#     instance_key: str
+#     pass_type: PassType
 
-    @validator("pass_type", pre=True)
-    def _string_to_enum(cls, key: str):
-        if isinstance(key, str):
-            try:
-                key = PassType[key]
-            except KeyError as e:
-                raise ValueError(f"{key} is not a valid PassType") from e
-            return key
-        return key
+#     @validator("pass_type", pre=True)
+#     def _string_to_enum(cls, key: str):
+#         if isinstance(key, str):
+#             try:
+#                 key = PassType[key]
+#             except KeyError as e:
+#                 raise ValueError(f"{key} is not a valid PassType") from e
+#             return key
+#         return key
 
 
-class CompVConfig(CompConfigABC):
-    type_hint: Literal[ComponentTypes.COMP_V]
+class CompVConfig(BaseModel):
     val_v: str
 
 
-class CompWConfig(CompConfigABC):
-    type_hint: Literal[ComponentTypes.COMP_W]
+class CompWConfig(BaseModel):
     val_w: str
 
 
-class CompXConfig(CompConfigABC):
-    type_hint: Literal[ComponentTypes.COMP_X]
+class CompXConfig(BaseModel):
     val_x: str
     single_dependency: PydanticComponen_V_W_X_IF_Type
 
 
-class CompYConfig(CompConfigABC):
-    type_hint: Literal[ComponentTypes.COMP_Y]
+class CompYConfig(BaseModel):
     val_y: str
     multi_dependency: List[PydanticComponen_V_W_X_IF_Type]
 
 
-class CompZConfig(CompConfigABC):
-    type_hint: Literal[ComponentTypes.COMP_Z]
+class CompZConfig(BaseModel):
     val_z: str
