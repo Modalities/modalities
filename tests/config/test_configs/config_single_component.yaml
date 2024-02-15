@@ -1,0 +1,5 @@
+custom_comp_1:
+    component_key: COMP_V
+    variant_key: default
+    config:
+        val_v: "some value v"

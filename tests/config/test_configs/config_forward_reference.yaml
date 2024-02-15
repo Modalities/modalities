@@ -1,17 +1,27 @@
 comp_y_1:
-    type_hint: COMP_Y
-    val_y: "some other value y"
-    multi_dependency:
-        - type_hint: COMP_W
-          val_w: "some other value w"
-        - type_hint: COMP_V
-          val_v: "some other value v"
-        - instance_key: comp_x_1
-          pass_type: BY_REFERENCE
+    component_key: COMP_Y
+    variant_key: default
+    config:
+      val_y: "some other value y"
+      multi_dependency:
+          - component_key: COMP_W
+            variant_key: default
+            config:
+              val_w: "some other value w"
+          - component_key: COMP_V
+            variant_key: default
+            config:
+              val_v: "some other value v"
+          - instance_key: comp_x_1
+            pass_type: BY_REFERENCE
 
 comp_x_1:
-    type_hint: COMP_X
-    val_x: "some other value X"
-    single_dependency:
-        type_hint: COMP_W
-        val_w: "some other value w"
+    component_key: COMP_X
+    variant_key: default
+    config:
+      val_x: "some other value X"
+      single_dependency:
+          component_key: COMP_W
+          variant_key: default
+          config:
+            val_w: "some other value w"
