@@ -116,7 +116,7 @@ class ComponentFactory:
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
         component_config_type: BaseModel = self.config_registry.get_entity(component_key, variant_key)
-        comp_config = component_config_type.model_validate(config_dict, strict=True)
+        comp_config = component_config_type(**config_dict, strict=True)
         return comp_config
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
