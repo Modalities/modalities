@@ -45,11 +45,9 @@ class Checkpointing(CheckpointingIF):
         self,
         checkpointing_strategy: CheckpointingStrategyIF,
         checkpointing_execution: CheckpointingExecutionIF,
-        num_ranks: int,
     ):
         self.checkpointing_strategy = checkpointing_strategy
         self.checkpointing_execution = checkpointing_execution
-        self.num_ranks = num_ranks
 
     def save_checkpoint(
         self,
