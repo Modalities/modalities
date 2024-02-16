@@ -25,6 +25,7 @@ dependencies = [
     "scipy",
     "torchaudio",
     "pillow",
+    "ffmpeg"
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Dict, Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 import numpy as np
 import torch
@@ -37,7 +37,6 @@ class FixSizedCodec(Codec[T]):
 
 
 class HfTokenizerCodec(FixSizedCodec[str]):
-
     TOKEN_SIZE_IN_BYTES = 4
 
     @classmethod
@@ -47,7 +46,6 @@ class HfTokenizerCodec(FixSizedCodec[str]):
     def __init__(
         self, tokenizer: PreTrainedTokenizer, max_length: Optional[int] = None, add_eos_token: bool = True
     ) -> None:
-
         # instantiate
         self.tokenizer = tokenizer
         self.add_eos_token = add_eos_token
@@ -86,7 +84,6 @@ class HfTokenizerCodec(FixSizedCodec[str]):
 
 
 class PillowImageCodec(Codec[str]):
-
     def __init__(self, save_format: str = "png") -> None:
         self._format = save_format
 
@@ -115,6 +112,19 @@ class TorchaudioAudioCodec(Codec[str]):
             hop_length=160,
         )
         self.target_sample_rate = 16_000
+
+    def load_audio(
+        self,
+        audio_file_path: str,
+    ) -> torch.Tensor:
+        audio, sample_rate = torchaudio.load(
+            audio_file_path,
+        )
+
+        return (
+            audio.mean(dim=0),
+            sample_rate,
+        )
 
     def extract_log_mel_spectrogram(
         self,
@@ -151,16 +161,8 @@ class TorchaudioAudioCodec(Codec[str]):
         self,
         audio_file_path: str,
     ) -> bytes:
-
-        audio, sample_rate = torchaudio.load(
+        audio, sample_rate = self.load_audio(
             audio_file_path,
-        )
-        audio = (
-            audio.mean(
-                dim=0,
-            )
-            if audio.shape[0] == 2
-            else audio
         )
 
         audio = (
