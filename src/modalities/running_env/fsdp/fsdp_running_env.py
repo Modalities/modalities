@@ -3,11 +3,10 @@ from typing import List
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, conint, validator
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
-from modalities.config.lookup_types import LookupEnum
 from modalities.config.types import ProcessGroupBackendType
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
@@ -59,7 +58,7 @@ class FSDPRunningEnv(RunningEnv):
 
 class FSDPRunningEnvConfig(BaseModel):
     process_group_backend: ProcessGroupBackendType
-    local_rank: int
+    local_rank: conint(ge=0)
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
     block_names: List[str]
@@ -80,11 +79,6 @@ class FSDPRunningEnvConfig(BaseModel):
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
-
-class RunningEnvTypes(LookupEnum):
-    FSDPRunningEnv = FSDPRunningEnv
-
-
-class RunningEnvConfig(BaseModel):
-    type_hint: RunningEnvTypes
-    config: FSDPRunningEnvConfig
+    @validator("process_group_backend", pre=True, always=True)
+    def parse_process_group_backend_by_name(cls, name):
+        return ProcessGroupBackendType[name]
