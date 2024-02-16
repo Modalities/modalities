@@ -2,12 +2,19 @@ import torch
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
-from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from modalities.checkpointing.checkpointing import Checkpointing
+from modalities.checkpointing.checkpointing_factory import CheckpointingExecutionFactory
 from modalities.checkpointing.checkpointing_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.config.config_new import CLMCrossEntropyLossConfig
+from modalities.config.config_new import (
+    CheckpointingConfig,
+    CLMCrossEntropyLossConfig,
+    FSDPToDiscCheckpointingConfig,
+    SaveEveryKStepsCheckpointingStrategyConfig,
+    SaveKMostRecentCheckpointsStrategyConfig,
+)
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
@@ -17,6 +24,7 @@ from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
 from modalities.registry.registry import Registry
+from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig
 
 
 class RegistryFactory:
@@ -52,6 +60,8 @@ class RegistryFactory:
             # data loaders
             ("data_loader", "llm_data_loader", LLMDataLoader),
             ("data_loader", "repeating_data_loader", RepeatingDataLoader),
+            # checkpointing
+            ("checkpointing", "default", Checkpointing),
             # checkpointing strategies
             (
                 "checkpointing_strategy",
@@ -60,7 +70,13 @@ class RegistryFactory:
             ),
             ("checkpointing_strategy", "save_k_most_recent_checkpoints_strategy", SaveKMostRecentCheckpointsStrategy),
             # checkpointing execution
-            ("checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointing),
+            (
+                "checkpointing_execution",
+                "fsdp_to_disc_checkpointing",
+                CheckpointingExecutionFactory.get_fsdp_to_disc_checkpointing,
+            ),
+            # running env
+            ("running_env", "fsdp_running_env", FSDPRunningEnv),
         ]
         registry = Registry()
         for component in components:
@@ -72,6 +88,23 @@ class RegistryFactory:
         components = [
             # losses
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLossConfig),
+            # checkpointing
+            ("checkpointing", "default", CheckpointingConfig),
+            # checkpointing strategies
+            (
+                "checkpointing_strategy",
+                "save_every_k_steps_checkpointing_strategy",
+                SaveEveryKStepsCheckpointingStrategyConfig,
+            ),
+            (
+                "checkpointing_strategy",
+                "save_k_most_recent_checkpoints_strategy",
+                SaveKMostRecentCheckpointsStrategyConfig,
+            ),
+            # checkpointing execution
+            ("checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointingConfig),
+            # running env
+            ("running_env", "fsdp_running_env", FSDPRunningEnvConfig),
         ]
         registry = Registry()
         for component in components:
