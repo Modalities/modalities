@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 import logging
+import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Type
 
 import click
 import click_pathlib
@@ -14,10 +15,9 @@ from torch.optim import Optimizer
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
-from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
+from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
-from modalities.config.resolver_register import ResolverRegister
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -34,6 +34,7 @@ from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import 
 )
 from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
 from modalities.loss_functions import Loss
+from modalities.registry.registry_factory import RegistryFactory
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
@@ -54,8 +55,7 @@ def main() -> None:
 )
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    config = AppConfig.model_validate(config_dict)
-    main = Main(config)
+    main = Main(config_dict)
     main.run()
 
 
@@ -150,20 +150,45 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
+    int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
+
+    def resolver_fun(var_name: str) -> int:
+        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
+
+    OmegaConf.register_new_resolver("modalities_env", resolver_fun)
+
     cfg = OmegaConf.load(config_file_path)
-    logging.info(f"Config\n {OmegaConf.to_yaml(cfg, resolve=True)}")
-    return OmegaConf.to_container(cfg, resolve=True)
+    config_dict = OmegaConf.to_container(cfg, resolve=True)
+    return config_dict
 
 
 class Main:
-    def __init__(self, config: AppConfig) -> None:
-        self.config = config
+    def __init__(
+        self, config_dict: Dict, component_names: List[str] = None, custom_config_types: List[Type] = None
+    ) -> None:
+        self.config_dict = config_dict
         self.experiment_id = get_date_of_run()
+        self.custom_config_types = custom_config_types if custom_config_types is not None else []
+        self.component_names = (
+            component_names if component_names is not None else ["running_env", "loss", "checkpointing"]
+        )
 
-        self.resolvers = ResolverRegister(config=config)
-        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
+        component_registry = RegistryFactory.get_component_registry()
+        component_config_registry = RegistryFactory.get_config_registry()
+        self.component_factory = ComponentFactory(
+            config_registry=component_config_registry, component_registry=component_registry
+        )
+
+    def build_component_dict(self) -> Dict:
+        component_dict = self.component_factory.build_config(
+            config_dict=self.config_dict, component_names=self.component_names
+        )
+        return component_dict
 
     def run(self):
+        self.build_component_dict()
+
+        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
         with self.running_env as running_env:
             (
                 gym,
@@ -186,17 +211,11 @@ class Main:
             )
 
     def construct_components(
-        self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
+        self, resolvers, config: AppConfig, running_env: RunningEnv
     ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
         # Checkpointing
 
-        checkpointing = CheckpointingFactory.get_checkpointing(
-            resolvers=self.resolvers,
-            config=config.checkpointing,
-            running_env=running_env,
-            experiment_id=self.experiment_id,
-            num_ranks=config.training.world_size,
-        )
+        checkpointing = None  # TODO pass in the component
 
         # Model and optimizer
         wrapped_model, optimizer = self.get_model_and_optimizer(
