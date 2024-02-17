@@ -145,7 +145,7 @@ model:
   config:
     sample_key: "input_ids" # TODO reference this
     prediction_key: "logits" # TODO reference this
-    block_size: 256 # TODO reference this
+    block_size: 256  # TODO reference this (same as sequence length)
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head: 4
@@ -184,10 +184,24 @@ tokenizer:
   config:
     tokenizer_file: data/tokenizer/tokenizer_gpt2.json
 
-sampler:
-  component_key: sampler
-  variant_key: distributed_sampler
+# sampler:
+#   component_key: sampler
+#   variant_key: distributed_sampler
+#   config:
+#     rank: ${modalities_env:RANK}
+#     num_replicas: ${modalities_env:WORLD_SIZE}
+#     shuffle: true
+
+  
+dataset:  
+  component_key: dataset
+  variant_key: mem_map_dataset
   config:
-    rank: ${training.global_rank}
-    num_replicas: ${training.world_size}
-    shuffle: true
+    raw_data_path: data/lorem_ipsum.jsonl
+    index_path: data/lorem_ipsum.idx
+    block_size: 256 # TODO reference this (same as sequence length)
+    jq_pattern: ".text"
+    sample_key: "input_ids" # TODO reference this
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE

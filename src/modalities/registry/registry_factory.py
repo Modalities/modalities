@@ -12,15 +12,18 @@ from modalities.config.config_new import (
     AdamWOptimizerConfig,
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
+    DistributedSamplerConfig,
     FSDPToDiscCheckpointingConfig,
     GPT2TokenizerFastConfig,
+    MemMapDatasetConfig,
+    OpenGPTXMMapDatasetConfig,
+    PackedMemMapDatasetContinuousConfig,
+    PackedMemMapDatasetMegatronConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
 )
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
-from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
-from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
-from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
+from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -48,12 +51,11 @@ class RegistryFactory:
             # tokenizers
             ("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFast),
             ("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast),
-            # dataset types
-            ("dataset", "mem_map_dataset", MemMapDataset),
-            ("dataset", "packed_mem_map_dataset_continuous", PackedMemMapDatasetContinuous),
-            ("dataset", "packed_mem_map_dataset_megatron", PackedMemMapDatasetMegatron),
-            ("dataset", "mmap_indexed_dataset", MMapIndexedDatasetBuilder),
-            ("dataset", "open_gptx_mmap_dataset", OpenGPTXMMapDataset),
+            # datasets
+            ("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset),
+            ("dataset", "packed_mem_map_dataset_continuous", DatasetFactory.get_packed_mem_map_dataset_continuous),
+            ("dataset", "packed_mem_map_dataset_megatron", DatasetFactory.get_packed_mem_map_dataset_megatron),
+            ("dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset),
             # samplers
             ("sampler", "distributed_sampler", DistributedSampler),
             # batch samplers
@@ -97,6 +99,13 @@ class RegistryFactory:
             ("optimizer", "adam_w", AdamWOptimizerConfig),
             # tokenizers
             ("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFastConfig),
+            # datasets
+            ("dataset", "mem_map_dataset", MemMapDatasetConfig),
+            ("dataset", "packed_mem_map_dataset_continuous", PackedMemMapDatasetContinuousConfig),
+            ("dataset", "packed_mem_map_dataset_megatron", PackedMemMapDatasetMegatronConfig),
+            ("dataset", "open_gptx_mmap_dataset", OpenGPTXMMapDatasetConfig),
+            # samplers
+            ("sampler", "distributed_sampler", DistributedSamplerConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies

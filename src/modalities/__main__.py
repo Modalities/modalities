@@ -172,7 +172,7 @@ class Main:
         self.component_names = (
             component_names
             if component_names is not None
-            else ["running_env", "loss", "checkpointing", "model", "optimizer", "tokenizer"]
+            else ["running_env", "loss", "checkpointing", "model", "optimizer", "tokenizer", "dataset"]
         )
 
         component_registry = RegistryFactory.get_component_registry()

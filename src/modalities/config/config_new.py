@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import torch.nn as nn
-from pydantic import BaseModel, GetCoreSchemaHandler, PositiveInt, conint
+from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint
 from pydantic_core import core_schema
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
@@ -79,10 +80,28 @@ class PydanticModelIF:
         )
 
 
+class PydanticTokenizerIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(PreTrainedTokenizerFast),
+            python_schema=core_schema.is_instance_schema(PreTrainedTokenizerFast),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
 PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
+PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF]
 
 
 class PassType(LookupEnum):
@@ -131,3 +150,42 @@ class AdamWOptimizerConfig(BaseModel):
 class GPT2TokenizerFastConfig(BaseModel):
     # Note: huggingface tokenizers expect file path as string
     tokenizer_file: str
+
+
+class DistributedSamplerConfig(BaseModel):
+    rank: conint(ge=0)
+    num_replicas: conint(ge=0)
+    shuffle: bool
+
+
+class MemMapDatasetConfig(BaseModel):
+    raw_data_path: FilePath
+    index_path: Optional[FilePath] = None
+    block_size: conint(gt=0)
+    tokenizer: PydanticTokenizerIFType
+    jq_pattern: str
+    sample_key: str
+
+
+class PackedMemMapDatasetContinuousConfig(BaseModel):
+    raw_data_path: Path
+    block_size: conint(gt=0)
+    sample_key: str
+
+
+class PackedMemMapDatasetMegatronConfig(BaseModel):
+    raw_data_path: Path
+    block_size: conint(gt=0)
+    sample_key: str
+
+
+class MMapIndexedDatasetConfig(BaseModel):
+    path: Path
+    skip_warmup: bool
+
+
+class OpenGPTXMMapDatasetConfig(BaseModel):
+    num_samples: conint(ge=1)
+    path: FilePath
+    sample_key: str
+    sequence_len: PositiveInt
