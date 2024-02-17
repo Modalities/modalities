@@ -10,22 +10,26 @@ from modalities.checkpointing.checkpointing_strategies import (
 )
 from modalities.config.config_new import (
     AdamWOptimizerConfig,
+    BatchSamplerConfig,
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
     DistributedSamplerConfig,
     FSDPToDiscCheckpointingConfig,
+    GPT2LLMCollateFnConfig,
     GPT2TokenizerFastConfig,
     MemMapDatasetConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
+    ResumableBatchSamplerConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
 )
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.loss_functions import CLMCrossEntropyLoss
-from modalities.models.gpt2.collator import GPT2LLMCollator
+from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -59,9 +63,10 @@ class RegistryFactory:
             # samplers
             ("sampler", "distributed_sampler", DistributedSampler),
             # batch samplers
-            ("batch_sampler", "batch_sampler", BatchSampler),
+            ("batch_sampler", "default", BatchSampler),
+            ("batch_sampler", "resumable_batch_sampler", ResumableBatchSampler),
             # collators
-            ("collator", "gpt2_llm_collator", GPT2LLMCollator),
+            ("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn),
             # data loaders
             ("data_loader", "llm_data_loader", LLMDataLoader),
             ("data_loader", "repeating_data_loader", RepeatingDataLoader),
@@ -106,6 +111,11 @@ class RegistryFactory:
             ("dataset", "open_gptx_mmap_dataset", OpenGPTXMMapDatasetConfig),
             # samplers
             ("sampler", "distributed_sampler", DistributedSamplerConfig),
+            # batch samplers
+            ("batch_sampler", "default", BatchSamplerConfig),
+            ("batch_sampler", "resumable_batch_sampler", ResumableBatchSamplerConfig),
+            # collators
+            ("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFnConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies

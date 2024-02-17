@@ -236,6 +236,11 @@ class BatchSamplerConfig(BaseModel):
     drop_last: bool
 
 
+class ResumableBatchSamplerConfig(BaseModel):
+    sampler: PydanticSamplerIF
+    start_index: conint(gt=0)
+
+
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
