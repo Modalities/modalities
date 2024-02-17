@@ -1,4 +1,3 @@
-from dataclasses import field
 from typing import Dict, List
 
 import torch
@@ -6,9 +5,8 @@ import torch
 from modalities.batch import DatasetBatch
 
 
-class GPT2LLMCollator:
+class GPT2LLMCollateFn:
     def __init__(self, sample_key: str, target_key: str):
-        self.device: torch.device = field(default_factory=lambda: torch.device("cpu"))
         self.sample_key = sample_key
         self.target_key = target_key
 

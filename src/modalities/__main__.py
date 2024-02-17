@@ -182,6 +182,7 @@ class Main:
                 "dataset",
                 "sampler",
                 "batch_sampler",
+                "collate_fn",
             ]
         )
 

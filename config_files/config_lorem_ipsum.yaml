@@ -218,3 +218,10 @@ batch_sampler:
     sampler:
       instance_key: sampler
       pass_type: BY_REFERENCE
+  
+collate_fn:  
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: input_ids # TODO reference this
+    target_key: target_ids # TODO reference this

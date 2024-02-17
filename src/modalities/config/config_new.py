@@ -234,3 +234,8 @@ class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIF
     batch_size: conint(gt=0)
     drop_last: bool
+
+
+class GPT2LLMCollateFnConfig(BaseModel):
+    sample_key: str
+    target_key: str
