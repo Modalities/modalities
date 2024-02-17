@@ -184,13 +184,16 @@ tokenizer:
   config:
     tokenizer_file: data/tokenizer/tokenizer_gpt2.json
 
-# sampler:
-#   component_key: sampler
-#   variant_key: distributed_sampler
-#   config:
-#     rank: ${modalities_env:RANK}
-#     num_replicas: ${modalities_env:WORLD_SIZE}
-#     shuffle: true
+sampler:
+  component_key: sampler
+  variant_key: distributed_sampler
+  config:
+    rank: ${modalities_env:RANK}
+    num_replicas: ${modalities_env:WORLD_SIZE}
+    shuffle: true
+    dataset:
+      instance_key: dataset
+      pass_type: BY_REFERENCE
 
   
 dataset:  
@@ -204,4 +207,14 @@ dataset:
     sample_key: "input_ids" # TODO reference this
     tokenizer:
       instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+batch_sampler:
+  component_key: batch_sampler
+  variant_key: default
+  config:
+    batch_size: 3
+    drop_last: false
+    sampler:
+      instance_key: sampler
       pass_type: BY_REFERENCE

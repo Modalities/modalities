@@ -4,6 +4,7 @@ from typing import Annotated, Any, Optional
 import torch.nn as nn
 from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint
 from pydantic_core import core_schema
+from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
@@ -115,12 +116,30 @@ class PydanticDatasetIF:
         )
 
 
+class PydanticSamplerIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(Sampler),
+            python_schema=core_schema.is_instance_schema(Sampler),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
 PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF]
 PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
+PydanticSamplerIFType = Annotated[Sampler, PydanticSamplerIF]
 
 
 class PassType(LookupEnum):
@@ -209,3 +228,9 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
     path: FilePath
     sample_key: str
     sequence_len: PositiveInt
+
+
+class BatchSamplerConfig(BaseModel):
+    sampler: PydanticSamplerIF
+    batch_size: conint(gt=0)
+    drop_last: bool
