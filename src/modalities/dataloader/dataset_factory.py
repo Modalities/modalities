@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import FilePath
 from transformers import PreTrainedTokenizer
 
+from modalities.dataloader.dataloader_factory import OpenGPTXDatasetWrapper
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 
@@ -18,6 +19,10 @@ class DatasetFactory:
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
     ) -> MemMapDataset:
+        # TODO this was part of the old Dataloader implementation.
+        # we need to check if this is actually wanted generally.
+        tokenizer.pad_token = tokenizer.eos_token
+
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
             block_size=block_size,
@@ -56,4 +61,9 @@ class DatasetFactory:
         dataset = OpenGPTXMMapDataset(
             sample_key=sample_key, path=path, sequence_len=sequence_len, num_samples=num_samples, seed=seed
         )
-        return dataset
+
+        # BUG: Sometimes the dataset genereated by the OpenGPTXMMap implementation has too many samples.
+        # This is a workaround to fix the dataset to the size, as specified in the config!
+        # TODO: Fix the OpenGPTX implementation and get rid of this hack.
+        dataset_wrapped = OpenGPTXDatasetWrapper(open_gptx_dataset=dataset, num_samples=num_samples)
+        return dataset_wrapped
