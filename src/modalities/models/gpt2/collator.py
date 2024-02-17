@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Dict, List
 
 import torch
@@ -5,7 +6,13 @@ import torch
 from modalities.batch import DatasetBatch
 
 
-class GPT2LLMCollateFn:
+class CollateFnIF(ABC):
+    @abstractmethod
+    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+        raise NotImplementedError
+
+
+class GPT2LLMCollateFn(CollateFnIF):
     def __init__(self, sample_key: str, target_key: str):
         self.sample_key = sample_key
         self.target_key = target_key
