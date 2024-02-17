@@ -17,6 +17,7 @@ from modalities.config.config_new import (
     FSDPToDiscCheckpointingConfig,
     GPT2LLMCollateFnConfig,
     GPT2TokenizerFastConfig,
+    LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
@@ -116,6 +117,8 @@ class RegistryFactory:
             ("batch_sampler", "resumable_batch_sampler", ResumableBatchSamplerConfig),
             # collators
             ("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFnConfig),
+            # data loaders
+            ("data_loader", "llm_data_loader", LLMDataLoaderConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies

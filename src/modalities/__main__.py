@@ -183,6 +183,7 @@ class Main:
                 "sampler",
                 "batch_sampler",
                 "collate_fn",
+                "train_dataloader",
             ]
         )
 

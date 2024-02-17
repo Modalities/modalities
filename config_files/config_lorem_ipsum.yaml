@@ -225,3 +225,23 @@ collate_fn:
   config:
     sample_key: input_ids # TODO reference this
     target_key: target_ids # TODO reference this
+
+
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: llm_data_loader
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "train"
+    dataset:
+      instance_key: dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      instance_key: batch_sampler
+      pass_type: BY_REFERENCE 
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE 

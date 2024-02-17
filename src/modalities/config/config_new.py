@@ -11,6 +11,7 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_types import LookupEnum
+from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.running_env import RunningEnv
 
 
@@ -133,6 +134,23 @@ class PydanticSamplerIF:
         )
 
 
+class PydanticCollateFnIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(CollateFnIF),
+            python_schema=core_schema.is_instance_schema(CollateFnIF),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
@@ -140,6 +158,7 @@ PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF]
 PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
 PydanticSamplerIFType = Annotated[Sampler, PydanticSamplerIF]
+PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticCollateFnIF]
 
 
 class PassType(LookupEnum):
@@ -244,3 +263,16 @@ class ResumableBatchSamplerConfig(BaseModel):
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
+
+
+class CudaKwargsConfig(BaseModel):
+    num_workers: conint(ge=0)
+    pin_memory: bool
+    shuffle: bool
+
+
+class LLMDataLoaderConfig(CudaKwargsConfig):
+    dataloader_tag: str
+    dataset: PydanticDatasetIF
+    batch_sampler: PydanticSamplerIF
+    collate_fn: PydanticCollateFnIF
