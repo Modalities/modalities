@@ -4,6 +4,7 @@ from typing import Annotated, Any, Optional
 import torch.nn as nn
 from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint
 from pydantic_core import core_schema
+from torch.utils.data.dataset import Dataset
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
@@ -97,11 +98,29 @@ class PydanticTokenizerIF:
         )
 
 
+class PydanticDatasetIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(Dataset),
+            python_schema=core_schema.is_instance_schema(Dataset),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
 PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF]
+PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
 
 
 class PassType(LookupEnum):
@@ -156,6 +175,7 @@ class DistributedSamplerConfig(BaseModel):
     rank: conint(ge=0)
     num_replicas: conint(ge=0)
     shuffle: bool
+    dataset: PydanticDatasetIFType
 
 
 class MemMapDatasetConfig(BaseModel):
