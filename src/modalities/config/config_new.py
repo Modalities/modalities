@@ -126,3 +126,8 @@ class CheckpointingConfig(BaseModel):
 class AdamWOptimizerConfig(BaseModel):
     lr: float
     model: PydanticModelIFType
+
+
+class GPT2TokenizerFastConfig(BaseModel):
+    # Note: huggingface tokenizers expect file path as string
+    tokenizer_file: str

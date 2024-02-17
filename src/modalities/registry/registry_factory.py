@@ -13,6 +13,7 @@ from modalities.config.config_new import (
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
     FSDPToDiscCheckpointingConfig,
+    GPT2TokenizerFastConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
 )
@@ -94,6 +95,8 @@ class RegistryFactory:
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLossConfig),
             # optmizers
             ("optimizer", "adam_w", AdamWOptimizerConfig),
+            # tokenizers
+            ("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFastConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies

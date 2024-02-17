@@ -139,27 +139,28 @@ running_env:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-# model:
-#   type_hint: GPT2LLM
-#   config:
-#     sample_key: ${data.sample_key}
-#     prediction_key: "logits"
-#     block_size: ${data.sequence_len}
-#     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-#     n_layer: 2
-#     n_head: 4
-#     ffn_hidden: 128
-#     n_embd: 128
-#     dropout: 0.0
-#     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-#     attention:
-#       attention_type: default_attention # pytorch_flash_attention
-#       scaling_factor: 3
-#     activation: gelu
-#     epsilon: 1e-5
-#     weight_init:
-#       mean: 0.0
-#       std: 0.02
+model:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: "input_ids" # TODO reference this
+    prediction_key: "logits" # TODO reference this
+    block_size: 256 # TODO reference this
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 2
+    n_head: 4
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention:
+      attention_type: default_attention # pytorch_flash_attention
+      scaling_factor: 3
+    activation: gelu
+    epsilon: 1e-5
+    weight_init:
+      mean: 0.0
+      std: 0.02
 
 # scheduler:
 #   type_hint: StepLR
@@ -167,7 +168,26 @@ running_env:
 #     step_size: 1
 #     gamma: 0.1
 
-# optimizer:
-#   type_hint: AdamW
-#   config:
-#     lr: 0.0001
+optimizer:  
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0001
+    model: 
+      instance_key: model
+      pass_type: BY_REFERENCE
+
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: gpt2_tokenizer_fast
+  config:
+    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
+
+sampler:
+  component_key: sampler
+  variant_key: distributed_sampler
+  config:
+    rank: ${training.global_rank}
+    num_replicas: ${training.world_size}
+    shuffle: true
