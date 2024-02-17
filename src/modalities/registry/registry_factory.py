@@ -9,6 +9,7 @@ from modalities.checkpointing.checkpointing_strategies import (
     SaveKMostRecentCheckpointsStrategy,
 )
 from modalities.config.config_new import (
+    AdamWOptimizerConfig,
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
     FSDPToDiscCheckpointingConfig,
@@ -21,8 +22,9 @@ from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedData
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
-from modalities.models.gpt2.gpt2_model import GPT2LLM
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
+from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.registry.registry import Registry
 from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig
 
@@ -37,7 +39,7 @@ class RegistryFactory:
             # losses
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss),
             # optmizers
-            ("optimizer", "adamw", torch.optim.AdamW),
+            ("optimizer", "adam_w", OptimizerFactory.get_adam_w),
             # schedulers
             ("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR),
             ("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR),
@@ -86,8 +88,12 @@ class RegistryFactory:
     @staticmethod
     def get_config_registry() -> Registry:
         components = [
+            # models
+            ("model", "gpt2", GPT2LLMConfig),
             # losses
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLossConfig),
+            # optmizers
+            ("optimizer", "adam_w", AdamWOptimizerConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies

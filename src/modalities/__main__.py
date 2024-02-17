@@ -170,7 +170,9 @@ class Main:
         self.experiment_id = get_date_of_run()
         self.custom_config_types = custom_config_types if custom_config_types is not None else []
         self.component_names = (
-            component_names if component_names is not None else ["running_env", "loss", "checkpointing"]
+            component_names
+            if component_names is not None
+            else ["running_env", "loss", "checkpointing", "model", "optimizer"]
         )
 
         component_registry = RegistryFactory.get_component_registry()

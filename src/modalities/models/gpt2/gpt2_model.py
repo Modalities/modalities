@@ -34,7 +34,7 @@ class WeightInitailizationConfig(BaseModel):
     std: confloat(ge=0.0)
 
 
-class GPT2Config(BaseModel):
+class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
     block_size: conint(ge=1)
@@ -51,7 +51,7 @@ class GPT2Config(BaseModel):
     weight_init: WeightInitailizationConfig
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "GPT2Config":
+    def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
             [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):

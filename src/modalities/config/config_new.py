@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Annotated, Any
 
+import torch.nn as nn
 from pydantic import BaseModel, GetCoreSchemaHandler, PositiveInt, conint
 from pydantic_core import core_schema
 
@@ -61,9 +62,27 @@ class PydanticCheckpointingExecutionIF:
         )
 
 
+class PydanticModelIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(nn.Module),
+            python_schema=core_schema.is_instance_schema(nn.Module),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
+PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
 
 
 class PassType(LookupEnum):
@@ -102,3 +121,8 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
 class CheckpointingConfig(BaseModel):
     checkpointing_strategy: PydanticCheckpointingStrategyIFType
     checkpointing_execution: PydanticCheckpointingExecutionIFType
+
+
+class AdamWOptimizerConfig(BaseModel):
+    lr: float
+    model: PydanticModelIFType
