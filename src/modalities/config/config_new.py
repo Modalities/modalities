@@ -276,3 +276,9 @@ class LLMDataLoaderConfig(CudaKwargsConfig):
     dataset: PydanticDatasetIF
     batch_sampler: PydanticSamplerIF
     collate_fn: PydanticCollateFnIF
+
+
+class WandbMode(LookupEnum):
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    DISABLED = "DISABLED"

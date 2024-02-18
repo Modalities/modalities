@@ -29,6 +29,11 @@ from modalities.config.config_new import (
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.dataloader.samplers import ResumableBatchSampler
+from modalities.logging_broker.message_broker import MessageBroker
+from modalities.logging_broker.subscriber_impl.subscriber_factory import (
+    ProgressSubscriberFactory,
+    ResultsSubscriberFactory,
+)
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -88,6 +93,16 @@ class RegistryFactory:
             ),
             # running env
             ("running_env", "fsdp_running_env", FSDPRunningEnv),
+            # Progress subscriber
+            ("progress_subscriber", "dummy", ProgressSubscriberFactory.get_dummy_progress_subscriber),
+            ("progress_subscriber", "rich", ProgressSubscriberFactory.get_rich_progress_subscriber),
+            # Results subscriber
+            ("results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber),
+            ("results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber),
+            ("results_subscriber", "wandb", ResultsSubscriberFactory.get_wandb_result_subscriber),
+            # message broker
+            ("message_broker", "default", MessageBroker),
+            # Message publisher
         ]
         registry = Registry()
         for component in components:

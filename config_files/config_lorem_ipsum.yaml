@@ -1,105 +1,144 @@
+global_experiment_settings:
+  experiment_id: null
+  global_num_training_samples: 12
+  callback_interval_in_samples: 6
+  sequence_length: 256
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+  training:
+    run_mode: FROM_SCRATCH
+    global_num_seen_samples: 0
+  batching:
+    gradient_acc_step: 1
+    local_train_micro_batch_size: 3
+  performance_settings:
+    do_apply_activation_checkpointing: true
+  environment:
+    local_rank: ${modalities_env:LOCAL_RANK}
+    global_rank: ${modalities_env:RANK}
+    world_size: ${modalities_env:WORLD_SIZE}
 
 
-# modalities_setup:
-#   run_mode: FROM_SCRATCH
-#   settings:
-#     global_num_seen_samples: 0
+tokenizer:
+  component_key: tokenizer
+  variant_key: gpt2_tokenizer_fast
+  config:
+    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
 
-# wandb:
-#   project_name: modalities
-#   mode: OFFLINE
+collate_fn:  
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${global_experiment_settings.referencing_keys.sample_key}
+    target_key: ${global_experiment_settings.referencing_keys.target_key}
 
-# data:
-#   sample_key: "input_ids"
-#   target_key: "target_ids"
-#   sequence_len: 256
-#   train_dataloader:
-#     type_hint: LLMDataLoader
-#     config:
-#       num_workers: 2
-#       pin_memory: true
-#       shuffle: false
-#       dataloader_tag: "train"
-#       dataset:
-#         type_hint: MemMapDataset
-#         config:
-#           raw_data_path: data/lorem_ipsum.jsonl
-#           index_path: data/lorem_ipsum.idx
-#           block_size: ${data.sequence_len}
-#           jq_pattern: ".text"
-#           sample_key: ${data.sample_key}
-#           tokenizer:
-#             type_hint: GPT2TokenizerFast
-#             config:
-#               tokenizer_file: data/tokenizer/tokenizer_gpt2.json
-#       batch_sampler:
-#         type_hint: BatchSampler
-#         config:
-#           batch_size: 3
-#           drop_last: false
-#           sampler:
-#             type_hint: DistributedSampler
-#             config:
-#               rank: ${training.global_rank}
-#               num_replicas: ${training.world_size}
-#               shuffle: true
-#       collate_fn:
-#         type_hint: GPT2LLMCollator
-#         config:
-#           sample_key: ${data.sample_key}
-#           target_key: ${data.target_key}
-#   eval_dataloaders:
-#     - type_hint: LLMDataLoader
-#       config:
-#         num_workers: 2
-#         pin_memory: true
-#         shuffle: false
-#         dataloader_tag: "val"
-#         dataset: ${data.train_dataloader.config.dataset}
-#         batch_sampler:
-#           type_hint: BatchSampler
-#           config:
-#             batch_size: 3
-#             drop_last: false
-#             sampler:
-#               type_hint: DistributedSampler
-#               config:
-#                 rank: ${training.global_rank}
-#                 num_replicas: ${training.world_size}
-#                 shuffle: true
-#         collate_fn: ${data.train_dataloader.config.collate_fn}
-#     - type_hint: LLMDataLoader
-#       config:
-#         num_workers: 2
-#         pin_memory: true
-#         shuffle: false
-#         dataloader_tag: "test"
-#         dataset: ${data.train_dataloader.config.dataset}
-#         batch_sampler:
-#           type_hint: BatchSampler
-#           config:
-#             batch_size: 3
-#             drop_last: false
-#             sampler:
-#               type_hint: DistributedSampler
-#               config:
-#                 rank: ${training.global_rank}
-#                 num_replicas: ${training.world_size}
-#                 shuffle: true
-#         collate_fn: ${data.train_dataloader.config.collate_fn}
+train_dataset:  
+  component_key: dataset
+  variant_key: mem_map_dataset
+  config:
+    raw_data_path: data/lorem_ipsum.jsonl
+    index_path: data/lorem_ipsum.idx
+    block_size: ${global_experiment_settings.sequence_length}
+    jq_pattern: ".text"
+    sample_key:  ${global_experiment_settings.referencing_keys.sample_key}
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
 
-# training:
-#   process_group_backend: "nccl"
-#   global_num_training_samples: 12
-#   callback_interval_in_samples: 6
-#   local_rank: ${oc.env:LOCAL_RANK}
-#   global_rank: ${oc.env:RANK}
-#   world_size: ${oc.env:WORLD_SIZE}
-#   main_rank: 0
-#   local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
-#   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
-#   gradient_acc_step: 1
-#   do_apply_activation_checkpointing: True
+data:
+  train_dataloader:
+    component_key: data_loader
+    variant_key: llm_data_loader
+    config:
+      num_workers: 2
+      pin_memory: true
+      shuffle: false
+      dataloader_tag: "train"
+      dataset:
+        instance_key: train_dataset
+        pass_type: BY_REFERENCE
+      batch_sampler:
+        component_key: batch_sampler
+        variant_key: default
+        config:
+          batch_size: 3
+          drop_last: false
+          sampler:
+            component_key: sampler
+            variant_key: distributed_sampler
+            config:
+              rank: ${global_experiment_settings.environment.global_rank}
+              num_replicas: ${global_experiment_settings.environment.world_size}
+              shuffle: true
+              dataset:
+                instance_key: train_dataset
+                pass_type: BY_REFERENCE
+      collate_fn:
+        instance_key: collate_fn
+        pass_type: BY_REFERENCE
+  eval_dataloaders:
+    - component_key: data_loader
+      variant_key: llm_data_loader
+      config:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "val"
+        dataset:
+          instance_key: train_dataset
+          pass_type: BY_REFERENCE
+        batch_sampler:
+          component_key: batch_sampler
+          variant_key: default
+          config:
+            batch_size: 3
+            drop_last: false
+            sampler:
+              component_key: sampler
+              variant_key: distributed_sampler
+              config:
+                rank: ${global_experiment_settings.environment.global_rank}
+                num_replicas: ${global_experiment_settings.environment.world_size}
+                shuffle: false
+                dataset:
+                  instance_key: train_dataset
+                  pass_type: BY_REFERENCE
+        collate_fn:
+          instance_key: collate_fn
+          pass_type: BY_REFERENCE
+    - component_key: data_loader
+      variant_key: llm_data_loader
+      config:
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "test"
+        dataset:
+          instance_key: train_dataset
+          pass_type: BY_REFERENCE
+        batch_sampler:
+          component_key: batch_sampler
+          variant_key: default
+          config:
+            batch_size: 3
+            drop_last: false
+            sampler:
+              component_key: sampler
+              variant_key: distributed_sampler
+              config:
+                rank: ${global_experiment_settings.environment.global_rank}
+                num_replicas: ${global_experiment_settings.environment.world_size}
+                shuffle: false
+                dataset:
+                  instance_key: train_dataset
+                  pass_type: BY_REFERENCE
+
+        collate_fn:
+          instance_key: collate_fn
+          pass_type: BY_REFERENCE 
+
+
 
 checkpointing:
   component_key: checkpointing
@@ -115,7 +154,7 @@ checkpointing:
       variant_key: fsdp_to_disc_checkpointing
       config:
         checkpoint_path: data/checkpoints
-        global_rank: ${modalities_env:RANK}
+        global_rank: ${global_experiment_settings.environment.global_rank}
         experiment_id: "abc" # TODO set this via env var maybe?
         running_env:
           instance_key: running_env
@@ -134,7 +173,7 @@ running_env:
   variant_key: fsdp_running_env
   config:
     process_group_backend: nccl
-    local_rank: ${modalities_env:LOCAL_RANK}
+    local_rank: ${global_experiment_settings.environment.local_rank}
     mixed_precision_settings: FP_16
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
@@ -177,19 +216,12 @@ optimizer:
       instance_key: model
       pass_type: BY_REFERENCE
 
-
-tokenizer:
-  component_key: tokenizer
-  variant_key: gpt2_tokenizer_fast
-  config:
-    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
-
 sampler:
   component_key: sampler
   variant_key: distributed_sampler
   config:
-    rank: ${modalities_env:RANK}
-    num_replicas: ${modalities_env:WORLD_SIZE}
+    rank: ${global_experiment_settings.environment.global_rank}
+    num_replicas: ${global_experiment_settings.environment.world_size}
     shuffle: true
     dataset:
       instance_key: dataset
@@ -219,29 +251,61 @@ batch_sampler:
       instance_key: sampler
       pass_type: BY_REFERENCE
   
-collate_fn:  
-  component_key: collate_fn
-  variant_key: gpt_2_llm_collator
+
+
+# message subscriber
+
+batch_progress_subscriber:
+  component_key: message_subscriber
+  variant_key: rich_progress_subscriber
   config:
-    sample_key: input_ids # TODO reference this
-    target_key: target_ids # TODO reference this
-
-
-
-train_dataloader:
-  component_key: data_loader
-  variant_key: llm_data_loader
-  config:
-    num_workers: 2
-    pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
-    dataset:
-      instance_key: dataset
+    num_ranks: ${global_experiment_settings.environment.world_size}
+    train_split:
+      instance_key: train_dataset
       pass_type: BY_REFERENCE
-    batch_sampler:
-      instance_key: batch_sampler
-      pass_type: BY_REFERENCE 
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE 
+    eval_splits:
+      val:
+        instance_key: train_dataset
+        pass_type: BY_REFERENCE
+      test:
+        instance_key: train_dataset
+        pass_type: BY_REFERENCE
+
+    
+batch_progress_subscriber:
+  component_key: message_subscriber
+  variant_key: wandb_evaluation_result_subscriber
+  config:
+    num_ranks: ${global_experiment_settings.environment.world_size}
+    project: modalities
+    mode: OFFLINE
+    experiment_id: "abc" # TODO set this via env var maybe?
+
+    
+# message broker
+message_broker:
+  component_key: message_broker
+  variant_key: default
+  config: {}
+
+# message publisher
+batch_progress_publisher:
+  component_key: message_publisher
+  variant_key: default
+  config:
+    message_broker:
+      instance_key: message_broker
+      pass_type: BY_REFERENCE
+    global_rank: ${global_experiment_settings.environment.global_rank}
+    local_rank: ${global_experiment_settings.environment.local_rank}
+
+evaluation_result_publisher:
+  component_key: message_publisher
+  variant_key: default
+  config:
+    message_broker:
+      instance_key: message_broker
+      pass_type: BY_REFERENCE
+    global_rank: ${global_experiment_settings.environment.global_rank}
+    local_rank: ${global_experiment_settings.environment.local_rank}
+
