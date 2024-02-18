@@ -7,9 +7,10 @@ from rich.panel import Panel
 
 import wandb
 from modalities.batch import EvaluationResultBatch
+from modalities.config.config import AppConfig, WandbConfig
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.config.config import AppConfig, WandbConfig
+
 
 class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def consume_message(self, message: Message[EvaluationResultBatch]):
@@ -49,8 +50,15 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber object for the WandBEvaluationResult observable."""
 
-    def __init__(self, num_ranks: int, project: str, experiment_id: str, mode: WandbConfig.WandbMode, dir: Path, 
-                 experiment_config: Optional[AppConfig] = None) -> None:
+    def __init__(
+        self,
+        num_ranks: int,
+        project: str,
+        experiment_id: str,
+        mode: WandbConfig.WandbMode,
+        directory: Path,
+        experiment_config: Optional[AppConfig] = None,
+    ) -> None:
         super().__init__()
         self.num_ranks = num_ranks
 
@@ -58,7 +66,9 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         # if experiment_config is not None:
         #     experiment_config_json = experiment_config.model_dump(mode="json")
 
-        wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=dir, config=experiment_config)
+        wandb.init(
+            project=project, name=experiment_id, mode=mode.value.lower(), dir=directory, config=experiment_config
+        )
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
@@ -82,6 +92,4 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             f"{eval_result.dataloader_tag} {metric_key}": metric_values
             for metric_key, metric_values in eval_result.throughput_metrics.items()
         }
-        wandb.log(
-            data=throughput_metrics, step=eval_result.global_train_sample_id + 1
-        ) 
+        wandb.log(data=throughput_metrics, step=eval_result.global_train_sample_id + 1)
