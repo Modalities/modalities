@@ -114,6 +114,11 @@ def llm_data_loader_mock():
 
 
 @pytest.fixture(scope="function")
+def llm_data_loader_mock2():
+    return MagicMock(spec=LLMDataLoader)
+
+
+@pytest.fixture(scope="function")
 def progress_publisher_mock():
     return MagicMock(spec=MessagePublisher)
 

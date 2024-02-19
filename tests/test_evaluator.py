@@ -56,13 +56,14 @@ def test_evaluate_cpu(nn_model_mock, llm_data_loader_mock, progress_publisher_mo
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_builds_in_all_loss_factories(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -74,13 +75,14 @@ def test_evaluate_builds_in_all_loss_factories(
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_calls_add_for_all_losses_and_batches(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -93,13 +95,14 @@ def test_evaluate_calls_add_for_all_losses_and_batches(
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_calls_compute_on_all_losses(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -112,13 +115,14 @@ def test_evaluate_calls_compute_on_all_losses(
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_builds_in_all_metrics_factories(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -130,13 +134,14 @@ def test_evaluate_builds_in_all_metrics_factories(
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_calls_add_for_all_metrics_and_batches(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -149,13 +154,14 @@ def test_evaluate_calls_add_for_all_metrics_and_batches(
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
 def test_evaluate_calls_compute_on_all_metrics(
-    nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
+    nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
     num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
         num_batches,
         llm_data_loader_mock,
+        llm_data_loader_mock2,
         nn_model_mock,
         progress_publisher_mock,
         throughput_aggregator,
@@ -169,6 +175,7 @@ def test_evaluate_calls_compute_on_all_metrics(
 def _run_loss_and_metrics_test(
     num_batches: int,
     llm_data_loader_mock: LLMDataLoader,
+    llm_data_loader_mock2: LLMDataLoader,
     nn_model_mock,
     progress_publisher_mock,
     throughput_aggregator,
@@ -179,7 +186,7 @@ def _run_loss_and_metrics_test(
     loss_factories = [loss_factory] * 3
     metric_factories = [metric_factory] * 5
 
-    data_loaders = _prepare_data_loaders(num_batches, num_batches2, llm_data_loader_mock)
+    data_loaders = _prepare_data_loaders(num_batches, num_batches2, llm_data_loader_mock, llm_data_loader_mock2)
 
     evaluator = Evaluator(
         local_rank=int(os.getenv("LOCAL_RANK", 0)),
@@ -199,12 +206,13 @@ def _run_loss_and_metrics_test(
     return loss_factories, metric_factories
 
 
-def _prepare_data_loaders(num_batches: int, num_batches2: int, llm_data_loader_mock: LLMDataLoader):
+def _prepare_data_loaders(
+    num_batches: int, num_batches2: int, llm_data_loader_mock: LLMDataLoader, llm_data_loader_mock2: LLMDataLoader
+):
     _prepare_test_batches(llm_data_loader_mock, num_batches=num_batches)
     data_loaders = [llm_data_loader_mock]
 
     if num_batches2 > 0:
-        llm_data_loader_mock2 = MagicMock(spec=LLMDataLoader)
         _prepare_test_batches(llm_data_loader_mock2, batch_size=17, seq_len=13, num_batches=num_batches2)
         data_loaders.append(llm_data_loader_mock2)
     return data_loaders
@@ -225,6 +233,9 @@ def _prepare_test_batches(
     batches = [DatasetBatch(targets=targets, samples=samples) for _ in range(num_batches)]
 
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
+    llm_data_loader_mock.drop_last = False
     llm_data_loader_mock.batch_size = batch_size
+
+    llm_data_loader_mock.dataset = MagicMock()
 
     return batches
