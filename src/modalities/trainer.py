@@ -44,6 +44,8 @@ class Trainer:
         model.train()
         cummulated_loss = self._reset_loss()
 
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+
         # batch loop
         batch: DatasetBatch
         # TODO: why do we need a barrier here?

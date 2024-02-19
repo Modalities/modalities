@@ -38,6 +38,9 @@ class Evaluator:
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
+
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+
         for data_loader in data_loaders:
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
