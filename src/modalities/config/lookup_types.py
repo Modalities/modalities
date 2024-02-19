@@ -1,7 +1,3 @@
-from enum import Enum
-from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
-from modalities.evaluation.perplexity import AggregativePerplexityFactory
-
 import torch
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
@@ -17,6 +13,8 @@ from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
+from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
+from modalities.evaluation.perplexity import AggregativePerplexityFactory
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM

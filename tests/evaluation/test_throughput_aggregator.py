@@ -1,10 +1,10 @@
+import pytest
+
 from modalities.evaluation.throughput_aggregator import (
     ThroughputAggregationContext,
     ThroughputAggregator,
     start_throughput_measurement,
 )
-import pytest
-
 from tests.conftest import set_env_cpu
 
 

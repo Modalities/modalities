@@ -1,6 +1,4 @@
 from typing import Any, Dict, List
-from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
-from modalities.evaluation.measure import AggregativeMeasureFactory
 
 import torch.optim as optim
 from class_resolver import ClassResolver
@@ -26,6 +24,8 @@ from modalities.config.lookup_types import (
 )
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
+from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
+from modalities.evaluation.measure import AggregativeMeasureFactory
 from modalities.loss_functions import CLMCrossEntropyLoss, Loss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import NNModel

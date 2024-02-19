@@ -2,12 +2,12 @@ import os
 import unittest
 from typing import List, Tuple
 from unittest.mock import MagicMock, call
-from modalities.dataloader.dataloader import LLMDataLoader
 
 import pytest
 import torch
 
 from modalities.batch import DatasetBatch
+from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
 from modalities.evaluation.throughput_aggregator import ThroughputAggregator
 from modalities.evaluator import Evaluator
