@@ -11,6 +11,7 @@ from modalities.config.lookup_types import (
     BatchSamplerTypes,
     CheckpointingExectionTypes,
     CheckpointingStrategyTypes,
+    CodecTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -20,7 +21,6 @@ from modalities.config.lookup_types import (
     SamplerTypes,
     SchedulerTypes,
     TokenizerTypes,
-    CodecTypes
 )
 from modalities.config.types import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2Config
@@ -53,7 +53,6 @@ class TokenizerConfig(BaseModel):
 
 
 class CodecConfig(BaseModel):
-
     class HfTokenizerCodecConfig(BaseModel):
         tokenizer: TokenizerConfig
         max_length: Optional[int] = None
@@ -63,19 +62,15 @@ class CodecConfig(BaseModel):
         save_format: str = "png"
 
     type_hint: CodecTypes
-    config: Union[
-        HfTokenizerCodecConfig,
-        PillowImageCodecConfig
-    ] = Field(union_mode="left_to_right")
+    config: Union[HfTokenizerCodecConfig, PillowImageCodecConfig] = Field(union_mode="left_to_right")
 
 
 class FeatureConfig(BaseModel):
-
     codec: CodecConfig
     jq_pattern: str
 
-class PreparationAppConfig(BaseModel):
 
+class PreparationAppConfig(BaseModel):
     features: List[FeatureConfig]
 
 
@@ -311,6 +306,7 @@ class CheckpointingConfig(BaseModel):
 class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
+
 
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):

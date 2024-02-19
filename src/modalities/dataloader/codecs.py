@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Optional, Dict, Any
-
 from io import BytesIO
+from typing import Generic, Optional, TypeVar
+
 from PIL import Image
 from transformers import PreTrainedTokenizer
 
 T = TypeVar("T")
+
 
 class Codec(ABC, Generic[T]):
     @abstractmethod
@@ -33,20 +34,15 @@ class FixSizedCodec(Codec[T]):
 
 
 class HfTokenizerCodec(FixSizedCodec[str]):
-
     TOKEN_SIZE_IN_BYTES = 4
-    
+
     @classmethod
     def num_bytes_per_value(cls) -> int:
         return cls.TOKEN_SIZE_IN_BYTES
 
     def __init__(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        max_length: Optional[int] = None,
-        add_eos_token: bool = True
+        self, tokenizer: PreTrainedTokenizer, max_length: Optional[int] = None, add_eos_token: bool = True
     ) -> None:
-
         # instantiate
         self.tokenizer = tokenizer
         self.add_eos_token = add_eos_token
@@ -56,9 +52,8 @@ class HfTokenizerCodec(FixSizedCodec[str]):
             eos_token = self.tokenizer.convert_tokens_to_ids(self.tokenizer.eos_token)
             self.eos_token = eos_token.to_bytes(type(self).TOKEN_SIZE_IN_BYTES, byteorder="big")
 
-        self.tokenizer_kwargs = {} if max_length is None else dict(
-            max_length=max_length - int(add_eos_token),
-            truncation=True
+        self.tokenizer_kwargs = (
+            {} if max_length is None else dict(max_length=max_length - int(add_eos_token), truncation=True)
         )
 
     def encode(self, text: str) -> bytes:
@@ -67,7 +62,7 @@ class HfTokenizerCodec(FixSizedCodec[str]):
             t.to_bytes(type(self).TOKEN_SIZE_IN_BYTES, byteorder="big")
             for t in self.tokenizer(text, **self.tokenizer_kwargs)["input_ids"]
         ]
-        # 
+        #
         if len(tokens) == 0:
             raise ValueError("Received empty sample")
         # add special eos token
@@ -80,20 +75,13 @@ class HfTokenizerCodec(FixSizedCodec[str]):
     @classmethod
     def decode(cls, serialized_tokens: bytes) -> str:
         return [
-            int.from_bytes(
-                serialized_tokens[i:i+cls.TOKEN_SIZE_IN_BYTES],
-                byteorder="big"
-            )
+            int.from_bytes(serialized_tokens[i : i + cls.TOKEN_SIZE_IN_BYTES], byteorder="big")
             for i in range(0, len(serialized_tokens), cls.TOKEN_SIZE_IN_BYTES)
         ]
 
 
 class PillowImageCodec(Codec[str]):
-
-    def __init__(
-        self,
-        save_format: str = "png"
-    ) -> None:
+    def __init__(self, save_format: str = "png") -> None:
         self._format = save_format
 
     def encode(self, img_file_path: str) -> bytes:
@@ -108,4 +96,3 @@ class PillowImageCodec(Codec[str]):
     @staticmethod
     def decode(serialized_img: bytes) -> str:
         return Image.open(BytesIO(serialized_img))
-

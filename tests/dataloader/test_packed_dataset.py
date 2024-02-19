@@ -1,12 +1,16 @@
 import json
-import pytest
 
-from PIL import Image
 import numpy.testing
+import pytest
+from PIL import Image
 
 from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec
 from modalities.dataloader.create_packed_data import PackedDataGenerator
-from modalities.dataloader.dataset import PackedMemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from modalities.dataloader.dataset import (
+    PackedMemMapDataset,
+    PackedMemMapDatasetContinuous,
+    PackedMemMapDatasetMegatron,
+)
 
 
 @pytest.mark.skip(reason="New packed data format not implemented for megatron dataset")
@@ -17,11 +21,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
 
 
 def test_packed_dataset_loading(dummy_packed_data_path):
-    
-    ds = PackedMemMapDataset(
-        dummy_packed_data_path,
-        sample_keys=["input_ids"]
-    )
+    ds = PackedMemMapDataset(dummy_packed_data_path, sample_keys=["input_ids"])
 
     assert len(ds) == 4
     assert ds[0]["input_ids"] == [0, 1, 2, 3, 4, 5]
@@ -33,7 +33,7 @@ def test_packed_dataset_loading(dummy_packed_data_path):
 @pytest.mark.parametrize(
     "block_size, expected_length, expected_output",
     [
-        #(1, 20, [[i] for i in range(20)]), # TODO
+        # (1, 20, [[i] for i in range(20)]), # TODO
         (2, 10, [[2 * i, 2 * i + 1] for i in range(10)]),
         (3, 6, [[3 * i, 3 * i + 1, 3 * i + 2] for i in range(6)]),
         (10, 2, [list(range(10)), list(range(10, 20))]),
@@ -42,19 +42,10 @@ def test_packed_dataset_loading(dummy_packed_data_path):
         (25, 0, []),
     ],
 )
-def test_packed_continuous_dataset_loading(
-    dummy_packed_data_path, block_size, expected_length, expected_output
-):
-    ds = PackedMemMapDatasetContinuous(
-        dummy_packed_data_path,
-        sample_key="input_ids",
-        block_size=block_size
-    )
+def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
+    ds = PackedMemMapDatasetContinuous(dummy_packed_data_path, sample_key="input_ids", block_size=block_size)
     assert len(ds) == expected_length
-    retrieved_input_ids = [
-        list(packed_samples["input_ids"])
-        for packed_samples in ds
-    ]
+    retrieved_input_ids = [list(packed_samples["input_ids"]) for packed_samples in ds]
     assert retrieved_input_ids == expected_output
 
 
@@ -64,15 +55,8 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
 
 
-@pytest.mark.parametrize(
-    "max_num_of_tokens, expected_index_size", [(None, 12), (10, 1)]
-)
-def test_create_packed_dataset(
-    indexed_dummy_data_path,
-    gpt2_tokenizer,
-    max_num_of_tokens,
-    expected_index_size
-):
+@pytest.mark.parametrize("max_num_of_tokens, expected_index_size", [(None, 12), (10, 1)])
+def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer, max_num_of_tokens, expected_index_size):
     block_size = 5
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_data_path.raw_data_path,
@@ -82,9 +66,8 @@ def test_create_packed_dataset(
             )
         },
         max_num_of_bytes=(
-            (HfTokenizerCodec.TOKEN_SIZE_IN_BYTES * max_num_of_tokens)
-            if max_num_of_tokens is not None else None
-        )
+            (HfTokenizerCodec.TOKEN_SIZE_IN_BYTES * max_num_of_tokens) if max_num_of_tokens is not None else None
+        ),
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
@@ -112,9 +95,7 @@ def test_packed_image_dataset(indexed_dummy_image_data_path):
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_image_data_path.raw_data_path,
         idx_path=indexed_dummy_image_data_path.index_path,
-        codecs={
-            ".img_path": PillowImageCodec()
-        }
+        codecs={".img_path": PillowImageCodec()},
     )
     # get destination path
     default_packed_dataset_path = packed_generator._default_destination_path()
@@ -136,20 +117,15 @@ def test_packed_image_dataset(indexed_dummy_image_data_path):
             numpy.testing.assert_allclose(src_img, item["img"])
 
 
-def test_packed_multimodal_dataset(
-    indexed_dummy_image_data_path, gpt2_tokenizer
-):
+def test_packed_multimodal_dataset(indexed_dummy_image_data_path, gpt2_tokenizer):
     # create packed data file
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_image_data_path.raw_data_path,
         idx_path=indexed_dummy_image_data_path.index_path,
         codecs={
             ".img_path": PillowImageCodec(),
-            ".text": HfTokenizerCodec(
-                tokenizer=gpt2_tokenizer,
-                add_eos_token=False
-            )
-        }
+            ".text": HfTokenizerCodec(tokenizer=gpt2_tokenizer, add_eos_token=False),
+        },
     )
     # get destination path
     default_packed_dataset_path = packed_generator._default_destination_path()

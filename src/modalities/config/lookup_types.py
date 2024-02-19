@@ -9,6 +9,7 @@ from modalities.checkpointing.checkpointing_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
@@ -16,11 +17,6 @@ from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMM
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM
-
-from modalities.dataloader.codecs import (
-    HfTokenizerCodec,
-    PillowImageCodec
-)
 
 
 class LookupEnum(Enum):

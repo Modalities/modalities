@@ -8,20 +8,20 @@ from torch.utils.data.distributed import DistributedSampler
 from transformers import PreTrainedTokenizer
 
 from modalities.checkpointing.checkpointing import CheckpointingExecutionIF, CheckpointingStrategyIF
-from modalities.config.config import AppConfig, OptimizerTypes, SchedulerTypes
+from modalities.config.config import OptimizerTypes, SchedulerTypes
 from modalities.config.lookup_types import (
-    LookupEnum,
     BatchSamplerTypes,
     CheckpointingExectionTypes,
     CheckpointingStrategyTypes,
+    CodecTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
+    LookupEnum,
     LossTypes,
     ModelTypes,
     SamplerTypes,
     TokenizerTypes,
-    CodecTypes
 )
 from modalities.dataloader.codecs import Codec
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -31,27 +31,22 @@ from modalities.models.gpt2.collator import GPT2LLMCollator
 from modalities.models.gpt2.gpt2_model import GPT2LLM, NNModel
 from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 
+
 # TODO: this should be a singleton
 class ResolverRegister:
-
     # TODO: args and kwargs only to be backwards compatible
     #       older versions required the appconfig as argument
     def __init__(self, *args, **kwargs):
         self._resolver_register = self._build_resolver_register()
-    
-    def build_component_by_key_query(
-        self, register_key: str, type_hint: str, extra_kwargs: Dict = {}
-    ) -> Any:
-        raise NotImplementedError
-    
-    def build_component_by_config(
-        self, config: BaseModel, extra_kwargs: Dict[str, Any] = {}
-    ) -> Any:
 
+    def build_component_by_key_query(self, register_key: str, type_hint: str, extra_kwargs: Dict = {}) -> Any:
+        raise NotImplementedError
+
+    def build_component_by_config(self, config: BaseModel, extra_kwargs: Dict[str, Any] = {}) -> Any:
         assert (
             "type_hint" in config.model_fields.keys()
         ), f"Field 'type_hint' missing but needed for initalisation in {config}"
-        
+
         assert (
             "config" in config.model_fields.keys()
         ), f"Field 'config' missing but needed for initalisation in {config}"
@@ -65,11 +60,7 @@ class ResolverRegister:
             val = kwargs.get(key, val)
 
             # handle nested components
-            if (
-                isinstance(val, BaseModel) and
-                "type_hint" in val.model_fields and
-                "config" in val.model_fields
-            ):
+            if isinstance(val, BaseModel) and "type_hint" in val.model_fields and "config" in val.model_fields:
                 kwargs[key] = self.build_component_by_config(val)
 
             else:
@@ -80,13 +71,8 @@ class ResolverRegister:
             register_query=config.type_hint.name,
             extra_kwargs=kwargs,
         )
-    
-    def _build_component(
-        self,
-        register_key: LookupEnum,
-        register_query: str,
-        extra_kwargs: Dict[str, Any] = {}
-    ):
+
+    def _build_component(self, register_key: LookupEnum, register_query: str, extra_kwargs: Dict[str, Any] = {}):
         assert register_key in self._resolver_register
         return self._resolver_register[register_key].make(
             query=register_query,
@@ -135,25 +121,15 @@ class ResolverRegister:
                 base=DataLoader,
                 default=LLMDataLoader,
             ),
-            DatasetTypes: ClassResolver(
-                [t.value for t in DatasetTypes], base=Dataset
-            ),
-            CollatorTypes: ClassResolver(
-                [t.value for t in CollatorTypes], base=GPT2LLMCollator
-            ),
-            TokenizerTypes: ClassResolver(
-                [t.value for t in TokenizerTypes], base=PreTrainedTokenizer
-            ),
-            CodecTypes: ClassResolver(
-                [t.value for t in CodecTypes], base=Codec
-            ),
+            DatasetTypes: ClassResolver([t.value for t in DatasetTypes], base=Dataset),
+            CollatorTypes: ClassResolver([t.value for t in CollatorTypes], base=GPT2LLMCollator),
+            TokenizerTypes: ClassResolver([t.value for t in TokenizerTypes], base=PreTrainedTokenizer),
+            CodecTypes: ClassResolver([t.value for t in CodecTypes], base=Codec),
             CheckpointingStrategyTypes: ClassResolver(
-                [t.value for t in CheckpointingStrategyTypes],
-                base=CheckpointingStrategyIF
+                [t.value for t in CheckpointingStrategyTypes], base=CheckpointingStrategyIF
             ),
             # TODO: fix type in execution
             CheckpointingExectionTypes: ClassResolver(
-                [t.value for t in CheckpointingExectionTypes],
-                base=CheckpointingExecutionIF
-            )
+                [t.value for t in CheckpointingExectionTypes], base=CheckpointingExecutionIF
+            ),
         }

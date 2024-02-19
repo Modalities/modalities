@@ -15,8 +15,10 @@ from .codecs import FixSizedCodec
 from .create_packed_data import PackedDataGenerator
 from .large_file_lines_reader import LargeFileLinesReader
 
+
 class SampleKeysMismatchException(Exception):
     pass
+
 
 class Dataset(TorchdataSet):
     def __init__(self, raw_data_path: Path, sample_keys: list[str]):
@@ -83,15 +85,16 @@ class MemMapDataset(Dataset):
 
 
 class PackedMemMapDatasetBase(Dataset):
-    
     def _read_bytes(self, offset: int, size: int) -> bytes:
         return np.memmap(
             self.raw_data_path,
             mode="r",
             offset=offset,
             shape=(size,),
-        ).view(f"S{size}")[0]
-    
+        ).view(
+            f"S{size}"
+        )[0]
+
     @property
     def num_elements_per_item(self) -> int:
         return len(self._codec_types)
@@ -109,7 +112,7 @@ class PackedMemMapDatasetBase(Dataset):
             (codec_1, codec_2, ...)
 
         The index stores byte positions of the dataset items in the following format:
-        
+
             (offset, size_1, size_2, ...)
 
         The start and end tuple of the j-th value are computed by:
@@ -140,57 +143,37 @@ class PackedMemMapDatasetBase(Dataset):
 
         def read_header(offset: int, size: int) -> int:
             # read bytes from file
-            return int.from_bytes(
-                self._read_bytes(offset, size),
-                byteorder="big"
-            )
+            return int.from_bytes(self._read_bytes(offset, size), byteorder="big")
 
         # read headers
-        self.data_len = read_header(
-            offset=0,
-            size=PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES
-        )
+        self.data_len = read_header(offset=0, size=PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES)
         self.codecs_len = read_header(
-            offset=PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES,
-            size=PackedDataGenerator.CODECS_HEAD_SIZE_IN_BYTES
+            offset=PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES, size=PackedDataGenerator.CODECS_HEAD_SIZE_IN_BYTES
         )
 
         # compute offsets to index raw data file
-        self.data_offset = (
-            PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES +
-            PackedDataGenerator.CODECS_HEAD_SIZE_IN_BYTES
-        )
+        self.data_offset = PackedDataGenerator.DATA_HEAD_SIZE_IN_BYTES + PackedDataGenerator.CODECS_HEAD_SIZE_IN_BYTES
         self.codecs_offset = self.data_offset + self.data_len
         self.index_offset = self.codecs_offset + self.codecs_len
 
         # read codecs
-        self._codec_type_hints = self._read_bytes(
-            offset=self.codecs_offset,
-            size=self.codecs_len
-        )
+        self._codec_type_hints = self._read_bytes(offset=self.codecs_offset, size=self.codecs_len)
         self._codec_type_hints = pickle.loads(self._codec_type_hints)
         # needs to be here to avoid circular import
         # TODO: find a better way to avoid the circular import
         from ..config.lookup_types import CodecTypes
+
         # resolve codec types
-        self._codec_types = [
-            getattr(CodecTypes, codec_type_hint).value
-            for codec_type_hint in self._codec_type_hints
-        ]
+        self._codec_types = [getattr(CodecTypes, codec_type_hint).value for codec_type_hint in self._codec_type_hints]
 
         # get index
-        self._index_base = self._read_bytes(
-            offset=self.index_offset,
-            size=self.total_bytes - self.index_offset
-        )
+        self._index_base = self._read_bytes(offset=self.index_offset, size=self.total_bytes - self.index_offset)
         self._index_base = pickle.loads(self._index_base)
         assert all(len(idx) == len(self._codec_types) + 1 for idx in self._index_base)
-        
+
         # initialize after codec types are defined because
         # num_elements_per_item depends on it
-        super().__init__(
-            raw_data_path=raw_data_path, sample_keys=sample_keys
-        )
+        super().__init__(raw_data_path=raw_data_path, sample_keys=sample_keys)
 
 
 class PackedMemMapDataset(PackedMemMapDatasetBase):
@@ -206,9 +189,7 @@ class PackedMemMapDataset(PackedMemMapDatasetBase):
 
         enc = {}
         offset = idx[0]
-        for key, size, codec_type in zip(
-            self.sample_keys, idx[1:], self._codec_types
-        ):
+        for key, size, codec_type in zip(self.sample_keys, idx[1:], self._codec_types):
             # decode item
             bytestring = self._read_bytes(offset, size)
             enc[key] = codec_type.decode(bytestring)
@@ -219,7 +200,6 @@ class PackedMemMapDataset(PackedMemMapDatasetBase):
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
-    
     def __init__(self, raw_data_path: Path, sample_key: str, block_size: int):
         """
         PackedMemMapDatasetContinuous iterates through the data in block_size sized chunks,
@@ -242,16 +222,13 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
 
         # check if codec is supported
         if not issubclass(self.codec_type, FixSizedCodec):
-            raise ValueError(
-                "Can only read continuously from fix-sized codecs, got %s."
-                % self.codec_type
-            )
+            raise ValueError("Can only read continuously from fix-sized codecs, got %s." % self.codec_type)
 
         self.block_size = block_size
         # get number of total tokens in file
         total_values = self.data_len // self._num_bytes_per_value
         self._num_samples = total_values // self.block_size
-    
+
     @property
     def sample_key(self) -> str:
         return self.sample_keys[0]
@@ -272,7 +249,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         # read block-sized chunk of bytes
         byte_string = self._read_bytes(
             offset=self.data_offset + idx * self.block_size * self._num_bytes_per_value,
-            size=self.block_size * self._num_bytes_per_value
+            size=self.block_size * self._num_bytes_per_value,
         )
         # decode and pack into batch encoding
         values = self.codec_type.decode(byte_string)

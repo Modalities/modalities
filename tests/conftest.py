@@ -1,18 +1,17 @@
 import dataclasses
-import os
 import json
+import os
 import pickle
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-from PIL import Image
 import numpy as np
+import pytest
 import torch
+from PIL import Image
 from torch.optim import Optimizer
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
-
 
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing import CheckpointingIF
@@ -46,9 +45,7 @@ def dummy_packed_data_path(tmpdir) -> Path:
     tokens = list(range(20))
     codecs_bytes = pickle.dumps(["HfTokenizerCodec"])
     # headers
-    data += (
-        len(tokens) * int_size_in_bytes
-    ).to_bytes(data_header_size_in_bytes, byteorder="big")
+    data += (len(tokens) * int_size_in_bytes).to_bytes(data_header_size_in_bytes, byteorder="big")
     data += len(codecs_bytes).to_bytes(codecs_header_size_in_bytes, byteorder="big")
     # data and codecs
     data += b"".join([t.to_bytes(int_size_in_bytes, byteorder="big") for t in tokens])
@@ -84,8 +81,7 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 
 
 @pytest.fixture
-def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:    
-
+def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
     base_path = Path(tmpdir, "image_data")
     img_base_path = Path(base_path, "images")
 
@@ -94,10 +90,7 @@ def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
 
     data_path = Path(base_path, "data.jsonl")
     index_path = Path(base_path, "data.idx")
-    img_paths = [
-        Path(img_base_path, "img_%i.png" % i)
-        for i in range(15)
-    ]
+    img_paths = [Path(img_base_path, "img_%i.png" % i) for i in range(15)]
     # create random images and save them into the temp directory
     for img_path in img_paths:
         im = np.random.rand(100, 100, 3) * 255
@@ -110,12 +103,10 @@ def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
                 json.dumps(
                     {
                         "img_path": img_path.absolute().as_posix(),
-                        "text": (
-                            "This item refers to the image stored at %s"
-                            % str(img_path)
-                        )
+                        "text": ("This item refers to the image stored at %s" % str(img_path)),
                     }
-                ) + "\n"
+                )
+                + "\n"
             )
     # create the index file to the jsonl file
     IndexGenerator(data_path).create_index(index_path)

@@ -15,7 +15,7 @@ from modalities.activation_checkpointing import apply_activation_checkpointing_i
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode, PreparationAppConfig
+from modalities.config.config import AppConfig, ModalitiesSetupConfig, PreparationAppConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -118,15 +118,11 @@ def entry_point_create_memmap_index(src_path, index_path):
     help="input path for index. will search in parent directory of src_path if none.",
 )
 def entry_point_create_packed_data(src_path, config_file_path, dst_path, idx_path):
-
     config_dict = load_app_config_dict(config_file_path)
     config = PreparationAppConfig.model_validate(config_dict)
     # build codec components
     resolvers = ResolverRegister()
-    codecs = {
-        f.jq_pattern: resolvers.build_component_by_config(f.codec)
-        for f in config.features
-    }
+    codecs = {f.jq_pattern: resolvers.build_component_by_config(f.codec) for f in config.features}
     # generate packed data
     generator = PackedDataGenerator(
         codecs,
