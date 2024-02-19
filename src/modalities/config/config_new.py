@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Dict, Optional
 
 import torch.nn as nn
 from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint
@@ -11,6 +11,7 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_types import LookupEnum
+from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.running_env import RunningEnv
 
@@ -151,6 +152,23 @@ class PydanticCollateFnIF:
         )
 
 
+class PydanticLLMDataLoaderIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(LLMDataLoader),
+            python_schema=core_schema.is_instance_schema(LLMDataLoader),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
 PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
@@ -159,6 +177,7 @@ PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF
 PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
 PydanticSamplerIFType = Annotated[Sampler, PydanticSamplerIF]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticCollateFnIF]
+PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticLLMDataLoaderIF]
 
 
 class PassType(LookupEnum):
@@ -265,20 +284,48 @@ class GPT2LLMCollateFnConfig(BaseModel):
     target_key: str
 
 
-class CudaKwargsConfig(BaseModel):
-    num_workers: conint(ge=0)
-    pin_memory: bool
-    shuffle: bool
-
-
-class LLMDataLoaderConfig(CudaKwargsConfig):
+class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIF
     batch_sampler: PydanticSamplerIF
     collate_fn: PydanticCollateFnIF
+    num_workers: conint(ge=0)
+    pin_memory: bool
+    shuffle: bool
+    skip_num_batches: Optional[int] = 0
 
 
 class WandbMode(LookupEnum):
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"
     DISABLED = "DISABLED"
+
+
+class DummyProgressSubscriberConfig(BaseModel):
+    pass
+
+
+class RichProgressSubscriberConfig(BaseModel):
+    train_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: Dict[str, PydanticLLMDataLoaderIFType]
+    world_size: int
+    global_num_seen_samples: int
+    local_rank: int
+
+
+class DummyResultSubscriberConfig(BaseModel):
+    pass
+
+
+class WandBEvaluationResultSubscriberConfig(BaseModel):
+    local_rank: int
+    project: str
+    experiment_id: str
+    mode: WandbMode
+    directory: Path
+    experiment_config: Optional[Dict] = None
+
+
+class RichResultSubscriberConfig(BaseModel):
+    num_ranks: int
+    local_rank: int

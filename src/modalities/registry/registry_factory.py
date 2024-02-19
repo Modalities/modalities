@@ -14,6 +14,8 @@ from modalities.config.config_new import (
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
     DistributedSamplerConfig,
+    DummyProgressSubscriberConfig,
+    DummyResultSubscriberConfig,
     FSDPToDiscCheckpointingConfig,
     GPT2LLMCollateFnConfig,
     GPT2TokenizerFastConfig,
@@ -22,14 +24,14 @@ from modalities.config.config_new import (
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
-    ResumableBatchSamplerConfig,
+    RichProgressSubscriberConfig,
+    RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    WandBEvaluationResultSubscriberConfig,
 )
-from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
+from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset_factory import DatasetFactory
-from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
@@ -70,12 +72,11 @@ class RegistryFactory:
             ("sampler", "distributed_sampler", DistributedSampler),
             # batch samplers
             ("batch_sampler", "default", BatchSampler),
-            ("batch_sampler", "resumable_batch_sampler", ResumableBatchSampler),
             # collators
             ("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn),
             # data loaders
-            ("data_loader", "llm_data_loader", LLMDataLoader),
-            ("data_loader", "repeating_data_loader", RepeatingDataLoader),
+            ("data_loader", "default", DataloaderFactory.get_dataloader),
+            # ("data_loader", "repeating_data_loader", RepeatingDataLoader),
             # checkpointing
             ("checkpointing", "default", Checkpointing),
             # checkpointing strategies
@@ -100,9 +101,6 @@ class RegistryFactory:
             ("results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber),
             ("results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber),
             ("results_subscriber", "wandb", ResultsSubscriberFactory.get_wandb_result_subscriber),
-            # message broker
-            ("message_broker", "default", MessageBroker),
-            # Message publisher
         ]
         registry = Registry()
         for component in components:
@@ -129,11 +127,10 @@ class RegistryFactory:
             ("sampler", "distributed_sampler", DistributedSamplerConfig),
             # batch samplers
             ("batch_sampler", "default", BatchSamplerConfig),
-            ("batch_sampler", "resumable_batch_sampler", ResumableBatchSamplerConfig),
             # collators
             ("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFnConfig),
             # data loaders
-            ("data_loader", "llm_data_loader", LLMDataLoaderConfig),
+            ("data_loader", "default", LLMDataLoaderConfig),
             # checkpointing
             ("checkpointing", "default", CheckpointingConfig),
             # checkpointing strategies
@@ -151,6 +148,13 @@ class RegistryFactory:
             ("checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointingConfig),
             # running env
             ("running_env", "fsdp_running_env", FSDPRunningEnvConfig),
+            # Progress subscriber
+            ("progress_subscriber", "dummy", DummyProgressSubscriberConfig),
+            ("progress_subscriber", "rich", RichProgressSubscriberConfig),
+            # Results subscriber
+            ("results_subscriber", "dummy", DummyResultSubscriberConfig),
+            ("results_subscriber", "rich", RichResultSubscriberConfig),
+            ("results_subscriber", "wandb", WandBEvaluationResultSubscriberConfig),
         ]
         registry = Registry()
         for component in components:

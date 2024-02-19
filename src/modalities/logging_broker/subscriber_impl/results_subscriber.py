@@ -52,7 +52,6 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
     def __init__(
         self,
-        num_ranks: int,
         project: str,
         experiment_id: str,
         mode: WandbConfig.WandbMode,
@@ -60,7 +59,6 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         experiment_config: Optional[AppConfig] = None,
     ) -> None:
         super().__init__()
-        self.num_ranks = num_ranks
 
         # experiment_config_json = None
         # if experiment_config is not None:

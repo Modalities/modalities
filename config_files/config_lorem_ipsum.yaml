@@ -46,97 +46,112 @@ train_dataset:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
 
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 3
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${global_experiment_settings.environment.global_rank}
+            num_replicas: ${global_experiment_settings.environment.world_size}
+            shuffle: true
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 3
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${global_experiment_settings.environment.global_rank}
+            num_replicas: ${global_experiment_settings.environment.world_size}
+            shuffle: false
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "test"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 3
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${global_experiment_settings.environment.global_rank}
+            num_replicas: ${global_experiment_settings.environment.world_size}
+            shuffle: false
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE 
+
+
 data:
   train_dataloader:
-    component_key: data_loader
-    variant_key: llm_data_loader
-    config:
-      num_workers: 2
-      pin_memory: true
-      shuffle: false
-      dataloader_tag: "train"
-      dataset:
-        instance_key: train_dataset
-        pass_type: BY_REFERENCE
-      batch_sampler:
-        component_key: batch_sampler
-        variant_key: default
-        config:
-          batch_size: 3
-          drop_last: false
-          sampler:
-            component_key: sampler
-            variant_key: distributed_sampler
-            config:
-              rank: ${global_experiment_settings.environment.global_rank}
-              num_replicas: ${global_experiment_settings.environment.world_size}
-              shuffle: true
-              dataset:
-                instance_key: train_dataset
-                pass_type: BY_REFERENCE
-      collate_fn:
-        instance_key: collate_fn
-        pass_type: BY_REFERENCE
+    instance_key: train_dataloader
+    pass_type: BY_REFERENCE
   eval_dataloaders:
-    - component_key: data_loader
-      variant_key: llm_data_loader
-      config:
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        dataloader_tag: "val"
-        dataset:
-          instance_key: train_dataset
-          pass_type: BY_REFERENCE
-        batch_sampler:
-          component_key: batch_sampler
-          variant_key: default
-          config:
-            batch_size: 3
-            drop_last: false
-            sampler:
-              component_key: sampler
-              variant_key: distributed_sampler
-              config:
-                rank: ${global_experiment_settings.environment.global_rank}
-                num_replicas: ${global_experiment_settings.environment.world_size}
-                shuffle: false
-                dataset:
-                  instance_key: train_dataset
-                  pass_type: BY_REFERENCE
-        collate_fn:
-          instance_key: collate_fn
-          pass_type: BY_REFERENCE
-    - component_key: data_loader
-      variant_key: llm_data_loader
-      config:
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        dataloader_tag: "test"
-        dataset:
-          instance_key: train_dataset
-          pass_type: BY_REFERENCE
-        batch_sampler:
-          component_key: batch_sampler
-          variant_key: default
-          config:
-            batch_size: 3
-            drop_last: false
-            sampler:
-              component_key: sampler
-              variant_key: distributed_sampler
-              config:
-                rank: ${global_experiment_settings.environment.global_rank}
-                num_replicas: ${global_experiment_settings.environment.world_size}
-                shuffle: false
-                dataset:
-                  instance_key: train_dataset
-                  pass_type: BY_REFERENCE
-
-        collate_fn:
-          instance_key: collate_fn
-          pass_type: BY_REFERENCE 
+    val:
+      instance_key: val_dataloader
+      pass_type: BY_REFERENCE
+    test: 
+      instance_key: test_dataloader
+      pass_type: BY_REFERENCE
+  
 
 
 
@@ -256,56 +271,31 @@ batch_sampler:
 # message subscriber
 
 batch_progress_subscriber:
-  component_key: message_subscriber
-  variant_key: rich_progress_subscriber
+  component_key: progress_subscriber
+  variant_key: rich
   config:
-    num_ranks: ${global_experiment_settings.environment.world_size}
-    train_split:
+    local_rank: ${global_experiment_settings.environment.local_rank}
+    world_size: ${global_experiment_settings.environment.world_size}
+    global_num_seen_samples: ${global_experiment_settings.training.global_num_seen_samples}
+    train_dataloader:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
-    eval_splits:
+    eval_dataloaders:
       val:
-        instance_key: train_dataset
+        instance_key: val_dataloader
         pass_type: BY_REFERENCE
-      test:
-        instance_key: train_dataset
+      test: 
+        instance_key: test_dataloader
         pass_type: BY_REFERENCE
 
     
-batch_progress_subscriber:
-  component_key: message_subscriber
-  variant_key: wandb_evaluation_result_subscriber
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
   config:
-    num_ranks: ${global_experiment_settings.environment.world_size}
+    local_rank: ${global_experiment_settings.environment.local_rank}
     project: modalities
     mode: OFFLINE
     experiment_id: "abc" # TODO set this via env var maybe?
-
+    directory: "."
     
-# message broker
-message_broker:
-  component_key: message_broker
-  variant_key: default
-  config: {}
-
-# message publisher
-batch_progress_publisher:
-  component_key: message_publisher
-  variant_key: default
-  config:
-    message_broker:
-      instance_key: message_broker
-      pass_type: BY_REFERENCE
-    global_rank: ${global_experiment_settings.environment.global_rank}
-    local_rank: ${global_experiment_settings.environment.local_rank}
-
-evaluation_result_publisher:
-  component_key: message_publisher
-  variant_key: default
-  config:
-    message_broker:
-      instance_key: message_broker
-      pass_type: BY_REFERENCE
-    global_rank: ${global_experiment_settings.environment.global_rank}
-    local_rank: ${global_experiment_settings.environment.local_rank}
-
