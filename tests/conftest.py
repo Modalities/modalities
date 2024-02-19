@@ -77,7 +77,7 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
 
 @pytest.fixture
 def gpt2_tokenizer() -> GPT2TokenizerFast:
-    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer.json")
+    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer_gpt2.json")
     assert default_gpt2_tokenizer_path.is_file()
     return GPT2TokenizerFast(tokenizer_file=str(default_gpt2_tokenizer_path))
 
