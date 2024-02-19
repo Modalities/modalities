@@ -51,10 +51,11 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .coverage
-# .coverage.*
+.coverage.*
 .cache
 nosetests.xml
 coverage.xml
+coverage_html_report
 *.cover
 .hypothesis/
 .pytest_cache/
@@ -151,4 +152,3 @@ checkpoints
 data
 docs/source/generated
 docs/source/api
-coverage
