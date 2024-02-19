@@ -7,7 +7,7 @@ from einops import repeat
 from pydantic import BaseModel, Field
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, Block, GPT2Config, LayerNorm, TransformerMLP
+from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Block, GPT2Config, LayerNorm, TransformerMLP
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import Attention
@@ -31,7 +31,7 @@ class TextDecoder(NNModel):
                 drop=nn.Dropout(config.dropout),
                 h=nn.ModuleList(
                     [
-                        Block(
+                        GPT2Block(
                             n_embd=config.n_embd,
                             bias=config.bias,
                             epsilon=config.epsilon,
