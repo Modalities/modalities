@@ -151,3 +151,4 @@ checkpoints
 data
 docs/source/generated
 docs/source/api
+coverage

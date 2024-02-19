@@ -1,10 +1,6 @@
 [tool.coverage.run]
-data_file = ".coverage/coverage"
-omit = [
-    # __init__.py, __about__.py
-    "*__*__*",
-]
-    
+branch = true
+
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
 exclude_also = [
@@ -27,4 +23,4 @@ exclude_also = [
 ignore_errors = true
 
 [tool.coverage.html]
-directory = ".coverage/html"
+directory = "coverage_html_report"
