@@ -89,7 +89,7 @@ class PillowImageCodec(Codec[str]):
         # write image to buffer
         with Image.open(img_file_path) as img:
             img.save(buf, format=self._format)
-        # retuen buffer content
+        # return buffer content
         buf.seek(0)
         return buf.read()
 
