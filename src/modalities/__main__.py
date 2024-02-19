@@ -187,11 +187,8 @@ class Main:
             ]
         )
 
-        component_registry = RegistryFactory.get_component_registry()
-        component_config_registry = RegistryFactory.get_config_registry()
-        self.component_factory = ComponentFactory(
-            config_registry=component_config_registry, component_registry=component_registry
-        )
+        registry = RegistryFactory.get_registry()
+        self.component_factory = ComponentFactory(registry=registry)
 
     def build_component_dict(self) -> Dict:
         component_dict = self.component_factory.build_config(
