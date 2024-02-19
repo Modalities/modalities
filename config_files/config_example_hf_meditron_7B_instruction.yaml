@@ -100,3 +100,9 @@ loss:
   config:
     target_key: ${data.target_key}
     prediction_key: ${model.config.prediction_key}
+
+validation_measure_factories:
+  - type_hint: AggregativeCLMCrossEntropyLossFactory
+    config:
+      target_key: ${data.target_key}
+      prediction_key: ${model.config.prediction_key}
