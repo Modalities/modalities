@@ -64,7 +64,7 @@ class Trainer:
             thoughput_aggregator.stop(len(batch))
             # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
-            cummulated_loss[1] += len(batch)
+            cummulated_loss[1] += 1
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,

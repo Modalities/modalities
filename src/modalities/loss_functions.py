@@ -24,7 +24,8 @@ class Loss(ABC):
 
 
 class CLMCrossEntropyLoss(Loss):
-    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss", reduction: str = "sum"):
+
+    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss", reduction: str = "mean"):
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
@@ -38,6 +39,7 @@ class CLMCrossEntropyLoss(Loss):
         labels = labels.to(lm_logits.device)
         shift_logits = lm_logits.contiguous()
         shift_labels = labels.contiguous()
+
         # Flatten the tokens
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
