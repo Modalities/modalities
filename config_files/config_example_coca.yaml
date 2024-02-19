@@ -127,6 +127,7 @@ running_env:
     mixed_precision_settings: FP_16
     sharding_strategy: FULL_SHARD
     auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+    block_names: [GPT2Block, VisionTransformerBlock]
 
 model:
   type_hint: CoCa

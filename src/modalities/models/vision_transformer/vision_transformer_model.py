@@ -50,7 +50,7 @@ class ImagePatchEmbedding(nn.Module):
         return x
 
 
-class Block(nn.Module):
+class VisionTransformerBlock(nn.Module):
     def __init__(self, n_embd: int = 768, n_head: int = 8) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(n_embd)
@@ -75,7 +75,9 @@ class VisionTransformer(nn.Module):
         )
         self.pos_embd = nn.Embedding(num_embeddings=config.block_size, embedding_dim=config.n_embd)
         self.dropout = nn.Dropout(config.dropout)
-        self.blocks = nn.ModuleList([Block(n_embd=config.n_embd, n_head=config.n_head) for _ in range(config.n_layer)])
+        self.blocks = nn.ModuleList(
+            [VisionTransformerBlock(n_embd=config.n_embd, n_head=config.n_head) for _ in range(config.n_layer)]
+        )
 
         self.head = None
         if config.n_classes is not None:
