@@ -199,7 +199,7 @@ def convert_pytorch_to_hf_checkpoint(
     logging.info(f"Config\n{config}")
     main = Main(config)
     input_pytorch_checkpoint_path = input_pytorch_checkpoint_dir / input_pytorch_model_name
-    main.load_and_convert_checkpoint(input_pytorch_checkpoint_path, output_hf_checkpoint_dir)
+    main.load_and_convert_checkpoint(output_hf_checkpoint_dir, input_pytorch_checkpoint_path)
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -404,10 +404,15 @@ class Main:
 
         return evaluation_result_publisher, batch_processed_publisher
 
-    def load_and_convert_checkpoint(self, checkpoint_path: Path, output_path: str):
-        model = self._get_model_from_checkpoint(checkpoint_path)
+    def load_and_convert_checkpoint(self, output_path: str, checkpoint_path: Path = None):
+        if checkpoint_path:
+            model = self._get_model_from_checkpoint(checkpoint_path)
+        else:
+            # For testing purpose, we don't need to load the model.bin. We initialize the model randomly.
+            model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
         self._convert_checkpoint(output_path, model)
         return model
+
 
     def _get_model_from_checkpoint(self, checkpoint_path: Path):
         model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
