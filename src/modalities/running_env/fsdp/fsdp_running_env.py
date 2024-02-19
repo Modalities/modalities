@@ -1,67 +1,18 @@
-import functools
-from enum import Enum
-from typing import Type
+from typing import List
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from pydantic import BaseModel, ValidationError, field_validator
-from torch.distributed.fsdp.api import ShardingStrategy
-from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+from pydantic import BaseModel, validator
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.config.lookup_types import LookupEnum
 from modalities.config.types import ProcessGroupBackendType
-from modalities.models.gpt2.gpt2_model import Block
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.running_env.running_env import RunningEnv
-
-
-def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
-    try:
-        return enum_type[name]
-    except KeyError:
-        raise ValidationError(f"Invalid {enum_type} member name: {name}")
-
-
-transformer_auto_wrapper_policy = functools.partial(
-    transformer_auto_wrap_policy,
-    transformer_layer_cls={
-        Block,
-    },
-)
-
-
-class AutoWrapPolicies(Enum):
-    TRANSFORMER_AUTO_WRAP_POLICY = transformer_auto_wrapper_policy
-
-
-class FSDPRunningEnvConfig(BaseModel):
-    process_group_backend: ProcessGroupBackendType
-    local_rank: int
-    mixed_precision_settings: MixedPrecisionSettings
-    sharding_strategy: ShardingStrategy
-    auto_wrap_policy: AutoWrapPolicies
-
-    @field_validator("mixed_precision_settings", mode="before")
-    def parse_mixed_precision_setting_by_name(cls, name):
-        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
-            name=name, enum_type=MixedPrecisionSettings
-        )
-        if not has_bfloat_support() and (
-            mixed_precision_settings == MixedPrecisionSettings.BF_16
-            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
-        ):
-            raise ValueError("BF16 not supported in the current environment")
-        return mixed_precision_settings
-
-    @field_validator("sharding_strategy", mode="before")
-    def parse_sharding_strategy_by_name(cls, name):
-        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
-
-    @field_validator("auto_wrap_policy", mode="before")
-    def parse_auto_wrap_policy_by_name(cls, name):
-        return parse_enum_by_name(name=name, enum_type=AutoWrapPolicies)
+from modalities.util import parse_enum_by_name
 
 
 class FSDPRunningEnv(RunningEnv):
@@ -71,13 +22,13 @@ class FSDPRunningEnv(RunningEnv):
         local_rank: int,
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
-        auto_wrap_policy: AutoWrapPolicies,
+        block_names: List[str],
     ) -> None:
         self.process_group_backend = process_group_backend
         self.local_rank = local_rank
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
-        self.auto_wrap_policy = auto_wrap_policy
+        self.block_names = block_names
 
     def __enter__(self) -> "RunningEnv":
         dist.init_process_group(self.process_group_backend.value)
@@ -90,16 +41,44 @@ class FSDPRunningEnv(RunningEnv):
         # dist.destroy_process_group()
 
     def wrap_model(self, model: nn.Module, sync_module_states: bool) -> FSDP:
+        # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
+        # we also might want to have different auto wrap policies later...
+        fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=self.block_names)
+
         # model is on CPU before input to FSDP
         fsdp_model = FSDP(
             model,
-            auto_wrap_policy=self.auto_wrap_policy.value,
+            auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
             mixed_precision=self.mixed_precision_settings.value,
             sharding_strategy=self.sharding_strategy,
             device_id=torch.cuda.current_device(),
             sync_module_states=sync_module_states,
         )
         return fsdp_model
+
+
+class FSDPRunningEnvConfig(BaseModel):
+    process_group_backend: ProcessGroupBackendType
+    local_rank: int
+    mixed_precision_settings: MixedPrecisionSettings
+    sharding_strategy: ShardingStrategy
+    block_names: List[str]
+
+    @validator("mixed_precision_settings", pre=True, always=True)
+    def parse_mixed_precision_setting_by_name(cls, name):
+        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
+            name=name, enum_type=MixedPrecisionSettings
+        )
+        if not has_bfloat_support() and (
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return mixed_precision_settings
+
+    @validator("sharding_strategy", pre=True, always=True)
+    def parse_sharding_strategy_by_name(cls, name):
+        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
 class RunningEnvTypes(LookupEnum):

@@ -66,6 +66,8 @@ class Trainer:
         cummulated_loss = self._reset_loss()
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+
         # batch loop
         batch: DatasetBatch
         # TODO: why do we need a barrier here?
@@ -88,7 +90,7 @@ class Trainer:
             # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
-            batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+            batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -101,9 +103,7 @@ class Trainer:
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
-                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(
-                        torch.device(self.local_rank)
-                    )
+                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                     forward_backward_time_recorder.reset()
 
                     thoughput_aggregator.add_value(

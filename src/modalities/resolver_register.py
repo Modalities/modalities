@@ -25,7 +25,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.loss_functions import CLMCrossEntropyLoss, Loss
 from modalities.models.gpt2.collator import GPT2LLMCollator
-from modalities.models.gpt2.gpt2_model import GPT2LLM, NNModel
+from modalities.models.gpt2.gpt2_model import NNModel
 from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, RunningEnv, RunningEnvTypes
 
 
@@ -71,11 +71,6 @@ class ResolverRegister:
                 [t.value for t in RunningEnvTypes],
                 base=RunningEnv,
                 default=FSDPRunningEnv,
-            ),
-            config.model.type_hint: ClassResolver(
-                [t.value for t in ModelTypes],
-                base=NNModel,
-                default=GPT2LLM,
             ),
             config.optimizer.type_hint: ClassResolver(
                 [t.value for t in OptimizerTypes],
@@ -140,6 +135,7 @@ class ResolverRegister:
                 )
                 for checkpointing_execution_type in CheckpointingExectionTypes
             },
+            **{model_type: ClassResolver([t.value for t in ModelTypes], base=NNModel) for model_type in ModelTypes},
         }
         return resolvers
 
