@@ -9,11 +9,6 @@ import numpy as np
 import pytest
 import torch
 import torchaudio
-from PIL import Image
-from torch.optim import Optimizer
-from torch.utils.data.sampler import BatchSampler, SequentialSampler
-from transformers import GPT2TokenizerFast
-
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing import CheckpointingIF
 from modalities.config.config import AppConfig
@@ -26,6 +21,10 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.trainer import Trainer
+from PIL import Image
+from torch.optim import Optimizer
+from torch.utils.data.sampler import BatchSampler, SequentialSampler
+from transformers import GPT2TokenizerFast
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -82,21 +81,35 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 
 
 @pytest.fixture
-def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
+def indexed_multimodal_dummy_data_path(tmpdir) -> DataPathCollection:
     base_path = Path(tmpdir, "image_data")
     img_base_path = Path(base_path, "images")
+    audio_base_path = Path(base_path, "audios")
 
     base_path.mkdir(parents=True, exist_ok=True)
     img_base_path.mkdir(parents=True, exist_ok=True)
+    audio_base_path.mkdir(parents=True, exist_ok=True)
 
     data_path = Path(base_path, "data.jsonl")
     index_path = Path(base_path, "data.idx")
     img_paths = [Path(img_base_path, "img_%i.png" % i) for i in range(15)]
+    audio_paths = [Path(audio_base_path, "audio_%i.wav" % i) for i in range(15)]
+
     # create random images and save them into the temp directory
     for img_path in img_paths:
         im = np.random.rand(100, 100, 3) * 255
         im = Image.fromarray(im.astype("uint8")).convert("RGB")
         im.save(img_path, "PNG")
+
+    # create random spectrograms and save them into the temp directory
+    NUM_CHANNELS = 1
+    SAMPLING_RATE = 16000
+    AUDIO_DUR_SECS = 5
+
+    for audio_path in audio_paths:
+        audio = torch.randn(NUM_CHANNELS, SAMPLING_RATE * AUDIO_DUR_SECS)
+        torchaudio.save(audio_path, audio, SAMPLING_RATE)
+
     # create the jsonl file
     with data_path.open("w+") as f:
         for img_path in img_paths:
@@ -104,46 +117,10 @@ def indexed_dummy_image_data_path(tmpdir) -> DataPathCollection:
                 json.dumps(
                     {
                         "img_path": img_path.absolute().as_posix(),
-                        "text": ("This item refers to the image stored at %s" % str(img_path)),
-                    }
-                )
-                + "\n"
-            )
-    # create the index file to the jsonl file
-    IndexGenerator(data_path).create_index(index_path)
-
-    return DataPathCollection(raw_data_path=data_path, index_path=index_path)
-
-
-@pytest.fixture
-def indexed_dummy_audio_data_path(
-    tmpdir,
-) -> DataPathCollection:
-    base_path = Path(tmpdir, "audio_data")
-    audio_base_path = Path(base_path, "audios")
-
-    base_path.mkdir(parents=True, exist_ok=True)
-    audio_base_path.mkdir(parents=True, exist_ok=True)
-
-    data_path = Path(base_path, "data.jsonl")
-    index_path = Path(base_path, "data.idx")
-    audio_paths = [Path(audio_base_path, "audio_%i.wav" % i) for i in range(15)]
-
-    NUM_CHANNELS = 1
-    SAMPLING_RATE = 16000
-    AUDIO_DUR_SECS = 5
-    # create random spectrograms and save them into the temp directory
-    for audio_path in audio_paths:
-        audio = torch.randn(NUM_CHANNELS, SAMPLING_RATE * AUDIO_DUR_SECS)
-        torchaudio.save(audio_path, audio, SAMPLING_RATE)
-    # create the jsonl file
-    with data_path.open("w+") as f:
-        for audio_path in audio_paths:
-            f.write(
-                json.dumps(
-                    {
                         "audio_path": audio_path.absolute().as_posix(),
-                        "text": ("This item refers to the spectrogram stored at %s" % str(audio_path)),
+                        "text": (
+                            f"This item refers to the image stored at {str(img_path)} and the spectrogram stored at {str(audio_path)}"
+                        ),
                     }
                 )
                 + "\n"

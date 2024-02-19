@@ -2,8 +2,6 @@ import json
 
 import numpy.testing
 import pytest
-from PIL import Image
-
 from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec, TorchaudioAudioCodec
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataset import (
@@ -11,6 +9,7 @@ from modalities.dataloader.dataset import (
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
 )
+from PIL import Image
 
 
 @pytest.mark.skip(reason="New packed data format not implemented for megatron dataset")
@@ -90,11 +89,11 @@ def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer, max_num_
         assert offset + entry_length == packed_dataset._index_base[idx + 1][0]
 
 
-def test_packed_image_dataset(indexed_dummy_image_data_path):
+def test_packed_image_dataset(indexed_multimodal_dummy_data_path):
     # create packed data file
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_image_data_path.raw_data_path,
-        idx_path=indexed_dummy_image_data_path.index_path,
+        src_path=indexed_multimodal_dummy_data_path.raw_data_path,
+        idx_path=indexed_multimodal_dummy_data_path.index_path,
         codecs={".img_path": PillowImageCodec()},
     )
     # get destination path
@@ -109,7 +108,7 @@ def test_packed_image_dataset(indexed_dummy_image_data_path):
         sample_keys=["img"],
     )
     # read the jsonl to get the source image paths
-    with indexed_dummy_image_data_path.raw_data_path.open("r") as f:
+    with indexed_multimodal_dummy_data_path.raw_data_path.open("r") as f:
         src_data = list(map(json.loads, f.read().strip().split("\n")))
     # compare source image with dataset content
     for src, item in zip(src_data, ds):
@@ -117,11 +116,11 @@ def test_packed_image_dataset(indexed_dummy_image_data_path):
             numpy.testing.assert_allclose(src_img, item["img"])
 
 
-def test_packed_audio_dataset(indexed_dummy_audio_data_path):
+def test_packed_audio_dataset(indexed_multimodal_dummy_data_path):
     # create packed data file
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_audio_data_path.raw_data_path,
-        idx_path=indexed_dummy_audio_data_path.index_path,
+        src_path=indexed_multimodal_dummy_data_path.raw_data_path,
+        idx_path=indexed_multimodal_dummy_data_path.index_path,
         codecs={".audio_path": TorchaudioAudioCodec()},
     )
     # get destination path
@@ -136,9 +135,10 @@ def test_packed_audio_dataset(indexed_dummy_audio_data_path):
         sample_keys=["feat"],
     )
     # read the jsonl to get the source feature paths
-    with indexed_dummy_audio_data_path.raw_data_path.open("r") as f:
+    with indexed_multimodal_dummy_data_path.raw_data_path.open("r") as f:
         src_data = list(map(json.loads, f.read().strip().split("\n")))
-        # compare source features with dataset content
+
+    # compare source features with dataset content
     codec = TorchaudioAudioCodec()
     for src, item in zip(src_data, ds, strict=True):
         audio, sample_rate = codec.load_audio(src["audio_path"])
@@ -147,14 +147,15 @@ def test_packed_audio_dataset(indexed_dummy_audio_data_path):
         numpy.testing.assert_allclose(log_mel_spec, item["feat"])
 
 
-def test_packed_multimodal_dataset(indexed_dummy_image_data_path, gpt2_tokenizer):
+def test_packed_multimodal_dataset(indexed_multimodal_dummy_data_path, gpt2_tokenizer):
     # create packed data file
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_image_data_path.raw_data_path,
-        idx_path=indexed_dummy_image_data_path.index_path,
+        src_path=indexed_multimodal_dummy_data_path.raw_data_path,
+        idx_path=indexed_multimodal_dummy_data_path.index_path,
         codecs={
             ".img_path": PillowImageCodec(),
             ".text": HfTokenizerCodec(tokenizer=gpt2_tokenizer, add_eos_token=False),
+            ".audio_path": TorchaudioAudioCodec(),
         },
     )
     # get destination path
@@ -166,13 +167,20 @@ def test_packed_multimodal_dataset(indexed_dummy_image_data_path, gpt2_tokenizer
     # read dataset
     ds = PackedMemMapDataset(
         default_packed_dataset_path,
-        sample_keys=["img", "input_ids"],
+        sample_keys=["img", "input_ids", "audio_feat"],
     )
+    audio_codec = TorchaudioAudioCodec()
+
     # read the jsonl to get the source values
-    with indexed_dummy_image_data_path.raw_data_path.open("r") as f:
+    with indexed_multimodal_dummy_data_path.raw_data_path.open("r") as f:
         src_data = list(map(json.loads, f.read().strip().split("\n")))
     # compare source with dataset content
     for src, item in zip(src_data, ds):
         with Image.open(src["img_path"]) as src_img:
             numpy.testing.assert_allclose(src_img, item["img"])
         assert gpt2_tokenizer(src["text"])["input_ids"] == item["input_ids"]
+
+        audio, sample_rate = audio_codec.load_audio(src["audio_path"])
+        audio = audio_codec.resample(audio, sample_rate)
+        log_mel_spec = audio_codec.extract_log_mel_spectrogram(audio)
+        numpy.testing.assert_allclose(log_mel_spec, item["audio_feat"])
