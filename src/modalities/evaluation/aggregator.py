@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Generic, Hashable, TypeVar
+from typing import Dict, Generic, Hashable, Optional, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -12,8 +12,8 @@ KeyType = TypeVar("KeyType", bound=Hashable)
 
 class Aggregator(Generic[KeyType]):
 
-    def __init__(self, initial_values: Dict[KeyType, torch.Tensor] = {}) -> None:
-        self._key_to_value = initial_values
+    def __init__(self, initial_values: Optional[Dict[KeyType, torch.Tensor]] = None) -> None:
+        self._key_to_value = initial_values if initial_values else {}
 
     def add_values(self, value_dict: Dict[KeyType, torch.Tensor]):
         for key, value in value_dict.items():

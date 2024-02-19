@@ -16,19 +16,6 @@ class ThroughputAggregationKeys(Enum):
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
 
 
-T = TypeVar("T", bound=Any)
-
-
-def start_throughput_measurement(
-    iterable: Iterable[T], throughput_aggregatgor_factory: Callable[[], ThroughputAggregator]
-) -> Iterable[Tuple[ThroughputAggregator, T]]:
-    a = throughput_aggregatgor_factory()
-    a.start()
-    for e in iterable:
-        yield a, e
-        a.start()
-
-
 class ThroughputAggregator:
     def __init__(self) -> None:
         self.reset()
@@ -60,13 +47,27 @@ class ThroughputAggregator:
         )
         return synced_num_samples / synced_foward_backward_time
 
+T = TypeVar("T", bound=Any)
+
+
+def start_throughput_measurement(
+    iterable: Iterable[T],
+    throughput_aggregatgor_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
+) -> Iterable[Tuple[ThroughputAggregator, T]]:
+    a = throughput_aggregatgor_factory()
+    a.start()
+    for e in iterable:
+        yield a, e
+        a.start()
+
 
 class ThroughputAggregationContext:
+
     def __init__(
         self,
         num_samples: int,
         local_rank: int,
-        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self._local_rank = local_rank
         self._num_samples = num_samples

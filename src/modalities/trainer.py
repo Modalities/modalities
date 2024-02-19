@@ -15,13 +15,14 @@ from modalities.running_env.fsdp.reducer import Reducer
 
 
 class Trainer:
+
     def __init__(
         self,
         local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_step: int,
-        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher

@@ -20,7 +20,7 @@ class Evaluator:
         metric_factories: List[AggregativeMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
-        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self.local_rank = local_rank
         self._loss_factories = loss_factories
