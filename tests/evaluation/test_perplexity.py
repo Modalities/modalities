@@ -117,7 +117,9 @@ def test_sanity_check_computation():
     # so this does not actually test the application, but rather is a semi-manual computation of the perplexity
     logits = torch.tensor([[-0.7891, 1.3421, 0.4929, 0.0715, -0.0910], [0.9024, -0.8675, 0.8498, -1.0331, 0.5531]])
     actual = torch.tensor([2, 3])
-    as_batch = InferenceResultBatch(targets={"target_ids": actual}, predictions={"logits": logits})
+    as_batch = InferenceResultBatch(
+        targets={"target_ids": actual.unsqueeze(0)}, predictions={"logits": logits.unsqueeze(0)}
+    )
     loss_fun = torch.nn.CrossEntropyLoss(reduction="none")
     loss = loss_fun(logits, actual)
     loss = loss.sum() / len(actual)

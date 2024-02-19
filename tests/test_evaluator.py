@@ -2,6 +2,7 @@ import os
 import unittest
 from typing import List, Tuple
 from unittest.mock import MagicMock, call
+from modalities.dataloader.dataloader import LLMDataLoader
 
 import pytest
 import torch
@@ -58,10 +59,17 @@ def test_evaluate_builds_in_all_loss_factories(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
-    assert len(loss_factories[0].created_mocks) == len(loss_factories)
+    expected_num_calls = len(loss_factories) * (2 if num_batches2 > 0 else 1)
+    assert len(loss_factories[0].created_mocks) == expected_num_calls
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -69,11 +77,18 @@ def test_evaluate_calls_add_for_all_losses_and_batches(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
     add_call_counts = [loss.add.call_count for loss in loss_factories[0].created_mocks]
-    unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(loss_factories))
+    expected_call_counts = [num_batches] * len(loss_factories) + [num_batches2] * len(loss_factories)
+    unittest.TestCase().assertListEqual(add_call_counts, expected_call_counts)
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -81,11 +96,18 @@ def test_evaluate_calls_compute_on_all_losses(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     loss_factories, _ = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
     compute_call_counts = [loss.compute.call_count for loss in loss_factories[0].created_mocks]
-    unittest.TestCase().assertListEqual(compute_call_counts, [1] * len(loss_factories))
+    expected_call_counts = [1] * len(loss_factories) * (2 if num_batches2 > 0 else 1)
+    unittest.TestCase().assertListEqual(compute_call_counts, expected_call_counts)
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -93,10 +115,17 @@ def test_evaluate_builds_in_all_metrics_factories(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
-    assert len(metric_factories[0].created_mocks) == len(metric_factories)
+    expected_num_calls = len(metric_factories) * (2 if num_batches2 > 0 else 1)
+    assert len(metric_factories[0].created_mocks) == expected_num_calls
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -104,11 +133,18 @@ def test_evaluate_calls_add_for_all_metrics_and_batches(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
     add_call_counts = [loss.add.call_count for loss in metric_factories[0].created_mocks]
-    unittest.TestCase().assertListEqual(add_call_counts, [num_batches] * len(metric_factories))
+    expected_call_counts = [num_batches] * len(metric_factories) + [num_batches2] * len(metric_factories)
+    unittest.TestCase().assertListEqual(add_call_counts, expected_call_counts)
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -116,22 +152,34 @@ def test_evaluate_calls_compute_on_all_metrics(
     nn_model_mock, llm_data_loader_mock, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
+    num_batches2 = 3
     _, metric_factories = _run_loss_and_metrics_test(
-        num_batches, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+        num_batches,
+        llm_data_loader_mock,
+        nn_model_mock,
+        progress_publisher_mock,
+        throughput_aggregator,
+        num_batches2=num_batches2,
     )
     compute_call_counts = [loss.compute.call_count for loss in metric_factories[0].created_mocks]
-    unittest.TestCase().assertListEqual(compute_call_counts, [1] * len(metric_factories))
+    expected_call_counts = [1] * len(metric_factories) * (2 if num_batches2 > 0 else 1)
+    unittest.TestCase().assertListEqual(compute_call_counts, expected_call_counts)
 
 
 def _run_loss_and_metrics_test(
-    num_batches: int, llm_data_loader_mock, nn_model_mock, progress_publisher_mock, throughput_aggregator
+    num_batches: int,
+    llm_data_loader_mock: LLMDataLoader,
+    nn_model_mock,
+    progress_publisher_mock,
+    throughput_aggregator,
+    num_batches2: int = 0,
 ) -> Tuple[List[MockAggregativeMeasureFactory], List[MockAggregativeMeasureFactory]]:
     loss_factory = MockAggregativeMeasureFactory()
     metric_factory = MockAggregativeMeasureFactory()
     loss_factories = [loss_factory] * 3
     metric_factories = [metric_factory] * 5
 
-    _prepare_test_batches(llm_data_loader_mock, num_batches=num_batches)
+    data_loaders = _prepare_data_loaders(num_batches, num_batches2, llm_data_loader_mock)
 
     evaluator = Evaluator(
         local_rank=int(os.getenv("LOCAL_RANK", 0)),
@@ -144,11 +192,22 @@ def _run_loss_and_metrics_test(
 
     evaluator.evaluate(
         model=nn_model_mock,
-        data_loaders=[llm_data_loader_mock],
+        data_loaders=data_loaders,
         global_train_sample_id=0,
         local_sample_id_to_global_sample_id=lambda i: i,
     )
     return loss_factories, metric_factories
+
+
+def _prepare_data_loaders(num_batches: int, num_batches2: int, llm_data_loader_mock: LLMDataLoader):
+    _prepare_test_batches(llm_data_loader_mock, num_batches=num_batches)
+    data_loaders = [llm_data_loader_mock]
+
+    if num_batches2 > 0:
+        llm_data_loader_mock2 = MagicMock(spec=LLMDataLoader)
+        _prepare_test_batches(llm_data_loader_mock2, batch_size=17, seq_len=13, num_batches=num_batches2)
+        data_loaders.append(llm_data_loader_mock2)
+    return data_loaders
 
 
 def _prepare_test_batches(
