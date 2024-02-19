@@ -66,7 +66,7 @@ class Trainer:
         cummulated_loss = self._reset_loss()
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
-        device = torch.device(self.local_rank) if torch.cuda.is_available() else "cpu"
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch

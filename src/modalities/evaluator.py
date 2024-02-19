@@ -46,7 +46,7 @@ class Evaluator:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 
-        device = torch.device(self.local_rank) if torch.cuda.is_available() else "cpu"
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
         for data_loader in data_loaders:
             cummulated_loss = torch.zeros(3).to(device)
