@@ -104,14 +104,16 @@ class PillowImageCodec(Codec[str]):
 class TorchaudioAudioCodec(Codec[str]):
     def __init__(
         self,
+        target_sample_rate: int = 16_000,
+        n_mels: int = 80,
     ) -> None:
         self.extract_mel_spec = torchaudio.transforms.MelSpectrogram(
-            sample_rate=16_000,
+            sample_rate=target_sample_rate,
             n_fft=400,
-            n_mels=80,
+            n_mels=n_mels,
             hop_length=160,
         )
-        self.target_sample_rate = 16_000
+        self.target_sample_rate = target_sample_rate
 
     def load_audio(
         self,

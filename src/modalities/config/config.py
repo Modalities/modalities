@@ -4,13 +4,11 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
-from transformers import PretrainedConfig
-
 from modalities.config.lookup_types import (
     BatchSamplerTypes,
     CheckpointingExectionTypes,
     CheckpointingStrategyTypes,
+    CodecTypes,
     CollatorTypes,
     DataloaderTypes,
     DatasetTypes,
@@ -20,11 +18,12 @@ from modalities.config.lookup_types import (
     SamplerTypes,
     SchedulerTypes,
     TokenizerTypes,
-    CodecTypes
 )
 from modalities.config.types import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2Config
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
+from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from transformers import PretrainedConfig
 
 
 class WandbConfig(BaseModel):
@@ -62,14 +61,15 @@ class CodecConfig(BaseModel):
     class PillowImageCodecConfig(BaseModel):
         save_format: str = "png"
 
-    class TorchaudioAudioCodec(BaseModel):
-        pass
+    class TorchaudioAudioCodecConfig(BaseModel):
+        target_sample_rate: int = 16_000
+        n_mels: int = 80
 
     type_hint: CodecTypes
     config: Union[
         HfTokenizerCodecConfig,
         PillowImageCodecConfig,
-        TorchaudioAudioCodec,
+        TorchaudioAudioCodecConfig,
     ] = Field(union_mode="left_to_right")
 
 
@@ -77,6 +77,7 @@ class FeatureConfig(BaseModel):
 
     codec: CodecConfig
     jq_pattern: str
+
 
 class PreparationAppConfig(BaseModel):
 
@@ -315,6 +316,7 @@ class CheckpointingConfig(BaseModel):
 class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
+
 
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
