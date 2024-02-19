@@ -13,6 +13,3 @@ features:
       type_hint: PillowImageCodec
       config:
         save_format: png
-  - jq_pattern: .audio_path
-    codec:
-      type_hint: TorchaudioAudioCodec
