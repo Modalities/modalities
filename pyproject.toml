@@ -22,7 +22,12 @@ dependencies = [
     "xformers",
     "class_resolver",
     "wandb",
-    "pillow"
+    "pillow",
+    "scipy",
+    "torchaudio",
+    "pillow",
+    "ffmpeg",
+    "soundfile"
 ]
 
 [project.optional-dependencies]

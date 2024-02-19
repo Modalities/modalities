@@ -9,7 +9,7 @@ from modalities.checkpointing.checkpointing_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec
+from modalities.dataloader.codecs import HfTokenizerCodec, PillowImageCodec, TorchaudioAudioCodec
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.mmap_dataset import MMapIndexedDatasetBuilder
@@ -51,6 +51,7 @@ class TokenizerTypes(LookupEnum):
 class CodecTypes(LookupEnum):
     HfTokenizerCodec = HfTokenizerCodec
     PillowImageCodec = PillowImageCodec
+    TorchaudioAudioCodec = TorchaudioAudioCodec
 
 
 class DatasetTypes(LookupEnum):

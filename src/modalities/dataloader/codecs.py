@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import Generic, Optional, TypeVar
 
+import numpy as np
+import torch
+import torchaudio
 from PIL import Image
 from transformers import PreTrainedTokenizer
 
@@ -96,3 +99,98 @@ class PillowImageCodec(Codec[str]):
     @staticmethod
     def decode(serialized_img: bytes) -> str:
         return Image.open(BytesIO(serialized_img))
+
+
+class TorchaudioAudioCodec(Codec[str]):
+    N_FFT = 400
+    HOP_LENGTH = 160
+
+    def __init__(
+        self,
+        target_sample_rate: int = 16_000,
+        n_mels: int = 80,
+    ) -> None:
+        self.target_sample_rate = target_sample_rate
+        self.extract_mel_spec = torchaudio.transforms.MelSpectrogram(
+            sample_rate=target_sample_rate,
+            n_mels=n_mels,
+            n_fft=type(self).N_FFT,
+            hop_length=type(self).HOP_LENGTH,
+        )
+
+    def load_audio(
+        self,
+        audio_file_path: str,
+    ) -> torch.Tensor:
+        audio, sample_rate = torchaudio.load(
+            audio_file_path,
+        )
+
+        return (
+            audio.mean(dim=0),
+            sample_rate,
+        )
+
+    def extract_log_mel_spectrogram(
+        self,
+        audio: torch.Tensor,
+    ) -> torch.Tensor:
+        ############################################
+        # Feature extraction is quite similar to how it is done
+        # for Radford, Alec, et al. "Robust speech recognition
+        # via large-scale weak supervision." 2023 AKA Whisper.
+        # Their code can be found here:
+        # https://github.com/openai/whisper/blob/main/whisper/audio.py
+        # MIT LICENSE: https://github.com/openai/whisper/blob/main/LICENSE
+        ############################################
+
+        mel_spec = self.extract_mel_spec(audio)
+        log_mel_spec = torch.clamp(mel_spec, min=1e-10).log10()
+        log_mel_spec = torch.maximum(log_mel_spec, log_mel_spec.max() - 8.0)
+        log_mel_spec = (log_mel_spec + 4.0) / 4.0
+        return log_mel_spec.transpose(1, 0)
+
+    def resample(
+        self,
+        audio: torch.Tensor,
+        sample_rate: int,
+    ) -> torch.Tensor:
+        resampler = torchaudio.transforms.Resample(
+            sample_rate,
+            self.target_sample_rate,
+            dtype=audio.dtype,
+        )
+        return resampler(audio)
+
+    def encode(
+        self,
+        audio_file_path: str,
+    ) -> bytes:
+        audio, sample_rate = self.load_audio(
+            audio_file_path,
+        )
+
+        audio = (
+            self.resample(
+                audio,
+                sample_rate,
+            )
+            if sample_rate != self.target_sample_rate
+            else audio
+        )
+
+        log_mel_spec = self.extract_log_mel_spectrogram(
+            audio,
+        ).numpy()
+
+        buf = BytesIO()
+        np.save(buf, log_mel_spec)
+        buf.seek(0)
+
+        return buf.read()
+
+    @staticmethod
+    def decode(
+        serialized_audio: bytes,
+    ) -> np.ndarray:
+        return np.load(BytesIO(serialized_audio))

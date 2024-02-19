@@ -61,8 +61,34 @@ class CodecConfig(BaseModel):
     class PillowImageCodecConfig(BaseModel):
         save_format: str = "png"
 
+    class TorchaudioAudioCodecConfig(BaseModel):
+        target_sample_rate: int = 16_000
+        n_mels: int = 80
+
     type_hint: CodecTypes
-    config: Union[HfTokenizerCodecConfig, PillowImageCodecConfig] = Field(union_mode="left_to_right")
+    config: Union[
+        HfTokenizerCodecConfig,
+        PillowImageCodecConfig,
+        TorchaudioAudioCodecConfig,
+    ] = Field(union_mode="left_to_right")
+
+    @model_validator(mode="before")
+    def _resolve_type(cls, data):
+        if isinstance(data, dict):
+            # resolve config type from type hint
+            type_hint = data["type_hint"]
+            CONFIG_RESOLVER = {
+                CodecTypes.HfTokenizerCodec.name: cls.HfTokenizerCodecConfig,
+                CodecTypes.PillowImageCodec.name: cls.PillowImageCodecConfig,
+                CodecTypes.TorchaudioAudioCodec.name: cls.TorchaudioAudioCodecConfig,
+            }
+            # create config object of correct type
+            config_type = CONFIG_RESOLVER.get(type_hint)
+            config = config_type(**data["config"])
+            # return codec config
+            return {"type_hint": type_hint, "config": config}
+
+        return data
 
 
 class FeatureConfig(BaseModel):
