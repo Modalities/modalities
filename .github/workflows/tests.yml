@@ -26,7 +26,7 @@ jobs:
         pip install -e .[tests]
     - name: Run tests
       run: |
-        pytest --cov
+        pytest
     - name: Coveralls GitHub Action
       uses: coverallsapp/github-action@v2.2.3
 
