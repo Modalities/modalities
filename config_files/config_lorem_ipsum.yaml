@@ -10,7 +10,7 @@ wandb:
 data:
   sample_key: "input_ids"
   target_key: "target_ids"
-  sequence_len: 128
+  sequence_len: 256
   train_dataloader:
     type_hint: LLMDataLoader
     config:
@@ -29,7 +29,7 @@ data:
           tokenizer:
             type_hint: GPT2TokenizerFast
             config:
-              tokenizer_file: data/tokenizer/tokenizer.json
+              tokenizer_file: data/tokenizer/tokenizer_gpt2.json
       batch_sampler:
         type_hint: BatchSampler
         config:
@@ -123,7 +123,7 @@ running_env:
     local_rank: ${oc.env:LOCAL_RANK}
     mixed_precision_settings: FP_16
     sharding_strategy: FULL_SHARD
-    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+    block_names: [GPT2Block]
 
 model:
   type_hint: GPT2LLM
@@ -139,7 +139,7 @@ model:
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention:
-      attention_type: pytorch_flash_attention
+      attention_type: default_attention # pytorch_flash_attention
       scaling_factor: 3
     activation: gelu
     epsilon: 1e-5
