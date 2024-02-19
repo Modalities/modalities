@@ -12,6 +12,7 @@ from modalities.models.model import NNModel, model_predict_batch
 
 
 class Evaluator:
+
     def __init__(
         self,
         local_rank: int,
@@ -19,7 +20,7 @@ class Evaluator:
         metric_factories: List[AggregativeMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
-        throughput_aggregator_factory: Callable[[], ThroughputAggregator],
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = lambda: ThroughputAggregator(),
     ) -> None:
         self.local_rank = local_rank
         self._loss_factories = loss_factories

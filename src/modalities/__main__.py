@@ -252,7 +252,9 @@ class Main:
         # Evaluator
         evaluator = Evaluator(
             local_rank=config.training.local_rank,
-            loss_factories=resolvers.build_component_by_config(config=config.validation_measure_factories),
+            loss_factories=[
+                resolvers.build_component_by_config(config=factory) for factory in config.validation_measure_factories
+            ],
             metric_factories=[],
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
