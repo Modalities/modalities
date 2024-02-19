@@ -1,8 +1,10 @@
 from abc import abstractmethod
 from typing import Dict
-from modalities.batch import DatasetBatch, InferenceResultBatch
+
 import torch
 import torch.nn as nn
+
+from modalities.batch import DatasetBatch, InferenceResultBatch
 
 
 class NNModel(nn.Module):

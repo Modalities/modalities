@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from modalities.logging_broker.message_broker import Message, MessageBroker
 
+from modalities.logging_broker.message_broker import Message, MessageBroker
 from modalities.logging_broker.messages import MessageTypes
 
 T = TypeVar("T")
@@ -15,6 +15,7 @@ class MessagePublisherIF(ABC, Generic[T]):
 
 class MessagePublisher(MessagePublisherIF[T]):
     """The MessagePublisher sends messages through a message broker."""
+
     def __init__(
         self,
         message_broker: MessageBroker,

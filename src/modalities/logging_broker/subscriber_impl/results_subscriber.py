@@ -2,10 +2,10 @@ from pathlib import Path
 from typing import Optional
 
 import rich
+import wandb
 from rich.console import Group
 from rich.panel import Panel
 
-import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import AppConfig, WandbConfig
 from modalities.logging_broker.messages import Message
