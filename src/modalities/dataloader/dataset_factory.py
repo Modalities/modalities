@@ -2,11 +2,27 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import FilePath
+from torch.utils.data.dataset import Dataset
 from transformers import PreTrainedTokenizer
 
-from modalities.dataloader.dataloader_factory import OpenGPTXDatasetWrapper
 from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
+
+
+class OpenGPTXDatasetWrapper(Dataset):
+    def __init__(self, open_gptx_dataset: OpenGPTXMMapDataset, num_samples: int) -> None:
+        super().__init__()
+        self.open_gptx_dataset = open_gptx_dataset
+        self.num_samples = num_samples
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx: int):
+        if self.num_samples > idx:
+            return self.open_gptx_dataset.__getitem__(idx)
+        else:
+            raise ValueError("num_samples <= idx")
 
 
 class DatasetFactory:
