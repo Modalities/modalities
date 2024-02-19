@@ -4,6 +4,9 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
 
+from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
+from transformers import PretrainedConfig
+
 from modalities.config.lookup_types import (
     BatchSamplerTypes,
     CheckpointingExectionTypes,
@@ -22,8 +25,6 @@ from modalities.config.lookup_types import (
 from modalities.config.types import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2Config
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
-from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
-from transformers import PretrainedConfig
 
 
 class WandbConfig(BaseModel):
@@ -52,7 +53,6 @@ class TokenizerConfig(BaseModel):
 
 
 class CodecConfig(BaseModel):
-
     class HfTokenizerCodecConfig(BaseModel):
         tokenizer: TokenizerConfig
         max_length: Optional[int] = None
@@ -72,15 +72,31 @@ class CodecConfig(BaseModel):
         TorchaudioAudioCodecConfig,
     ] = Field(union_mode="left_to_right")
 
+    @model_validator(mode="before")
+    def _resolve_type(cls, data):
+        if isinstance(data, dict):
+            # resolve config type from type hint
+            type_hint = data["type_hint"]
+            CONFIG_RESOLVER = {
+                CodecTypes.HfTokenizerCodec.name: cls.HfTokenizerCodecConfig,
+                CodecTypes.PillowImageCodec.name: cls.PillowImageCodecConfig,
+                CodecTypes.TorchaudioAudioCodec.name: cls.TorchaudioAudioCodecConfig,
+            }
+            # create config object of correct type
+            config_type = CONFIG_RESOLVER.get(type_hint)
+            config = config_type(**data["config"])
+            # return codec config
+            return {"type_hint": type_hint, "config": config}
+
+        return data
+
 
 class FeatureConfig(BaseModel):
-
     codec: CodecConfig
     jq_pattern: str
 
 
 class PreparationAppConfig(BaseModel):
-
     features: List[FeatureConfig]
 
 
