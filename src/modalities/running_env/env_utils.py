@@ -1,10 +1,10 @@
-from enum import Enum
-
 import torch
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
 from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
+
+from modalities.config.lookup_types import LookupEnum
 
 
 def has_bfloat_support():
@@ -48,7 +48,7 @@ fpThirtytwo = MixedPrecision(
 )
 
 
-class MixedPrecisionSettings(Enum):
+class MixedPrecisionSettings(LookupEnum):
     FP_16 = fpSixteen
     BF_16 = bfSixteen
     BF_16_WORKING = bfSixteen_working
