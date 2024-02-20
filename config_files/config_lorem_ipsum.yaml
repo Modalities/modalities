@@ -1,24 +1,20 @@
-global_experiment_settings:
-  experiment_id: null
-  global_num_training_samples: 12
-  callback_interval_in_samples: 6
-  sequence_length: 256
+settings:  
+  experiment_id: "abc"
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
   training:
-    run_mode: FROM_SCRATCH
+    callback_interval_in_batches: 6
+    global_num_training_samples: 12
     global_num_seen_samples: 0
-  batching:
+    do_apply_activation_checkpointing: true
     gradient_acc_step: 1
     local_train_micro_batch_size: 3
-  performance_settings:
-    do_apply_activation_checkpointing: true
-  environment:
+    sequence_length: 256
+  cuda_env:
     local_rank: ${modalities_env:LOCAL_RANK}
     global_rank: ${modalities_env:RANK}
     world_size: ${modalities_env:WORLD_SIZE}
-
 
 tokenizer:
   component_key: tokenizer
@@ -30,8 +26,8 @@ collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
-    sample_key: ${global_experiment_settings.referencing_keys.sample_key}
-    target_key: ${global_experiment_settings.referencing_keys.target_key}
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
 
 train_dataset:  
   component_key: dataset
@@ -39,9 +35,9 @@ train_dataset:
   config:
     raw_data_path: data/lorem_ipsum.jsonl
     index_path: data/lorem_ipsum.idx
-    block_size: ${global_experiment_settings.sequence_length}
+    block_size: ${settings.training.sequence_length}
     jq_pattern: ".text"
-    sample_key:  ${global_experiment_settings.referencing_keys.sample_key}
+    sample_key:  ${settings.referencing_keys.sample_key}
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -67,8 +63,8 @@ train_dataloader:
           component_key: sampler
           variant_key: distributed_sampler
           config:
-            rank: ${global_experiment_settings.environment.global_rank}
-            num_replicas: ${global_experiment_settings.environment.world_size}
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
             shuffle: true
             dataset:
               instance_key: train_dataset
@@ -98,8 +94,8 @@ val_dataloader:
           component_key: sampler
           variant_key: distributed_sampler
           config:
-            rank: ${global_experiment_settings.environment.global_rank}
-            num_replicas: ${global_experiment_settings.environment.world_size}
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
             dataset:
               instance_key: train_dataset
@@ -129,8 +125,8 @@ test_dataloader:
           component_key: sampler
           variant_key: distributed_sampler
           config:
-            rank: ${global_experiment_settings.environment.global_rank}
-            num_replicas: ${global_experiment_settings.environment.world_size}
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
             dataset:
               instance_key: train_dataset
@@ -138,22 +134,6 @@ test_dataloader:
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE 
-
-
-data:
-  train_dataloader:
-    instance_key: train_dataloader
-    pass_type: BY_REFERENCE
-  eval_dataloaders:
-    val:
-      instance_key: val_dataloader
-      pass_type: BY_REFERENCE
-    test: 
-      instance_key: test_dataloader
-      pass_type: BY_REFERENCE
-  
-
-
 
 checkpointing:
   component_key: checkpointing
@@ -169,27 +149,29 @@ checkpointing:
       variant_key: fsdp_to_disc_checkpointing
       config:
         checkpoint_path: data/checkpoints
-        global_rank: ${global_experiment_settings.environment.global_rank}
+        global_rank: ${settings.cuda_env.global_rank}
         experiment_id: "abc" # TODO set this via env var maybe?
-        running_env:
-          instance_key: running_env
-          pass_type: BY_REFERENCE
+        mixed_precision_settings: BF_16
+        sharding_strategy: FULL_SHARD
+        block_names: [GPT2Block]
 
 # resolving class types via different enums sucks...
-loss:
+loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
   config:
     target_key: target_ids
     prediction_key: logits
 
-running_env:
-  component_key: running_env
-  variant_key: fsdp_running_env
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
   config:
-    process_group_backend: nccl
-    local_rank: ${global_experiment_settings.environment.local_rank}
-    mixed_precision_settings: FP_16
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
@@ -227,46 +209,9 @@ optimizer:
   variant_key: adam_w
   config:
     lr: 0.0001
-    model: 
-      instance_key: model
+    wrapped_model: 
+      instance_key: wrapped_model
       pass_type: BY_REFERENCE
-
-sampler:
-  component_key: sampler
-  variant_key: distributed_sampler
-  config:
-    rank: ${global_experiment_settings.environment.global_rank}
-    num_replicas: ${global_experiment_settings.environment.world_size}
-    shuffle: true
-    dataset:
-      instance_key: dataset
-      pass_type: BY_REFERENCE
-
-  
-dataset:  
-  component_key: dataset
-  variant_key: mem_map_dataset
-  config:
-    raw_data_path: data/lorem_ipsum.jsonl
-    index_path: data/lorem_ipsum.idx
-    block_size: 256 # TODO reference this (same as sequence length)
-    jq_pattern: ".text"
-    sample_key: "input_ids" # TODO reference this
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
-
-batch_sampler:
-  component_key: batch_sampler
-  variant_key: default
-  config:
-    batch_size: 3
-    drop_last: false
-    sampler:
-      instance_key: sampler
-      pass_type: BY_REFERENCE
-  
-
 
 # message subscriber
 
@@ -274,11 +219,11 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${global_experiment_settings.environment.local_rank}
-    world_size: ${global_experiment_settings.environment.world_size}
-    global_num_seen_samples: ${global_experiment_settings.training.global_num_seen_samples}
+    local_rank: ${settings.cuda_env.local_rank}
+    world_size: ${settings.cuda_env.world_size}
+    global_num_seen_samples: ${settings.training.global_num_seen_samples}
     train_dataloader:
-      instance_key: train_dataset
+      instance_key: train_dataloader
       pass_type: BY_REFERENCE
     eval_dataloaders:
       val:
@@ -293,7 +238,7 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${global_experiment_settings.environment.local_rank}
+    local_rank: ${settings.cuda_env.local_rank}
     project: modalities
     mode: OFFLINE
     experiment_id: "abc" # TODO set this via env var maybe?
