@@ -1,5 +1,5 @@
-from enum import Enum
+from modalities.config.lookup_types import LookupEnum
 
 
-class ProcessGroupBackendType(Enum):
+class ProcessGroupBackendType(LookupEnum):
     nccl = "nccl"
