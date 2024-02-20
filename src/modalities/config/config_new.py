@@ -1,22 +1,28 @@
 from pathlib import Path
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 import torch.nn as nn
-from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint
+from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint, validator
 from pydantic_core import core_schema
+from torch.distributed.fsdp import ShardingStrategy
+from torch.optim import Optimizer
 from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
+from modalities.checkpointing.checkpointing import CheckpointingIF
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_types import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
-from modalities.running_env.running_env import RunningEnv
+from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.util import parse_enum_by_name
 
 
-class PydanticRunningEnvIF:
+class PydanticCheckpointingIF:
     @classmethod
     def __get_pydantic_core_schema__(
         cls,
@@ -25,8 +31,8 @@ class PydanticRunningEnvIF:
     ) -> core_schema.CoreSchema:
         # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
         return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(RunningEnv),
-            python_schema=core_schema.is_instance_schema(RunningEnv),
+            json_schema=core_schema.is_instance_schema(CheckpointingIF),
+            python_schema=core_schema.is_instance_schema(CheckpointingIF),
             # serialization=core_schema.plain_serializer_function_ser_schema(
             #     lambda instance: instance.x
             # ),
@@ -169,7 +175,58 @@ class PydanticLLMDataLoaderIF:
         )
 
 
-PydanticRunningEnvType = Annotated[RunningEnv, PydanticRunningEnvIF]
+class PydanticOptimizerIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(Optimizer),
+            python_schema=core_schema.is_instance_schema(Optimizer),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
+class PydanticLossIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(Loss),
+            python_schema=core_schema.is_instance_schema(Loss),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
+class PydanticMessageSubscriberIF:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(MessageSubscriberIF),
+            python_schema=core_schema.is_instance_schema(MessageSubscriberIF),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
+
+
+PydanticCheckpointingIFType = Annotated[CheckpointingIF, PydanticCheckpointingIF]
 PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
 PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
 PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
@@ -178,6 +235,9 @@ PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
 PydanticSamplerIFType = Annotated[Sampler, PydanticSamplerIF]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticCollateFnIF]
 PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticLLMDataLoaderIF]
+PydanticOptimizerIFType = Annotated[Optimizer, PydanticOptimizerIF]
+PydanticLossIFType = Annotated[Loss, PydanticLossIF]
+PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticMessageSubscriberIF]
 
 
 class PassType(LookupEnum):
@@ -210,7 +270,25 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: conint(ge=0)
     experiment_id: str
-    running_env: PydanticRunningEnvType
+    block_names: List[str]
+    mixed_precision_settings: MixedPrecisionSettings
+    sharding_strategy: ShardingStrategy
+
+    @validator("mixed_precision_settings", pre=True, always=True)
+    def parse_mixed_precision_setting_by_name(cls, name):
+        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
+            name=name, enum_type=MixedPrecisionSettings
+        )
+        if not has_bfloat_support() and (
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return mixed_precision_settings
+
+    @validator("sharding_strategy", pre=True, always=True)
+    def parse_sharding_strategy_by_name(cls, name):
+        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
 class CheckpointingConfig(BaseModel):
@@ -220,7 +298,44 @@ class CheckpointingConfig(BaseModel):
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
+    wrapped_model: PydanticModelIFType
+
+
+class CheckpointedOptimizerConfig(BaseModel):
+    checkpointing: PydanticCheckpointingIFType
+    checkpoint_path: Path
+    wrapped_model: PydanticModelIFType
+    optimizer: PydanticOptimizerIFType
+
+
+class CheckpointedModelConfig(BaseModel):
+    checkpointing: PydanticCheckpointingIFType
+    checkpoint_path: Path
     model: PydanticModelIFType
+
+
+class FSDPWrappedModelConfig(BaseModel):
+    model: PydanticModelIFType
+    sync_module_states: bool
+    mixed_precision_settings: MixedPrecisionSettings
+    sharding_strategy: ShardingStrategy
+    block_names: List[str]
+
+    @validator("mixed_precision_settings", pre=True, always=True)
+    def parse_mixed_precision_setting_by_name(cls, name):
+        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
+            name=name, enum_type=MixedPrecisionSettings
+        )
+        if not has_bfloat_support() and (
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return mixed_precision_settings
+
+    @validator("sharding_strategy", pre=True, always=True)
+    def parse_sharding_strategy_by_name(cls, name):
+        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
 class GPT2TokenizerFastConfig(BaseModel):
@@ -329,3 +444,38 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
     local_rank: int
+
+
+class Settings(BaseModel):
+    class CudaEnv(BaseModel):
+        local_rank: conint(ge=0)
+        world_size: conint(ge=1)
+        global_rank: conint(ge=0)
+
+    class Training(BaseModel):
+        callback_interval_in_batches: conint(ge=1)
+        global_num_training_samples: conint(ge=1)
+        global_num_seen_samples: conint(ge=0)
+        do_apply_activation_checkpointing: bool
+        gradient_acc_step: conint(ge=1)
+        local_train_micro_batch_size: conint(ge=1)
+        sequence_length: conint(ge=1)
+
+    experiment_id: str
+    referencing_keys: Dict[str, str]
+    training: Training
+    cuda_env: CudaEnv
+
+
+class ComponentsModel(BaseModel):
+    wrapped_model: PydanticModelIFType
+    optimizer: PydanticOptimizerIFType
+    loss_fn: PydanticLossIFType
+    train_dataloader: PydanticLLMDataLoaderIFType
+    val_dataloader: PydanticLLMDataLoaderIFType
+    test_dataloader: PydanticLLMDataLoaderIFType
+    batch_progress_subscriber: PydanticMessageSubscriberIFType
+    evaluation_subscriber: PydanticMessageSubscriberIFType
+    checkpointing: PydanticCheckpointingIFType
+
+    settings: Settings
