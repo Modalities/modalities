@@ -11,13 +11,14 @@ class ComponentFactory:
         self.component_registry = component_registry
 
     def build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
+        component_dict_filtered = {name: config_dict[name] for name in component_names}
         components, _ = self._build_component(
-            current_component_config=config_dict,
+            current_component_config=component_dict_filtered,
             component_config=config_dict,
             top_level_components={},
             traversal_path=[],
         )
-        return {name: components[name] for name in component_names}
+        return components
 
     def _build_component(
         self,
@@ -74,7 +75,7 @@ class ComponentFactory:
                 if referenced_entity_key not in top_level_components:
                     materialized_referenced_component, top_level_components = self._build_component(
                         current_component_config=component_config[referenced_entity_key],
-                        component_config=component_config[referenced_entity_key],
+                        component_config=component_config,
                         top_level_components=top_level_components,
                         traversal_path=[referenced_entity_key],
                     )
