@@ -7,35 +7,24 @@ from typing import Dict, List, Tuple, Type
 
 import click
 import click_pathlib
-import torch
-import torch.nn as nn
 from omegaconf import OmegaConf
-from torch.optim import Optimizer
 
-from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
-from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
+from modalities.config.config_new import ComponentsModel
 from modalities.config.lookup_types import TokenizerTypes
+from modalities.config.types import ProcessGroupBackendType
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
-from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
-    DummyProgressSubscriber,
-    RichProgressSubscriber,
-)
-from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
-from modalities.loss_functions import Loss
+from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.registry_factory import RegistryFactory
-from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
+from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
 from modalities.utils.generate_text import main as generate_text_main
@@ -173,17 +162,16 @@ class Main:
             component_names
             if component_names is not None
             else [
-                "running_env",
-                "loss",
+                "settings",
+                "loss_fn",
                 "checkpointing",
-                "model",
+                "wrapped_model",
                 "optimizer",
-                "tokenizer",
-                "dataset",
-                "sampler",
-                "batch_sampler",
-                "collate_fn",
                 "train_dataloader",
+                "val_dataloader",
+                "test_dataloader",
+                "batch_progress_subscriber",
+                "evaluation_subscriber",
             ]
         )
 
@@ -193,190 +181,195 @@ class Main:
             config_registry=component_config_registry, component_registry=component_registry
         )
 
-    def build_component_dict(self) -> Dict:
+    def build_component_dict(self, component_names: List[str]) -> Dict:
         component_dict = self.component_factory.build_config(
-            config_dict=self.config_dict, component_names=self.component_names
+            config_dict=self.config_dict, component_names=component_names
         )
         return component_dict
 
     def run(self):
-        self.build_component_dict()
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            component_dict = self.build_component_dict(component_names=self.component_names)
+            print(component_dict)
+            components = ComponentsModel(**component_dict)
+            evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+                progress_subscriber=components.batch_progress_subscriber,
+                results_subscriber=components.evaluation_subscriber,
+                global_rank=components.settings.cuda_env.global_rank,
+                local_rank=components.settings.cuda_env.local_rank,
+            )
 
-        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
-        with self.running_env as running_env:
-            (
-                gym,
-                train_dataloader,
-                eval_data_loaders,
-                checkpointing,
-                wrapped_model,
-                optimizer,
-            ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
+            # Trainer
+            trainer = Trainer(
+                local_rank=components.settings.cuda_env.local_rank,
+                batch_progress_publisher=batch_processed_publisher,
+                evaluation_result_publisher=evaluation_result_publisher,
+                gradient_acc_step=components.settings.training.gradient_acc_step,
+            )
 
-            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+            # Evaluator
+            evaluator = Evaluator(
+                local_rank=components.settings.cuda_env.local_rank,
+                batch_progress_publisher=batch_processed_publisher,
+                evaluation_result_publisher=evaluation_result_publisher,
+            )
 
+            #     # Gym
+            gym = Gym(
+                trainer=trainer,
+                evaluator=evaluator,
+                loss_fun=components.loss_fn,
+                num_ranks=components.settings.cuda_env.world_size,
+            )
+
+            logging.info(
+                f"Training model with {compute_number_of_trainable_parameters(components.wrapped_model)} parameters."
+            )
             gym.run(
-                callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
-                train_data_loader=train_dataloader,
-                evaluation_data_loaders=eval_data_loaders,
-                checkpointing=checkpointing,
-                model=wrapped_model,
-                optimizer=optimizer,
+                callback_interval_in_batches=3,
+                train_data_loader=components.train_dataloader,
+                evaluation_data_loaders=[components.val_dataloader, components.test_dataloader],
+                checkpointing=components.checkpointing,
+                model=components.wrapped_model,
+                optimizer=components.optimizer,
             )
+            print("done")
 
-    def construct_components(
-        self, resolvers, config: AppConfig, running_env: RunningEnv
-    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
-        # Checkpointing
+    # def construct_components(
+    #     self, resolvers, config: AppConfig, running_env: RunningEnv
+    # ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
+    #     # Checkpointing
 
-        checkpointing = None  # TODO pass in the component
+    #     checkpointing = None  # TODO pass in the component
 
-        # Model and optimizer
-        wrapped_model, optimizer = self.get_model_and_optimizer(
-            config=config, running_env=running_env, checkpointing=checkpointing
-        )
-        if config.training.do_apply_activation_checkpointing:
-            apply_activation_checkpointing_inplace(wrapped_model)
-            logging.info("Applied activation checkpointing!")
+    #     # Model and optimizer
+    #     wrapped_model, optimizer = self.get_model_and_optimizer(
+    #         config=config, running_env=running_env, checkpointing=checkpointing
+    #     )
+    #     if config.training.do_apply_activation_checkpointing:
+    #         apply_activation_checkpointing_inplace(wrapped_model)
+    #         logging.info("Applied activation checkpointing!")
 
-        # Loss function
-        loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
+    #     # Loss function
+    #     loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
 
-        # Dataloaders
-        # skip_num_samples = 0
-        # if run_mode == RunMode.WARM_START:
-        #     skip_num_samples = config.modalities_setup.settings.checkpoint_num_seen_samples
+    #     # Dataloaders
+    #     # skip_num_samples = 0
+    #     # if run_mode == RunMode.WARM_START:
+    #     #     skip_num_samples = config.modalities_setup.settings.checkpoint_num_seen_samples
 
-        skip_num_local_train_batches = config.training.skip_num_local_train_batches
-        train_dataloader = DataloaderFactory.get_dataloader(
-            resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
-        )
-        eval_dataloaders = [
-            DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
-            for dataloader_config in config.data.eval_dataloaders
-        ]
+    #     skip_num_local_train_batches = config.training.skip_num_local_train_batches
+    #     train_dataloader = DataloaderFactory.get_dataloader(
+    #         resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
+    #     )
+    #     eval_dataloaders = [
+    #         DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
+    #         for dataloader_config in config.data.eval_dataloaders
+    #     ]
 
-        # Logging
-        eval_split_lengths = {
-            dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.sampler_batch_size
-            for dataloader in eval_dataloaders
-        }
+    #     # Logging
+    #     eval_split_lengths = {
+    #         dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.batch_size
+    #         for dataloader in eval_dataloaders
+    #     }
 
-        # TODO: check why not *config.training.world_size
-        #  and consider just using config.training.num_training_samples for progress Subscriber
-        train_split_lengths = {
-            train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
-            * config.training.world_size
-            * train_dataloader.sampler_batch_size
-        }
+    #     # TODO: check why not *config.training.world_size
+    #     #  and consider just using config.training.num_training_samples for progress Subscriber
+    #     train_split_lengths = {
+    #         train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
+    #         * config.training.world_size
+    #         * train_dataloader.batch_size
+    #     }
 
-        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-            config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
-        )
+    #     evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+    #         config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
+    #     )
 
-        # Trainer
-        trainer = Trainer(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-            gradient_acc_step=config.training.gradient_acc_step,
-        )
+    #     # Trainer
+    #     trainer = Trainer(
+    #         local_rank=config.training.local_rank,
+    #         batch_progress_publisher=batch_processed_publisher,
+    #         evaluation_result_publisher=evaluation_result_publisher,
+    #         gradient_acc_step=config.training.gradient_acc_step,
+    #     )
 
-        # Evaluator
-        evaluator = Evaluator(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-        )
+    #     # Evaluator
+    #     evaluator = Evaluator(
+    #         local_rank=config.training.local_rank,
+    #         batch_progress_publisher=batch_processed_publisher,
+    #         evaluation_result_publisher=evaluation_result_publisher,
+    #     )
 
-        # Gym
-        gym = Gym(trainer=trainer, evaluator=evaluator, loss_fun=loss_fun, num_ranks=config.training.world_size)
+    #     # Gym
+    #     gym = Gym(trainer=trainer, evaluator=evaluator, loss_fun=loss_fun, num_ranks=config.training.world_size)
 
-        return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
+    #     return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
 
-    def get_model_and_optimizer(
-        self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
-    ) -> Tuple[nn.Module, Optimizer]:
-        run_mode = config.modalities_setup.run_mode
+    # def get_model_and_optimizer(
+    #     self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing,
+    # model: nn.Module, optimizer: Optimizer,
+    #     run_mode: RunMode
+    # ) -> Tuple[nn.Module, Optimizer]:
 
-        model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
+    #     if run_mode == RunMode.WARM_START:
+    #         warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
 
-        if run_mode == RunMode.WARM_START:
-            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
-            wrapped_model = checkpointing.load_model_checkpoint(
-                file_path=warm_start_settings.checkpoint_model_path,
-                model=model,
-            )
+    #         wrapped_model = checkpointing.load_model_checkpoint(
+    #             file_path=warm_start_settings.checkpoint_model_path,
+    #             model=model,
+    #         )
 
-            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-            )
+    #         optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
+    #             config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
+    #         )
 
-            # TODO improve this
-            if warm_start_settings.checkpoint_optimizer_path is None:
-                raise (
-                    NotImplementedError(
-                        "So far we always have to provide an optimizer checkpoint. "
-                        "For fine-tuning a pre-trained, we might not want to load "
-                        "an optimizer checkpoint."
-                    )
-                )
+    #         # TODO improve this
+    #         if warm_start_settings.checkpoint_optimizer_path is None:
+    #             raise (
+    #                 NotImplementedError(
+    #                     "So far we always have to provide an optimizer checkpoint. "
+    #                     "For fine-tuning a pre-trained, we might not want to load "
+    #                     "an optimizer checkpoint."
+    #                 )
+    #             )
 
-            optimizer = checkpointing.load_optimizer_checkpoint(
-                optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
-            )
+    #         optimizer = checkpointing.load_optimizer_checkpoint(
+    #             optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
+    #         )
 
-        else:
-            wrapped_model = running_env.wrap_model(model=model, sync_module_states=False)
-            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-            )
+    #     else:
+    #         wrapped_model = running_env.wrap_model(model=model, sync_module_states=False)
+    #         optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
+    #             config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
+    #         )
 
-        # TODO implement scheduler
-        # scheduler = self.resolvers.build_component_by_config(
-        #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
-        # )
+    #     # TODO implement scheduler
+    #     # scheduler = self.resolvers.build_component_by_config(
+    #     #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
+    #     # )
 
-        return wrapped_model, optimizer
+    #     return wrapped_model, optimizer
 
     def get_logging_publishers(
-        self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
+        self,
+        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
+        results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
+        global_rank: int,
+        local_rank: int,
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
-        # Message Broker
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
+            global_rank=global_rank,
+            local_rank=local_rank,
         )
         evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
             message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
+            global_rank=global_rank,
+            local_rank=local_rank,
         )
 
-        # TODO make logging rank configurable
-        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
-        if config.training.global_rank == 0:
-            progress_subscriber = RichProgressSubscriber(
-                num_ranks=config.training.world_size,
-                train_split_num_samples=train_split_lengths,
-                eval_splits_num_samples=eval_split_lengths,
-            )
-            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
-                num_ranks=config.training.world_size,
-                project=config.wandb.project_name,
-                experiment_id=self.experiment_id,
-                mode=config.wandb.mode,
-                dir=config.wandb.dir,
-                experiment_config=config,
-            )
-            message_broker.add_subscriber(
-                subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
-            )
-
-        else:
-            progress_subscriber = DummyProgressSubscriber()
+        message_broker.add_subscriber(subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber)
         message_broker.add_subscriber(
             subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
             subscriber=progress_subscriber,
