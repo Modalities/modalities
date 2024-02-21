@@ -3,20 +3,23 @@ from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
 from modalities.checkpointing.checkpointing import Checkpointing
-from modalities.checkpointing.checkpointing_factory import CheckpointingExecutionFactory
+from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
 from modalities.checkpointing.checkpointing_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.config.config_new import (
+from modalities.config.config import (
     AdamWOptimizerConfig,
     BatchSamplerConfig,
+    CheckpointedModelConfig,
+    CheckpointedOptimizerConfig,
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
     DistributedSamplerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     FSDPToDiscCheckpointingConfig,
+    FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2TokenizerFastConfig,
     LLMDataLoaderConfig,
@@ -40,9 +43,9 @@ from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModel
+from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.registry.registry import Registry
-from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig
 
 
 class RegistryFactory:
@@ -52,10 +55,13 @@ class RegistryFactory:
             # models
             ("model", "gpt2", GPT2LLM),
             ("model", "huggingface_pretrained_model", HuggingFacePretrainedModel),
+            ("model", "checkpointed", ModelFactory.get_checkpointed_model),
+            ("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model),
             # losses
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss),
             # optmizers
             ("optimizer", "adam_w", OptimizerFactory.get_adam_w),
+            ("optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer),
             # schedulers
             ("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR),
             ("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR),
@@ -90,10 +96,8 @@ class RegistryFactory:
             (
                 "checkpointing_execution",
                 "fsdp_to_disc_checkpointing",
-                CheckpointingExecutionFactory.get_fsdp_to_disc_checkpointing,
+                FSDPToDiscCheckpointing,
             ),
-            # running env
-            ("running_env", "fsdp_running_env", FSDPRunningEnv),
             # Progress subscriber
             ("progress_subscriber", "dummy", ProgressSubscriberFactory.get_dummy_progress_subscriber),
             ("progress_subscriber", "rich", ProgressSubscriberFactory.get_rich_progress_subscriber),
@@ -112,10 +116,13 @@ class RegistryFactory:
         components = [
             # models
             ("model", "gpt2", GPT2LLMConfig),
+            ("model", "checkpointed", CheckpointedModelConfig),
+            ("model", "fsdp_wrapped", FSDPWrappedModelConfig),
             # losses
             ("loss", "clm_cross_entropy_loss", CLMCrossEntropyLossConfig),
             # optmizers
             ("optimizer", "adam_w", AdamWOptimizerConfig),
+            ("optimizer", "checkpointed", CheckpointedOptimizerConfig),
             # tokenizers
             ("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFastConfig),
             # datasets
@@ -146,8 +153,6 @@ class RegistryFactory:
             ),
             # checkpointing execution
             ("checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointingConfig),
-            # running env
-            ("running_env", "fsdp_running_env", FSDPRunningEnvConfig),
             # Progress subscriber
             ("progress_subscriber", "dummy", DummyProgressSubscriberConfig),
             ("progress_subscriber", "rich", RichProgressSubscriberConfig),
