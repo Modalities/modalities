@@ -72,7 +72,7 @@ class Evaluator:
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
                     local_dataset_sample_id = Evaluator._get_local_sample_id(
-                        batch_id=batch_id, batch_size=data_loader.sampler_batch_size
+                        batch_id=batch_id, batch_size=data_loader.batch_size
                     )
 
                     global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
