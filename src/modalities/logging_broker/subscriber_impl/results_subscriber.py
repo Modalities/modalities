@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import rich
 from rich.console import Group
@@ -7,7 +7,7 @@ from rich.panel import Panel
 
 import wandb
 from modalities.batch import EvaluationResultBatch
-from modalities.config.config import AppConfig, WandbConfig
+from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 
@@ -54,9 +54,9 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         self,
         project: str,
         experiment_id: str,
-        mode: WandbConfig.WandbMode,
+        mode: WandbMode,
         directory: Path,
-        experiment_config: Optional[AppConfig] = None,
+        experiment_config: Optional[Dict] = None,
     ) -> None:
         super().__init__()
 
