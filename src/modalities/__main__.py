@@ -161,7 +161,7 @@ class Main:
                 local_rank=components.settings.cuda_env.local_rank,
                 batch_progress_publisher=batch_processed_publisher,
                 evaluation_result_publisher=evaluation_result_publisher,
-                gradient_acc_step=components.settings.training.gradient_acc_steps,
+                gradient_acc_steps=components.settings.training.gradient_acc_steps,
             )
 
             # Evaluator

@@ -471,7 +471,7 @@ class Settings(BaseModel):
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
-        gradient_acc_step: Annotated[int, Field(strict=True, ge=1)]
+        gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
 
