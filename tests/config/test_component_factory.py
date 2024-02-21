@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from modalities.__main__ import load_app_config_dict
 from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import load_app_config_dict
 from modalities.registry.registry import Registry
 from tests.config.components import ComponentV, ComponentW, ComponentX, ComponentY
 from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig
@@ -48,7 +48,7 @@ def test_backward_reference(config_file_path: Path, component_factory: Component
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
-    components = component_factory.build_config(config_dict=config_dict, component_names=component_names)
+    components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
     # make sure that the reference is not identical, despite both being of type COMP_W
     assert components["comp_x_1"].single_dependency != components["comp_y_1"].multi_dependency[0]
@@ -68,7 +68,7 @@ def test_non_existing_reference(config_file_path: Path, component_factory: Compo
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
     with pytest.raises(KeyError):
-        component_factory.build_config(config_dict=config_dict, component_names=component_names)
+        component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
 
 @pytest.mark.parametrize(
@@ -82,7 +82,7 @@ def test_hierarchical_component_instantiation(config_file_path: Path, component_
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
-    components = component_factory.build_config(config_dict=config_dict, component_names=component_names)
+    components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
     assert isinstance(components["comp_y_1"].multi_dependency[0], ComponentW)
     assert isinstance(components["comp_y_1"].multi_dependency[1], ComponentV)
@@ -100,12 +100,12 @@ def test_component_filter(config_file_path: Path, component_factory: ComponentFa
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
-    components = component_factory.build_config(config_dict=config_dict, component_names=component_names)
+    components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "comp_y_1" in components
 
     component_names += "abc"
     with pytest.raises(KeyError):
-        components = component_factory.build_config(config_dict=config_dict, component_names=component_names)
+        components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
 
 @pytest.mark.parametrize(
@@ -119,5 +119,5 @@ def test_single_component(config_file_path: Path, component_factory: ComponentFa
 
     config_dict = load_app_config_dict(config_file_path=config_file_path)
 
-    components = component_factory.build_config(config_dict=config_dict, component_names=component_names)
+    components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "custom_comp_1" in components

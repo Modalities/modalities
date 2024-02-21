@@ -2,7 +2,7 @@ from abc import ABC
 from enum import Enum
 from typing import Annotated, Any, List
 
-from pydantic import BaseModel, GetCoreSchemaHandler, validator
+from pydantic import BaseModel, GetCoreSchemaHandler, field_validator
 from pydantic_core import core_schema
 
 from tests.config.components import Component_V_W_X_IF, ComponentTypes
@@ -31,7 +31,7 @@ PydanticComponen_V_W_X_IF_Type = Annotated[Component_V_W_X_IF, PydanticComponent
 class CompConfigABC(BaseModel, ABC):
     type_hint: Enum
 
-    @validator("type_hint", pre=True, allow_reuse=True, check_fields=False)
+    @field_validator("type_hint", mode="before", check_fields=False)
     def _string_to_enum(cls, key: str):
         if isinstance(key, str):
             try:

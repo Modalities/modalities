@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
 import torch.nn as nn
-from pydantic import BaseModel, FilePath, GetCoreSchemaHandler, PositiveInt, conint, validator
+from omegaconf import OmegaConf
+from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator
 from pydantic_core import core_schema
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
@@ -274,18 +276,18 @@ class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
 
 
 class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
-    k: conint(ge=-1)
+    k: Annotated[int, Field(strict=True, ge=-1)]
 
 
 class FSDPToDiscCheckpointingConfig(BaseModel):
     checkpoint_path: Path
-    global_rank: conint(ge=0)
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
     block_names: List[str]
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
 
-    @validator("mixed_precision_settings", pre=True, always=True)
+    @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
         mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
             name=name, enum_type=MixedPrecisionSettings
@@ -297,7 +299,7 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
 
-    @validator("sharding_strategy", pre=True, always=True)
+    @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
@@ -332,7 +334,7 @@ class FSDPWrappedModelConfig(BaseModel):
     sharding_strategy: ShardingStrategy
     block_names: List[str]
 
-    @validator("mixed_precision_settings", pre=True, always=True)
+    @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
         mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
             name=name, enum_type=MixedPrecisionSettings
@@ -344,7 +346,7 @@ class FSDPWrappedModelConfig(BaseModel):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
 
-    @validator("sharding_strategy", pre=True, always=True)
+    @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
@@ -355,8 +357,8 @@ class GPT2TokenizerFastConfig(BaseModel):
 
 
 class DistributedSamplerConfig(BaseModel):
-    rank: conint(ge=0)
-    num_replicas: conint(ge=0)
+    rank: Annotated[int, Field(strict=True, ge=0)]
+    num_replicas: Annotated[int, Field(strict=True, ge=0)]
     shuffle: bool
     dataset: PydanticDatasetIFType
 
@@ -364,7 +366,7 @@ class DistributedSamplerConfig(BaseModel):
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
-    block_size: conint(gt=0)
+    block_size: Annotated[int, Field(strict=True, gt=0)]
     tokenizer: PydanticTokenizerIFType
     jq_pattern: str
     sample_key: str
@@ -372,13 +374,13 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    block_size: conint(gt=0)
+    block_size: Annotated[int, Field(strict=True, gt=0)]
     sample_key: str
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
     raw_data_path: Path
-    block_size: conint(gt=0)
+    block_size: Annotated[int, Field(strict=True, gt=0)]
     sample_key: str
 
 
@@ -388,7 +390,7 @@ class MMapIndexedDatasetConfig(BaseModel):
 
 
 class OpenGPTXMMapDatasetConfig(BaseModel):
-    num_samples: conint(ge=1)
+    num_samples: Annotated[int, Field(strict=True, ge=1)]
     path: FilePath
     sample_key: str
     sequence_len: PositiveInt
@@ -396,13 +398,13 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIF
-    batch_size: conint(gt=0)
+    batch_size: Annotated[int, Field(strict=True, gt=0)]
     drop_last: bool
 
 
 class ResumableBatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIF
-    start_index: conint(gt=0)
+    start_index: Annotated[int, Field(strict=True, gt=0)]
 
 
 class GPT2LLMCollateFnConfig(BaseModel):
@@ -415,7 +417,7 @@ class LLMDataLoaderConfig(BaseModel):
     dataset: PydanticDatasetIF
     batch_sampler: PydanticSamplerIF
     collate_fn: PydanticCollateFnIF
-    num_workers: conint(ge=0)
+    num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
     skip_num_batches: Optional[int] = 0
@@ -457,20 +459,21 @@ class RichResultSubscriberConfig(BaseModel):
     local_rank: int
 
 
-class Settings(BaseModel):
-    class CudaEnv(BaseModel):
-        local_rank: conint(ge=0)
-        world_size: conint(ge=1)
-        global_rank: conint(ge=0)
+class CudaEnv(BaseModel):
+    local_rank: Annotated[int, Field(strict=True, ge=0)]
+    world_size: Annotated[int, Field(strict=True, ge=1)]
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
+
+class Settings(BaseModel):
     class Training(BaseModel):
-        callback_interval_in_batches: conint(ge=1)
-        global_num_training_samples: conint(ge=1)
-        global_num_seen_samples: conint(ge=0)
+        callback_interval_in_batches: Annotated[int, Field(strict=True, ge=1)]
+        global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
+        global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
-        gradient_acc_step: conint(ge=1)
-        local_train_micro_batch_size: conint(ge=1)
-        sequence_length: conint(ge=1)
+        gradient_acc_step: Annotated[int, Field(strict=True, ge=1)]
+        local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
+        sequence_length: Annotated[int, Field(strict=True, ge=1)]
 
     experiment_id: str
     referencing_keys: Dict[str, str]
@@ -490,3 +493,21 @@ class ComponentsModel(BaseModel):
     checkpointing: PydanticCheckpointingIFType
 
     settings: Settings
+
+
+class ComponentsInferenceModel(BaseModel):
+    wrapped_model: PydanticModelIFType
+    cuda_env: CudaEnv
+
+
+def load_app_config_dict(config_file_path: Path) -> Dict:
+    int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
+
+    def resolver_fun(var_name: str) -> int:
+        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
+
+    OmegaConf.register_new_resolver("modalities_env", resolver_fun)
+
+    cfg = OmegaConf.load(config_file_path)
+    config_dict = OmegaConf.to_container(cfg, resolve=True)
+    return config_dict

@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Type
+from typing import Dict, Tuple
 
 import click
 import click_pathlib
-from omegaconf import OmegaConf
 
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes
+from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -136,57 +134,17 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     generator.run(dst_path)
 
 
-def load_app_config_dict(config_file_path: Path) -> Dict:
-    int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
-
-    def resolver_fun(var_name: str) -> int:
-        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
-
-    OmegaConf.register_new_resolver("modalities_env", resolver_fun)
-
-    cfg = OmegaConf.load(config_file_path)
-    config_dict = OmegaConf.to_container(cfg, resolve=True)
-    return config_dict
-
-
 class Main:
-    def __init__(
-        self, config_dict: Dict, component_names: List[str] = None, custom_config_types: List[Type] = None
-    ) -> None:
+    def __init__(self, config_dict: Dict) -> None:
         self.config_dict = config_dict
         self.experiment_id = get_date_of_run()
-        self.custom_config_types = custom_config_types if custom_config_types is not None else []
-        self.component_names = (
-            component_names
-            if component_names is not None
-            else [
-                "settings",
-                "loss_fn",
-                "checkpointing",
-                "wrapped_model",
-                "optimizer",
-                "train_dataloader",
-                "val_dataloader",
-                "test_dataloader",
-                "batch_progress_subscriber",
-                "evaluation_subscriber",
-            ]
-        )
-
-        registry = RegistryFactory.get_registry()
-        self.component_factory = ComponentFactory(registry=registry)
-
-    def build_component_dict(self, component_names: List[str]) -> Dict:
-        component_dict = self.component_factory.build_config(
-            config_dict=self.config_dict, component_names=component_names
-        )
-        return component_dict
+        self.component_factory = ComponentFactory(registry=RegistryFactory.get_registry())
 
     def run(self):
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            component_dict = self.build_component_dict(component_names=self.component_names)
-            print(component_dict)
-            components = ComponentsModel(**component_dict)
+            components: ComponentsModel = self.component_factory.build_components(
+                config_dict=self.config_dict, components_model_type=ComponentsModel
+            )
             evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
                 progress_subscriber=components.batch_progress_subscriber,
                 results_subscriber=components.evaluation_subscriber,

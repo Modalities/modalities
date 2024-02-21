@@ -2,6 +2,7 @@ import dataclasses
 import os
 import pickle
 from pathlib import Path
+from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,9 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
-from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing import CheckpointingIF
-from modalities.config.config import AppConfig
+from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -42,14 +42,13 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 
 @pytest.fixture
-def dummy_config(monkeypatch) -> AppConfig:
+def dummy_config(monkeypatch) -> Dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
     dummy_config_path = _ROOT_DIR / Path("config_files/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    app_config = AppConfig.model_validate(config_dict)
-    return app_config
+    return config_dict
 
 
 @dataclasses.dataclass

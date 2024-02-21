@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Type, TypeVar, Union
 
 from pydantic import BaseModel
 
@@ -9,7 +9,16 @@ class ComponentFactory:
     def __init__(self, registry: Registry) -> None:
         self.registry = registry
 
-    def build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
+    BaseModelChild = TypeVar("BaseModelChild", bound=BaseModel)
+
+    def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
+        component_names = list(components_model_type.model_fields.keys())
+        component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
+        print(component_dict)
+        components = components_model_type(**component_dict)
+        return components
+
+    def _build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
         component_dict_filtered = {name: config_dict[name] for name in component_names}
         components, _ = self._build_component(
             current_component_config=component_dict_filtered,

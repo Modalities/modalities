@@ -6,7 +6,7 @@ from modalities.models.gpt2.gpt2_model import (
     ActivationType,
     AttentionConfig,
     AttentionType,
-    GPT2Config,
+    GPT2LLMConfig,
     WeightInitailizationConfig,
 )
 from modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
@@ -15,7 +15,7 @@ from modalities.models.gpt2.pretrained_gpt_model import PretrainedGPTModel
 def test_pretrained_gpt_model(tmp_path):
     # setup config and model
     attention_config = AttentionConfig(attention_type=AttentionType("default_attention"), scaling_factor=3)
-    config = GPT2Config(
+    config = GPT2LLMConfig(
         block_size=12,
         vocab_size=128,
         n_layer=2,
