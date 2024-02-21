@@ -58,6 +58,7 @@ class Trainer:
         optimizer,
         loss_fun: Loss,
         callback_interval_in_batches: int,
+        # TODO: remove
         epoch_done_callback: Callable[[int], None],
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
@@ -65,14 +66,18 @@ class Trainer:
         cummulated_loss = self._reset_loss()
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+
         # batch loop
         batch: DatasetBatch
+        # TODO: why do we need a barrier here?
         dist.barrier()
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         for batch_id, batch in enumerate(train_loader):
+            # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # train single batch
+            # Train single batch
             batch_loss = self._train_batch(
                 batch=batch,
                 model=model,
@@ -82,10 +87,10 @@ class Trainer:
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
-            # save the batch loss
+            # Save the batch loss
             cummulated_loss[0] += batch_loss.item()
             cummulated_loss[1] += len(batch)
-            batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+            batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -98,9 +103,7 @@ class Trainer:
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
-                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(
-                        torch.device(self.local_rank)
-                    )
+                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                     forward_backward_time_recorder.reset()
 
                     thoughput_aggregator.add_value(

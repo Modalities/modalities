@@ -6,9 +6,8 @@ from modalities.registry.registry import Registry
 
 
 class ComponentFactory:
-    def __init__(self, config_registry: Registry, component_registry: Registry) -> None:
-        self.config_registry = config_registry
-        self.component_registry = component_registry
+    def __init__(self, registry: Registry) -> None:
+        self.registry = registry
 
     def build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
         component_dict_filtered = {name: config_dict[name] for name in component_names}
@@ -116,7 +115,7 @@ class ComponentFactory:
         return {"instance_key", "pass_type"} == config_dict.keys()
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
-        component_config_type: BaseModel = self.config_registry.get_entity(component_key, variant_key)
+        component_config_type: BaseModel = self.registry.get_config(component_key, variant_key)
         comp_config = component_config_type(**config_dict, strict=True)
         return comp_config
 
@@ -128,7 +127,7 @@ class ComponentFactory:
                 output[name] = value
             return output
 
-        component_type = self.component_registry.get_entity(component_key, variant_key)
+        component_type = self.registry.get_component(component_key, variant_key)
         component_config_dict = base_model_to_dict(component_config)
         component = component_type(**component_config_dict)
         return component
