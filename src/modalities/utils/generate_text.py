@@ -102,6 +102,7 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
     )
 
     model = components.wrapped_model
+
     model.load_state_dict(state_dict)
     model.eval()
 

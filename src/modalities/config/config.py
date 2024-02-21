@@ -467,7 +467,7 @@ class CudaEnv(BaseModel):
 
 class Settings(BaseModel):
     class Training(BaseModel):
-        callback_interval_in_batches: Annotated[int, Field(strict=True, ge=1)]
+        callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool

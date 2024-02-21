@@ -103,6 +103,10 @@ running_env:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
+accuracy_metric:
+  config: 
+    prediction_subscription_key: "${model.config.prediction_key}"
+
 model:
   type_hint: GPT2LLM
   config:

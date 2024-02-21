@@ -22,7 +22,11 @@ from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.registry_factory import RegistryFactory
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
+from modalities.util import (
+    compute_number_of_trainable_parameters,
+    get_callback_interval_in_batches_per_rank,
+    get_date_of_run,
+)
 from modalities.utils.generate_text import main as generate_text_main
 
 
@@ -157,7 +161,7 @@ class Main:
                 local_rank=components.settings.cuda_env.local_rank,
                 batch_progress_publisher=batch_processed_publisher,
                 evaluation_result_publisher=evaluation_result_publisher,
-                gradient_acc_step=components.settings.training.gradient_acc_step,
+                gradient_acc_step=components.settings.training.gradient_acc_steps,
             )
 
             # Evaluator
@@ -178,8 +182,16 @@ class Main:
             logging.info(
                 f"Training model with {compute_number_of_trainable_parameters(components.wrapped_model)} parameters."
             )
+
+            callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
+                callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
+                local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
+                gradient_acc_steps=components.settings.training.gradient_acc_steps,
+                world_size=components.settings.cuda_env.world_size,
+            )
+
             gym.run(
-                callback_interval_in_batches=3,
+                callback_interval_in_batches=callback_interval_in_batches_per_rank,
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=[components.val_dataloader, components.test_dataloader],
                 checkpointing=components.checkpointing,

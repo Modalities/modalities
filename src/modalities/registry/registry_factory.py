@@ -55,7 +55,7 @@ class RegistryFactory:
     def get_registry() -> Registry:
         components = [
             # models
-            ("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+            ("model", "gpt2", (GPT2LLM, GPT2LLMConfig)),
             ("model", "huggingface_pretrained_model", (HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig)),
             ("model", "checkpointed", (ModelFactory.get_checkpointed_model, CheckpointedModelConfig)),
             ("model", "fsdp_wrapped", (ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig)),

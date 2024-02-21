@@ -13,8 +13,8 @@ from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
-from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.running_env.cuda_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
@@ -24,7 +24,7 @@ _ROOT_DIR = Path(__file__).parents[1]
 
 
 class ExperimentConfig(BaseModel):
-    llm_model_conf: GPT2Config  # Named it llm_model_conf as model_ is a protected namespace in pydantic
+    llm_model_conf: GPT2LLMConfig  # Named it llm_model_conf as model_ is a protected namespace in pydantic
     running_env_conf: FSDPRunningEnvConfig
 
 
@@ -190,7 +190,7 @@ class TestFSDPToDiscCheckpointing:
 
         checkpointing.load_optimizer_checkpoint(
             optimizer=optimizer_2,
-            model=fsdp_wrapped_model_2,
+            wrapped_model=fsdp_wrapped_model_2,
             experiment_id=experiment_id,
             global_train_batch_id=global_train_batch_id,
         )
