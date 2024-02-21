@@ -19,8 +19,7 @@ class DataloaderFactory:
         shuffle: bool,
         skip_num_batches: Optional[int] = 0,
     ) -> LLMDataLoader:
-        if skip_num_batches > 0:
-            batch_sampler = ResumableBatchSampler(start_index=skip_num_batches, underlying_batch_sampler=batch_sampler)
+        batch_sampler = ResumableBatchSampler(start_index=skip_num_batches, underlying_batch_sampler=batch_sampler)
 
         dataloader = LLMDataLoader(
             dataloader_tag=dataloader_tag,

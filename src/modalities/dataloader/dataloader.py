@@ -58,7 +58,7 @@ class LLMDataLoader(DataLoader[T_co]):
     def batch_size(self) -> int:
         # The parent Dataloader class has already a batch_size property defined which is originally used
         # when the batch_sampler is not specified. Since the  LLMDataLoader enforces to always use a BatchSampler,
-        # we defined the property sampler_batch_size to return the actual batch size used in the dataloder.
+        # we defined/ override the property batch_size to return the actual batch size used in the dataloder.
         # BatchSampler is required, as we must seek forward in the dataloder during a warm start and
         # we don't want to load all the data during the fast-forward.
         return self._batch_size

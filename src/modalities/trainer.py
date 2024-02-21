@@ -90,7 +90,7 @@ class Trainer:
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,
-                batch_size=train_loader.sampler_batch_size,
+                batch_size=train_loader.batch_size,
                 dataloader_tag=train_loader.dataloader_tag,
                 local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
@@ -120,7 +120,7 @@ class Trainer:
                         post_processing_fun=lambda t: t[0] / t[1],
                     )
                     local_train_sample_id = Trainer._get_local_sample_id(
-                        batch_id=local_train_batch_id, batch_size=train_loader.sampler_batch_size
+                        batch_id=local_train_batch_id, batch_size=train_loader.batch_size
                     )
 
                     global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
