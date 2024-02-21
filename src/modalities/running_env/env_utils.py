@@ -4,7 +4,7 @@ import torch.distributed as dist
 from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
 
-from modalities.config.lookup_types import LookupEnum
+from modalities.config.lookup_enum import LookupEnum
 
 
 def has_bfloat_support():

@@ -11,9 +11,7 @@ from omegaconf import OmegaConf
 
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config_new import ComponentsModel
-from modalities.config.lookup_types import TokenizerTypes
-from modalities.config.types import ProcessGroupBackendType
+from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader

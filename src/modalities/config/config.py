@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -16,6 +15,7 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 from modalities.checkpointing.checkpointing import CheckpointingIF
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
+from modalities.config.lookup_enum import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -242,11 +242,8 @@ PydanticLossIFType = Annotated[Loss, PydanticLossIF]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticMessageSubscriberIF]
 
 
-class LookupEnum(Enum):
-    @classmethod
-    def _missing_(cls, value: str) -> type:
-        """constructs Enum by member name, if not constructable by value"""
-        return cls.__dict__[value]
+class ProcessGroupBackendType(LookupEnum):
+    nccl = "nccl"
 
 
 class TokenizerTypes(LookupEnum):
