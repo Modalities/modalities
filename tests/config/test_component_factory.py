@@ -9,31 +9,21 @@ from tests.config.components import ComponentV, ComponentW, ComponentX, Componen
 from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def component_factory() -> ComponentFactory:
     components = [
-        ("COMP_V", "default", ComponentV),
-        ("COMP_W", "default", ComponentW),
-        ("COMP_Y", "default", ComponentY),
-        ("COMP_X", "default", ComponentX),
+        ("COMP_V", "default", (ComponentV, CompVConfig)),
+        ("COMP_W", "default", (ComponentW, CompWConfig)),
+        ("COMP_X", "default", (ComponentX, CompXConfig)),
+        ("COMP_Y", "default", (ComponentY, CompYConfig)),
     ]
 
-    component_registry = Registry()
+    registry = Registry()
     for component in components:
-        component_registry.add_entity(*component)
+        registry.add_entity(*component)
 
-    component_config_registry = Registry()
-    configs = [
-        ("COMP_V", "default", CompVConfig),
-        ("COMP_W", "default", CompWConfig),
-        ("COMP_X", "default", CompXConfig),
-        ("COMP_Y", "default", CompYConfig),
-    ]
-    for config in configs:
-        component_config_registry.add_entity(*config)
-
-    factory = ComponentFactory(config_registry=component_config_registry, component_registry=component_registry)
-    return factory
+    component_factory = ComponentFactory(registry=registry)
+    return component_factory
 
 
 @pytest.mark.parametrize(
