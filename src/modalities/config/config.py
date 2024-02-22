@@ -506,7 +506,7 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
     def resolver_fun(var_name: str) -> int:
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    OmegaConf.register_new_resolver("modalities_env", resolver_fun)
+    OmegaConf.register_new_resolver("modalities_env", resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
     config_dict = OmegaConf.to_container(cfg, resolve=True)
