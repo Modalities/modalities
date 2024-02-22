@@ -14,16 +14,16 @@ def component_factory() -> ComponentFactory:
     components = [
         ("COMP_V", "default", (ComponentV, CompVConfig)),
         ("COMP_W", "default", (ComponentW, CompWConfig)),
-        ("COMP_Y", "default", (ComponentY, CompYConfig)),
         ("COMP_X", "default", (ComponentX, CompXConfig)),
+        ("COMP_Y", "default", (ComponentY, CompYConfig)),
     ]
 
-    component_registry = Registry()
+    registry = Registry()
     for component in components:
-        component_registry.add_entity(*component)
+        registry.add_entity(*component)
 
-    factory = ComponentFactory(registry=component_registry)
-    return factory
+    component_factory = ComponentFactory(registry=registry)
+    return component_factory
 
 
 @pytest.mark.parametrize(
