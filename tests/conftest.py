@@ -122,7 +122,7 @@ def trainer(progress_publisher_mock):
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
-        gradient_acc_step=1,
+        gradient_acc_steps=1,
     )
 
 

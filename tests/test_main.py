@@ -16,8 +16,6 @@ def test_e2e_training_run_wout_ckpt(monkeypatch, indexed_dummy_data_path, dummy_
     monkeypatch.setenv("MASTER_ADDR", "localhost")
     monkeypatch.setenv("MASTER_PORT", "9948")
 
-    dummy_config.data.train_dataloader.config.dataset.config.raw_data_path = indexed_dummy_data_path.raw_data_path
-    for val_dataloader_config in dummy_config.data.eval_dataloaders:
-        val_dataloader_config.config.dataset.config.raw_data_path = indexed_dummy_data_path.raw_data_path
+    dummy_config["train_dataset"]["config"]["raw_data_path"] = indexed_dummy_data_path.raw_data_path
     main = Main(dummy_config)
     main.run()
