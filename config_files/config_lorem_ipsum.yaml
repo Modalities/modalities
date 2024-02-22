@@ -232,11 +232,7 @@ batch_progress_subscriber:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
     eval_dataloaders:
-      val:
-        instance_key: val_dataloader
-        pass_type: BY_REFERENCE
-      test: 
-        instance_key: test_dataloader
+        instance_key: eval_dataloaders
         pass_type: BY_REFERENCE
 
     

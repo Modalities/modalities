@@ -34,7 +34,7 @@ class ProgressSubscriberFactory:
 
             eval_splits_num_samples = {
                 dataloader.dataloader_tag: len(dataloader) * world_size * dataloader.batch_size
-                for _, dataloader in eval_dataloaders
+                for dataloader in eval_dataloaders
             }
 
             subscriber = RichProgressSubscriber(world_size, train_split_num_samples, eval_splits_num_samples)
