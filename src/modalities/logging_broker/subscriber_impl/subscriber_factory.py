@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -18,7 +18,7 @@ class ProgressSubscriberFactory:
     @staticmethod
     def get_rich_progress_subscriber(
         train_dataloader: LLMDataLoader,
-        eval_dataloaders: Dict[str, LLMDataLoader],
+        eval_dataloaders: List[LLMDataLoader],
         world_size: int,
         global_num_seen_samples: int,
         local_rank: int,
@@ -34,7 +34,7 @@ class ProgressSubscriberFactory:
 
             eval_splits_num_samples = {
                 dataloader.dataloader_tag: len(dataloader) * world_size * dataloader.batch_size
-                for _, dataloader in eval_dataloaders.items()
+                for _, dataloader in eval_dataloaders
             }
 
             subscriber = RichProgressSubscriber(world_size, train_split_num_samples, eval_splits_num_samples)

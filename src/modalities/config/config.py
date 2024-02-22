@@ -435,7 +435,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: Dict[str, PydanticLLMDataLoaderIFType]
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     world_size: int
     global_num_seen_samples: int
     local_rank: int
@@ -486,8 +486,7 @@ class ComponentsModel(BaseModel):
     optimizer: PydanticOptimizerIFType
     loss_fn: PydanticLossIFType
     train_dataloader: PydanticLLMDataLoaderIFType
-    val_dataloader: PydanticLLMDataLoaderIFType
-    test_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpointing: PydanticCheckpointingIFType

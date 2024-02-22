@@ -193,7 +193,7 @@ class Main:
             gym.run(
                 callback_interval_in_batches=callback_interval_in_batches_per_rank,
                 train_data_loader=components.train_dataloader,
-                evaluation_data_loaders=[components.val_dataloader, components.test_dataloader],
+                evaluation_data_loaders=components.eval_dataloaders,
                 checkpointing=components.checkpointing,
                 model=components.wrapped_model,
                 optimizer=components.optimizer,
