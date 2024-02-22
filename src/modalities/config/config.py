@@ -52,9 +52,7 @@ PydanticCheckpointingStrategyIFType = Annotated[
 PydanticCheckpointingExecutionIFType = Annotated[
     CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
 ]
-PydanticModelIFType = Annotated[
-    nn.Module, PydanticThirdPartyTypeIF(CheckpointingIF)
-]  # NOTE: Only here, there is a difference between the two arguments
+PydanticModelIFType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
