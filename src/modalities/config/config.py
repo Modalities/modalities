@@ -26,222 +26,43 @@ from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_
 from modalities.util import parse_enum_by_name
 
 
-class PydanticCheckpointingIF:
-    @classmethod
+class PydanticThirdPartyTypeIF:
+    def __init__(self, third_party_type):
+        self.third_party_type = third_party_type
+
     def __get_pydantic_core_schema__(
-        cls,
+        self,
         _source_type: Any,
         _handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
         # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
         return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(CheckpointingIF),
-            python_schema=core_schema.is_instance_schema(CheckpointingIF),
+            json_schema=core_schema.is_instance_schema(self.third_party_type),
+            python_schema=core_schema.is_instance_schema(self.third_party_type),
             # serialization=core_schema.plain_serializer_function_ser_schema(
             #     lambda instance: instance.x
             # ),
         )
 
 
-class PydanticCheckpointingStrategyIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(CheckpointingStrategyIF),
-            python_schema=core_schema.is_instance_schema(CheckpointingStrategyIF),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticCheckpointingExecutionIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(CheckpointingExecutionIF),
-            python_schema=core_schema.is_instance_schema(CheckpointingExecutionIF),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticModelIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(nn.Module),
-            python_schema=core_schema.is_instance_schema(nn.Module),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticTokenizerIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(PreTrainedTokenizerFast),
-            python_schema=core_schema.is_instance_schema(PreTrainedTokenizerFast),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticDatasetIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(Dataset),
-            python_schema=core_schema.is_instance_schema(Dataset),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticSamplerIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(Sampler),
-            python_schema=core_schema.is_instance_schema(Sampler),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticCollateFnIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(CollateFnIF),
-            python_schema=core_schema.is_instance_schema(CollateFnIF),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticLLMDataLoaderIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(LLMDataLoader),
-            python_schema=core_schema.is_instance_schema(LLMDataLoader),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticOptimizerIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(Optimizer),
-            python_schema=core_schema.is_instance_schema(Optimizer),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticLossIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(Loss),
-            python_schema=core_schema.is_instance_schema(Loss),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-class PydanticMessageSubscriberIF:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(MessageSubscriberIF),
-            python_schema=core_schema.is_instance_schema(MessageSubscriberIF),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-PydanticCheckpointingIFType = Annotated[CheckpointingIF, PydanticCheckpointingIF]
-PydanticCheckpointingStrategyIFType = Annotated[CheckpointingStrategyIF, PydanticCheckpointingStrategyIF]
-PydanticCheckpointingExecutionIFType = Annotated[CheckpointingExecutionIF, PydanticCheckpointingExecutionIF]
-PydanticModelIFType = Annotated[nn.Module, PydanticModelIF]
-PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticTokenizerIF]
-PydanticDatasetIFType = Annotated[Dataset, PydanticDatasetIF]
-PydanticSamplerIFType = Annotated[Sampler, PydanticSamplerIF]
-PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticCollateFnIF]
-PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticLLMDataLoaderIF]
-PydanticOptimizerIFType = Annotated[Optimizer, PydanticOptimizerIF]
-PydanticLossIFType = Annotated[Loss, PydanticLossIF]
-PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticMessageSubscriberIF]
+PydanticCheckpointingIFType = Annotated[CheckpointingIF, PydanticThirdPartyTypeIF(CheckpointingIF)]
+PydanticCheckpointingStrategyIFType = Annotated[
+    CheckpointingStrategyIF, PydanticThirdPartyTypeIF(CheckpointingStrategyIF)
+]
+PydanticCheckpointingExecutionIFType = Annotated[
+    CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
+]
+PydanticModelIFType = Annotated[
+    nn.Module, PydanticThirdPartyTypeIF(CheckpointingIF)
+]  # NOTE: Only here, there is a difference between the two arguments
+PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
+PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
+PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
+PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
+PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
+PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
+PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
+PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -269,8 +90,6 @@ class CLMCrossEntropyLossConfig(BaseModel):
 
 
 # Checkpointing
-
-
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
 
@@ -397,13 +216,13 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 
 
 class BatchSamplerConfig(BaseModel):
-    sampler: PydanticSamplerIF
+    sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
     drop_last: bool
 
 
 class ResumableBatchSamplerConfig(BaseModel):
-    sampler: PydanticSamplerIF
+    sampler: PydanticSamplerIFType
     start_index: Annotated[int, Field(strict=True, gt=0)]
 
 
@@ -414,9 +233,9 @@ class GPT2LLMCollateFnConfig(BaseModel):
 
 class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
-    dataset: PydanticDatasetIF
-    batch_sampler: PydanticSamplerIF
-    collate_fn: PydanticCollateFnIF
+    dataset: PydanticDatasetIFType
+    batch_sampler: PydanticSamplerIFType
+    collate_fn: PydanticCollateFnIFType
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
