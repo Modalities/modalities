@@ -1,12 +1,12 @@
 import math
 from enum import Enum
 from functools import partial
-from typing import Dict
+from typing import Annotated, Dict
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint, model_validator
+from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
 from modalities.models.model import NNModel
@@ -26,28 +26,30 @@ class ActivationType(str, Enum):
 
 class AttentionConfig(BaseModel):
     attention_type: AttentionType
-    scaling_factor: conint(ge=1)
+    scaling_factor: Annotated[int, Field(strict=True, gt=1)]
 
 
 class WeightInitailizationConfig(BaseModel):
-    mean: confloat(ge=0.0)
-    std: confloat(ge=0.0)
+    mean: Annotated[float, Field(strict=True, gt=0.0)]
+    std: Annotated[float, Field(strict=True, gt=0.0)]
 
 
 class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
-    block_size: conint(ge=1)
-    vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: conint(ge=1)
-    n_head: conint(ge=1)
-    n_embd: conint(ge=1)
-    ffn_hidden: conint(ge=1)
-    dropout: confloat(ge=0.0)
+    block_size: Annotated[int, Field(strict=True, gt=1)]
+    vocab_size: Annotated[
+        int, Field(strict=True, gt=1)
+    ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: Annotated[int, Field(strict=True, gt=1)]
+    n_head: Annotated[int, Field(strict=True, gt=1)]
+    n_embd: Annotated[int, Field(strict=True, gt=1)]
+    ffn_hidden: Annotated[int, Field(strict=True, gt=1)]
+    dropout: Annotated[float, Field(strict=True, gt=0.0)]
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
     activation: ActivationType
-    epsilon: confloat(ge=0.0)
+    epsilon: Annotated[float, Field(strict=True, gt=0.0)]
     weight_init: WeightInitailizationConfig
 
     @model_validator(mode="after")
