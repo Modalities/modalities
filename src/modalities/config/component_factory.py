@@ -124,7 +124,7 @@ class ComponentFactory:
         return {"instance_key", "pass_type"} == config_dict.keys()
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
-        component_config_type: BaseModel = self.registry.get_config(component_key, variant_key)
+        component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
         comp_config = component_config_type(**config_dict, strict=True)
         return comp_config
 
@@ -136,7 +136,7 @@ class ComponentFactory:
                 output[name] = value
             return output
 
-        component_type = self.registry.get_component(component_key, variant_key)
+        component_type: Type = self.registry.get_component(component_key, variant_key)
         component_config_dict = base_model_to_dict(component_config)
         component = component_type(**component_config_dict)
         return component
