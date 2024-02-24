@@ -23,7 +23,7 @@ from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import parse_enum_by_name
+from modalities.util import get_date_of_run, parse_enum_by_name
 
 
 class PydanticThirdPartyTypeIF:
@@ -317,12 +317,16 @@ class ComponentsInferenceModel(BaseModel):
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
-    int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
-
-    def resolver_fun(var_name: str) -> int:
+    def cuda_env_resolver_fun(var_name: str) -> int:
+        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    OmegaConf.register_new_resolver("modalities_env", resolver_fun, replace=True)
+    def modalities_env_resolver_fun(var_name: str) -> int:
+        if var_name == "experiment_id":
+            return get_date_of_run()
+
+    OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
+    OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
     config_dict = OmegaConf.to_container(cfg, resolve=True)

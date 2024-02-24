@@ -22,11 +22,7 @@ from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.registry_factory import RegistryFactory
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import (
-    compute_number_of_trainable_parameters,
-    get_callback_interval_in_batches_per_rank,
-    get_date_of_run,
-)
+from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
 from modalities.utils.generate_text import main as generate_text_main
 
 
@@ -141,7 +137,6 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 class Main:
     def __init__(self, config_dict: Dict) -> None:
         self.config_dict = config_dict
-        self.experiment_id = get_date_of_run()
         self.registry = RegistryFactory.get_registry()
         self.component_factory = ComponentFactory(registry=self.registry)
 
