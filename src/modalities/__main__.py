@@ -142,7 +142,12 @@ class Main:
     def __init__(self, config_dict: Dict) -> None:
         self.config_dict = config_dict
         self.experiment_id = get_date_of_run()
-        self.component_factory = ComponentFactory(registry=RegistryFactory.get_registry())
+        self.registry = RegistryFactory.get_registry()
+        self.component_factory = ComponentFactory(registry=self.registry)
+
+    def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
+        entity = (custom_component, custom_config)
+        self.registry.add_entity(component_key=component_key, variant_key=variant_key, entity=entity)
 
     def run(self):
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -199,121 +204,6 @@ class Main:
                 optimizer=components.optimizer,
             )
             print("done")
-
-    # def construct_components(
-    #     self, resolvers, config: AppConfig, running_env: RunningEnv
-    # ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
-    #     # Checkpointing
-
-    #     checkpointing = None  # TODO pass in the component
-
-    #     # Model and optimizer
-    #     wrapped_model, optimizer = self.get_model_and_optimizer(
-    #         config=config, running_env=running_env, checkpointing=checkpointing
-    #     )
-    #     if config.training.do_apply_activation_checkpointing:
-    #         apply_activation_checkpointing_inplace(wrapped_model)
-    #         logging.info("Applied activation checkpointing!")
-
-    #     # Loss function
-    #     loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
-
-    #     # Dataloaders
-    #     # skip_num_samples = 0
-    #     # if run_mode == RunMode.WARM_START:
-    #     #     skip_num_samples = config.modalities_setup.settings.checkpoint_num_seen_samples
-
-    #     skip_num_local_train_batches = config.training.skip_num_local_train_batches
-    #     train_dataloader = DataloaderFactory.get_dataloader(
-    #         resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
-    #     )
-    #     eval_dataloaders = [
-    #         DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
-    #         for dataloader_config in config.data.eval_dataloaders
-    #     ]
-
-    #     # Logging
-    #     eval_split_lengths = {
-    #         dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.batch_size
-    #         for dataloader in eval_dataloaders
-    #     }
-
-    #     # TODO: check why not *config.training.world_size
-    #     #  and consider just using config.training.num_training_samples for progress Subscriber
-    #     train_split_lengths = {
-    #         train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
-    #         * config.training.world_size
-    #         * train_dataloader.batch_size
-    #     }
-
-    #     evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-    #         config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
-    #     )
-
-    #     # Trainer
-    #     trainer = Trainer(
-    #         local_rank=config.training.local_rank,
-    #         batch_progress_publisher=batch_processed_publisher,
-    #         evaluation_result_publisher=evaluation_result_publisher,
-    #         gradient_acc_step=config.training.gradient_acc_step,
-    #     )
-
-    #     # Evaluator
-    #     evaluator = Evaluator(
-    #         local_rank=config.training.local_rank,
-    #         batch_progress_publisher=batch_processed_publisher,
-    #         evaluation_result_publisher=evaluation_result_publisher,
-    #     )
-
-    #     # Gym
-    #     gym = Gym(trainer=trainer, evaluator=evaluator, loss_fun=loss_fun, num_ranks=config.training.world_size)
-
-    #     return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
-
-    # def get_model_and_optimizer(
-    #     self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing,
-    # model: nn.Module, optimizer: Optimizer,
-    #     run_mode: RunMode
-    # ) -> Tuple[nn.Module, Optimizer]:
-
-    #     if run_mode == RunMode.WARM_START:
-    #         warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
-
-    #         wrapped_model = checkpointing.load_model_checkpoint(
-    #             file_path=warm_start_settings.checkpoint_model_path,
-    #             model=model,
-    #         )
-
-    #         optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-    #             config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-    #         )
-
-    #         # TODO improve this
-    #         if warm_start_settings.checkpoint_optimizer_path is None:
-    #             raise (
-    #                 NotImplementedError(
-    #                     "So far we always have to provide an optimizer checkpoint. "
-    #                     "For fine-tuning a pre-trained, we might not want to load "
-    #                     "an optimizer checkpoint."
-    #                 )
-    #             )
-
-    #         optimizer = checkpointing.load_optimizer_checkpoint(
-    #             optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
-    #         )
-
-    #     else:
-    #         wrapped_model = running_env.wrap_model(model=model, sync_module_states=False)
-    #         optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-    #             config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-    #         )
-
-    #     # TODO implement scheduler
-    #     # scheduler = self.resolvers.build_component_by_config(
-    #     #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
-    #     # )
-
-    #     return wrapped_model, optimizer
 
     def get_logging_publishers(
         self,
