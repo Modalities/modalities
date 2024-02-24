@@ -45,6 +45,7 @@ class GPT2LLMConfig(BaseModel):
     n_head: Annotated[int, Field(strict=True, ge=1)]
     n_embd: Annotated[int, Field(strict=True, ge=1)]
     ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
+
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
