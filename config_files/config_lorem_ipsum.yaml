@@ -1,5 +1,5 @@
 settings:  
-  experiment_id: "abc"
+  experiment_id: ${modalities_env:experiment_id}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -12,9 +12,9 @@ settings:
     local_train_micro_batch_size: 3
     sequence_length: 256
   cuda_env:
-    local_rank: ${modalities_env:LOCAL_RANK}
-    global_rank: ${modalities_env:RANK}
-    world_size: ${modalities_env:WORLD_SIZE}
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
 
 tokenizer:
   component_key: tokenizer
@@ -243,6 +243,6 @@ evaluation_subscriber:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
     mode: OFFLINE
-    experiment_id: "abc" # TODO set this via env var maybe?
+    experiment_id: ${settings.experiment_id}
     directory: "."
     

@@ -1,21 +1,21 @@
 settings:  
-  experiment_id: abc
+  experiment_id: ${modalities_env:experiment_id}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
     prediction_key: logits
   training:
-    callback_interval_in_samples: 64
+    callback_interval_in_samples: 2048
     global_num_training_samples: 2048
     global_num_seen_samples: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
-    sequence_length: 256
+    sequence_length: 4096
   cuda_env:
-    local_rank: ${modalities_env:LOCAL_RANK}
-    global_rank: ${modalities_env:RANK}
-    world_size: ${modalities_env:WORLD_SIZE}
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
 
 
 
@@ -30,7 +30,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
   config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_llama_2_tokenized_num_samples_1024_train.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -65,7 +65,46 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-eval_dataloaders: []
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_megatron
+  config: 
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1024.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: val_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            dataset:
+              instance_key: val_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders: [val_dataloader]
 
 checkpointing:
   component_key: checkpointing
@@ -135,13 +174,6 @@ optimizer:
       pass_type: BY_REFERENCE
 
 
-loss:
-  type_hint: CLMCrossEntropyLoss
-  config:
-    target_key: ${settings.referencing_keys.target_key}
-    prediction_key: ${model.config.prediction_key}
-
-
 batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
@@ -162,5 +194,5 @@ evaluation_subscriber:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
     mode: OFFLINE
-    experiment_id: "abc" # TODO set this via env var maybe?
+    experiment_id: ${settings.experiment_id}
     directory: "."
