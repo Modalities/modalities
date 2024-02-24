@@ -103,8 +103,8 @@ class SchedulerTypes(LookupEnum):
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
 
 class StepLRConfig(BaseModel):
-    step_size: Annotated[int, Field(strict=True, gt=1)]
-    gamma: Annotated[float, Field(strict=True, gt=0.0)]
+    step_size: Annotated[int, Field(strict=True, ge=1)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
 
 
 class ConstantLRConfig(BaseModel):
