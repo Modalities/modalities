@@ -25,7 +25,6 @@ class ProgressSubscriberFactory:
     ) -> RichProgressSubscriber:
         if local_rank == 0:
             skip_num_local_train_batches = global_num_seen_samples // world_size // train_dataloader.batch_size
-
             train_split_num_samples = {
                 train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
                 * world_size

@@ -7,6 +7,7 @@ from typing import Dict, Tuple
 import click
 import click_pathlib
 
+from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
@@ -178,10 +179,11 @@ class Main:
                 loss_fun=components.loss_fn,
                 num_ranks=components.settings.cuda_env.world_size,
             )
+            wrapped_model = components.wrapped_model
+            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
-            logging.info(
-                f"Training model with {compute_number_of_trainable_parameters(components.wrapped_model)} parameters."
-            )
+            if components.settings.training.do_apply_activation_checkpointing:
+                apply_activation_checkpointing_inplace(wrapped_model)
 
             callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
                 callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
@@ -195,7 +197,7 @@ class Main:
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=components.eval_dataloaders,
                 checkpointing=components.checkpointing,
-                model=components.wrapped_model,
+                model=wrapped_model,
                 optimizer=components.optimizer,
             )
             print("done")
