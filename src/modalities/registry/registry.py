@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from modalities.registry.components import ComponentEntity
 
-Entity = Tuple[Type, Type[BaseModel]]  # TODO: replace by BaseModel
+Entity = Tuple[Type, Type[BaseModel]]
 
 
 class Registry:

@@ -4,6 +4,7 @@ import pytest
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
+from modalities.registry.components import ComponentEntity
 from modalities.registry.registry import Registry
 from tests.config.components import ComponentV, ComponentW, ComponentX, ComponentY
 from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYConfig
@@ -12,16 +13,13 @@ from tests.config.configs import CompVConfig, CompWConfig, CompXConfig, CompYCon
 @pytest.fixture(scope="function")
 def component_factory() -> ComponentFactory:
     components = [
-        ("COMP_V", "default", (ComponentV, CompVConfig)),
-        ("COMP_W", "default", (ComponentW, CompWConfig)),
-        ("COMP_X", "default", (ComponentX, CompXConfig)),
-        ("COMP_Y", "default", (ComponentY, CompYConfig)),
+        ComponentEntity("COMP_V", "default", ComponentV, CompVConfig),
+        ComponentEntity("COMP_W", "default", ComponentW, CompWConfig),
+        ComponentEntity("COMP_X", "default", ComponentX, CompXConfig),
+        ComponentEntity("COMP_Y", "default", ComponentY, CompYConfig),
     ]
 
-    registry = Registry()
-    for component in components:
-        registry.add_entity(*component)
-
+    registry = Registry(components=components)
     component_factory = ComponentFactory(registry=registry)
     return component_factory
 
