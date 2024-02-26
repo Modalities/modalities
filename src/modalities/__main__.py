@@ -20,7 +20,8 @@ from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.registry.registry_factory import RegistryFactory
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
@@ -138,7 +139,7 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 class Main:
     def __init__(self, config_dict: Dict) -> None:
         self.config_dict = config_dict
-        self.registry = RegistryFactory.get_registry()
+        self.registry = Registry(COMPONENTS)
         self.component_factory = ComponentFactory(registry=self.registry)
 
     def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:

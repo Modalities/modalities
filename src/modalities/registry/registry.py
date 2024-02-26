@@ -1,14 +1,17 @@
-from typing import Dict, Tuple, Type
+from typing import Dict, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
 
-Entity = Tuple[Type, Type[BaseModel]]
+Entity = Tuple[Type, Type[BaseModel]]  # TODO: replace by BaseModel
 
 
 class Registry:
-    def __init__(self) -> None:
+    def __init__(self, components: Optional[List] = None) -> None:  # TODO: fix typing, introduce BaseModels
         # maps component_key -> variant_key -> entity = (component, config)
         self._registry_dict: Dict[str, Dict[str, Entity]] = {}
+        if components is not None:
+            for component in components:
+                self.add_entity(*component)
 
     def add_entity(self, component_key: str, variant_key: str, entity: Entity) -> None:
         if component_key not in self._registry_dict:

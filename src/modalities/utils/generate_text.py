@@ -15,7 +15,8 @@ from transformers import PreTrainedTokenizer
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsInferenceModel, load_app_config_dict
-from modalities.registry.registry_factory import RegistryFactory
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 
 chat_prefix = """
 This is a converstation between a user and a helpful bot, which answers the user's questsions as good as possible.
@@ -96,7 +97,8 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
     print(f"using {model_path}")
 
     config_dict = load_app_config_dict(config_path)
-    component_factory = ComponentFactory(registry=RegistryFactory.get_registry())
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
     components = component_factory.build_components(
         config_dict=config_dict, components_model_type=ComponentsInferenceModel
     )

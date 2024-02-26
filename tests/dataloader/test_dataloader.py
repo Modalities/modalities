@@ -8,7 +8,8 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.registry.registry_factory import RegistryFactory
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 
 
 def test_resumable_dataloader() -> LLMDataLoader:
@@ -31,7 +32,8 @@ def test_dataloader_from_config(dummy_config: Dict):
     class DataloaderTestModel(BaseModel):
         train_dataloader: PydanticLLMDataLoaderIFType
 
-    component_factory = ComponentFactory(registry=RegistryFactory.get_registry())
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
     components: DataloaderTestModel = component_factory.build_components(
         config_dict=dummy_config, components_model_type=DataloaderTestModel
     )
