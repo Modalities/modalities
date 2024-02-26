@@ -69,11 +69,6 @@ class MultiModalDecoder(NNModel):
         self.prediction_key = prediction_key
         self.block_size = block_size
 
-        if vocab_size is None:
-            raise ValueError("vocab_size is not defined.")
-        if block_size is None:
-            raise ValueError("block_size is not defined.")
-
         self.transformer = nn.ModuleDict(
             dict(
                 h=nn.ModuleList(

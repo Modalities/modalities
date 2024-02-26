@@ -32,11 +32,6 @@ class TextDecoder(NNModel):
         self.prediction_key = prediction_key
         self.block_size = block_size
 
-        if vocab_size is None:
-            raise ValueError("vocab_size is not defined.")
-        if block_size is None:
-            raise ValueError("block_size is not defined.")
-
         self.cls_token = nn.Parameter(torch.empty(1, 1, n_embd))
         self.transformer = nn.ModuleDict(
             dict(
