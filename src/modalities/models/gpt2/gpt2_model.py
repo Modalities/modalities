@@ -254,10 +254,8 @@ class CausalSelfAttention(nn.Module):
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
 
         #TODO: move logic into a function
-        transform = self.qkv_transforms[0]
-        q, k, v = transform(q, k, v)
-        # for qkv_transform in self.qkv_transforms:
-        #     q, k, v = qkv_transform(q, k, v)
+        for qkv_transform in self.qkv_transforms:
+            q, k, v = qkv_transform(q, k, v)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
