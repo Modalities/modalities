@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Callable, Dict, Generic, TypeVar, Type
+from typing import Callable, Dict, Generic, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -16,6 +16,13 @@ def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
         return enum_type[name]
     except KeyError:
         raise ValidationError(f"Invalid {enum_type} member name: {name}")
+
+def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+    try:
+        return enum_type[name]
+    except KeyError:
+        raise ValidationError(f"Invalid {enum_type} member name: {name}")
+
 
 def get_date_of_run():
     """create date and time for file save uniqueness

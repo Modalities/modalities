@@ -306,7 +306,7 @@ class TransformerMLP(nn.Module):
         return x
 
 
-class Block(nn.Module):
+class GPT2Block(nn.Module):
     def __init__(
         self,
         n_embd: int,
@@ -392,7 +392,7 @@ class GPT2LLM(NNModel):
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
-                        Block(
+                        GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
                             epsilon=epsilon,
