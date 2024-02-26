@@ -4,9 +4,7 @@ import torch.cuda
 from modalities.__main__ import Main
 
 
-@pytest.mark.skipif(
-    torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU."
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 def test_e2e_training_run_wout_ckpt(monkeypatch, indexed_dummy_data_path, dummy_config):
     # patch in env variables
     monkeypatch.setenv("MASTER_ADDR", "localhost")

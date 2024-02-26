@@ -1,5 +1,5 @@
-import tempfile
 import os
+import tempfile
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict
@@ -31,7 +31,8 @@ _ROOT_DIR = Path(__file__).parents[1]
 
 
 @pytest.mark.skipif(
-    not 'RANK' in os.environ or torch.cuda.device_count() < 2, reason="This e2e test requires 2 GPUs and a torchrun distributed environment."
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture(scope="function")
