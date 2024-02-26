@@ -56,26 +56,17 @@ data:
         pin_memory: true
         shuffle: false
         dataloader_tag: "val"
-        dataset: ${data.train_dataloader.config.dataset}
-        batch_sampler:
-          type_hint: BatchSampler
+        dataset:
+          type_hint: DummyDataset
           config:
-            batch_size: 3
-            drop_last: false
-            sampler:
-              type_hint: DistributedSampler
-              config:
-                rank: ${training.global_rank}
-                num_replicas: ${training.world_size}
-                shuffle: true
-        collate_fn: ${data.train_dataloader.config.collate_fn}
-    - type_hint: LLMDataLoader
-      config:
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        dataloader_tag: "test"
-        dataset: ${data.train_dataloader.config.dataset}
+            num_samples: 4
+            sample_definition:
+              - - images
+                - [3, 224, 224]
+                - float
+              - - input_ids
+                - [1024]
+                - int
         batch_sampler:
           type_hint: BatchSampler
           config:
