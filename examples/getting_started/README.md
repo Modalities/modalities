@@ -115,7 +115,7 @@ first and then divides it into chunks of size context-length.
 
 In modalities, we describe the entire training and evaluation setup (i.e., components such das model, trainer, evaluator, dataloder etc.) within a single config file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. 
 
-The example config file for this experiment can be found in `examples/mem_map_redpajama_gpt/config_example_mem_map_dataset.yaml`. 
+The example config file for this experiment can be found in `examples/getting_started/example_config.yaml`. 
 
 ## 2. Training
 
@@ -151,8 +151,8 @@ The command can be broken down into the following parts:
 7. **`run`**:
    - Command argument for the `modalities` executable to initiate the training.
 
-8. **`--config_file_path config_example_mem_map_dataset.yaml`**:
-   - Specifies the path to the configuration file. The file `config_example_mem_map_dataset.yaml` contains mentinoed configuratino of the components, including dataset and model configurations, training parameters, etc.
+8. **`--config_file_path example_config.yaml`**:
+   - Specifies the path to the configuration file. The file `example_config.yaml` contains the configuration of the components, including dataset and model configurations, training parameters, etc.
 
 
 Already during the training, the checkpoints can be found locally in `checkpoints/` and the loss and metric developments can be inspected online in [Weights&Biases](https://wandb.ai/). 
