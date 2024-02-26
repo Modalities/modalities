@@ -101,7 +101,7 @@ running_env:
     local_rank: ${oc.env:LOCAL_RANK}
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
+    block_names: [GPT2Block]
 
 model:
   type_hint: GPT2LLM
