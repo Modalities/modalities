@@ -24,7 +24,7 @@ from modalities.running_env.env_utils import MixedPrecisionSettings
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
-#   /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
+#   $(which pytest) path/to/test_fsdp_to_disc_checkpointing.py
 
 _ROOT_DIR = Path(__file__).parents[1]
 
