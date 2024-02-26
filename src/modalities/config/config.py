@@ -1,5 +1,6 @@
 import json
 import warnings
+from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
@@ -321,7 +322,13 @@ class AppConfig(BaseModel):
     loss: LossConfig
 
 
-class HuggingFaceModelConfig(PretrainedConfig):
+class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
+    @abstractmethod
+    def to_json_string():
+        raise NotImplementedError()
+
+
+class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
     model_type = "modalities_gpt2"
 
     def __init__(self, config: GPT2Config = None, **kwargs):

@@ -16,7 +16,7 @@ from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
 from modalities.checkpointing.checkpointing_execution import PytorchToDiscCheckpointing
 from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, HuggingFaceModelConfig, ModalitiesSetupConfig, RunMode
+from modalities.config.config import AppConfig, GPT2HuggingFaceAdapterConfig, ModalitiesSetupConfig, RunMode
 from modalities.config.lookup_types import TokenizerTypes
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -418,7 +418,7 @@ class Main:
         return model
 
     def _convert_checkpoint(self, output_path: Union[str, Path], model: nn.Module):
-        config = HuggingFaceModelConfig(self.config.model.config)
+        config = GPT2HuggingFaceAdapterConfig(self.config.model.config)
         hugging_face_model = HuggingFaceModel(config=config, model=model)
         hugging_face_model.save_pretrained(output_path, safe_serialization=False)
 

@@ -8,7 +8,7 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.config import AppConfig, HuggingFaceModelConfig
+from modalities.config.config import AppConfig, GPT2HuggingFaceAdapterConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.resolver_register import ResolverRegister
 
@@ -56,8 +56,8 @@ def test_convert_to_hf_checkpoint(tmp_path, config, device):
     output_before_loading = pytorch_model.forward({"input_ids": test_tensor})["logits"]
 
     # register config and model
-    AutoConfig.register("modalities_gpt2", HuggingFaceModelConfig)
-    AutoModelForCausalLM.register(HuggingFaceModelConfig, HuggingFaceModel)
+    AutoConfig.register("modalities_gpt2", GPT2HuggingFaceAdapterConfig)
+    AutoModelForCausalLM.register(GPT2HuggingFaceAdapterConfig, HuggingFaceModel)
     # load saved model
     hf_model = AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=pytorch_model.lm_head.weight.dtype)
     hf_model = hf_model.to(device)
