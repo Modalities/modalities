@@ -43,7 +43,7 @@ Given `CustomGPT2LLMCollateFnConfig` and `CustomGPT2LLMCollateFnConfig`, we regi
 ```python
 def main(): 
      # load and parse the config file 
-     config_file_path = Path("/raid/s3/opengptx/max_lue/modalities_custom/config_lorem_ipsum.yaml") 
+     config_file_path = Path("config_lorem_ipsum.yaml") 
      config_dict = load_app_config_dict(config_file_path) 
   
      # instantiate the Main entrypoint of modalities by passing in the config 
