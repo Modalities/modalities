@@ -5,17 +5,19 @@ settings:
     target_key: target_ids
     prediction_key: logits
   training:
-    callback_interval_in_samples: 2048
+    callback_interval_in_samples: 32768
     global_num_training_samples: 2048
     global_num_seen_samples: 0
-    do_apply_activation_checkpointing: true
+    do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 1
+    local_train_micro_batch_size: 16
     sequence_length: 4096
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpointing_path: data/checkpoints
 
 
 collate_fn:  
@@ -29,7 +31,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
   config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_16777216.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -68,7 +70,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
   config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1024_test.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_1024.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -120,7 +122,7 @@ checkpointing:
       component_key: checkpointing_execution
       variant_key: fsdp_to_disc_checkpointing
       config:
-        checkpoint_path: data/checkpoints
+        checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
@@ -205,6 +207,6 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: OFFLINE
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."

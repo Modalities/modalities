@@ -16,6 +16,6 @@ class OptimizerFactory:
         checkpointing: Checkpointing, checkpoint_path, wrapped_model: nn.Module, optimizer: Optimizer
     ):
         wrapped_optimizer = checkpointing.load_optimizer_checkpoint(
-            file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
+            file_path=checkpoint_path, optimizer=optimizer, wrapped_model=wrapped_model
         )
         return wrapped_optimizer

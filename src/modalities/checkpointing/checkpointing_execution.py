@@ -30,7 +30,7 @@ class CheckpointingExecutionIF(ABC):
     def load_optimizer_checkpoint(
         self,
         optimizer: Optimizer,
-        model: nn.Module,
+        wrapped_model: nn.Module,
         file_path: Path,
     ) -> Optimizer:
         raise NotImplementedError

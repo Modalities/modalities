@@ -16,7 +16,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
-
+  paths:
+    checkpointing_path: data/checkpoints
 
 
 collate_fn:  
@@ -119,7 +120,7 @@ checkpointing:
       component_key: checkpointing_execution
       variant_key: fsdp_to_disc_checkpointing
       config:
-        checkpoint_path: data/checkpoints
+        checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16

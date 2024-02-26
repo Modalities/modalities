@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -42,7 +44,7 @@ def main() -> None:
 )
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    main = Main(config_dict)
+    main = Main(config_dict, config_file_path)
     main.run()
 
 
@@ -137,8 +139,10 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 
 
 class Main:
-    def __init__(self, config_dict: Dict) -> None:
+    def __init__(self, config_dict: Dict, config_path: Path) -> None:
         self.config_dict = config_dict
+        self.config_path = config_path
+
         self.registry = Registry(COMPONENTS)
         self.component_factory = ComponentFactory(registry=self.registry)
 
@@ -151,6 +155,13 @@ class Main:
             components: ComponentsModel = self.component_factory.build_components(
                 config_dict=self.config_dict, components_model_type=ComponentsModel
             )
+
+            # save the config file to the checkpointing path
+            if components.settings.cuda_env.global_rank == 0:
+                experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+                os.makedirs(experiment_path, exist_ok=True)
+                shutil.copy(self.config_path, experiment_path / self.config_path.name)
+
             evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
                 progress_subscriber=components.batch_progress_subscriber,
                 results_subscriber=components.evaluation_subscriber,
@@ -173,7 +184,7 @@ class Main:
                 evaluation_result_publisher=evaluation_result_publisher,
             )
 
-            #     # Gym
+            # Gym
             gym = Gym(
                 trainer=trainer,
                 evaluator=evaluator,

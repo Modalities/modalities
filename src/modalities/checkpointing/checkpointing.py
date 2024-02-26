@@ -74,10 +74,10 @@ class Checkpointing(CheckpointingIF):
         model = self.checkpointing_execution.load_model_checkpoint(model=model, file_path=file_path)
         return model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, wrapped_model: nn.Module, file_path: Path) -> Optimizer:
         optimizer = self.checkpointing_execution.load_optimizer_checkpoint(
             optimizer=optimizer,
-            model=model,
+            wrapped_model=wrapped_model,
             file_path=file_path,
         )
         return optimizer

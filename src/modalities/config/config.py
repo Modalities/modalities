@@ -292,10 +292,14 @@ class Settings(BaseModel):
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
 
+    class Paths(BaseModel):
+        checkpointing_path: Path
+
     experiment_id: str
     referencing_keys: Dict[str, str]
     training: Training
     cuda_env: CudaEnv
+    paths: Paths
 
 
 class ComponentsModel(BaseModel):
@@ -307,7 +311,6 @@ class ComponentsModel(BaseModel):
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpointing: PydanticCheckpointingIFType
-
     settings: Settings
 
 
