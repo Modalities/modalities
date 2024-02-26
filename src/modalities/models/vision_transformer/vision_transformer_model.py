@@ -51,12 +51,14 @@ class ImagePatchEmbedding(nn.Module):
 
 
 class VisionTransformerBlock(nn.Module):
-    def __init__(self, n_embd: int = 768, n_head: int = 8) -> None:
+    def __init__(
+        self, n_embd: int = 768, n_head: int = 8, ffn_hidden: int = 3072, bias: bool = True, dropout: float = 0.0
+    ) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(n_embd)
         self.attention = Attention(n_embd, n_head)
         self.norm2 = nn.LayerNorm(n_embd)
-        self.mlp = MLP(n_embd)
+        self.mlp = MLP(in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.attention(self.norm1(x))
@@ -65,24 +67,41 @@ class VisionTransformerBlock(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, config: VisionTransformerConfig) -> None:
+    def __init__(
+        self,
+        sample_key: str,
+        prediction_key: str,
+        block_size: int = 197,
+        n_classes: int = 1000,
+        n_layer: int = 12,
+        n_head: int = 8,
+        n_embd: int = 768,
+        ffn_hidden: int = 3072,
+        dropout: float = 0.0,
+        patch_size: int = 16,
+        patch_stride: int = 16,
+        n_img_channels: int = 3,
+        add_cls_token: bool = True,
+        bias: bool = True,
+    ) -> None:
         super().__init__()
-        self.sample_key = config.sample_key
-        self.prediction_key = config.prediction_key
+        self.sample_key = sample_key
+        self.prediction_key = prediction_key
 
-        self.embd = ImagePatchEmbedding(
-            config.n_img_channels, config.n_embd, config.patch_size, config.patch_stride, config.add_cls_token
-        )
-        self.pos_embd = nn.Embedding(num_embeddings=config.block_size, embedding_dim=config.n_embd)
-        self.dropout = nn.Dropout(config.dropout)
+        self.embd = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
+        self.pos_embd = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
+        self.dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList(
-            [VisionTransformerBlock(n_embd=config.n_embd, n_head=config.n_head) for _ in range(config.n_layer)]
+            [
+                VisionTransformerBlock(n_embd=n_embd, n_head=n_head, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+                for _ in range(n_layer)
+            ]
         )
 
         self.head = None
-        if config.n_classes is not None:
-            self.norm = nn.LayerNorm(config.n_embd)
-            self.head = nn.Linear(in_features=config.n_embd, out_features=config.n_classes, bias=False)
+        if n_classes is not None:
+            self.norm = nn.LayerNorm(n_embd)
+            self.head = nn.Linear(in_features=n_embd, out_features=n_classes, bias=bias)
 
     def forward_embeddings(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embd(x)
