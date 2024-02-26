@@ -171,11 +171,4 @@ which opens an interactive chatting CMD interface.
 ```
 enter prompt> Once upon a time, 
 there was ... <eos>
-
-```
-
-```sh
-modalities generate_text --tokenizer_file tokenizer/tokenizer.json \
-                        /raid/s3/opengptx/max_lue/modalities/scripts/data/checkpoints/2024-01-13__18-27-59/eid_2024-01-13__18-27-59-model-num_samples_26542080.bin \
-                         /raid/s3/opengptx/max_lue/modalities/config_files/config_example_mem_map_dataset_max.yaml 
 ```
