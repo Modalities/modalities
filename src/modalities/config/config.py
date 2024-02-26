@@ -77,6 +77,12 @@ class PassType(LookupEnum):
     BY_REFERENCE = "by_reference"
 
 
+class WandbMode(LookupEnum):
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    DISABLED = "DISABLED"
+
+
 class ReferenceConfig(BaseModel):
     instance_key: str
     pass_type: PassType
@@ -238,12 +244,6 @@ class LLMDataLoaderConfig(BaseModel):
     pin_memory: bool
     shuffle: bool
     skip_num_batches: Optional[int] = 0
-
-
-class WandbMode(LookupEnum):
-    ONLINE = "ONLINE"
-    OFFLINE = "OFFLINE"
-    DISABLED = "DISABLED"
 
 
 class DummyProgressSubscriberConfig(BaseModel):
