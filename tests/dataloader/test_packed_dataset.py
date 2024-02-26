@@ -33,7 +33,7 @@ def test_packed_dataset_loading(dummy_packed_data_path):
 @pytest.mark.parametrize(
     "block_size, expected_length, expected_output",
     [
-        # (1, 20, [[i] for i in range(20)]), # TODO
+        (1, 20, [[i] for i in range(20)]),
         (2, 10, [[2 * i, 2 * i + 1] for i in range(10)]),
         (3, 6, [[3 * i, 3 * i + 1, 3 * i + 2] for i in range(6)]),
         (10, 2, [list(range(10)), list(range(10, 20))]),

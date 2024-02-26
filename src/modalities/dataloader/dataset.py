@@ -91,9 +91,7 @@ class PackedMemMapDatasetBase(Dataset):
             mode="r",
             offset=offset,
             shape=(size,),
-        ).view(
-            f"S{size}"
-        )[0]
+        ).tobytes()
 
     @property
     def num_elements_per_item(self) -> int:
