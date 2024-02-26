@@ -127,7 +127,7 @@ running_env:
     mixed_precision_settings: FP_16
     sharding_strategy: FULL_SHARD
     auto_wrap_policy: TRANSFORMER_AUTO_WRAP_POLICY
-    block_names: [GPT2Block, VisionTransformerBlock]
+    block_names: [GPT2Block, MultiModalBlock, VisionTransformerBlock]
 
 model:
   type_hint: CoCa
@@ -153,29 +153,10 @@ model:
       bias: True
     text_decoder_config:
       sample_key: input_ids
-      prediction_key: text_embeddings
-      block_size: 1025 # +1 for the class token
-      vocab_size: 50304
-      n_layer: 12
-      n_head: 12
-      ffn_hidden: 2048
-      n_embd: 768
-      dropout: 0.0
-      bias: true
-      attention:
-        attention_type: default_attention
-        scaling_factor: 3
-      activation: fused_swiglu
-      epsilon: 1e-5
-      weight_init:
-        mean: 0.0
-        std: 0.02
-    multimodal_decoder_config:
-      sample_key: text_embeddings
       prediction_key: logits
       block_size: 1024
       vocab_size: 50304
-      n_layer: 12
+      n_layer: 24
       n_head: 12
       ffn_hidden: 2048
       n_embd: 768
@@ -193,6 +174,7 @@ model:
     n_vision_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
+    n_shared_layer: 12
 
 scheduler:
   type_hint: StepLR

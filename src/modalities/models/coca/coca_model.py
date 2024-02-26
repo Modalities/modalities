@@ -1,193 +1,16 @@
-import math
-from typing import Annotated, Dict
+from typing import Annotated
 
 import torch
-import xformers.ops as xops
 from einops import repeat
 from pydantic import BaseModel, Field
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Block, GPT2Config, LayerNorm, TransformerMLP
+from modalities.models.coca.multi_modal_decoder import MultiModalDecoder
+from modalities.models.coca.text_decoder import TextDecoder
+from modalities.models.gpt2.gpt2_model import GPT2Config
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
-from modalities.nn.attention import Attention
-
-
-class TextDecoder(NNModel):
-    def __init__(self, config: GPT2Config):
-        super().__init__()
-        self.config = config
-        assert config.vocab_size is not None
-        assert config.block_size is not None
-
-        self.sample_key = config.sample_key
-        self.prediction_key = config.prediction_key
-
-        self.cls_token = nn.Parameter(torch.empty(1, 1, config.n_embd))
-        self.transformer = nn.ModuleDict(
-            dict(
-                wte=nn.Embedding(num_embeddings=config.vocab_size, embedding_dim=config.n_embd),
-                wpe=nn.Embedding(num_embeddings=config.block_size, embedding_dim=config.n_embd),
-                drop=nn.Dropout(config.dropout),
-                h=nn.ModuleList(
-                    [
-                        GPT2Block(
-                            n_embd=config.n_embd,
-                            bias=config.bias,
-                            epsilon=config.epsilon,
-                            activation=config.activation,
-                            n_head=config.n_head,
-                            attention=config.attention,
-                            dropout=config.dropout,
-                            block_size=config.block_size,
-                            ffn_hidden=config.ffn_hidden,
-                        )
-                        for _ in range(config.n_layer)
-                    ]
-                ),
-            )
-        )
-
-        # init all weights
-        self.apply(self._init_weights)
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(
-                    p, mean=config.weight_init.mean, std=config.weight_init.std / math.sqrt(2 * config.n_layer)
-                )
-
-    def _init_weights(self, module: nn.Module):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
-
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        input_ids = inputs[self.sample_key]
-        device = input_ids.device
-        b, t = input_ids.size()
-        assert (
-            t <= self.config.block_size
-        ), f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
-        pos = torch.arange(0, t + 1, dtype=torch.long, device=device)
-
-        tok_emb = self.transformer.wte(input_ids)
-        tok_emb = torch.cat([tok_emb, self.cls_token.repeat(b, 1, 1)], dim=1)
-        pos_emb = self.transformer.wpe(pos)
-        x = self.transformer.drop(tok_emb + pos_emb)
-        for block in self.transformer.h:
-            x = block(x)
-        return {self.prediction_key: x}
-
-
-class MultiModalBlock(nn.Module):
-    def __init__(
-        self,
-        n_embd: int,
-        bias: bool,
-        epsilon: float,
-        activation: ActivationType,
-        n_head: int,
-        dropout: float,
-        ffn_hidden: int,
-    ):
-        super().__init__()
-        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = Attention(n_embd, n_head, bias, is_causal=False, use_cross_attention=True)
-        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-
-        if activation == ActivationType.GELU:
-            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
-        else:
-            raise Exception("unimplemented activation")
-
-    def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.ln_1(x), context=context)
-        x = x + self.mlp(self.ln_2(x))
-        return x
-
-
-class MultiModalDecoder(NNModel):
-    def __init__(self, config: GPT2Config):
-        super().__init__()
-        self.config = config
-        assert config.vocab_size is not None
-        assert config.block_size is not None
-
-        self.sample_key = config.sample_key
-        self.prediction_key = config.prediction_key
-
-        self.transformer = nn.ModuleDict(
-            dict(
-                h=nn.ModuleList(
-                    [
-                        MultiModalBlock(
-                            n_embd=config.n_embd,
-                            bias=config.bias,
-                            epsilon=config.epsilon,
-                            activation=config.activation,
-                            n_head=config.n_head,
-                            dropout=config.dropout,
-                            ffn_hidden=config.ffn_hidden,
-                        )
-                        for _ in range(config.n_layer)
-                    ]
-                ),
-                ln_f=LayerNorm(ndim=config.n_embd, bias=config.bias, epsilon=config.epsilon),
-            )
-        )
-        self.lm_head = nn.Linear(in_features=config.n_embd, out_features=config.vocab_size, bias=False)
-
-        # init all weights
-        self.apply(self._init_weights)
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(
-                    p, mean=config.weight_init.mean, std=config.weight_init.std / math.sqrt(2 * config.n_layer)
-                )
-
-    def _init_weights(self, module: nn.Module):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=self.config.weight_init.mean, std=self.config.weight_init.std)
-
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        x = inputs[self.sample_key]
-        for block in self.transformer.h:
-            x = block(x, context=inputs["context"])
-        x = self.transformer.ln_f(x)
-        logits = self.lm_head(x)
-        return {self.prediction_key: logits}
-
-
-class AttentionalPooling(nn.Module):
-    def __init__(
-        self,
-        n_embd: int,
-        n_head: int,
-        bias: bool,
-        epsilon: float,
-    ):
-        super().__init__()
-        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = Attention(n_embd, n_head, use_cross_attention=True)
-        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-
-    def forward(self, vision_embd: torch.Tensor, vision_queries: torch.Tensor) -> torch.Tensor:
-        x = self.ln_1(vision_embd)
-        x = self.attn(vision_queries, context=x)
-        x = self.ln_2(x)
-        return x
+from modalities.nn.attention_pooling import AttentionalPooling
 
 
 class CoCaConfig(BaseModel):
@@ -198,11 +21,11 @@ class CoCaConfig(BaseModel):
     text_cls_prediciton_key: str
     vision_encoder_config: VisionTransformerConfig
     text_decoder_config: GPT2Config
-    multimodal_decoder_config: GPT2Config
     n_pool_head: Annotated[int, Field(ge=1)]
     n_vision_queries: Annotated[int, Field(ge=1)]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
+    n_shared_layer: Annotated[int, Field(ge=1)]
 
 
 class CoCa(NNModel):
@@ -221,7 +44,7 @@ class CoCa(NNModel):
         epsilon_attn_pool: float,
         vision_encoder_config: VisionTransformerConfig,
         text_decoder_config: GPT2Config,
-        multimodal_decoder_config: GPT2Config,
+        n_shared_layer: int,
     ) -> None:
         super().__init__()
         self.prediction_key = prediction_key
@@ -229,9 +52,28 @@ class CoCa(NNModel):
         self.text_cls_prediciton_key = text_cls_prediciton_key
         self.vision_embd_prediciton_key = vision_embd_prediciton_key
         self.text_embd_prediciton_key = text_embd_prediciton_key
-        self.vision_encoder = VisionTransformer(vision_encoder_config)
-        self.text_decoder = TextDecoder(text_decoder_config)
-        self.multimodal_decoder = MultiModalDecoder(multimodal_decoder_config)
+        self.vision_encoder = VisionTransformer(**dict(vision_encoder_config))
+
+        shared_decoder_kwargs = dict(text_decoder_config)
+        del shared_decoder_kwargs["sample_key"]
+        del shared_decoder_kwargs["prediction_key"]
+        del shared_decoder_kwargs["block_size"]
+        del shared_decoder_kwargs["n_layer"]
+
+        self.text_decoder = TextDecoder(
+            sample_key=text_decoder_config.sample_key,
+            prediction_key=text_embd_prediciton_key,
+            block_size=text_decoder_config.block_size + 1,  # +1 for the class token
+            n_layer=text_decoder_config.n_layer - n_shared_layer,
+            **shared_decoder_kwargs,
+        )
+        self.multimodal_decoder = MultiModalDecoder(
+            sample_key=text_embd_prediciton_key,
+            prediction_key=text_decoder_config.prediction_key,
+            block_size=text_decoder_config.block_size,
+            n_layer=n_shared_layer,
+            **shared_decoder_kwargs,
+        )
 
         # TODO Validate if weight tying is useful for coca
         self.text_decoder.transformer.wte.weight = (
