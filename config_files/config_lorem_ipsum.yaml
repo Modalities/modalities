@@ -97,7 +97,7 @@ training:
   local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
   gradient_acc_step: 1
-  do_apply_activation_checkpointing: true
+  do_apply_activation_checkpointing: True
 
 checkpointing:
   checkpointing_strategy:
@@ -146,7 +146,6 @@ model:
           config:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head}
-            block_size: ${model.config.block_size}
     activation: gelu
     epsilon: 1e-5
     weight_init:

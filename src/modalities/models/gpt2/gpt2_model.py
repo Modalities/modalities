@@ -47,21 +47,65 @@ class IdentityTransform(QueryKeyValueTransform):
 
 
 class RotaryTransform(QueryKeyValueTransform):
-    def __init__(self, n_embd: int, n_head: int, block_size: int):
+    """Implementation of Rotary Positioanl Embeddings
+    Source: https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py
+    We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the XFormers implementation 
+    and removed in this implementatiom.
+    """
+
+    def __init__(self, n_embd: int, n_head: int):
         super().__init__()
-        self.rope = RotaryEmbedding(dim_model=n_embd/n_head)
-        self.block_size = block_size
+        dim_model=n_embd/n_head
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        self.register_buffer("inv_freq", inv_freq)
 
-    def forward(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        q, k = self.rope(q, k)
+        self._seq_len_cached = None
+        self._cos_cached = None
+        self._sin_cached = None
+    
+    
+    def rotate_half(self, x):
+        x1, x2 = x.chunk(2, dim=-1)
+        return torch.cat((-x2, x1), dim=-1)
 
-        return q, k, v
+    def _update_cos_sin_tables(self, x, seq_dimension=1):
+        seq_len = x.shape[seq_dimension]
 
+        # Reset the tables if the sequence length has changed,
+        # or if we're on a new device (possibly due to tracing for instance)
+        if (
+            seq_len != self._seq_len_cached
+            or self._cos_cached.device != x.device
+            or self._cos_cached.dtype != x.dtype
+        ):
+            self._seq_len_cached = seq_len
+            t = torch.arange(
+                x.shape[seq_dimension], device=x.device, dtype=torch.float32
+            )
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
+            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
+
+            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
+            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
+
+        return self._cos_cached, self._sin_cached
+
+
+    def apply_rotary_pos_emb(self, x, cos, sin):
+        # NOTE: This could probably be moved to Triton
+
+        # Handle a possible sequence length mismatch in between q and k
+        cos = cos[:, :, : x.shape[-2], :]
+        sin = sin[:, :, : x.shape[-2], :]
+
+        return (x * cos) + (self.rotate_half(x) * sin)
+    
+    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k, seq_dimension=-2)
+        q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
+        k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
+
+        return q, k,v 
 
 class QueryKeyValueTransformType(Enum):
     IdentityTransform = IdentityTransform
@@ -86,7 +130,6 @@ class AttentionConfig(BaseModel):
         class RotaryTransformConfig(BaseModel):
             n_embd: int = conint(ge=0)
             n_head: int = conint(ge=0)
-            block_size: int = conint(ge=0)
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
@@ -211,8 +254,10 @@ class CausalSelfAttention(nn.Module):
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
 
         #TODO: move logic into a function
-        for qkv_transform in self.qkv_transforms:
-            q, k, v = qkv_transform(q, k, v)
+        transform = self.qkv_transforms[0]
+        q, k, v = transform(q, k, v)
+        # for qkv_transform in self.qkv_transforms:
+        #     q, k, v = qkv_transform(q, k, v)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
