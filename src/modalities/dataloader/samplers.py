@@ -13,6 +13,8 @@ class ResumableBatchSampler(Sampler):
 
         self.start_index = start_index
         self.underlying_batch_sampler = underlying_batch_sampler
+        # NOTE: we are only iterating ove the indices not the actual data
+        # so this is relatively cheap
         self.indices = list(iter(self.underlying_batch_sampler))
 
     def __iter__(self):
@@ -22,5 +24,5 @@ class ResumableBatchSampler(Sampler):
         return len(self.indices) - self.start_index
 
     @property
-    def sampler_batch_size(self) -> int:
+    def batch_size(self) -> int:
         return self.underlying_batch_sampler.batch_size

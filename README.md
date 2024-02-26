@@ -1,5 +1,6 @@
 # Modalities
 
+[![Coverage Status](https://coveralls.io/repos/github/Modalities/modalities/badge.svg)](https://coveralls.io/github/Modalities/modalities)
 
 # Getting started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
@@ -88,7 +89,8 @@ With this, a mapping between type hint strings needed for `class-resolver`, and 
 
 ```python
 from enum import Enum
-from pydantic import BaseModel, PositiveInt, PositiveFloat, conint, confloat
+from typing import Annotated
+from pydantic import BaseModel, PositiveInt, PositiveFloat, Field
 
 class LookupEnum(Enum):
     @classmethod
@@ -101,8 +103,8 @@ class SchedulerTypes(LookupEnum):
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
 
 class StepLRConfig(BaseModel):
-    step_size: conint(ge=1)
-    gamma: confloat(ge=0.0)
+    step_size: Annotated[int, Field(strict=True, ge=1)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
 
 
 class ConstantLRConfig(BaseModel):

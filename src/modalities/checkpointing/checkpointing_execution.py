@@ -1,18 +1,19 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Callable, List
+from typing import List
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp import StateDictType
+from torch.distributed.fsdp import ShardingStrategy, StateDictType
 from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpointing_instruction import CheckpointingInstruction
 from modalities.exceptions import CheckpointingError
+from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
 class CheckpointingEntityType(Enum):
@@ -29,7 +30,7 @@ class CheckpointingExecutionIF(ABC):
     def load_optimizer_checkpoint(
         self,
         optimizer: Optimizer,
-        model: nn.Module,
+        wrapped_model: nn.Module,
         file_path: Path,
     ) -> Optimizer:
         raise NotImplementedError
@@ -76,7 +77,9 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
-        model_wrapping_fn: Callable[[nn.Module, bool], FSDP],
+        block_names: List[str],
+        mixed_precision_settings: MixedPrecisionSettings,
+        sharding_strategy: ShardingStrategy,
     ):
         """
         Implementation of checkpointing to disc via FSDP
@@ -85,13 +88,13 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
-            model_wrapping_fn (Callable[[nn.Module, bool], FSDP]): Wrapping function that wraps raw model.
-                                                                   For FSDP, we pass in FSDPRunningEnv.wrap_model
         """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
-        self.model_wrapping_fn = model_wrapping_fn
         self.experiment_id = experiment_id
+        self.block_names = block_names
+        self.mixed_precision_settings = mixed_precision_settings
+        self.sharding_strategy = sharding_strategy
 
     def _get_checkpointing_path(
         self,
@@ -186,10 +189,20 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
             # load model on rank 0 into CPU RAM
             model_state = torch.load(file_path)
             model.load_state_dict(model_state)
-        fsdp_model = self.model_wrapping_fn(model=model, sync_module_states=True)
+
+        # TODO nasty workaround to prevent circular imports
+        from modalities.models.model_factory import ModelFactory
+
+        fsdp_model = ModelFactory.get_fsdp_wrapped_model(
+            model=model,
+            sync_module_states=True,
+            block_names=self.block_names,
+            mixed_precision_settings=self.mixed_precision_settings,
+            sharding_strategy=self.sharding_strategy,
+        )
         return fsdp_model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, wrapped_model: FSDP, file_path: Path) -> Optimizer:
         # load optimizer
         full_optimizer_state_dict = None
         if self.global_rank == 0:
@@ -198,7 +211,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
 
         # distribute the optimizer state dict from rank 0 to all the other ranks
         sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-            full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
+            full_optim_state_dict=full_optimizer_state_dict, model=wrapped_model, group=None
         )
         optimizer.load_state_dict(sharded_optimizer_state_dict)
 

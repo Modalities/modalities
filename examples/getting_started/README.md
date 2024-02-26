@@ -171,5 +171,4 @@ which opens an interactive chatting CMD interface.
 ```
 enter prompt> Once upon a time, 
 there was ... <eos>
-
 ```

@@ -6,7 +6,7 @@ from modalities.models.gpt2.gpt2_model import (
     ActivationType,
     AttentionConfig,
     AttentionType,
-    GPT2Config,
+    GPT2LLMConfig,
     WeightInitailizationConfig,
 )
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
@@ -15,7 +15,7 @@ from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 def test_pretrained_gpt_model(tmp_path):
     # setup config and model
     attention_config = AttentionConfig(attention_type=AttentionType("default_attention"), scaling_factor=3)
-    config = GPT2Config(
+    pretrained_config = dict(
         block_size=12,
         vocab_size=128,
         n_layer=2,
@@ -31,7 +31,7 @@ def test_pretrained_gpt_model(tmp_path):
         prediction_key="logits",
         weight_init=WeightInitailizationConfig(mean=0, std=0.02),
     )
-    pretrained_config = GPT2HuggingFaceAdapterConfig(config=config)
+    pretrained_config = GPT2HuggingFaceAdapterConfig(GPT2LLMConfig(**pretrained_config))
 
     model = HuggingFaceModel(config=pretrained_config)
     model.save_pretrained(tmp_path)
