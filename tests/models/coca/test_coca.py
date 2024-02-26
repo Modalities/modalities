@@ -1,11 +1,13 @@
 from pathlib import Path
 
+import pytest
 import torch
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.config.config import AppConfig
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from tests.conftest import _ROOT_DIR
+from tests.test_main import no_gpu_available
 
 
 def test_coca():
@@ -41,6 +43,9 @@ def test_coca():
     assert out["text_cls"].shape == (1, 1, 768)
 
 
+@pytest.mark.skipif(
+    no_gpu_available(), reason="This e2e test verifies a GPU-Setup and uses components, which do not support CPU-only."
+)
 def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
