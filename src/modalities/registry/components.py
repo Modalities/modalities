@@ -1,3 +1,7 @@
+from dataclasses import dataclass
+from typing import Type
+
+from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
 
@@ -48,94 +52,106 @@ from modalities.models.huggingface.huggingface_models import (
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 
+
+@dataclass
+class ComponentEntity:
+    component_key: str
+    variant_key: str
+    component_type: Type
+    component_config_type: Type[BaseModel]
+
+
 COMPONENTS = [
     # models
-    ("model", "gpt2", (GPT2LLM, GPT2LLMConfig)),
-    ("model", "huggingface_pretrained_model", (HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig)),
-    ("model", "checkpointed", (ModelFactory.get_checkpointed_model, CheckpointedModelConfig)),
-    ("model", "fsdp_wrapped", (ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig)),
+    ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    ComponentEntity(
+        "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
+    ),
+    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
+    ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     # losses
-    ("loss", "clm_cross_entropy_loss", (CLMCrossEntropyLoss, CLMCrossEntropyLossConfig)),
+    ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
-    ("optimizer", "adam_w", (OptimizerFactory.get_adam_w, AdamWOptimizerConfig)),
-    ("optimizer", "checkpointed", (OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig)),
+    ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
+    ComponentEntity(
+        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+    ),
     # schedulers
-    # ("scheduler", "step_lr", (torch.optim.lr_scheduler.StepLR, None)),  # TODO
-    # ("scheduler", "constant_lr", (torch.optim.lr_scheduler.ConstantLR, None)),  # TODO
-    # ("scheduler", "onecycle_lr", (torch.optim.lr_scheduler.OneCycleLR, None)),  # TODO
+    # ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, None),  # TODO
+    # ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, None),  # TODO
+    # ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, None),  # TODO
     # tokenizers
-    ("tokenizer", "gpt2_tokenizer_fast", (GPT2TokenizerFast, GPT2TokenizerFastConfig)),
-    # ("tokenizer", "llama_tokenizer_fast", (GPT2TokenizerFast, None)),  # TODO
+    ComponentEntity("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFast, GPT2TokenizerFastConfig),
+    # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
-    ("dataset", "mem_map_dataset", (DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig)),
-    (
+    ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),
+    ComponentEntity(
         "dataset",
         "packed_mem_map_dataset_continuous",
-        (DatasetFactory.get_packed_mem_map_dataset_continuous, PackedMemMapDatasetContinuousConfig),
+        DatasetFactory.get_packed_mem_map_dataset_continuous,
+        PackedMemMapDatasetContinuousConfig,
     ),
-    (
+    ComponentEntity(
         "dataset",
         "packed_mem_map_dataset_megatron",
-        (DatasetFactory.get_packed_mem_map_dataset_megatron, PackedMemMapDatasetMegatronConfig),
+        DatasetFactory.get_packed_mem_map_dataset_megatron,
+        PackedMemMapDatasetMegatronConfig,
     ),
-    (
-        "dataset",
-        "open_gptx_mmap_dataset",
-        (DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig),
+    ComponentEntity(
+        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     # samplers
-    ("sampler", "distributed_sampler", (DistributedSampler, DistributedSamplerConfig)),
+    ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
-    ("batch_sampler", "default", (BatchSampler, BatchSamplerConfig)),
+    ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
-    ("collate_fn", "gpt_2_llm_collator", (GPT2LLMCollateFn, GPT2LLMCollateFnConfig)),
+    ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     # data loaders
-    ("data_loader", "default", (DataloaderFactory.get_dataloader, LLMDataLoaderConfig)),
-    # ("data_loader", "repeating_data_loader", (RepeatingDataLoader, None)), # TODO
+    ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    # ComponentEntity("data_loader", "repeating_data_loader",(RepeatingDataLoader, None), # TODO
     # checkpointing
-    ("checkpointing", "default", (Checkpointing, CheckpointingConfig)),
+    ComponentEntity("checkpointing", "default", Checkpointing, CheckpointingConfig),
     # checkpointing strategies
-    (
+    ComponentEntity(
         "checkpointing_strategy",
         "save_every_k_steps_checkpointing_strategy",
-        (SaveEveryKStepsCheckpointingStrategy, SaveEveryKStepsCheckpointingStrategyConfig),
+        SaveEveryKStepsCheckpointingStrategy,
+        SaveEveryKStepsCheckpointingStrategyConfig,
     ),
-    (
+    ComponentEntity(
         "checkpointing_strategy",
         "save_k_most_recent_checkpoints_strategy",
-        (SaveKMostRecentCheckpointsStrategy, SaveKMostRecentCheckpointsStrategyConfig),
+        SaveKMostRecentCheckpointsStrategy,
+        SaveKMostRecentCheckpointsStrategyConfig,
     ),
     # checkpointing execution
-    (
-        "checkpointing_execution",
-        "fsdp_to_disc_checkpointing",
-        (FSDPToDiscCheckpointing, FSDPToDiscCheckpointingConfig),
+    ComponentEntity(
+        "checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointing, FSDPToDiscCheckpointingConfig
     ),
     # Progress subscriber
-    (
+    ComponentEntity(
         "progress_subscriber",
         "dummy",
-        (ProgressSubscriberFactory.get_dummy_progress_subscriber, DummyProgressSubscriberConfig),
+        ProgressSubscriberFactory.get_dummy_progress_subscriber,
+        DummyProgressSubscriberConfig,
     ),
-    (
+    ComponentEntity(
         "progress_subscriber",
         "rich",
-        (ProgressSubscriberFactory.get_rich_progress_subscriber, RichProgressSubscriberConfig),
+        ProgressSubscriberFactory.get_rich_progress_subscriber,
+        RichProgressSubscriberConfig,
     ),
     # Results subscriber
-    (
-        "results_subscriber",
-        "dummy",
-        (ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig),
+    ComponentEntity(
+        "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
     ),
-    (
-        "results_subscriber",
-        "rich",
-        (ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig),
+    ComponentEntity(
+        "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig
     ),
-    (
+    ComponentEntity(
         "results_subscriber",
         "wandb",
-        (ResultsSubscriberFactory.get_wandb_result_subscriber, WandBEvaluationResultSubscriberConfig),
+        ResultsSubscriberFactory.get_wandb_result_subscriber,
+        WandBEvaluationResultSubscriberConfig,
     ),
 ]
