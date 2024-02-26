@@ -302,7 +302,10 @@ class Main:
         return model
 
 
-# FIXME
+# FIXME: make the conversion entry point configurable from outside:
+# Which HuggingFaceAdapterConfig should be used etxactly currently it is too hard coded:
+# Allow for a custom callable for conversion to HF to be given to the entrypoint
+
 # def _get_model_from_checkpoint(self, checkpoint_path: Path):
 #     model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
 #     if torch.distributed.is_initialized():

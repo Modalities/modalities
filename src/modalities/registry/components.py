@@ -67,9 +67,6 @@ COMPONENTS = [
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
-    # ComponentEntity(
-    #     "model", "huggingface_wrapped_model", HuggingFaceModel, GPT2HuggingFaceAdapterConfig
-    # ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     # losses
