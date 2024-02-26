@@ -5,42 +5,6 @@ from pydantic import BaseModel
 from modalities.config.config import PydanticThirdPartyTypeIF
 from tests.config.components import Component_V_W_X_IF
 
-# from abc import ABC
-# from enum import Enum
-# from pydantic import BaseModel
-# from tests.config.compenents import ComponentTypes
-# class CompConfigABC(BaseModel, ABC):
-#     type_hint: Enum
-#
-#     @field_validator("type_hint", mode="before", check_fields=False)
-#     def _string_to_enum(cls, key: str):
-#         if isinstance(key, str):
-#             try:
-#                 key = ComponentTypes[key]
-#             except KeyError as e:
-#                 raise ValueError(f"{key} is not a valid ComponentType") from e
-#             return key
-#         return key
-
-# class PassType(Enum):
-#     BY_VALUE = "by_value"
-#     BY_REFERENCE = "by_reference"
-
-
-# class ReferenceConfig(BaseModel):
-#     instance_key: str
-#     pass_type: PassType
-
-#     @validator("pass_type", pre=True)
-#     def _string_to_enum(cls, key: str):
-#         if isinstance(key, str):
-#             try:
-#                 key = PassType[key]
-#             except KeyError as e:
-#                 raise ValueError(f"{key} is not a valid PassType") from e
-#             return key
-#         return key
-
 PydanticComponent_V_W_X_IF_Type = Annotated[Component_V_W_X_IF, PydanticThirdPartyTypeIF(Component_V_W_X_IF)]
 
 
