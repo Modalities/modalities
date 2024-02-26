@@ -1,19 +1,23 @@
 import os
+import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import torch
-import shutil
 from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.config.config import AppConfig, HuggingFaceModelConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
+from modalities.resolver_register import ResolverRegister
 
 
 @pytest.fixture
 def checkpoint_dir():
-    return Path(os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkpoint", "checkpoint_for_testing"))
+    return Path(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkpoint", "checkpoint_for_testing")
+    )
 
 
 @pytest.fixture
@@ -39,7 +43,10 @@ def device():
 def test_convert_to_hf_checkpoint(tmp_path, config, device):
     # load test checkpoint
     main = Main(config)
-    pytorch_model = main.load_and_convert_checkpoint(output_path=tmp_path)
+    resolvers = ResolverRegister(config=config)
+    model: torch.nn.Module = resolvers.build_component_by_config(config=config.model)
+    with patch.object(Main, "_get_model_from_checkpoint", return_value=model):
+        pytorch_model = main.load_and_convert_checkpoint(output_path=tmp_path, checkpoint_path=tmp_path)
 
     pytorch_model.eval()
     pytorch_model = pytorch_model.to(device)
@@ -62,5 +69,4 @@ def test_convert_to_hf_checkpoint(tmp_path, config, device):
 
     # Delete temporary model folder
     shutil.rmtree(tmp_path.parent)
-    assert os.path.exists(tmp_path.parent) ==  False
-
+    assert os.path.exists(tmp_path.parent) is False
