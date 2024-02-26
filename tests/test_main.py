@@ -4,12 +4,8 @@ import torch.cuda
 from modalities.__main__ import Main
 
 
-def no_gpu_available() -> bool:
-    return not torch.cuda.is_available()
-
-
 @pytest.mark.skipif(
-    no_gpu_available(), reason="This e2e test verifies a GPU-Setup and uses components, which do not support CPU-only."
+    torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU."
 )
 def test_e2e_training_run_wout_ckpt(monkeypatch, indexed_dummy_data_path, dummy_config):
     # patch in env variables

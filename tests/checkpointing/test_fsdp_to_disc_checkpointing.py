@@ -1,4 +1,5 @@
 import tempfile
+import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict
@@ -29,14 +30,13 @@ from modalities.running_env.env_utils import MixedPrecisionSettings
 _ROOT_DIR = Path(__file__).parents[1]
 
 
-# @pytest.mark.skip(
-#     reason="Need to fix absolute path for config_file_path and needs to be run via "
-#     "torchrun in a torch distributed environment (torchrun)"
-# )
+@pytest.mark.skipif(
+    not 'RANK' in os.environ or torch.cuda.device_count() < 2, reason="This e2e test requires 2 GPUs and a torchrun distributed environment."
+)
 class TestFSDPToDiscCheckpointing:
     @pytest.fixture(scope="function")
     def gpt2_model_config(self) -> GPT2LLMConfig:
-        config_file_path = Path("/raid/s3/opengptx/max_lue/modalities/tests/checkpointing/gpt2_config.yaml")
+        config_file_path = Path("tests/checkpointing/gpt2_config.yaml")
         config_dict = load_app_config_dict(config_file_path=config_file_path)
         config = GPT2LLMConfig(**config_dict["model"]["config"])
         return config
