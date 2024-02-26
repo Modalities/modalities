@@ -1,3 +1,5 @@
+import math
+from functools import partial
 from typing import Annotated
 
 import torch
@@ -7,7 +9,7 @@ from torch import nn
 
 from modalities.models.coca.multi_modal_decoder import MultiModalDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.gpt2.gpt2_model import GPT2Config
+from modalities.models.gpt2.gpt2_model import GPT2Config, WeightInitailizationConfig
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention_pooling import AttentionalPooling
@@ -88,6 +90,24 @@ class CoCa(NNModel):
             bias=bias_attn_pool,
             epsilon=epsilon_attn_pool,
         )
+
+        # init all weights
+        weight_init = text_decoder_config.weight_init
+        self.apply(partial(self._init_weights, weight_init=weight_init))
+        # apply special scaled init to the residual projections, per GPT-2 paper
+        for pn, p in self.named_parameters():
+            if pn.endswith("c_proj.weight"):
+                torch.nn.init.normal_(
+                    p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * text_decoder_config.n_layer)
+                )
+
+    def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
     def forward(self, inputs):
         vision_embd, vision_cls_token = self._forward_encode_vision(inputs)

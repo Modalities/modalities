@@ -1,5 +1,3 @@
-import math
-from functools import partial
 from typing import Dict
 
 import torch
@@ -56,21 +54,6 @@ class TextDecoder(NNModel):
                 ),
             )
         )
-
-        # init all weights
-        self.apply(partial(self._init_weights, weight_init=weight_init))
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
-
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
