@@ -23,6 +23,7 @@ from modalities.config.lookup_types import (
 )
 from modalities.config.types import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2Config
+from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModelConfig
 from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
 
 
@@ -140,7 +141,7 @@ class DataConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type_hint: ModelTypes
-    config: GPT2Config
+    config: HuggingFacePretrainedModelConfig | GPT2Config
 
 
 class CLMCrossEntropyLossConfig(BaseModel):
@@ -284,6 +285,7 @@ class RunMode(Enum):
     FROM_SCRATCH = "FROM_SCRATCH"
     WARM_START = "WARM_START"
 
+
 class ModalitiesSetupConfig(BaseModel):
     class WarmStartSettings(BaseModel):
         checkpoint_model_path: Path
@@ -299,7 +301,7 @@ class ModalitiesSetupConfig(BaseModel):
     # settings: WarmStartSettings
 
     @model_validator(mode="after")
-    def check_passwords_match(self) -> "ModalitiesSetupConfig":
+    def check_global_num_samples_equal_0_when_from_scratch(self) -> "ModalitiesSetupConfig":
         if self.run_mode == RunMode.FROM_SCRATCH:
             if self.settings.global_num_seen_samples != 0:
                 raise ValueError("When starting from scratch, global_num_seen_samples must be 0.")

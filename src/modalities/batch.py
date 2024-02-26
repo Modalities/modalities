@@ -103,12 +103,15 @@ class EvaluationResultBatch(Batch):
     losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
     metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
     throughput_metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
+
     def __str__(self) -> str:
         eval_str = (
             f"Evaluation result on dataset tag {self.dataloader_tag} after {self.global_train_sample_id + 1} samples:"
         )
         eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()])
         eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()])
-        eval_str += "\n\nthroughput metrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.throughput_metrics.items()])
+        eval_str += "\n\nthroughput metrics: " + "\n\t".join(
+            [f"{k}: {v.mean().item()}" for k, v in self.throughput_metrics.items()]
+        )
         eval_str += "\n==============================================="
         return eval_str

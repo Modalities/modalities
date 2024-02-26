@@ -3,7 +3,6 @@ import time
 from rich.progress import Progress
 
 with Progress() as progress:
-
     task1 = progress.add_task("[red]Downloading...", total=1000)
     task2 = progress.add_task("[green]Processing...", total=1000)
     task3 = progress.add_task("[cyan]Cooking...", total=1000)
