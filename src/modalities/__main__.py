@@ -147,8 +147,12 @@ class Main:
         self.component_factory = ComponentFactory(registry=self.registry)
 
     def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
-        entity = (custom_component, custom_config)
-        self.registry.add_entity(component_key=component_key, variant_key=variant_key, entity=entity)
+        self.registry.add_entity(
+            component_key=component_key,
+            variant_key=variant_key,
+            component_type=custom_component,
+            component_config_type=custom_config,
+        )
 
     def run(self):
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
