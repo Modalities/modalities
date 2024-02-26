@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from torch import Tensor, nn
 
@@ -11,7 +11,7 @@ class MLP(nn.Module):
         out_features: Optional[int] = None,
         bias: bool = True,
         dropout: float = 0.0,
-        act_fn: nn.Module = nn.GELU,
+        act_fn: Callable[[], nn.Module] = nn.GELU,
     ):
         super().__init__()
         out_features = out_features or in_features
