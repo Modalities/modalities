@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, AttentionConfig, GPT2Block, WeightInitailizationConfig
+from modalities.models.gpt2.gpt2_model import ActivationType, AttentionConfig, GPT2Block
 from modalities.models.model import NNModel
 
 
@@ -23,7 +23,6 @@ class TextDecoder(NNModel):
         attention: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
-        weight_init: WeightInitailizationConfig,
     ):
         super().__init__()
         self.sample_key = sample_key

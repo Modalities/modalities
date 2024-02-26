@@ -4,13 +4,7 @@ import torch
 import xformers.ops as xops
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import (
-    ActivationType,
-    AttentionConfig,
-    LayerNorm,
-    TransformerMLP,
-    WeightInitailizationConfig,
-)
+from modalities.models.gpt2.gpt2_model import ActivationType, AttentionConfig, LayerNorm, TransformerMLP
 from modalities.models.model import NNModel
 from modalities.nn.attention import Attention
 
@@ -60,7 +54,6 @@ class MultiModalDecoder(NNModel):
         attention: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
-        weight_init: WeightInitailizationConfig,
     ):
         super().__init__()
         self.sample_key = sample_key

@@ -61,6 +61,7 @@ class CoCa(NNModel):
         del shared_decoder_kwargs["prediction_key"]
         del shared_decoder_kwargs["block_size"]
         del shared_decoder_kwargs["n_layer"]
+        del shared_decoder_kwargs["weight_init"]
 
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
