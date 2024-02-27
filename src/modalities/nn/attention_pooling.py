@@ -5,7 +5,7 @@ from modalities.models.gpt2.gpt2_model import LayerNorm
 from modalities.nn.attention import Attention
 
 
-class AttentionalPooling(nn.Module):
+class AttentionPooling(nn.Module):
     def __init__(
         self,
         n_embd: int,

@@ -12,7 +12,7 @@ from modalities.models.coca.text_decoder import TextDecoder
 from modalities.models.gpt2.gpt2_model import GPT2Config, WeightInitailizationConfig
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
-from modalities.nn.attention_pooling import AttentionalPooling
+from modalities.nn.attention_pooling import AttentionPooling
 
 
 class CoCaConfig(BaseModel):
@@ -85,7 +85,7 @@ class CoCa(NNModel):
 
         # vision_queries: 256 queries for multimodal cross attention and 1 as vision cls token for contrastive learning
         self.vision_queries = nn.Parameter(torch.randn(n_vision_queries + 1, vision_encoder_config.n_embd))
-        self.attn_pool = AttentionalPooling(
+        self.attn_pool = AttentionPooling(
             n_embd=vision_encoder_config.n_embd,
             n_head=n_pool_head,
             bias=bias_attn_pool,
