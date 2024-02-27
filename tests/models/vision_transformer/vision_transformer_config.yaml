@@ -1,0 +1,13 @@
+sample_key: images
+prediction_key: logits
+block_size: 197
+n_classes: 1000
+n_layer: 6
+n_head: 8
+n_embd: 768
+dropout: 0.0
+patch_size: 16
+patch_stride: 16
+n_img_channels: 3
+add_cls_token: True
+bias: True
