@@ -187,12 +187,10 @@ def entry_point_merge_packed_data(src_paths, target_path):
     input_files = []
     for p in src_paths:
         p: Path
-        if p.is_file():
-            input_files.append(p)
-        elif p.is_dir():
+        if p.is_dir():
             input_files.extend(p.glob("**/*.pbin"))
         else:
-            raise ValueError(f"{p} is neither a directory nor a file.")
+            input_files.append(p)
     embedded_datasets = list(map(EmbeddedStreamData, input_files))
     join_embedded_stream_data(embedded_datasets, target_path)
 
