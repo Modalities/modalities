@@ -9,12 +9,8 @@ from pydantic import BaseModel
 from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import AppConfig, GPT2HuggingFaceAdapterConfig, PydanticModelIFType
+from modalities.config.config import GPT2HuggingFaceAdapterConfig, PydanticModelIFType
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
-from modalities.resolver_register import ResolverRegister
 
 
 @pytest.fixture
@@ -36,8 +32,9 @@ def config(config_path, monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "1")
     config_dict = load_app_config_dict(config_path)
     # FIXME
-    pydantic_config = AppConfig.model_validate(config_dict)
-    return pydantic_config
+    # pydantic_config = AppConfig.model_validate(config_dict)
+    # return pydantic_config
+    return config_dict
 
 
 @pytest.fixture
@@ -45,20 +42,16 @@ def device():
     return "cpu"
 
 
-def test_convert_to_hf_checkpoint(tmp_path, config, device):
+def test_convert_to_hf_checkpoint(tmp_path, config, config_path, device):
     # load test checkpoint
-    main = Main(config)
 
     class HFCkptTestModel(BaseModel):
         model: PydanticModelIFType
 
-    registry = Registry(COMPONENTS)
-    component_factory = ComponentFactory(registry=registry)
-    component_factory.build_components(config_dict=config, components_model_type=HFCkptTestModel)
+    main = Main(config, config_path)
+    components = main.component_factory.build_components(config_dict=config, components_model_type=HFCkptTestModel)
 
-    resolvers = ResolverRegister(config=config)
-    model: torch.nn.Module = resolvers.build_component_by_config(config=config.model)
-    with patch.object(Main, "_get_model_from_checkpoint", return_value=model):
+    with patch.object(Main, "_get_model_from_checkpoint", return_value=components):
         pytorch_model = main.load_and_convert_checkpoint(output_path=tmp_path, checkpoint_path=tmp_path)
 
     pytorch_model.eval()

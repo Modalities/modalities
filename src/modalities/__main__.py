@@ -142,55 +142,77 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 
 
 # FIXME
-# @main.command(name="convert_pytorch_to_hf_checkpoint")
-# @click.option(
-#     "--input_pytorch_checkpoint_dir",
-#     type=click_pathlib.Path(exists=True),
-#     required=True,
-#     help="Load pytorch checkpoint from this directory.",
-# )
-# @click.option(
-#     "--input_pytorch_config_name",
-#     type=str,
-#     required=False,
-#     default="model_config.yaml",
-#     help="Name of the config file for the input pytorch checkpoint, "
-#     "which must be located in input_pytorch_checkpoint_dir.",
-# )
-# @click.option(
-#     "--input_pytorch_model_name",
-#     type=str,
-#     required=False,
-#     default="model.bin",
-#     help="Name of the model file for the input pytorch checkpoint, "
-#     "which must be located in input_pytorch_checkpoint_dir.",
-# )
-# @click.option(
-#     "--output_hf_checkpoint_dir",
-#     type=click_pathlib.Path(exists=False),
-#     required=True,
-#     help="Converted hf checkpoint will be written to this directory.",
-# )
-# def convert_pytorch_to_hf_checkpoint(
-#     input_pytorch_checkpoint_dir, input_pytorch_config_name, input_pytorch_model_name, output_hf_checkpoint_dir
-# ):
-#     input_pytorch_checkpoint_dir = Path(input_pytorch_checkpoint_dir)
-#     input_pytorch_config_file_path = input_pytorch_checkpoint_dir / input_pytorch_config_name
-#     if not input_pytorch_config_file_path.exists():
-#         raise ValueError(f"Could not find {input_pytorch_config_name} in {input_pytorch_checkpoint_dir}")
+@main.command(name="convert_pytorch_to_hf_checkpoint")
+@click.option(
+    "--input_pytorch_checkpoint_dir",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Load pytorch checkpoint from this directory.",
+)
+@click.option(
+    "--input_pytorch_config_name",
+    type=str,
+    required=False,
+    default="model_config.yaml",
+    help="Name of the config file for the input pytorch checkpoint, "
+    "which must be located in input_pytorch_checkpoint_dir.",
+)
+@click.option(
+    "--input_pytorch_model_name",
+    type=str,
+    required=False,
+    default="model.bin",
+    help="Name of the model file for the input pytorch checkpoint, "
+    "which must be located in input_pytorch_checkpoint_dir.",
+)
+@click.option(
+    "--output_hf_checkpoint_dir",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Converted hf checkpoint will be written to this directory.",
+)
+def convert_pytorch_to_hf_checkpoint(
+    input_pytorch_checkpoint_dir, input_pytorch_config_name, input_pytorch_model_name, output_hf_checkpoint_dir
+):
+    # FIXME: make the conversion entry point configurable from outside:
+    # Which HuggingFaceAdapterConfig should be used etxactly currently it is too hard coded:
+    # Allow for a custom callable for conversion to HF to be given to the entrypoint
+    # def get_model_from_checkpoint(checkpoint_path: Path):
+    #     model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
+    #     if torch.distributed.is_initialized():
+    #         raise NotImplementedError("Checkpoint conversion is only implemented for non-distributed environments")
+    #     rank = 0
+    #     checkpointing = PytorchToDiscCheckpointing(rank)
+    #     if not checkpoint_path.exists():
+    #         raise ValueError(f"Could not find model.bin in {checkpoint_path}")
+    #     model = checkpointing.load_model_checkpoint(model, checkpoint_path)
+    #     return model
 
-#     config_dict = load_app_config_dict(input_pytorch_config_file_path)
-#     config = AppConfig.model_validate(config_dict)
-#     logging.info(f"Config\n{config}")
-#     main = Main(config)
-#     input_pytorch_checkpoint_path = input_pytorch_checkpoint_dir / input_pytorch_model_name
-#     main.load_and_convert_checkpoint(output_hf_checkpoint_dir, input_pytorch_checkpoint_path)
+    # def convert_checkpoint(output_path: Union[str, Path], model: torch.nn.Module):
+    #     # FIXME
+    #     # config = GPT2HuggingFaceAdapterConfig(self.config.model.config)
+    #     hugging_face_model = HuggingFaceModel(config=config, model=model)
+    #     hugging_face_model.save_pretrained(output_path, safe_serialization=False)
 
+    # input_pytorch_checkpoint_dir = Path(input_pytorch_checkpoint_dir)
+    # input_pytorch_config_file_path = input_pytorch_checkpoint_dir / input_pytorch_config_name
+    # if not input_pytorch_config_file_path.exists():
+    #     raise ValueError(f"Could not find {input_pytorch_config_name} in {input_pytorch_checkpoint_dir}")
 
-# def load_app_config_dict(config_file_path: Path) -> Dict:
-#     cfg = OmegaConf.load(config_file_path)
-#     logging.info(f"Config\n {OmegaConf.to_yaml(cfg, resolve=True)}")
-#     return OmegaConf.to_container(cfg, resolve=True)
+    # config_dict = load_app_config_dict(input_pytorch_config_file_path)
+    # logging.info(f"Config\n{config_dict}")
+
+    # class ModelConfig(BaseModel):
+    #     model: PydanticModelIFType
+
+    # main = Main(config_dict, input_pytorch_config_file_path)
+    # components = main.component_factory.build_components(config_dict=config_dict, components_model_type=ModelConfig)
+    # model = components.model
+
+    # input_pytorch_checkpoint_path = input_pytorch_checkpoint_dir / input_pytorch_model_name
+    # model = get_model_from_checkpoint(input_pytorch_checkpoint_path)
+    # convert_checkpoint(output_hf_checkpoint_dir, model)
+    ...
 
 
 class Main:
@@ -295,32 +317,6 @@ class Main:
         )
 
         return evaluation_result_publisher, batch_processed_publisher
-
-    def load_and_convert_checkpoint(self, output_path: str, checkpoint_path: Path):
-        model = self._get_model_from_checkpoint(checkpoint_path)
-        self._convert_checkpoint(output_path, model)
-        return model
-
-
-# FIXME: make the conversion entry point configurable from outside:
-# Which HuggingFaceAdapterConfig should be used etxactly currently it is too hard coded:
-# Allow for a custom callable for conversion to HF to be given to the entrypoint
-
-# def _get_model_from_checkpoint(self, checkpoint_path: Path):
-#     model: torch.nn.Module = self.resolvers.build_component_by_config(config=self.config.model)
-#     if torch.distributed.is_initialized():
-#         raise NotImplementedError("Checkpoint conversion is only implemented for non-distributed environments")
-#     rank = 0
-#     checkpointing = PytorchToDiscCheckpointing(rank)
-#     if not checkpoint_path.exists():
-#         raise ValueError(f"Could not find model.bin in {checkpoint_path}")
-#     model = checkpointing.load_model_checkpoint(model, checkpoint_path)
-#     return model
-
-# def _convert_checkpoint(self, output_path: Union[str, Path], model: nn.Module):
-#     config = GPT2HuggingFaceAdapterConfig(self.config.model.config)
-#     hugging_face_model = HuggingFaceModel(config=config, model=model)
-#     hugging_face_model.save_pretrained(output_path, safe_serialization=False)
 
 
 if __name__ == "__main__":
