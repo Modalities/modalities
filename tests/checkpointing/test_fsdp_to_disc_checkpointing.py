@@ -1,69 +1,73 @@
+import os
 import tempfile
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Generator
+from typing import Dict
 
 import pytest
 import torch
 import torch.distributed as dist
-from pydantic import BaseModel
+import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import ShardingStrategy
 from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
-from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Config
-from modalities.running_env.fsdp.fsdp_running_env import FSDPRunningEnv, FSDPRunningEnvConfig, RunningEnv
+from modalities.checkpointing.checkpointing_execution import CheckpointingEntityType, FSDPToDiscCheckpointing
+from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import ProcessGroupBackendType
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.model_factory import ModelFactory
+from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.running_env.cuda_env import CudaEnv
+from modalities.running_env.env_utils import MixedPrecisionSettings
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
-#   /path/to/pytest path/to/test_fsdp_to_disc_checkpointing.py
+#   $(which pytest) path/to/test_fsdp_to_disc_checkpointing.py
 
 _ROOT_DIR = Path(__file__).parents[1]
 
 
-class ExperimentConfig(BaseModel):
-    llm_model_conf: GPT2Config  # Named it llm_model_conf as model_ is a protected namespace in pydantic
-    running_env_conf: FSDPRunningEnvConfig
-
-
-@pytest.mark.skip(
-    reason="Need to fix absolute path for config_file_path and needs to be run via "
-    "torchrun in a torch distributed environment (torchrun)"
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
 class TestFSDPToDiscCheckpointing:
-    @pytest.fixture
-    def experiment_config(self) -> ExperimentConfig:
-        config_file_path = _ROOT_DIR / Path("tests/checkpointing/gpt2_config.yaml")
+    @pytest.fixture(scope="function")
+    def gpt2_model_config(self) -> GPT2LLMConfig:
+        config_file_path = Path("tests/checkpointing/gpt2_config.yaml")
         config_dict = load_app_config_dict(config_file_path=config_file_path)
-        experiment_config = ExperimentConfig.model_validate(config_dict)
-        return experiment_config
+        config = GPT2LLMConfig(**config_dict["model"]["config"])
+        return config
 
     @pytest.fixture(scope="function")
-    def gpt2_model(self, experiment_config: ExperimentConfig) -> GPT2LLM:
-        model = GPT2LLM(config=experiment_config.llm_model_conf)
+    def gpt2_model(self, gpt2_model_config: GPT2LLMConfig) -> GPT2LLM:
+        config_dict = ComponentFactory.base_model_to_dict(gpt2_model_config)
+        model = GPT2LLM(**config_dict)
         return model
 
     @pytest.fixture(scope="function")
-    def gpt2_model_2(self, experiment_config: ExperimentConfig) -> GPT2LLM:
-        model = GPT2LLM(config=experiment_config.llm_model_conf)
+    def gpt2_model_2(self, gpt2_model_config: GPT2LLMConfig) -> GPT2LLM:
+        config_dict = ComponentFactory.base_model_to_dict(gpt2_model_config)
+        model = GPT2LLM(**config_dict)
         return model
 
     @pytest.fixture
-    def fsdp_running_env(self, experiment_config: ExperimentConfig) -> Generator[RunningEnv, Any, Any]:
-        running_env = FSDPRunningEnv(**dict(experiment_config.running_env_conf))
-        with running_env as running_env:
-            yield running_env
-
-    @pytest.fixture
-    def fsdp_wrapped_model(self, gpt2_model: GPT2LLM, fsdp_running_env) -> FSDP:
-        wrapped_model: FSDP = FSDPRunningEnv.wrap_model(gpt2_model, sync_module_states=True)
+    def fsdp_wrapped_model(self, gpt2_model: GPT2LLM) -> FSDP:
+        wrapped_model: FSDP = ModelFactory.get_fsdp_wrapped_model(
+            gpt2_model,
+            sync_module_states=True,
+            block_names=["GPT2Block"],
+            mixed_precision_settings=MixedPrecisionSettings.FP_16,
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
+        )
         return wrapped_model
 
     @pytest.fixture
-    def optimizer(self, fsdp_wrapped_model: GPT2LLM) -> Optimizer:
-        optimizer = AdamW(fsdp_wrapped_model.parameters(), lr=0.001)
+    def optimizer(self, fsdp_wrapped_model: nn.Module) -> Optimizer:
+        optimizer = OptimizerFactory.get_adam_w(wrapped_model=fsdp_wrapped_model, lr=0.001)
         return optimizer
 
     @pytest.fixture
@@ -71,20 +75,23 @@ class TestFSDPToDiscCheckpointing:
         with tempfile.TemporaryDirectory() as tmp_dir_path:
             yield Path(tmp_dir_path)
 
+    @pytest.fixture(autouse=True)
+    def cuda_env_context(self):
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            yield
+
     @staticmethod
-    def _generate_batch(experiment_config: ExperimentConfig):
+    def _generate_batch(gpt2_model_config: GPT2LLMConfig):
         # prepare input and targets
-        data = torch.randint(
-            0, experiment_config.llm_model_conf.vocab_size, (8, experiment_config.llm_model_conf.block_size + 1)
-        ).cuda()
-        batch_input_ids_dict = {experiment_config.llm_model_conf.sample_key: data[:, :-1]}
+        data = torch.randint(0, gpt2_model_config.vocab_size, (8, gpt2_model_config.block_size + 1)).cuda()
+        batch_input_ids_dict = {gpt2_model_config.sample_key: data[:, :-1]}
         batch_target_ids = data[:, 1:]
         batch_target_ids = batch_target_ids.contiguous()
         return batch_input_ids_dict, batch_target_ids
 
     @staticmethod
     def _forward_backward_pass(
-        experiment_config: ExperimentConfig,
+        gpt2_model_config: GPT2LLMConfig,
         model: FSDP,
         optimizer: Optimizer,
         batch_input_ids_dict: Dict,
@@ -96,7 +103,7 @@ class TestFSDPToDiscCheckpointing:
         optimizer.zero_grad()
 
         # forward pass
-        predictions = model.forward(inputs=batch_input_ids_dict)[experiment_config.llm_model_conf.prediction_key]
+        predictions = model.forward(inputs=batch_input_ids_dict)[gpt2_model_config.prediction_key]
         predictions = predictions.contiguous()
         # backward pass
         loss = ce_loss(predictions.view(-1, predictions.size(-1)), batch_target_ids.view(-1))
@@ -147,25 +154,27 @@ class TestFSDPToDiscCheckpointing:
         optimizer: Optimizer,
         temporary_checkpoint_folder_path: Path,
         gpt2_model_2: GPT2LLM,
-        experiment_config: ExperimentConfig,
+        gpt2_model_config: GPT2LLMConfig,
     ):
         experiment_id = "0"
-        global_train_batch_id = 1
+        global_train_sample_id = 1
 
         checkpointing = FSDPToDiscCheckpointing(
             checkpoint_path=temporary_checkpoint_folder_path,
             experiment_id=experiment_id,
             global_rank=dist.get_rank(),
-            model_wrapping_fn=FSDPRunningEnv.wrap_model,
+            block_names=["GPT2Block"],
+            mixed_precision_settings=MixedPrecisionSettings.FP_16,
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
         )
 
         untrained_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
         untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
-        batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
+        batch_input_ids_dict, batch_target_ids = self._generate_batch(gpt2_model_config)
         self._forward_backward_pass(
-            experiment_config=experiment_config,
+            gpt2_model_config=gpt2_model_config,
             model=fsdp_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
@@ -176,23 +185,28 @@ class TestFSDPToDiscCheckpointing:
 
         # save model and optimizer before backward pass
         checkpointing._save_checkpoint(
-            model=fsdp_wrapped_model, optimizer=optimizer, global_train_batch_id=global_train_batch_id
+            model=fsdp_wrapped_model, optimizer=optimizer, global_train_sample_id=global_train_sample_id
         )
 
         # load the model checkpoint
-        fsdp_wrapped_model_2 = checkpointing.load_model_checkpoint(
-            model=gpt2_model_2,
+        model_checkpointing_path = checkpointing._get_checkpointing_path(
             experiment_id=experiment_id,
-            global_train_batch_id=global_train_batch_id,
+            global_train_sample_id=global_train_sample_id,
+            entity_type=CheckpointingEntityType.MODEL,
+        )
+        fsdp_wrapped_model_2 = checkpointing.load_model_checkpoint(
+            model=gpt2_model_2, file_path=model_checkpointing_path
         )
 
         optimizer_2 = AdamW(fsdp_wrapped_model_2.parameters(), lr=0.001)
 
-        checkpointing.load_optimizer_checkpoint(
-            optimizer=optimizer_2,
-            model=fsdp_wrapped_model_2,
+        optimizer_checkpointing_path = checkpointing._get_checkpointing_path(
             experiment_id=experiment_id,
-            global_train_batch_id=global_train_batch_id,
+            global_train_sample_id=global_train_sample_id,
+            entity_type=CheckpointingEntityType.OPTIMIZER,
+        )
+        checkpointing.load_optimizer_checkpoint(
+            optimizer=optimizer_2, wrapped_model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
         loaded_and_updated_model_parameters = [p.clone() for p in fsdp_wrapped_model_2.parameters()]
@@ -218,17 +232,17 @@ class TestFSDPToDiscCheckpointing:
         # we do another forward/backward pass and check
         #  if the weights are equally updated for the loaded model as for the not-loaded model
         # run backward pass
-        batch_input_ids_dict, batch_target_ids = self._generate_batch(experiment_config)
+        batch_input_ids_dict, batch_target_ids = self._generate_batch(gpt2_model_config)
 
         loss_1 = self._forward_backward_pass(
-            experiment_config=experiment_config,
+            gpt2_model_config=gpt2_model_config,
             model=fsdp_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
         loss_2 = self._forward_backward_pass(
-            experiment_config=experiment_config,
+            gpt2_model_config=gpt2_model_config,
             model=fsdp_wrapped_model_2,
             optimizer=optimizer_2,
             batch_input_ids_dict=batch_input_ids_dict,
