@@ -219,17 +219,10 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
 
 
 class PytorchToDiscCheckpointing(CheckpointingExecution):
-    def __init__(
-        self,
-        global_rank: int,
-    ):
+    def __init__(self):
         """
         Implementation of checkpointing to disc via Pytorch
-
-        Args:
-            global_rank (int): global rank within the current process group
         """
-        self.global_rank = global_rank
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_sample_id: int):
         raise NotImplementedError
@@ -238,9 +231,8 @@ class PytorchToDiscCheckpointing(CheckpointingExecution):
         raise NotImplementedError
 
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
-        if self.global_rank == 0:
-            model_state = torch.load(file_path)
-            model.load_state_dict(model_state)
+        model_state = torch.load(file_path)
+        model.load_state_dict(model_state)
 
         return model
 

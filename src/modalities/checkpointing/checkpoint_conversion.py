@@ -67,8 +67,7 @@ class CheckpointConversion:
     def _get_model_from_checkpoint(self, model: torch.nn.Module):
         if torch.distributed.is_initialized():
             raise NotImplementedError("Checkpoint conversion is only implemented for non-distributed environments")
-        rank = 0
-        checkpointing = PytorchToDiscCheckpointing(rank)
+        checkpointing = PytorchToDiscCheckpointing()
         if not self.input_pytorch_checkpoint_path.exists():
             raise ValueError(f"Could not find model.bin in {self.input_pytorch_checkpoint_path}")
         model = checkpointing.load_model_checkpoint(model, self.input_pytorch_checkpoint_path)
