@@ -9,6 +9,8 @@ import xformers.ops as xops
 from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
+from modalities.config.config import PydanticLayerNormIFType
+from modalities.models.components.layer_norms import LayerNormIF
 from modalities.models.model import NNModel
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -47,11 +49,13 @@ class GPT2LLMConfig(BaseModel):
     ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
 
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
-    bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention: AttentionConfig
-    activation: ActivationType
-    epsilon: Annotated[float, Field(strict=True, ge=0.0)]
+    bias: bool  # True: bias in Linears like GPT-2. False: a bit better and faster
+    attention_config: AttentionConfig
+    activation_type: ActivationType
     weight_init: WeightInitailizationConfig
+    attention_norm: PydanticLayerNormIFType
+    ffn_norm: PydanticLayerNormIFType
+    lm_head_norm: PydanticLayerNormIFType
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
@@ -64,35 +68,16 @@ class GPT2LLMConfig(BaseModel):
         return self
 
 
-class LayerNorm(nn.Module):
-    """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
-
-    def __init__(self, ndim: int, bias: bool, epsilon: float):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(ndim))
-        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
-        self.epsilon = epsilon
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return F.layer_norm(
-            input=input,
-            normalized_shape=self.weight.shape,
-            weight=self.weight,
-            bias=self.bias,
-            eps=self.epsilon,
-        )
-
-
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self, n_head: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
+        self, n_head: int, n_embd: int, attention_config: AttentionConfig, bias: bool, dropout: float, block_size: int
     ):
         super().__init__()
         assert n_embd % n_head == 0
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
             in_features=n_embd,
-            out_features=attention.scaling_factor * n_embd,
+            out_features=attention_config.scaling_factor * n_embd,
             bias=bias,
         )
 
@@ -109,7 +94,7 @@ class CausalSelfAttention(nn.Module):
         self.n_head = n_head
         self.n_embd = n_embd
         self.dropout = dropout
-        self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
+        self.flash = attention_config.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -181,32 +166,39 @@ class GPT2Block(nn.Module):
         self,
         n_embd: int,
         bias: bool,
-        epsilon: float,
-        activation: ActivationType,
+        activation_type: ActivationType,
         n_head: int,
-        attention: AttentionConfig,
+        attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
         ffn_hidden: int,
+        attention_norm: LayerNormIF,
+        ffn_norm: LayerNormIF,
     ):
         super().__init__()
-        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.attention_norm = attention_norm
+        self.ffn_norm = ffn_norm
         self.attn = CausalSelfAttention(
-            n_head=n_head, n_embd=n_embd, attention=attention, bias=bias, dropout=dropout, block_size=block_size
+            n_head=n_head,
+            n_embd=n_embd,
+            attention_config=attention_config,
+            bias=bias,
+            dropout=dropout,
+            block_size=block_size,
         )
-        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-
-        if activation == ActivationType.GELU:
+        if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation == ActivationType.FUSED_SWIGLU:
+        elif activation_type == ActivationType.FUSED_SWIGLU:
             hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
             self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
         else:
-            raise Exception("unimplemented activation")
+            raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
+        x = self.attention_norm(x)
+        x = x + self.attn(x)
+        x = self.ffn_norm(x)
+        x = x + self.mlp(x)
         return x
 
 
@@ -223,10 +215,12 @@ class GPT2LLM(NNModel):
         ffn_hidden: int,
         dropout: float,
         bias: bool,
-        attention: AttentionConfig,
-        activation: ActivationType,
-        epsilon: float,
+        attention_config: AttentionConfig,
+        activation_type: ActivationType,
         weight_init: WeightInitailizationConfig,
+        attention_norm: LayerNormIF,
+        ffn_norm: LayerNormIF,
+        lm_head_norm: LayerNormIF,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -246,18 +240,19 @@ class GPT2LLM(NNModel):
                         GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
-                            epsilon=epsilon,
-                            activation=activation,
+                            activation_type=activation_type,
                             n_head=n_head,
-                            attention=attention,
+                            attention_config=attention_config,
                             dropout=dropout,
                             block_size=block_size,
                             ffn_hidden=ffn_hidden,
+                            attention_norm=attention_norm,
+                            ffn_norm=ffn_norm,
                         )
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon),
+                ln_f=lm_head_norm,
             )
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
