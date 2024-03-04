@@ -1,6 +1,6 @@
 sample_key: images
 prediction_key: logits
-block_size: 197
+img_size: 224
 n_classes: 1000
 n_layer: 6
 n_head: 8

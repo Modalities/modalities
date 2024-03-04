@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import torch
 
 from modalities.__main__ import load_app_config_dict
@@ -31,3 +32,21 @@ def test_vision_transformer():
     # Test outputs
     assert "logits" in out
     assert out["logits"].shape == (1, 1000)
+
+
+@pytest.mark.parametrize(
+    "img_size,patch_size,patch_stride,add_cls_token,target_block_size",
+    [
+        ((224, 224), 16, 16, True, 197),
+        ((224, 224), 16, 16, False, 196),
+        ((224, 112), 16, 16, False, 98),
+        ((480, 480), 16, 16, False, 900),
+        ((480 + 1, 480 + 1), 16, 16, False, 900),
+        ((224, 224), 8, 16, True, 197),
+        ((224, 224), 16, 8, True, 730),
+        ((224, 224), 8, 8, True, 785),
+    ],
+)
+def test_vision_transformer_block_size(img_size, patch_size, patch_stride, add_cls_token, target_block_size):
+    block_size = VisionTransformer._calcualte_block_size(img_size, patch_size, patch_stride, add_cls_token)
+    assert block_size == target_block_size

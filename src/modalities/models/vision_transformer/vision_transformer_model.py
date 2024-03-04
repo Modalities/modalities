@@ -1,4 +1,5 @@
-from typing import Annotated, Dict, Optional
+from math import floor
+from typing import Annotated, Dict, Optional, Tuple, Union
 
 import torch
 from einops.layers.torch import Rearrange
@@ -12,7 +13,7 @@ from modalities.nn.mlp import MLP
 class VisionTransformerConfig(BaseModel):
     sample_key: str
     prediction_key: str
-    block_size: Annotated[int, Field(ge=1)] = 197
+    img_size: Annotated[Union[Tuple[int, int], int], Field(ge=1)] = 224
     n_classes: Optional[Annotated[int, Field(ge=1)]] = 1000
     n_layer: Annotated[int, Field(ge=1)] = 12
     n_head: Annotated[int, Field(ge=1)] = 8
@@ -71,7 +72,7 @@ class VisionTransformer(nn.Module):
         self,
         sample_key: str,
         prediction_key: str,
-        block_size: int = 197,
+        img_size: Union[Tuple[int, int], int] = 224,
         n_classes: int = 1000,
         n_layer: int = 12,
         n_head: int = 8,
@@ -87,9 +88,11 @@ class VisionTransformer(nn.Module):
         super().__init__()
         self.sample_key = sample_key
         self.prediction_key = prediction_key
+        self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
+        self.block_size = self._calcualte_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
 
         self.embd = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
-        self.pos_embd = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
+        self.pos_embd = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)
         self.dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList(
             [
@@ -120,3 +123,10 @@ class VisionTransformer(nn.Module):
                 x = x.mean(dim=1)
             x = self.head(self.norm(x))
         return {self.prediction_key: x}
+
+    @staticmethod
+    def _calcualte_block_size(img_size, patch_size, patch_stride, add_cls_token):
+        block_size = (floor((img_size[0] - patch_size) / patch_stride) + 1) * (
+            floor((img_size[1] - patch_size) / patch_stride) + 1
+        ) + int(add_cls_token)
+        return block_size

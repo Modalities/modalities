@@ -6,7 +6,7 @@ text_cls_prediction_key: text_cls
 vision_encoder_config:
   sample_key: images
   prediction_key: vision_embeddings
-  block_size: 196
+  img_size: 224
   n_classes: Null # Disable vision transformer head
   n_layer: 6
   n_head: 8
