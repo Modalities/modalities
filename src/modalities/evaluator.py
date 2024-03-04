@@ -12,7 +12,6 @@ from modalities.models.model import NNModel, model_predict_batch
 
 
 class Evaluator:
-
     def __init__(
         self,
         local_rank: int,
@@ -38,8 +37,6 @@ class Evaluator:
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
-
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
         for data_loader in data_loaders:
             Evaluator._publish_progress(
@@ -99,7 +96,7 @@ class Evaluator:
             )
 
             local_dataset_sample_id = Evaluator._get_local_sample_id(
-                batch_id=batch_id, batch_size=data_loader.sampler_batch_size
+                batch_id=batch_id, batch_size=data_loader.batch_size
             )
             global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
             Evaluator._publish_progress(
