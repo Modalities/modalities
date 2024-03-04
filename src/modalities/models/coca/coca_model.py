@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Annotated
+from typing import Annotated, Dict, Tuple
 
 import torch
 from einops import repeat
@@ -110,7 +110,7 @@ class CoCa(NNModel):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
-    def forward(self, inputs):
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
         text_embd, text_cls_token = self._forward_encode_text(inputs)
         logits = self._forward_decode(text_embd, vision_embd)
@@ -120,19 +120,19 @@ class CoCa(NNModel):
             self.text_cls_prediciton_key: text_cls_token,
         }
 
-    def _forward_encode_vision(self, inputs):
+    def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediciton_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(queries, context=vision_embd)
         vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
         return vision_embd, vision_cls_token
 
-    def _forward_encode_text(self, inputs):
+    def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         text_embd = self.text_decoder(inputs)[self.text_embd_prediciton_key]
         text_embd, text_cls_token = text_embd[:, :-1, :], text_embd[:, -1:, :]
         return text_embd, text_cls_token
 
-    def _forward_decode(self, text_embd, vision_embd):
+    def _forward_decode(self, text_embd: torch.Tensor, vision_embd: torch.Tensor) -> torch.Tensor:
         decoder_inputs = {
             self.text_embd_prediciton_key: text_embd,
             "context": vision_embd,
