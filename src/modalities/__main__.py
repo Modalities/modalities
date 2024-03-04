@@ -263,7 +263,10 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[
+        MessagePublisher[EvaluationResultBatch],
+        MessagePublisher[BatchProgressUpdate],
+    ]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
