@@ -123,7 +123,7 @@ class CoCa(NNModel):
     def _forward_encode_vision(self, inputs):
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediciton_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
-        vision_embd = self.attn_pool(vision_embd, queries)
+        vision_embd = self.attn_pool(queries, context=vision_embd)
         vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
         return vision_embd, vision_cls_token
 

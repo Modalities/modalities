@@ -18,8 +18,8 @@ class AttentionPooling(nn.Module):
         self.attn = Attention(n_embd, n_head, use_cross_attention=True)
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
-    def forward(self, vision_embd: torch.Tensor, vision_queries: torch.Tensor) -> torch.Tensor:
-        x = self.ln_1(vision_embd)
-        x = self.attn(vision_queries, context=x)
+    def forward(self, queries: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        x = self.ln_1(context)
+        x = self.attn(queries, context=x)
         x = self.ln_2(x)
         return x
