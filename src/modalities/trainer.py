@@ -15,7 +15,6 @@ from modalities.running_env.fsdp.reducer import Reducer
 
 
 class Trainer:
-
     def __init__(
         self,
         local_rank: int,
@@ -44,7 +43,7 @@ class Trainer:
         model.train()
         cumulated_loss = self._reset_loss()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch
@@ -66,8 +65,8 @@ class Trainer:
             )
             thoughput_aggregator.stop(len(batch))
             # Save the batch loss
-            cummulated_loss[0] += batch_loss.item()
-            cummulated_loss[1] += 1
+            cumulated_loss[0] += batch_loss.item()
+            cumulated_loss[1] += 1
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,
@@ -86,7 +85,7 @@ class Trainer:
                         train_loader.dataloader_tag,
                         loss_fun.tag,
                         local_sample_id_to_global_sample_id,
-                        cummulated_loss,
+                        cumulated_loss,
                         thoughput_aggregator,
                         local_train_sample_id,
                     )
@@ -106,10 +105,10 @@ class Trainer:
         data_loader: LLMDataLoader,
     ) -> torch.Tensor:
         result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch) / self.gradient_acc_step
+        loss = loss_fun(result_batch) / self.gradient_acc_steps
         loss.backward()
 
-        if (batch_id + 1) % self.gradient_acc_step == 0 or (batch_id + 1) == len(data_loader):
+        if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
             optimizer.zero_grad()
         return loss
