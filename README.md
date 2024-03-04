@@ -62,7 +62,7 @@ The mechanismn introduced to instantiate classes via `type_hint` in the `config.
 2) Pydantic for the validation of the config
 3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
 
-Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as `${subconfig.attribue}`. 
+Firstly, Omegaconf loads the config yaml file and resolves internal references such as `${subconfig.attribute}`. 
 
 Then, Pydantic validates the whole config as is and checks that each of the sub-configs are `pydantic.BaseModel` classes.
 For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced.
@@ -80,7 +80,7 @@ activation_kwargs={...}
 activation_resolver.make(type_hint, activation_kwargs),
 ```
 
-In our implmentation we go a step further, as both,
+In our implementation we go a step further, as both,
 * a `type_hint` in a `BaseModel` config must be of type `modalities.config.lookup_types.LookupEnum` and 
 * `config` is a union of allowed concrete configs of base type `BaseModel`. 
 `config` hereby replaces `activation_kwargs` in the example above, and replaces it with pydantic-validated `BaseModel` configs.

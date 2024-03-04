@@ -34,11 +34,11 @@ class CustomGPT2LLMCollateFn(CollateFnIF):
 
 def main():
     # load and parse the config file
-    config_file_path = Path("/raid/s3/opengptx/max_lue/modalities_custom/config_lorem_ipsum.yaml")
+    config_file_path = Path("config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(config_file_path)
 
     # instantiate the Main entrypoint of modalities by passing in the config
-    modalities_main = Main(config_dict=config_dict)
+    modalities_main = Main(config_dict=config_dict, config_path=config_file_path)
 
     # add the custom component to modalities
     modalities_main.add_custom_component(

@@ -63,7 +63,7 @@ class Trainer:
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
-        cummulated_loss = self._reset_loss()
+        cumulated_loss = self._reset_loss()
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
@@ -88,8 +88,8 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cummulated_loss[0] += batch_loss.item()
-            cummulated_loss[1] += len(batch)
+            cumulated_loss[0] += batch_loss.item()
+            cumulated_loss[1] += len(batch)
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
@@ -103,22 +103,22 @@ class Trainer:
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
-                    foward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
+                    forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                     forward_backward_time_recorder.reset()
 
                     thoughput_aggregator.add_value(
-                        key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
+                        key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
                     )
                     synced_num_samples = thoughput_aggregator.get_all_reduced_value(
                         ThroughputAggregationKeys.NUM_SAMPLES
                     )
-                    synced_foward_backward_time = thoughput_aggregator.get_all_reduced_value(
+                    synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
                         ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
                     )
-                    synced_num_samples_per_second = synced_num_samples / synced_foward_backward_time
+                    synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     train_loss = Reducer.reduce(
-                        tensor=cummulated_loss,
+                        tensor=cumulated_loss,
                         operation=dist.ReduceOp.SUM,
                         post_processing_fun=lambda t: t[0] / t[1],
                     )
@@ -144,19 +144,19 @@ class Trainer:
                     model.train()
 
                 # TODO early stopping
-                cummulated_loss = self._reset_loss()
+                cumulated_loss = self._reset_loss()
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
-        cummulated_loss = torch.zeros(2)
+        cumulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
-            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
+            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
         else:
-            cummulated_loss = cummulated_loss.to("cpu")
-        return cummulated_loss
+            cumulated_loss = cumulated_loss.to("cpu")
+        return cumulated_loss
 
     @staticmethod
     def _publish_progress(

@@ -19,7 +19,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
 chat_prefix = """
-This is a converstation between a user and a helpful bot, which answers the user's questsions as good as possible.
+This is a conversation between a user and a helpful bot, which answers the user's questions as good as possible.
 
 user: What is 1+1?
 bot: 1+1 is 2.
