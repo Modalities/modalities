@@ -1,10 +1,11 @@
+from functools import partial
 from typing import Dict
 
 import torch
 import xformers.ops as xops
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, AttentionConfig, LayerNorm, TransformerMLP
+from modalities.models.gpt2.gpt2_model import ActivationType, LayerNorm, TransformerMLP
 from modalities.models.model import NNModel
 from modalities.nn.attention import Attention
 
@@ -21,20 +22,28 @@ class MultiModalBlock(nn.Module):
         ffn_hidden: int,
     ):
         super().__init__()
-        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = Attention(n_embd, n_head, bias, is_causal=False, use_cross_attention=True)
-        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
         if activation == ActivationType.GELU:
-            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+            mlp = partial(TransformerMLP, n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation == ActivationType.FUSED_SWIGLU:
-            self.mlp = xops.SwiGLU(n_embd, ffn_hidden, n_embd, bias=False)
+            mlp = partial(xops.SwiGLU, in_features=n_embd, hidden_features=ffn_hidden, bias=bias)
         else:
-            raise Exception("unimplemented activation")
+            raise NotImplementedError(f"activation type {activation} not implemented")
+
+        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.self_attn = Attention(n_embd, n_head, bias, is_causal=True)
+        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.mlp_1 = mlp()
+        self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.cross_attn = Attention(n_embd, n_head, bias, use_cross_attention=True)
+        self.ln_4 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.mlp_2 = mlp()
 
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.ln_1(x), context=context)
-        x = x + self.mlp(self.ln_2(x))
+        x = x + self.self_attn(self.ln_1(x))
+        x = x + self.mlp_1(self.ln_2(x))
+        x = x + self.cross_attn(self.ln_3(x), context=context)
+        x = x + self.mlp_2(self.ln_4(x))
         return x
 
 
@@ -51,7 +60,6 @@ class MultiModalDecoder(NNModel):
         ffn_hidden: int,
         dropout: float,
         bias: bool,
-        attention: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
     ):
