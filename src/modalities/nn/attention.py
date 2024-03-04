@@ -63,8 +63,8 @@ class Attention(nn.Module):
     def _forward_input_projection(self, x: Tensor, context: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         B, T, C = x.shape
         _, Tc, Cc = context.shape
-        k = self.wk(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         q = self.wq(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
+        k = self.wk(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         v = self.wv(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         return q, k, v
 
