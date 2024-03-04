@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import rich
 import wandb
@@ -7,7 +7,7 @@ from rich.console import Group
 from rich.panel import Panel
 
 from modalities.batch import EvaluationResultBatch
-from modalities.config.config import AppConfig, WandbConfig
+from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 
@@ -52,21 +52,21 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
     def __init__(
         self,
-        num_ranks: int,
         project: str,
         experiment_id: str,
-        mode: WandbConfig.WandbMode,
-        dir: Path,
-        experiment_config: Optional[AppConfig] = None,
+        mode: WandbMode,
+        directory: Path,
+        experiment_config: Optional[Dict] = None,
     ) -> None:
         super().__init__()
-        self.num_ranks = num_ranks
 
         # experiment_config_json = None
         # if experiment_config is not None:
         #     experiment_config_json = experiment_config.model_dump(mode="json")
 
-        wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=dir, config=experiment_config)
+        wandb.init(
+            project=project, name=experiment_id, mode=mode.value.lower(), dir=directory, config=experiment_config
+        )
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""

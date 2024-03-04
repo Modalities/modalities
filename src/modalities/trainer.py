@@ -21,13 +21,13 @@ class Trainer:
         local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
-        gradient_acc_step: int,
+        gradient_acc_steps: int,
         throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
-        self.gradient_acc_step = gradient_acc_step
+        self.gradient_acc_steps = gradient_acc_steps
         self._throughput_aggregator_factory = throughput_aggregator_factory
 
     def train(
@@ -42,7 +42,7 @@ class Trainer:
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
-        cummulated_loss = self._reset_loss()
+        cumulated_loss = self._reset_loss()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
@@ -71,7 +71,7 @@ class Trainer:
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,
-                batch_size=train_loader.sampler_batch_size,
+                batch_size=train_loader.batch_size,
                 dataloader_tag=train_loader.dataloader_tag,
                 local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
@@ -80,7 +80,7 @@ class Trainer:
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
                     local_train_sample_id = Trainer._get_local_sample_id(
-                        batch_id=local_train_batch_id, batch_size=train_loader.sampler_batch_size
+                        batch_id=local_train_batch_id, batch_size=train_loader.batch_size
                     )
                     self._compute_publish_loss_and_throughput(
                         train_loader.dataloader_tag,
@@ -94,7 +94,7 @@ class Trainer:
                     model.train()
 
                 # TODO early stopping
-                cummulated_loss = self._reset_loss()
+                cumulated_loss = self._reset_loss()
 
     def _train_batch(
         self,
@@ -148,12 +148,12 @@ class Trainer:
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
-        cummulated_loss = torch.zeros(2)
+        cumulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
-            cummulated_loss = cummulated_loss.to(torch.device(self.local_rank))
+            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
         else:
-            cummulated_loss = cummulated_loss.to("cpu")
-        return cummulated_loss
+            cumulated_loss = cumulated_loss.to("cpu")
+        return cumulated_loss
 
     @staticmethod
     def _publish_progress(

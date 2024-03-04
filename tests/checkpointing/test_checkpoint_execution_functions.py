@@ -3,8 +3,10 @@ from pathlib import Path
 import pytest
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import ShardingStrategy
 
-from src.modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
 @pytest.mark.skip
@@ -28,7 +30,12 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
     p.write_text(CONTENT)
 
     checkpointing = FSDPToDiscCheckpointing(
-        checkpoint_path=d, experiment_id=str(1), global_rank=0, model_wrapping_fn=dummy_method
+        checkpoint_path=d,
+        experiment_id=str(1),
+        global_rank=0,
+        block_names=["model"],
+        mixed_precision_settings=MixedPrecisionSettings.BF_16,
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
     )
     files_paths_to_delete = checkpointing._get_paths_to_delete(global_train_sample_id=100)
     assert len(files_paths_to_delete) != 0
@@ -50,7 +57,9 @@ def test_delete_checkpoint(tmpdir):
         checkpoint_path=directory,
         experiment_id=experiment_id,
         global_rank=0,
-        model_wrapping_fn=dummy_method,
+        block_names=["model"],
+        mixed_precision_settings=MixedPrecisionSettings.BF_16,
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
     )
     checkpointing._delete_checkpoint(global_train_sample_id=100)
     assert is_empty_directory((directory / experiment_id).__str__())

@@ -31,6 +31,7 @@ pre-commit install --install-hooks
 
 - Make sure your code passes all the tests and pre-commit hooks. Use `pytest` from within the root of your local repository.
 
+- For vscode users, disable pytest coverage in `settings.json` to enable pytest debugging: `"python.testing.pytestArgs": ["--no-cov"]`
 
 ## Commit Guidelines
 
