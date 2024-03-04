@@ -11,8 +11,9 @@ import click_pathlib
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
+from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict, GPT2HuggingFaceAdapterConfig
+from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -28,7 +29,6 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
 from modalities.utils.generate_text import main as generate_text_main
-from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 
 
 @click.group()
@@ -155,16 +155,14 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     type=str,
     required=False,
     default="model_config.yaml",
-    help="Name of the config file for the input pytorch checkpoint, "
-    "which must be located in checkpoint_dir.",
+    help="Name of the config file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
 )
 @click.option(
     "--model_file_name",
     type=str,
     required=False,
     default="model.bin",
-    help="Name of the model file for the input pytorch checkpoint, "
-    "which must be located in checkpoint_dir.",
+    help="Name of the model file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
 )
 @click.option(
     "--output_hf_checkpoint_dir",
@@ -175,12 +173,7 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
 def entry_point_convert_pytorch_to_hf_checkpoint(
     checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir
 ):
-    cp = CheckpointConversion(
-        checkpoint_dir,
-        config_file_name,
-        model_file_name,
-        output_hf_checkpoint_dir
-    )
+    cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
     cp.convert_pytorch_to_hf_checkpoint()
 
 
