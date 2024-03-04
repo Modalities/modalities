@@ -4,15 +4,13 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple
 
 import click
 import click_pathlib
-import torch
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
-from modalities.checkpointing.checkpointing_execution import PytorchToDiscCheckpointing
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict, GPT2HuggingFaceAdapterConfig
 from modalities.dataloader.create_index import IndexGenerator
@@ -24,17 +22,13 @@ from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
 from modalities.utils.generate_text import main as generate_text_main
-from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
-from pydantic import BaseModel
-
-from src.modalities.config.config import PydanticModelIFType
+from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 
 
 @click.group()
@@ -178,46 +172,16 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     required=True,
     help="Converted hf checkpoint will be written to this directory.",
 )
-def convert_pytorch_to_hf_checkpoint(
+def entry_point_convert_pytorch_to_hf_checkpoint(
     checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir
 ):
-    # FIXME: make the conversion entry point configurable from outside:
-    # Which HuggingFaceAdapterConfig should be used etxactly currently it is too hard coded:
-    # Allow for a custom callable for conversion to HF to be given to the entrypoint
-    def get_model_from_checkpoint(checkpoint_path: Path, model: torch.nn.Module):
-        if torch.distributed.is_initialized():
-            raise NotImplementedError("Checkpoint conversion is only implemented for non-distributed environments")
-        rank = 0
-        checkpointing = PytorchToDiscCheckpointing(rank)
-        if not checkpoint_path.exists():
-            raise ValueError(f"Could not find model.bin in {checkpoint_path}")
-        model = checkpointing.load_model_checkpoint(model, checkpoint_path)
-        return model
-
-    def convert_checkpoint(output_path: Union[str, Path], model: torch.nn.Module, model_config: BaseModel):
-        hugging_face_model = HuggingFaceModel(config=model_config, model=model)
-        hugging_face_model.save_pretrained(output_path, safe_serialization=False)
-
-    checkpoint_dir = Path(checkpoint_dir)
-    input_pytorch_config_file_path = checkpoint_dir / config_file_name
-    if not input_pytorch_config_file_path.exists():
-        raise ValueError(f"Could not find {config_file_name} in {checkpoint_dir}")
-
-    # TODO resolve config hierarchically
-    config_dict = load_app_config_dict(input_pytorch_config_file_path)
-    logging.info(f"Config\n{config_dict}")
-
-    class ModelConfig(BaseModel):
-        model: PydanticModelIFType
-
-    main = Main(config_dict, input_pytorch_config_file_path)
-    components = main.component_factory.build_components(config_dict=config_dict, components_model_type=ModelConfig)
-    model = components.model
-
-    input_pytorch_checkpoint_path = checkpoint_dir / model_file_name
-    model = get_model_from_checkpoint(input_pytorch_checkpoint_path, model)
-    model_config = GPT2HuggingFaceAdapterConfig(GPT2LLMConfig(**config_dict['model']['config']))
-    convert_checkpoint(output_hf_checkpoint_dir, model, model_config)
+    cp = CheckpointConversion(
+        checkpoint_dir,
+        config_file_name,
+        model_file_name,
+        output_hf_checkpoint_dir
+    )
+    cp.convert_pytorch_to_hf_checkpoint()
 
 
 class Main:
