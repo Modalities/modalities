@@ -21,6 +21,7 @@ from modalities.config.lookup_enum import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
+from modalities.models.components.layer_norms import LayerNormIF
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
 from modalities.util import get_date_of_run, parse_enum_by_name
@@ -61,6 +62,7 @@ PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
+PydanticLayerNormIFType = Annotated[LayerNormIF, PydanticThirdPartyTypeIF(LayerNormIF)]
 
 
 class ProcessGroupBackendType(LookupEnum):
