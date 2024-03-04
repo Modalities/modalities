@@ -178,8 +178,9 @@ loss:
     target_key: ${data.target_key}
     prediction_key: ${model.config.prediction_key}
 
-validation_measure_factories:
-  - type_hint: AggregativeCLMCrossEntropyLossFactory
+evaluation_measures:
+  - component_key: eval_measures
+    variant_key: clm_cross_entropy_loss
     config:
       target_key: ${data.target_key}
       prediction_key: ${model.config.prediction_key}

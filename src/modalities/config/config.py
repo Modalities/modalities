@@ -92,11 +92,6 @@ class CLMCrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
 
-# TODO adapt to new config scheme
-class ValidationMeasureFactoryConfig(BaseModel):
-    type_hint: ValidationMeasureFactoryTypes
-    config: CLMCrossEntropyLossConfig
-
 
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
@@ -286,7 +281,6 @@ class CudaEnv(BaseModel):
     world_size: Annotated[int, Field(strict=True, ge=1)]
     global_rank: Annotated[int, Field(strict=True, ge=0)]
 
-    validation_measure_factories: List[ValidationMeasureFactoryConfig]
 
 class Settings(BaseModel):
     class Training(BaseModel):

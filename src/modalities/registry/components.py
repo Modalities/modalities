@@ -38,6 +38,8 @@ from modalities.config.config import (
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.evaluation.clm_cross_entropy_loss import AggregativeCLMCrossEntropyLossFactory
+from modalities.evaluation.perplexity import AggregativePerplexityFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
@@ -71,6 +73,14 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    # EvalLosses
+    ComponentEntity(
+        "eval_measures",
+        "clm_cross_entropy_loss",
+        AggregativeCLMCrossEntropyLossFactory,
+        CLMCrossEntropyLossConfig,
+    ),
+    ComponentEntity("eval_measures", "perplexity", AggregativePerplexityFactory, CLMCrossEntropyLossConfig),
     # optmizers
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
