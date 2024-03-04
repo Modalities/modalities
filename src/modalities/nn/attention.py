@@ -19,7 +19,8 @@ class Attention(nn.Module):
         use_cross_attention: bool = False,
     ):
         super().__init__()
-        assert n_embd % n_head == 0, "n_embd needs to be devisible by n_head"
+        if n_embd % n_head != 0:
+            raise ValueError("n_embd needs to be divisible by n_head")
         self.n_head = n_head
         self.n_embd = n_embd
         self.dropout = dropout
