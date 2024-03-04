@@ -186,6 +186,8 @@ class Main:
                 local_rank=components.settings.cuda_env.local_rank,
                 batch_progress_publisher=batch_processed_publisher,
                 evaluation_result_publisher=evaluation_result_publisher,
+                loss_factories=components.evaluation_measures,
+                metric_factories=[],
             )
 
             # Gym
