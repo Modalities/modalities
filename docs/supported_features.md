@@ -31,7 +31,7 @@ In this file, we list the already implemented, planned and in-progress features 
 | RMSNorm (pre-normalization)    | planned          | Normalizes the pre-activation weights in a layer to stabilize training, often used as an alternative to LayerNorm for improved training dynamics. |
 | Gradient Clipping              | planned          | Prevents exploding gradients by clipping the gradients of an optimization algorithm to a maximum value, thereby stabilizing training. |
 | Training Warmup                | planned          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
-| Loss Masking                   | planned          | Ignores or gives less weight to certain data points in the loss function, often used in tasks with variable-length sequences to ignore padding tokens. |
+| Loss Masking                   | planned          | Ignores or gives less weight to certain data points in the loss function, often used in tasks with variable-length sequences to ignore padding tokens or in more specific usecases such as GAtt. |
 | Knowledge Distillation         | planned  | Transfers knowledge from a larger, complex model to a smaller, more efficient model, improving the smaller model's performance without the computational cost of the larger model.|
 
 
