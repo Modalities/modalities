@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -60,7 +60,7 @@ class Attention(nn.Module):
         y = self.resid_dropout(self.c_proj(y))
         return y
 
-    def _forward_input_projection(self, x, context):
+    def _forward_input_projection(self, x: Tensor, context: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         B, T, C = x.shape
         _, Tc, Cc = context.shape
         k = self.wk(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
@@ -68,7 +68,7 @@ class Attention(nn.Module):
         v = self.wv(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         return q, k, v
 
-    def _forward_attention(self, query, key, value):
+    def _forward_attention(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
         att = (query @ key.transpose(-2, -1)) * (1.0 / math.sqrt(key.size(-1)))
         if self.is_causal:
             T = query.size(2)
