@@ -1,10 +1,12 @@
+import pytest
 import torch
 
 from modalities.nn.attention import Attention
 
 
-def test_attention_forward():
-    model = Attention(n_embd=64, n_head=8)
+@pytest.mark.parametrize("is_causal", [True, False])
+def test_attention_forward(is_causal):
+    model = Attention(n_embd=64, n_head=8, is_causal=is_causal)
     dummy_input = torch.randn(1, 256, 64)
     out = model(dummy_input)
     assert out.shape == (1, 256, 64)
