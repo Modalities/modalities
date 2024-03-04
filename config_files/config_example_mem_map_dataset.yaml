@@ -31,7 +31,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
   config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_16777216.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -142,15 +142,36 @@ model:
     ffn_hidden: 2048
     n_embd: 768
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention:
+    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
+    attention_config:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
-    activation: gelu
-    epsilon: 1e-5
+    activation_type: gelu
     weight_init:
       mean: 0.0
       std: 0.02
+    attention_norm:
+      component_key: layer_norm
+      variant_key: z_layer_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        eps: 1e-5
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: z_layer_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        eps: 1e-5
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: z_layer_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        eps: 1e-5
+
 
 wrapped_model:
   component_key: model
