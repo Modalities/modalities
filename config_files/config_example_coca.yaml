@@ -124,10 +124,10 @@ model:
   type_hint: CoCa
   config:
     prediction_key: logits
-    vision_embd_prediciton_key: vision_embeddings
-    text_embd_prediciton_key: text_embeddings
-    vision_cls_prediciton_key: vision_cls
-    text_cls_prediciton_key: text_cls
+    vision_embd_prediction_key: vision_embeddings
+    text_embd_prediction_key: text_embeddings
+    vision_cls_prediction_key: vision_cls
+    text_cls_prediction_key: text_cls
     vision_encoder_config:
       sample_key: images
       prediction_key: vision_embeddings

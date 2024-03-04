@@ -17,10 +17,10 @@ from modalities.nn.attention_pooling import AttentionPooling
 
 class CoCaConfig(BaseModel):
     prediction_key: str = "logits"
-    vision_embd_prediciton_key: str  # same key as vision encoder
-    text_embd_prediciton_key: str  # same key as text encoder
-    vision_cls_prediciton_key: str
-    text_cls_prediciton_key: str
+    vision_embd_prediction_key: str  # same key as vision encoder
+    text_embd_prediction_key: str  # same key as text encoder
+    vision_cls_prediction_key: str
+    text_cls_prediction_key: str
     vision_encoder_config: VisionTransformerConfig
     text_decoder_config: GPT2Config
     n_pool_head: Annotated[int, Field(ge=1)]
@@ -36,10 +36,10 @@ class CoCa(NNModel):
     def __init__(
         self,
         prediction_key: str,
-        vision_cls_prediciton_key: str,
-        text_cls_prediciton_key: str,
-        vision_embd_prediciton_key: str,
-        text_embd_prediciton_key: str,
+        vision_cls_prediction_key: str,
+        text_cls_prediction_key: str,
+        vision_embd_prediction_key: str,
+        text_embd_prediction_key: str,
         n_vision_queries: int,
         n_pool_head: int,
         bias_attn_pool: bool,
@@ -50,10 +50,10 @@ class CoCa(NNModel):
     ) -> None:
         super().__init__()
         self.prediction_key = prediction_key
-        self.vision_cls_prediciton_key = vision_cls_prediciton_key
-        self.text_cls_prediciton_key = text_cls_prediciton_key
-        self.vision_embd_prediciton_key = vision_embd_prediciton_key
-        self.text_embd_prediciton_key = text_embd_prediciton_key
+        self.vision_cls_prediction_key = vision_cls_prediction_key
+        self.text_cls_prediction_key = text_cls_prediction_key
+        self.vision_embd_prediction_key = vision_embd_prediction_key
+        self.text_embd_prediction_key = text_embd_prediction_key
         self.vision_encoder = VisionTransformer(**dict(vision_encoder_config))
 
         shared_decoder_kwargs = dict(text_decoder_config)
@@ -65,13 +65,13 @@ class CoCa(NNModel):
 
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
-            prediction_key=text_embd_prediciton_key,
+            prediction_key=text_embd_prediction_key,
             block_size=text_decoder_config.block_size + 1,  # +1 for the class token
             n_layer=text_decoder_config.n_layer - n_shared_layer,
             **shared_decoder_kwargs,
         )
         self.multimodal_decoder = MultiModalDecoder(
-            sample_key=text_embd_prediciton_key,
+            sample_key=text_embd_prediction_key,
             prediction_key=text_decoder_config.prediction_key,
             block_size=text_decoder_config.block_size,
             n_layer=n_shared_layer,
@@ -116,25 +116,25 @@ class CoCa(NNModel):
         logits = self._forward_decode(text_embd, vision_embd)
         return {
             self.prediction_key: logits,
-            self.vision_cls_prediciton_key: vision_cls_token,
-            self.text_cls_prediciton_key: text_cls_token,
+            self.vision_cls_prediction_key: vision_cls_token,
+            self.text_cls_prediction_key: text_cls_token,
         }
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediciton_key]
+        vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(queries, context=vision_embd)
         vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
         return vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        text_embd = self.text_decoder(inputs)[self.text_embd_prediciton_key]
+        text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]
         text_embd, text_cls_token = text_embd[:, :-1, :], text_embd[:, -1:, :]
         return text_embd, text_cls_token
 
     def _forward_decode(self, text_embd: torch.Tensor, vision_embd: torch.Tensor) -> torch.Tensor:
         decoder_inputs = {
-            self.text_embd_prediciton_key: text_embd,
+            self.text_embd_prediction_key: text_embd,
             "context": vision_embd,
         }
         decoder_outputs = self.multimodal_decoder(decoder_inputs)
