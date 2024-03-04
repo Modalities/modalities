@@ -5,12 +5,11 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from pydantic import BaseModel
 from transformers import AutoConfig, AutoModelForCausalLM
 
-from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.config import GPT2HuggingFaceAdapterConfig, PydanticModelIFType
+from modalities.config.config import GPT2HuggingFaceAdapterConfig, PydanticModelIFType, load_app_config_dict
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
+from modalities.checkpointing import checkpoint_conversion
 
 
 @pytest.fixture
@@ -22,19 +21,7 @@ def checkpoint_dir():
 
 @pytest.fixture
 def config_path(checkpoint_dir):
-    return os.path.join(checkpoint_dir, "model_config.yaml")
-
-
-@pytest.fixture
-def config(config_path, monkeypatch):
-    monkeypatch.setenv("RANK", "0")
-    monkeypatch.setenv("LOCAL_RANK", "0")
-    monkeypatch.setenv("WORLD_SIZE", "1")
-    config_dict = load_app_config_dict(config_path)
-    # FIXME
-    # pydantic_config = AppConfig.model_validate(config_dict)
-    # return pydantic_config
-    return config_dict
+    return Path(os.path.join(checkpoint_dir, "model_config.yaml"))
 
 
 @pytest.fixture
@@ -42,20 +29,25 @@ def device():
     return "cpu"
 
 
-def test_convert_to_hf_checkpoint(tmp_path, config, config_path, device):
+def test_convert_to_hf_checkpoint(tmp_path, config_path, device):
     # load test checkpoint
-
-    class HFCkptTestModel(BaseModel):
-        model: PydanticModelIFType
-
-    main = Main(config, config_path)
-    components = main.component_factory.build_components(config_dict=config, components_model_type=HFCkptTestModel)
-
-    with patch.object(Main, "_get_model_from_checkpoint", return_value=components):
-        pytorch_model = main.load_and_convert_checkpoint(output_path=tmp_path, checkpoint_path=tmp_path)
+    cp = checkpoint_conversion.CheckpointConversion(
+        checkpoint_dir=config_path.parent,
+        config_file_name=config_path.name,
+        model_file_name="",
+        output_hf_checkpoint_dir=tmp_path
+    )
+    pytorch_model = cp._setup_model()
+    with patch.object(
+            checkpoint_conversion.CheckpointConversion,
+            "_get_model_from_checkpoint",
+            return_value=pytorch_model
+    ):
+        cp.convert_pytorch_to_hf_checkpoint()
 
     pytorch_model.eval()
     pytorch_model = pytorch_model.to(device)
+
     # check that model before and after loading return the same output
     test_tensor = torch.randint(10, size=(5, 10))
     test_tensor = test_tensor.to(device)
@@ -64,6 +56,7 @@ def test_convert_to_hf_checkpoint(tmp_path, config, config_path, device):
     # register config and model
     AutoConfig.register("modalities_gpt2", GPT2HuggingFaceAdapterConfig)
     AutoModelForCausalLM.register(GPT2HuggingFaceAdapterConfig, HuggingFaceModel)
+
     # load saved model
     hf_model = AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=pytorch_model.lm_head.weight.dtype)
     hf_model = hf_model.to(device)
