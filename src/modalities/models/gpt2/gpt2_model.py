@@ -3,12 +3,12 @@ from enum import Enum
 
 import math
 from functools import partial
-from typing import Dict, Tuple, List
+from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint, model_validator, validator
+from pydantic import BaseModel, Field, model_validator, validator
 from torch.nn import functional as F
 from xformers.components.positional_embedding import RotaryEmbedding
 
@@ -128,8 +128,8 @@ class AttentionConfig(BaseModel):
             pass
 
         class RotaryTransformConfig(BaseModel):
-            n_embd: int = conint(ge=0)
-            n_head: int = conint(ge=0)
+            n_embd: Annotated[int, Field(strict=True, ge=0)]
+            n_head: Annotated[int, Field(strict=True, ge=0)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
@@ -140,32 +140,36 @@ class AttentionConfig(BaseModel):
 
     attention_type: AttentionType
     qkv_transforms: List[QueryKeyValueTransformConfig]
+    scaling_factor: Annotated[int, Field(strict=True, ge=1)]
 
 
 class WeightInitializationConfig(BaseModel):
-    mean: confloat(ge=0.0)
-    std: confloat(ge=0.0)
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)]
 
 
-class GPT2Config(BaseModel):
+class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
     poe_type: PositionTypes
-    block_size: conint(ge=1)
-    vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: conint(ge=1)
-    n_head: conint(ge=1)
-    n_embd: conint(ge=1)
-    ffn_hidden: conint(ge=1)
-    dropout: confloat(ge=0.0)
+    block_size: Annotated[int, Field(strict=True, ge=1)]
+    vocab_size: Annotated[
+        int, Field(strict=True, ge=1)
+    ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: Annotated[int, Field(strict=True, ge=1)]
+    n_head: Annotated[int, Field(strict=True, ge=1)]
+    n_embd: Annotated[int, Field(strict=True, ge=1)]
+    ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
+
+    dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
     activation: ActivationType
-    epsilon: confloat(ge=0.0)
+    epsilon: Annotated[float, Field(strict=True, ge=0.0)]
     weight_init: WeightInitializationConfig
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "GPT2Config":
+    def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
             [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):

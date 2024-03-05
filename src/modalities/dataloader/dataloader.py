@@ -2,15 +2,14 @@ from typing import Iterable, Optional, Union
 
 from torch.utils.data import Dataset, Sampler
 from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
-
-from modalities.dataloader.samplers import ResumableBatchSampler
+from torch.utils.data.sampler import BatchSampler
 
 
 class LLMDataLoader(DataLoader[T_co]):
     def __init__(
         self,
         dataloader_tag: str,
-        batch_sampler: ResumableBatchSampler,
+        batch_sampler: BatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
         shuffle: Optional[bool] = None,
@@ -49,19 +48,24 @@ class LLMDataLoader(DataLoader[T_co]):
         )
 
         self._dataloader_tag = dataloader_tag
+        self._batch_size = batch_sampler.batch_size
 
     @property
     def dataloader_tag(self) -> str:
         return self._dataloader_tag
 
     @property
-    def sampler_batch_size(self) -> int:
+    def batch_size(self) -> int:
         # The parent Dataloader class has already a batch_size property defined which is originally used
         # when the batch_sampler is not specified. Since the  LLMDataLoader enforces to always use a BatchSampler,
-        # we defined the property sampler_batch_size to return the actual batch size used in the dataloder.
+        # we defined/ override the property batch_size to return the actual batch size used in the dataloder.
         # BatchSampler is required, as we must seek forward in the dataloder during a warm start and
         # we don't want to load all the data during the fast-forward.
-        return self.batch_sampler.sampler_batch_size
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, value: int):
+        self._batch_size = value
 
     @property
     def fast_forward_sample_id(self) -> int:
@@ -70,7 +74,7 @@ class LLMDataLoader(DataLoader[T_co]):
         Returns:
             int: fast forward sample id
         """
-        return self.sampler_batch_size * self.batch_sampler.start_index
+        return self.batch_size * self.batch_sampler.start_index
 
     @property
     def fast_forward_batch_id(self) -> int:
@@ -83,15 +87,15 @@ class LLMDataLoader(DataLoader[T_co]):
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
-    def __init__(self, data_loader: LLMDataLoader[T_co], reshuffle_after_epoch: bool = False):
+    def __init__(self, dataloader: LLMDataLoader[T_co], reshuffle_after_epoch: bool = False):
         """Wraps an iterator to allow for infinite iteration. This is especially useful
         for DataLoader types that we wish to automatically restart upon completion.
 
         Args:
             loader (iterator): The data loader to repeat.
         """
-        self.data_loader = data_loader
-        self.data_iter = iter(self.data_loader)
+        self.dataloader = dataloader
+        self.data_iter = iter(self.dataloader)
         self.current_epoch = 0
         self.reshuffle_after_epoch = reshuffle_after_epoch
 
@@ -102,24 +106,24 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         try:
             batch = next(self.data_iter)
         except StopIteration:
-            if self.data_loader.sampler is not None:
+            if self.dataloader.sampler is not None:
                 # In distributed mode, calling the set_epoch() method at the beginning of each epoch before creating
                 # the DataLoader iterator is necessary to make shuffling work properly across multiple epochs.
                 # Otherwise, the same ordering will be always used. See discussion:
                 # https://discuss.pytorch.org/t/why-is-sampler-set-epoch-epoch-needed-for-distributedsampler/149672
                 self.current_epoch += 1
-                self.data_loader.sampler.set_epoch(self.current_epoch)
-            self.data_iter = iter(self.data_loader)
+                self.dataloader.sampler.set_epoch(self.current_epoch)
+            self.data_iter = iter(self.dataloader)
             batch = next(self.data_iter)
         return batch
 
     @property
     def dataloader_tag(self) -> str:
-        return self.data_loader._dataloader_tag
+        return self.dataloader._dataloader_tag
 
     @property
-    def sampler_batch_size(self) -> int:
-        return self.data_loader.batch_sampler.batch_size
+    def batch_size(self) -> int:
+        return self.dataloader.batch_sampler.batch_size
 
     @property
     def fast_forward_sample_id(self) -> int:
@@ -128,7 +132,7 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         Returns:
             int: fast forward sample id
         """
-        return self.data_loader.sampler_batch_size * self.batch_sampler.start_index
+        return self.dataloader.batch_size * self.batch_sampler.start_index
 
     @property
     def fast_forward_batch_id(self) -> int:
@@ -137,4 +141,4 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         Returns:
             int: fast forward batch id
         """
-        return self.data_loader.batch_sampler.start_index
+        return self.dataloader.batch_sampler.start_index

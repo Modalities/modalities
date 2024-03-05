@@ -1,114 +1,141 @@
-modalities_setup:
-  run_mode: FROM_SCRATCH
-  settings:
+settings:  
+  experiment_id: ${modalities_env:experiment_id}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  training:
+    callback_interval_in_samples: 32768
+    global_num_training_samples: 2048
     global_num_seen_samples: 0
+    do_apply_activation_checkpointing: false
+    gradient_acc_steps: 1
+    local_train_micro_batch_size: 16
+    sequence_length: 4096
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpointing_path: data/checkpoints
 
-wandb:
-  project_name: modalities
-  mode: ONLINE
 
-data:
-  sample_key: "input_ids"
-  target_key: "target_ids"
-  sequence_len: 1024
-  train_dataloader:
-    type_hint: LLMDataLoader
-    config:
-      dataloader_tag: "train"
-      num_workers: 2
-      pin_memory: true
-      shuffle: false
-      batch_sampler:
-        type_hint: BatchSampler
-        config:
-          batch_size: 8 # per rank
-          drop_last: false
-          sampler:
-            type_hint: DistributedSampler
-            config:
-              rank: ${training.global_rank}
-              num_replicas: ${training.world_size}
-              shuffle: true
-      dataset:
-        type_hint: PackedMemMapDatasetContinuous
-        config: 
-          raw_data_path: ./data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_train.pbin
-          block_size: ${data.sequence_len}
-          sample_key: ${data.sample_key}
-      collate_fn:
-        type_hint: GPT2LLMCollator
-        config:
-          sample_key: ${data.sample_key}
-          target_key: ${data.target_key}
-  eval_dataloaders:
-    - type_hint: LLMDataLoader
+collate_fn:  
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_megatron
+  config: 
+    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_16777216.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
       config:
-        dataloader_tag: "val"
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        batch_sampler:
-          type_hint: BatchSampler
-          config: 
-            batch_size: 8 # per rank
-            drop_last: false
-            sampler:
-              type_hint: DistributedSampler
-              config:
-                rank: ${training.global_rank}
-                num_replicas: ${training.world_size}
-                shuffle: false
-        dataset:
-          type_hint: PackedMemMapDatasetContinuous
-          config: 
-            raw_data_path: ./data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_samples_1024_test.pbin
-            block_size: ${data.sequence_len}
-            sample_key: ${data.sample_key}
-        collate_fn:
-          type_hint: GPT2LLMCollator
-          config: 
-            sample_key: ${data.sample_key}
-            target_key: ${data.target_key}
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
 
-training:
-  process_group_backend: "nccl"
-  global_num_training_samples: 2048
-  callback_interval_in_samples: 256
-  local_rank: ${oc.env:LOCAL_RANK}
-  global_rank: ${oc.env:RANK}
-  world_size: ${oc.env:WORLD_SIZE}
-  main_rank: 0
-  local_train_micro_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
-  global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
-  gradient_acc_step: 1
-  do_apply_activation_checkpointing: false
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_megatron
+  config: 
+    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_1024.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: val_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: false
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            dataset:
+              instance_key: val_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
 
 checkpointing:
-  checkpointing_strategy:
-    type_hint: SaveKMostRecentCheckpointsStrategy
-    config:
-      k: -1   # -1 to save all checkpoints
-  checkpointing_execution:
-    type_hint: FSDPToDiscCheckpointing
-    config: 
-      checkpoint_path: ./data/checkpoints
-      global_rank: ${oc.env:RANK}
-
-running_env:
-  type_hint: FSDPRunningEnv
+  component_key: checkpointing
+  variant_key: default
   config:
-    process_group_backend: ${training.process_group_backend}
-    local_rank: ${oc.env:LOCAL_RANK}
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    checkpointing_strategy:
+      component_key: checkpointing_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: -1   # -1 to save all checkpoints
+    checkpointing_execution:
+      component_key: checkpointing_execution
+      variant_key: fsdp_to_disc_checkpointing
+      config:
+        checkpoint_path: ${settings.paths.checkpointing_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id} 
+        mixed_precision_settings: BF_16
+        sharding_strategy: FULL_SHARD
+        block_names: [GPT2Block]
 
 model:
-  type_hint: GPT2LLM
+  component_key: model
+  variant_key: gpt2
   config:
-    sample_key: ${data.sample_key}
-    prediction_key: "logits"
-    block_size: ${data.sequence_len}
+    sample_key: ${settings.referencing_keys.sample_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    block_size: ${settings.training.sequence_length}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
     n_head: 12
@@ -125,20 +152,61 @@ model:
       mean: 0.0
       std: 0.02
 
-scheduler:
-  type_hint: StepLR
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
   config:
-    step_size: 1
-    gamma: 0.1
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
 
-optimizer:
-  type_hint: AdamW
+# scheduler:
+#   type_hint: StepLR
+#   config:
+#     step_size: 1
+#     gamma: 0.1
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+
+optimizer:  
+  component_key: optimizer
+  variant_key: adam_w
   config:
     lr: 0.0001
+    wrapped_model: 
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
 
-
-loss:
-  type_hint: CLMCrossEntropyLoss
+batch_progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
   config:
-    target_key: ${data.target_key}
-    prediction_key: ${model.config.prediction_key}
+    local_rank: ${settings.cuda_env.local_rank}
+    world_size: ${settings.cuda_env.world_size}
+    global_num_seen_samples: ${settings.training.global_num_seen_samples}
+    train_dataloader:
+      instance_key: train_dataloader
+      pass_type: BY_REFERENCE
+    eval_dataloaders:
+      - instance_key: val_dataloader
+        pass_type: BY_REFERENCE
+
+    
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    project: modalities
+    mode: ONLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
