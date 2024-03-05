@@ -1,0 +1,15 @@
+
+comp_y_1:
+    component_key: COMP_Y
+    variant_key: default
+    config:
+      val_y: "some other value y"
+      multi_dependency:
+        - component_key: COMP_W
+          variant_key: default
+          config:
+            val_w: "some other value w"
+        - component_key: COMP_V
+          variant_key: default
+          config:
+            val_v: "some other value v"

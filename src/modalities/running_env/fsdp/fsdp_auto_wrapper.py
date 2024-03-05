@@ -7,7 +7,7 @@ import torch.nn as nn
 from accelerate.utils.dataclasses import FullyShardedDataParallelPlugin
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
-from modalities.config.lookup_types import LookupEnum
+from modalities.config.lookup_enum import LookupEnum
 
 
 class FSDPAutoWrapFactoryIF(ABC):

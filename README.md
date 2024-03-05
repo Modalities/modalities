@@ -4,7 +4,7 @@
 
 # Getting started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
-Also, see our WIki and API reference documentation: https://modalities.github.io/modalities/
+Also, see our Wiki and API reference documentation: https://modalities.github.io/modalities/
 
 # Installation
 
@@ -20,7 +20,7 @@ then, install the repository via
 pip install -e . 
 ```
 
-If you want to contribute, have look at `CONTRIBUTING.md`.
+If you want to contribute, have a look at `CONTRIBUTING.md`.
 
 
 
@@ -57,12 +57,12 @@ Or, if you are a VsCode user, add this to your `launch.json`:
 
 # Pydantic and ClassResolver
 
-The mechanismn introduced to instantiate classes via `type_hint` in the `config.yaml`, utilizes 
+The mechanism introduced to instantiate classes via `type_hint` in the `config.yaml`, utilizes 
 1) Omegaconf to load the config yaml file
 2) Pydantic for the validation of the config
 3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
 
-Firstly, Omegaconf loads the config yaml file and resolves internal refrences such as `${subconfig.attribue}`. 
+Firstly, Omegaconf loads the config yaml file and resolves internal references such as `${subconfig.attribute}`. 
 
 Then, Pydantic validates the whole config as is and checks that each of the sub-configs are `pydantic.BaseModel` classes.
 For configs, which allow different concrete classes to be instantiated by `ClassResolver`, the special member names `type_hint` and `config` are introduced.
@@ -80,7 +80,7 @@ activation_kwargs={...}
 activation_resolver.make(type_hint, activation_kwargs),
 ```
 
-In our implmentation we go a step further, as both,
+In our implementation we go a step further, as both,
 * a `type_hint` in a `BaseModel` config must be of type `modalities.config.lookup_types.LookupEnum` and 
 * `config` is a union of allowed concrete configs of base type `BaseModel`. 
 `config` hereby replaces `activation_kwargs` in the example above, and replaces it with pydantic-validated `BaseModel` configs.
@@ -89,7 +89,8 @@ With this, a mapping between type hint strings needed for `class-resolver`, and 
 
 ```python
 from enum import Enum
-from pydantic import BaseModel, PositiveInt, PositiveFloat, conint, confloat
+from typing import Annotated
+from pydantic import BaseModel, PositiveInt, PositiveFloat, Field
 
 class LookupEnum(Enum):
     @classmethod
@@ -102,8 +103,8 @@ class SchedulerTypes(LookupEnum):
     ConstantLR = torch.optim.lr_scheduler.ConstantLR
 
 class StepLRConfig(BaseModel):
-    step_size: conint(ge=1)
-    gamma: confloat(ge=0.0)
+    step_size: Annotated[int, Field(strict=True, ge=1)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
 
 
 class ConstantLRConfig(BaseModel):
@@ -116,7 +117,7 @@ class SchedulerConfig(BaseModel):
     config: StepLRConfig | ConstantLRConfig
 ```
 
-To allow a user-friendly instantiation, all class resolvers are defined in the `ResolverRegistry` and `build_component_by_config` as convenience function is introduced. Dependecies can be passed-through with the `extra_kwargs` argument:
+To allow a user-friendly instantiation, all class resolvers are defined in the `ResolverRegistry` and `build_component_by_config` as convenience function is introduced. Dependencies can be passed-through with the `extra_kwargs` argument:
 ```python
 resolvers = ResolverRegister(config=config)
 optimizer = ...  # our example dependency
