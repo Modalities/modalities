@@ -1,6 +1,7 @@
 import json
 import pickle
 import tempfile
+import warnings
 from pathlib import Path
 
 import pytest
@@ -37,9 +38,11 @@ def test_index_creation(tmpdir, dummy_content_text):
         dummy_dst_path.unlink(missing_ok=True)
         indexer.create_index(dummy_dst_path)
 
-    with pytest.raises(ValueError):
-        generate_data_index_file(plain_text_data_path)
-    generate_data_index_file(plain_text_data_path, drop_faulty_entries=True)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        with pytest.raises(ValueError):
+            generate_data_index_file(plain_text_data_path)
+        generate_data_index_file(plain_text_data_path, drop_faulty_entries=True)
     generate_data_index_file(jsonl_data_path)
 
     index = pickle.loads(dummy_dst_path.read_bytes())

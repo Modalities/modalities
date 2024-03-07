@@ -67,7 +67,8 @@ class IndexGenerator:
 
         self._index_map = []
         for line_start_idx, line in tqdm(queue_generator(), desc="Processed Lines"):
-            self._check_for_parallel_errors()
+            if self._check_for_parallel_errors():
+                return
             parse_line_as_json(line_start_idx, line)
 
     def _reader_thread(self):
@@ -75,7 +76,8 @@ class IndexGenerator:
             while True:
                 cursor = fin.tell()
                 line = fin.readline()
-                self._check_for_parallel_errors()
+                if self._check_for_parallel_errors():
+                    return
                 if fin.tell() == self._total_num_chars:
                     self._queue_of_raw_lines.put((cursor, line))
                     break
@@ -83,6 +85,5 @@ class IndexGenerator:
                 self._queue_of_raw_lines.put((cursor, line_without_newline_char))
         self._queue_of_raw_lines.put(None)
 
-    def _check_for_parallel_errors(self):
-        if self._exception_buffer:
-            raise RuntimeError("Exception found in exception buffer. Another thread encountered a problem apparently.")
+    def _check_for_parallel_errors(self) -> bool:
+        return bool(self._exception_buffer)

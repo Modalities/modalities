@@ -110,15 +110,15 @@ class PackedDataGenerator:
 
     def _generator_for_tokens_to_get_written(self):
         while True:
-            self._check_for_parallel_errors()
+            if self._check_for_parallel_errors():
+                return
             tokens = self._tokens_write_queue.get()
             if tokens is None:
                 break
             yield tokens
 
-    def _check_for_parallel_errors(self):
-        if self._exception_buffer:
-            raise RuntimeError("Exception found in exception buffer. Another thread encountered a problem apparently.")
+    def _check_for_parallel_errors(self) -> bool:
+        return bool(self._exception_buffer)
 
     def _writer_thread(self, dst_path: Path) -> Callable:
         def writer():
@@ -147,7 +147,8 @@ class PackedDataGenerator:
         return writer
 
     def _process_thread(self, process_id: int):
-        self._check_for_parallel_errors()
+        if self._check_for_parallel_errors():
+            return
         for idx in range(process_id, len(self._reader), self._number_of_processes):
             line = self._reader[idx]
             try:
