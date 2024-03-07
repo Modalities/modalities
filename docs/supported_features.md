@@ -12,6 +12,7 @@ In this file, we list the already implemented, planned and in-progress features 
 | Memmap for efficient data loading     | supported        | Optimizes the data pipeline to reduce I/O bottlenecks. |
 | Activation Checkpointing              | supported        | Saves intermediate activations to memory only at certain points during the forward pass and recomputes them during the backward pass, reducing memory usage at the cost of additional computation. |
 | Flash Attention                       | supported        | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models. |
+| RMS and Layer Norm (pre-normalization) | supported        | Normalizes the pre-activation weights in a layer to stabilize training. |
 | Adaptive Batch Size Exploration       | planned         | Dynamically increases the training batch size during the training process to identify the maximum batch size that can be accommodated by a given GPU setup without causing memory overflow or performance degradation. |
 | Node Failure Recovery                 | planned         | Implements mechanisms to automatically detect and recover from failures (e.g., node or GPU failures) in distributed training environments, ensuring that training can continue with minimal interruption even if one or more nodes / GPUs in the cluster fail. |
 
@@ -30,10 +31,10 @@ In this file, we list the already implemented, planned and in-progress features 
 |--------------------------------|------------------|-------------------------------------------------------------------------------------------------------------------|
 | SwiGLU                         | supported         | A nonlinear activation function combining Gated Linear Units (GLU) with Swish for enhancing model capacity and learning efficiency. |
 | Weight Decay                   | supported        | Regularization technique that adds a penalty on the size of weights, encouraging smaller weights to reduce overfitting and improve generalization. |
+| RMSNorm (pre-normalization)    | supported        | Normalizes the pre-activation weights in a layer to stabilize training, often used as an alternative to LayerNorm for improved training dynamics. |
 | Rotary Positional Embeddings (RoPE) | in-progress   | Encodes sequence position information into attention mechanisms, preserving relative positional information and improving model's understanding of sequence order. |
 | Grouped-query Attention (GQA)  | in-progress      | Enhances attention mechanisms by grouping queries to reduce computation and memory footprint while maintaining or improving performance. |
 | Learning Rate Scheduler        | in-progress      | Adjusts the learning rate during training according to a predefined schedule (e.g., step decay, exponential decay) to improve convergence and performance. |
-| RMSNorm (pre-normalization)    | planned          | Normalizes the pre-activation weights in a layer to stabilize training, often used as an alternative to LayerNorm for improved training dynamics. |
 | Gradient Clipping              | planned          | Prevents exploding gradients by clipping the gradients of an optimization algorithm to a maximum value, thereby stabilizing training. |
 | Training Warmup                | planned          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
 | Loss Masking                   | planned          | Ignores or gives less weight to certain data points in the loss function, often used in tasks with variable-length sequences to ignore padding tokens or in more specific usecases such as GAtt. |
