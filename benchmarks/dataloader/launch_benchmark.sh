@@ -10,10 +10,10 @@ measure_modalities_preparation() {
         set -e
         test -f $INPUT_DIR
         rm -f ${INPUT_DIR/.jsonl/.idx}
-        modalities create_memmap_index $INPUT_DIR &> /dev/null
+        modalities data create_raw_index $INPUT_DIR &> /dev/null
         echo "finished memmap index creation"
         rm -f ${INPUT_DIR/.jsonl/.pbin}
-        modalities create_packed_data $INPUT_DIR &> /dev/null
+        modalities data pack_encoded_data $INPUT_DIR &> /dev/null
         echo "finished memmap packing"
     )
 }

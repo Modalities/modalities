@@ -41,29 +41,29 @@ Firstly, we create the dataset index via
 cd modalities/examples/getting_started/
 
 # train split
-modalities create_memmap_index --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
+modalities data create_raw_index --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
                                data/raw/redpajama_v2_samples_512_train.jsonl
 
 # test split
-modalities create_memmap_index --index_path data/mem_map/redpajama_v2_samples_512_test.idx \
+modalities data create_raw_index --index_path data/mem_map/redpajama_v2_samples_512_test.idx \
                                data/raw/redpajama_v2_samples_512_test.jsonl
 ```
 In this step, we read the JSON file as a binary file, iterate over all characters and build up the sample index (char-wise start and end position for each JSON sample)
-as determined by the `\n` character positions. The sample index is stored in the specified `index_path`. Internally, the `create_memmap_index` command 
+as determined by the `\n` character positions. The sample index is stored in the specified `index_path`. Internally, the `create_raw_index` command 
 instantiates and calls the [IndexGenerator](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/create_index.py#L14).
 
 After having determined the index, we create the packed dataset as described below by leveraging the tokenizer, jsonl file and the created index.
 
 ```sh
 # train split
-modalities create_packed_data --jq_pattern .raw_content \
+modalities data pack_encoded_data --jq_pattern .raw_content \
                               --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
                               --dst_path data/mem_map/redpajama_v2_samples_512_train.pbin \
                               --tokenizer_file tokenizer/tokenizer.json \
                               data/raw/redpajama_v2_samples_512_train.jsonl
 
 # test split
-modalities create_packed_data --jq_pattern .raw_content \
+modalities data pack_encoded_data --jq_pattern .raw_content \
                               --index_path data/mem_map/redpajama_v2_samples_512_test.idx \
                               --dst_path data/mem_map/redpajama_v2_samples_512_test.pbin \
                               --tokenizer_file tokenizer/tokenizer.json \
@@ -83,15 +83,21 @@ Technically, packed datasets are defined a self-contained format that stores the
 **Packed MemMap File Format**
 
 ```
-|--8-BYTES-HEADER--|-------------------DATA-SEGMENT-------------------|----INDEX-SEGMENT----|
+|--HEADER--|-------------------DATA-SEGMENT-------------------|----INDEX-SEGMENT----|
 
 
-8 bytes header:
+header:
 ===============
-specifies the size of the data segment in bytes. Since the header size is fixed to 8 bytes, 
-the start and end position of each segment (i.e, header, data, index) is specified. Therefore, the theoretical maximum size of the data segment 
-is 2^64 bytes = 18,446 peta bytes or 4600e+15 tokens or 4.6 quintillion tokens, given that a token has 4 bytes.
-
+Contains two elements:
+* Specifies the size of the data segment in bytes. Since the header size is fixed to 8 bytes, 
+  the start and end position of each segment (i.e, header, data, index) is specified. 
+  Therefore, the theoretical maximum size of the data segment 
+  is 2^64 bytes = 18,446 peta bytes or 4600e+15 tokens or 4.6 quintillion tokens, given that a token has 4 bytes.
+* The size of a each represented single token in the data segment in bytes. 
+  This values is inferred from the source data of this `.pbin` 
+  and depends solely on the tokenizer's vocabulary used for encoding. 
+  A 4-byte integer is used for this.
+Therefore the header is always 8+4=12 bytes long.
 
 Data segment:
 =============

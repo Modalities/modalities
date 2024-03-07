@@ -12,20 +12,20 @@ To start a training you need to create memmap dataset out of a jsonl file first,
 .. code-block:: bash
 
     # Create memmap dataset from jsonl file.
-    modalities create_memmap_index <path/to/jsonl/file>
+    modalities data create_raw_index <path/to/jsonl/file>
 
     # Create packed dataset.
-    modalities create_packed_data <path/to/jsonl/file>
+    modalities data pack_encoded_data <path/to/jsonl/file>
 
 For example, using the lorem ipsum example:
 
 .. code-block:: bash
 
     # Create memmap dataset from jsonl file.
-    modalities create_memmap_index data/lorem_ipsum.jsonl
+    modalities data create_raw_index data/lorem_ipsum.jsonl
 
     # Create packed dataset.
-    modalities create_packed_data data/lorem_ipsum.jsonl
+    modalities data pack_encoded_data data/lorem_ipsum.jsonl
 
 Training
 ----------------------------------------------------
