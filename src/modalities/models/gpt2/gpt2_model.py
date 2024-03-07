@@ -1,4 +1,5 @@
 import math
+from copy import copy
 from enum import Enum
 from functools import partial
 from typing import Annotated, Dict
@@ -246,8 +247,8 @@ class GPT2LLM(NNModel):
                             dropout=dropout,
                             block_size=block_size,
                             ffn_hidden=ffn_hidden,
-                            attention_norm=attention_norm,
-                            ffn_norm=ffn_norm,
+                            attention_norm=copy(attention_norm),
+                            ffn_norm=copy(ffn_norm),
                         )
                         for _ in range(n_layer)
                     ]

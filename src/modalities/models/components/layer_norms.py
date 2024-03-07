@@ -12,6 +12,9 @@ class LayerNormIF(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
+    def __copy__(self):
+        raise NotImplementedError
+
 
 class RMSLayerNorm(LayerNormIF):
     def __init__(self, ndim: int, epsilon: float = 1e-6):
@@ -40,6 +43,10 @@ class RMSLayerNorm(LayerNormIF):
         output = self._norm(x.float()).type_as(x)
         return output * self.weight
 
+    def __copy__(self):
+        copied_instance = RMSLayerNorm(self.weight.shape[0], self.epsilon)
+        return copied_instance
+
 
 class ZLayerNorm(LayerNormIF):
     """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
@@ -47,17 +54,22 @@ class ZLayerNorm(LayerNormIF):
     def __init__(self, ndim: int, bias: bool, epsilon: float = 1e-6):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(ndim))
-        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
+        self.bias_tensor = nn.Parameter(torch.zeros(ndim)) if bias else None
         self.epsilon = epsilon
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return F.layer_norm(
+        normalized_x = F.layer_norm(
             input=x,
             normalized_shape=self.weight.shape,
             weight=self.weight,
-            bias=self.bias,
+            bias=self.bias_tensor,
             eps=self.epsilon,
         )
+        return normalized_x
+
+    def __copy__(self):
+        copied_instance = ZLayerNorm(self.weight.shape[0], self.bias_tensor is not None, self.epsilon)
+        return copied_instance
 
 
 class LayerNorms(LookupEnum):
