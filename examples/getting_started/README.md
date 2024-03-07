@@ -83,15 +83,21 @@ Technically, packed datasets are defined a self-contained format that stores the
 **Packed MemMap File Format**
 
 ```
-|--8-BYTES-HEADER--|-------------------DATA-SEGMENT-------------------|----INDEX-SEGMENT----|
+|--HEADER--|-------------------DATA-SEGMENT-------------------|----INDEX-SEGMENT----|
 
 
-8 bytes header:
+header:
 ===============
-specifies the size of the data segment in bytes. Since the header size is fixed to 8 bytes, 
-the start and end position of each segment (i.e, header, data, index) is specified. Therefore, the theoretical maximum size of the data segment 
-is 2^64 bytes = 18,446 peta bytes or 4600e+15 tokens or 4.6 quintillion tokens, given that a token has 4 bytes.
-
+Contains two elements:
+* Specifies the size of the data segment in bytes. Since the header size is fixed to 8 bytes, 
+  the start and end position of each segment (i.e, header, data, index) is specified. 
+  Therefore, the theoretical maximum size of the data segment 
+  is 2^64 bytes = 18,446 peta bytes or 4600e+15 tokens or 4.6 quintillion tokens, given that a token has 4 bytes.
+* The size of a each represented single token in the data segment in bytes. 
+  This values is inferred from the source data of this `.pbin` 
+  and depends solely on the tokenizer's vocabulary used for encoding. 
+  A 4-byte integer is used for this.
+Therefore the header is always 8+4=12 bytes long.
 
 Data segment:
 =============
