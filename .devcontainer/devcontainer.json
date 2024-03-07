@@ -1,0 +1,23 @@
+{
+    "name": "DGX3 Dev Container",
+    "dockerFile": "Dockerfile",
+    "runArgs": [
+        "--network",
+        "host",
+        "--gpus",
+        "all"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.shell.linux": "/bin/bash"
+            },
+            "mounts": [
+                "source=/home/fhgiais/.bashrc,target=/root/.bashrc,type=bind"
+            ],
+            "extensions": [
+                "ms-python.python"
+            ]
+        }
+    }
+}
