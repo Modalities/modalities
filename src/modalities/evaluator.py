@@ -45,11 +45,11 @@ class Evaluator:
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
+
+        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+
         for data_loader in data_loaders:
-            if torch.cuda.is_available():
-                cummulated_loss = torch.zeros(3).to(torch.device(self.local_rank))
-            else:
-                cummulated_loss = torch.zeros(3).to("cpu")
+            cumulated_loss = torch.zeros(3).to(device)
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -66,13 +66,13 @@ class Evaluator:
                         loss_fun=loss_fun,
                     )
 
-                    cummulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cummulated_loss[1] += len(batch)
-                    batch_length_tensor = torch.tensor(len(batch)).to(torch.device(self.local_rank))
+                    cumulated_loss[0] += batch_loss.item()  # sum up batch loss
+                    cumulated_loss[1] += len(batch)
+                    batch_length_tensor = torch.tensor(len(batch)).to(device)
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
                     local_dataset_sample_id = Evaluator._get_local_sample_id(
-                        batch_id=batch_id, batch_size=data_loader.sampler_batch_size
+                        batch_id=batch_id, batch_size=data_loader.batch_size
                     )
 
                     global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
@@ -85,22 +85,20 @@ class Evaluator:
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
             total_loss = Reducer.reduce(
-                tensor=cummulated_loss,
+                tensor=cumulated_loss,
                 operation=dist.ReduceOp.SUM,
                 post_processing_fun=lambda t: t[0] / t[1],
             )
 
-            foward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(
-                torch.device(self.local_rank)
-            )
+            forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
             thoughput_aggregator.add_value(
-                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=foward_backward_time
+                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
             )
             synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-            synced_foward_backward_time = thoughput_aggregator.get_all_reduced_value(
+            synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
                 ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
             )
-            num_samples_per_second = synced_num_samples / synced_foward_backward_time
+            num_samples_per_second = synced_num_samples / synced_forward_backward_time
 
             evaluation_result = EvaluationResultBatch(
                 losses={loss_fun.tag: total_loss},
