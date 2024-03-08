@@ -10,7 +10,10 @@ class AttentionPooling(nn.Module):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
         self.attn = MultiheadAttention(
-            n_embd, n_head, attention_config=attention_config, attention_type=AttentionType.CROSS_ATTENTION
+            n_embd=n_embd,
+            n_head=n_head,
+            attention_config=attention_config,
+            attention_type=AttentionType.CROSS_ATTENTION,
         )
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
