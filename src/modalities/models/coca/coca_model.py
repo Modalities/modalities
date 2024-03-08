@@ -96,7 +96,6 @@ class CoCa(NNModel):
             **shared_decoder_kwargs,
         )
 
-        # TODO Validate if weight tying is useful for coca
         self.text_decoder.transformer.wte.weight = (
             self.multimodal_decoder.lm_head.weight
         )  # https://paperswithcode.com/method/weight-tying
