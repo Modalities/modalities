@@ -40,7 +40,14 @@ class ImagePatchEmbedding(nn.Module):
         self.conv = nn.Conv2d(
             in_channels=n_img_channels, out_channels=n_embd, kernel_size=patch_size, stride=patch_stride
         )
+
+        # Define a rearrangement operation to reshape the tensor from
+        # batched 4D format (batch_size, channels, height, width) to
+        # batched 3D format (batch_size, height*width, channels).
+        # This is required to support torch.compile.
+        # See https://github.com/arogozhnikov/einops/wiki/Using-torch.compile-with-einops
         self.rearrange = Rearrange("b c h w -> b (h w) c")
+
         self.cls_token = None
         if add_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, n_embd))
