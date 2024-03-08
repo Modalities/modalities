@@ -1,11 +1,15 @@
 import numpy as np
 
-from modalities.dataloader.dataset import DummyDataset
+from modalities.dataloader.dataset import DummyDataset, DummySampleConfig, DummySampleDataType
 
 
 def test_dummy_dataset():
     dataset = DummyDataset(
-        num_samples=50, sample_definition=[("input_ids", (512,), "int"), ("images", (3, 224, 224), "float")]
+        num_samples=50,
+        sample_definition=[
+            DummySampleConfig(sample_key="input_ids", sample_shape=(512,), sample_type=DummySampleDataType.INT),
+            DummySampleConfig(sample_key="images", sample_shape=(3, 224, 224), sample_type=DummySampleDataType.FLOAT),
+        ],
     )
     assert len(dataset) == 50
     sample = next(iter(dataset))
