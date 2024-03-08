@@ -89,6 +89,15 @@ class VisionTransformerBlock(nn.Module):
 
 
 class VisionTransformer(nn.Module):
+    """ViT
+
+    The Vision Transformer (ViT) is a pure transformer architecture
+    that applies attention mechanisms directly to sequences of image patches for image classification tasks.
+
+    Paper: `An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale`
+    Link: https://arxiv.org/abs/2010.11929
+    """
+
     def __init__(
         self,
         sample_key: str,
