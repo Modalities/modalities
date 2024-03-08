@@ -104,8 +104,8 @@ class VisionTransformer(nn.Module):
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         self.block_size = self._calcualte_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
 
-        self.embd = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
-        self.pos_embd = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)
+        self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
+        self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)
         self.dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList(
             [
@@ -127,8 +127,8 @@ class VisionTransformer(nn.Module):
             self.head = nn.Linear(in_features=n_embd, out_features=n_classes, bias=bias)
 
     def forward_embeddings(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.embd(x)
-        x = self.dropout(x + self.pos_embd.weight)
+        x = self.embedding_fn(x)
+        x = self.dropout(x + self.positional_embedding_fn.weight)
         for block in self.blocks:
             x = block(x)
         return x
@@ -137,7 +137,7 @@ class VisionTransformer(nn.Module):
         x = inputs[self.sample_key]
         x = self.forward_embeddings(x)
         if self.head:
-            if self.embd.cls_token is not None:
+            if self.embedding_fn.cls_token is not None:
                 x = x[:, 0]
             else:
                 x = x.mean(dim=1)
