@@ -60,12 +60,12 @@ class TextDecoder(NNModel):
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
         device = input_ids.device
-        b, t = input_ids.size()
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
-        pos = torch.arange(0, t + 1, dtype=torch.long, device=device)
+        B, T = input_ids.size()
+        assert T <= self.block_size, f"Cannot forward sequence of length {T}, block size is only {self.block_size}"
+        pos = torch.arange(0, T + 1, dtype=torch.long, device=device)
 
         tok_emb = self.transformer.wte(input_ids)
-        tok_emb = torch.cat([tok_emb, self.cls_token.repeat(b, 1, 1)], dim=1)
+        tok_emb = torch.cat([tok_emb, self.cls_token.repeat(B, 1, 1)], dim=1)
         pos_emb = self.transformer.wpe(pos)
         x = self.transformer.drop(tok_emb + pos_emb)
         for block in self.transformer.h:
