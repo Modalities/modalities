@@ -135,7 +135,7 @@ class VisionTransformer(nn.Module):
             self.norm = nn.LayerNorm(n_embd)
             self.head = nn.Linear(in_features=n_embd, out_features=n_classes, bias=bias)
 
-    def forward_embeddings(self, x: torch.Tensor) -> torch.Tensor:
+    def forward_images(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding_fn(x)
         x = self.dropout(x + self.positional_embedding_fn.weight)
         for block in self.blocks:
@@ -144,7 +144,7 @@ class VisionTransformer(nn.Module):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = inputs[self.sample_key]
-        x = self.forward_embeddings(x)
+        x = self.forward_images(x)
         if self.head:
             if self.embedding_fn.cls_token is not None:
                 x = x[:, 0]
