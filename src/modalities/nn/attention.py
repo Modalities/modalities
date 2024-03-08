@@ -61,7 +61,7 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, x: Tensor, context: Optional[Tensor] = None) -> Tensor:
         context = context if self.use_cross_attention else x
-        B, T, C = x.shape
+        B, T, C = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
         q, k, v = self._forward_input_projection(x, context=context)
         if self.use_flash:
             y = F.scaled_dot_product_attention(
@@ -79,8 +79,10 @@ class MultiHeadAttention(nn.Module):
         return y
 
     def _forward_input_projection(self, x: Tensor, context: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        B, T, C = x.shape
-        _, Tc, Cc = context.shape
+        B, T, C = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
+        _, Tc, Cc = context.shape  # batch size, context length, context embedding dimensionality
+        # Note that the context length (Tc), sequence length (T) and embedding dimensionalities (C and Cc)
+        # are the same for self-attention and can only differ for cross-attention
         q = self.wq(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         k = self.wk(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         v = self.wv(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
