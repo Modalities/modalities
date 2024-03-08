@@ -37,14 +37,16 @@ class ImagePatchEmbedding(nn.Module):
         add_cls_token: bool = True,
     ) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(n_img_channels, n_embd, kernel_size=patch_size, stride=patch_stride)
+        self.conv = nn.Conv2d(
+            in_channels=n_img_channels, out_channels=n_embd, kernel_size=patch_size, stride=patch_stride
+        )
         self.rearrange = Rearrange("b c h w -> b (h w) c")
         self.cls_token = None
         if add_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, n_embd))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, *_ = x.shape
+        B = x.shape[0]
         x = self.conv(x)
         x = self.rearrange(x)
         if self.cls_token is not None:
