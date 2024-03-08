@@ -9,6 +9,8 @@ vision_encoder_config:
   img_size: 224
   n_classes: Null # Disable vision transformer head
   n_layer: 6
+  attention_config:
+    attention_engine_type: pytorch_flash_attention
   n_head: 8
   n_embd: 768
   dropout: 0.0
@@ -23,21 +25,20 @@ text_decoder_config:
   block_size: 1024
   vocab_size: 50304
   n_layer: 12
+  attention_config:
+    attention_engine_type: pytorch_flash_attention
   n_head: 12
   ffn_hidden: 2048
   n_embd: 768
   dropout: 0.0
   bias: true
-  attention:
-    attention_type: pytorch_flash_attention
-    scaling_factor: 3
   activation: fused_swiglu
   epsilon: 1e-5
-  weight_init:
-    mean: 0.0
-    std: 0.02
 n_pool_head: 8
 n_vision_queries: 256
 bias_attn_pool: False
 epsilon_attn_pool: 1e-5
 n_shared_layer: 6
+weight_init:
+  mean: 0.0
+  std: 0.02

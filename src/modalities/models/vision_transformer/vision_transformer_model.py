@@ -6,7 +6,7 @@ from einops.layers.torch import Rearrange
 from pydantic import BaseModel, Field
 from torch import nn
 
-from modalities.nn.attention import Attention
+from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAttention
 from modalities.nn.mlp import MLP
 
 
@@ -16,6 +16,7 @@ class VisionTransformerConfig(BaseModel):
     img_size: Annotated[Union[Tuple[int, int], int], Field(ge=1)] = 224
     n_classes: Optional[Annotated[int, Field(ge=1)]] = 1000
     n_layer: Annotated[int, Field(ge=1)] = 12
+    attention_config: AttentionConfig = None
     n_head: Annotated[int, Field(ge=1)] = 8
     n_embd: Annotated[int, Field(ge=1)] = 768
     dropout: Annotated[float, Field(ge=0.0)] = 0.0
@@ -53,11 +54,22 @@ class ImagePatchEmbedding(nn.Module):
 
 class VisionTransformerBlock(nn.Module):
     def __init__(
-        self, n_embd: int = 768, n_head: int = 8, ffn_hidden: int = 3072, bias: bool = True, dropout: float = 0.0
+        self,
+        attention_config: AttentionConfig = None,
+        n_embd: int = 768,
+        n_head: int = 8,
+        ffn_hidden: int = 3072,
+        bias: bool = True,
+        dropout: float = 0.0,
     ) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(n_embd)
-        self.attention = Attention(n_embd, n_head)
+        self.attention = MultiheadAttention(
+            n_embd=n_embd,
+            n_head=n_head,
+            attention_config=attention_config,
+            attention_type=AttentionType.NON_CAUSAL_ATTENTION,
+        )
         self.norm2 = nn.LayerNorm(n_embd)
         self.mlp = MLP(in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
 
@@ -75,6 +87,7 @@ class VisionTransformer(nn.Module):
         img_size: Union[Tuple[int, int], int] = 224,
         n_classes: int = 1000,
         n_layer: int = 12,
+        attention_config: AttentionConfig = None,
         n_head: int = 8,
         n_embd: int = 768,
         ffn_hidden: int = 3072,
@@ -96,7 +109,14 @@ class VisionTransformer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList(
             [
-                VisionTransformerBlock(n_embd=n_embd, n_head=n_head, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+                VisionTransformerBlock(
+                    attention_config=attention_config,
+                    n_embd=n_embd,
+                    n_head=n_head,
+                    ffn_hidden=ffn_hidden,
+                    bias=bias,
+                    dropout=dropout,
+                )
                 for _ in range(n_layer)
             ]
         )

@@ -5,9 +5,10 @@ import torch
 import xformers.ops as xops
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, LayerNorm, TransformerMLP
+from modalities.models.gpt2.gpt2_model import ActivationType, LayerNorm
 from modalities.models.model import NNModel
-from modalities.nn.attention import Attention
+from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAttention
+from modalities.nn.mlp import MLP
 
 
 class MultiModalBlock(nn.Module):
@@ -20,30 +21,45 @@ class MultiModalBlock(nn.Module):
         n_head: int,
         dropout: float,
         ffn_hidden: int,
+        attention_config: AttentionConfig = None,
+        attention_type: AttentionType = AttentionType.NON_CAUSAL_ATTENTION,
+        with_context: bool = True,
     ):
         super().__init__()
+        self.with_context = with_context
 
         if activation == ActivationType.GELU:
-            mlp = partial(TransformerMLP, n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+            mlp = partial(MLP, in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
         elif activation == ActivationType.FUSED_SWIGLU:
             mlp = partial(xops.SwiGLU, in_features=n_embd, hidden_features=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError(f"activation type {activation} not implemented")
 
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.self_attn = Attention(n_embd, n_head, bias, is_causal=True)
+        self.attn = MultiheadAttention(
+            n_embd=n_embd, n_head=n_head, bias=bias, attention_config=attention_config, attention_type=attention_type
+        )
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.mlp_1 = mlp()
-        self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.cross_attn = Attention(n_embd, n_head, bias, use_cross_attention=True)
-        self.ln_4 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.mlp_2 = mlp()
+        self.mlp = mlp()
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        x = x + self.self_attn(self.ln_1(x))
-        x = x + self.mlp_1(self.ln_2(x))
-        x = x + self.cross_attn(self.ln_3(x), context=context)
-        x = x + self.mlp_2(self.ln_4(x))
+        if self.with_context:
+            self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.cross_attn = MultiheadAttention(
+                n_embd=n_embd,
+                n_head=n_head,
+                bias=bias,
+                attention_config=attention_config,
+                attention_type=AttentionType.CROSS_ATTENTION,
+            )
+            self.ln_4 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.mlp_2 = mlp()
+
+    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
+        x = x + self.attn(self.ln_1(x))
+        x = x + self.mlp(self.ln_2(x))
+        if self.with_context:
+            x = x + self.cross_attn(self.ln_3(x), context=context)
+            x = x + self.mlp_2(self.ln_4(x))
         return x
 
 
@@ -60,6 +76,7 @@ class MultiModalDecoder(NNModel):
         ffn_hidden: int,
         dropout: float,
         bias: bool,
+        attention_config: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
     ):
@@ -77,6 +94,7 @@ class MultiModalDecoder(NNModel):
                             bias=bias,
                             epsilon=epsilon,
                             activation=activation,
+                            attention_config=attention_config,
                             n_head=n_head,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,

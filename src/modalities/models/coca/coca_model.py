@@ -9,25 +9,43 @@ from torch import nn
 
 from modalities.models.coca.multi_modal_decoder import MultiModalDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.gpt2.gpt2_model import GPT2Config, WeightInitailizationConfig
+from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Config, WeightInitailizationConfig
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
+from modalities.nn.attention import AttentionConfig
 from modalities.nn.attention_pooling import AttentionPooling
+
+
+class TextDecoderConfig(BaseModel):
+    sample_key: str
+    prediction_key: str
+    block_size: Annotated[int, Field(ge=1)]
+    vocab_size: Annotated[int, Field(ge=1)]
+    n_layer: Annotated[int, Field(ge=1)]
+    n_head: Annotated[int, Field(ge=1)]
+    n_embd: Annotated[int, Field(ge=1)]
+    ffn_hidden: Annotated[int, Field(ge=1)]
+    dropout: Annotated[float, Field(ge=0.0)]
+    bias: bool
+    attention_config: AttentionConfig
+    activation: ActivationType
+    epsilon: Annotated[float, Field(ge=0.0)]
 
 
 class CoCaConfig(BaseModel):
     prediction_key: str = "logits"
     vision_embd_prediction_key: str  # same key as vision encoder
-    text_embd_prediction_key: str  # same key as text encoder
+    text_embd_prediction_key: str
     vision_cls_prediction_key: str
     text_cls_prediction_key: str
     vision_encoder_config: VisionTransformerConfig
-    text_decoder_config: GPT2Config
+    text_decoder_config: TextDecoderConfig
     n_pool_head: Annotated[int, Field(ge=1)]
     n_vision_queries: Annotated[int, Field(ge=1)]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
     n_shared_layer: Annotated[int, Field(ge=1)]
+    weight_init: WeightInitailizationConfig
 
 
 class CoCa(NNModel):
@@ -47,6 +65,7 @@ class CoCa(NNModel):
         vision_encoder_config: VisionTransformerConfig,
         text_decoder_config: GPT2Config,
         n_shared_layer: int,
+        weight_init: WeightInitailizationConfig,
     ) -> None:
         super().__init__()
         self.prediction_key = prediction_key
@@ -61,7 +80,6 @@ class CoCa(NNModel):
         del shared_decoder_kwargs["prediction_key"]
         del shared_decoder_kwargs["block_size"]
         del shared_decoder_kwargs["n_layer"]
-        del shared_decoder_kwargs["weight_init"]
 
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
@@ -90,10 +108,10 @@ class CoCa(NNModel):
             n_head=n_pool_head,
             bias=bias_attn_pool,
             epsilon=epsilon_attn_pool,
+            attention_config=text_decoder_config.attention_config,
         )
 
         # init all weights
-        weight_init = text_decoder_config.weight_init
         self.apply(partial(self._init_weights, weight_init=weight_init))
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
