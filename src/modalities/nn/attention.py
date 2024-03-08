@@ -1,32 +1,50 @@
 import math
+from enum import Enum
 from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from pydantic import BaseModel
 from torch import Tensor, nn
 
 
-class Attention(nn.Module):
+class AttentionEngineType(str, Enum):
+    DEFAULT_ATTENTION = "default_attention"
+    PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
+
+
+class AttentionType(str, Enum):
+    CAUSAL_ATTENTION = "causal_attention"
+    NON_CAUSAL_ATTENTION = "non_causal_attention"
+    CROSS_ATTENTION = "cross_attention"
+
+
+class AttentionConfig(BaseModel):
+    attention_engine_type: AttentionEngineType
+
+
+class MultiheadAttention(nn.Module):
     def __init__(
         self,
+        attention_config: AttentionConfig = None,
+        attention_type: AttentionType = AttentionType.CAUSAL_ATTENTION,
         n_embd: int = 768,
         n_head: int = 8,
         bias: bool = True,
         dropout: float = 0.0,
         block_size: int = 1024,
-        use_flash: bool = False,
-        is_causal: bool = False,
-        use_cross_attention: bool = False,
     ):
         super().__init__()
         if n_embd % n_head != 0:
             raise ValueError("n_embd needs to be divisible by n_head")
+        if attention_config is None:
+            attention_config = AttentionConfig(attention_engine_type=AttentionEngineType.DEFAULT_ATTENTION)
         self.n_head = n_head
         self.n_embd = n_embd
         self.dropout = dropout
-        self.use_flash = use_flash
-        self.is_causal = is_causal
-        self.use_cross_attention = use_cross_attention
+        self.use_flash = attention_config.attention_engine_type == AttentionEngineType.PYTORCH_FLASH_ATTENTION
+        self.is_causal = attention_type == AttentionType.CAUSAL_ATTENTION
+        self.use_cross_attention = attention_type == AttentionType.CROSS_ATTENTION
 
         self.wq = nn.Linear(in_features=n_embd, out_features=n_embd, bias=bias)
         self.wk = nn.Linear(in_features=n_embd, out_features=n_embd, bias=bias)
