@@ -73,27 +73,37 @@ class CoCa(NNModel):
         self.text_cls_prediction_key = text_cls_prediction_key
         self.vision_embd_prediction_key = vision_embd_prediction_key
         self.text_embd_prediction_key = text_embd_prediction_key
+
         self.vision_encoder = VisionTransformer(**dict(vision_encoder_config))
-
-        shared_decoder_kwargs = dict(text_decoder_config)
-        del shared_decoder_kwargs["sample_key"]
-        del shared_decoder_kwargs["prediction_key"]
-        del shared_decoder_kwargs["block_size"]
-        del shared_decoder_kwargs["n_layer"]
-
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
             prediction_key=text_embd_prediction_key,
             block_size=text_decoder_config.block_size + 1,  # +1 for the class token
             n_layer=text_decoder_config.n_layer - n_shared_layer,
-            **shared_decoder_kwargs,
+            vocab_size=text_decoder_config.vocab_size,
+            n_head=text_decoder_config.n_head,
+            n_embd=text_decoder_config.n_embd,
+            ffn_hidden=text_decoder_config.ffn_hidden,
+            dropout=text_decoder_config.dropout,
+            bias=text_decoder_config.bias,
+            attention_config=text_decoder_config.attention_config,
+            activation=text_decoder_config.activation,
+            epsilon=text_decoder_config.epsilon,
         )
         self.multimodal_decoder = MultiModalDecoder(
             sample_key=text_embd_prediction_key,
             prediction_key=text_decoder_config.prediction_key,
             block_size=text_decoder_config.block_size,
             n_layer=n_shared_layer,
-            **shared_decoder_kwargs,
+            vocab_size=text_decoder_config.vocab_size,
+            n_head=text_decoder_config.n_head,
+            n_embd=text_decoder_config.n_embd,
+            ffn_hidden=text_decoder_config.ffn_hidden,
+            dropout=text_decoder_config.dropout,
+            bias=text_decoder_config.bias,
+            attention_config=text_decoder_config.attention_config,
+            activation=text_decoder_config.activation,
+            epsilon=text_decoder_config.epsilon,
         )
 
         self.text_decoder.transformer.wte.weight = (
