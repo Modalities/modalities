@@ -142,7 +142,7 @@ class CoCa(NNModel):
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(queries, context=vision_embd)
-        vision_cls_token, vision_embd = vision_embd[:, :1, :], vision_embd[:, 1:, :]
+        vision_embd, vision_cls_token = vision_embd[:, :-1, :], vision_embd[:, -1:, :]
         return vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
