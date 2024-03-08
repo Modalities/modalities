@@ -6,7 +6,7 @@ from einops.layers.torch import Rearrange
 from pydantic import BaseModel, Field
 from torch import nn
 
-from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAttention
+from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 from modalities.nn.mlp import MLP
 
 
@@ -64,7 +64,7 @@ class VisionTransformerBlock(nn.Module):
     ) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(n_embd)
-        self.attention = MultiheadAttention(
+        self.attention = MultiHeadAttention(
             n_embd=n_embd,
             n_head=n_head,
             attention_config=attention_config,

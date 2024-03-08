@@ -23,7 +23,7 @@ class AttentionConfig(BaseModel):
     attention_engine_type: AttentionEngineType
 
 
-class MultiheadAttention(nn.Module):
+class MultiHeadAttention(nn.Module):
     def __init__(
         self,
         attention_config: AttentionConfig = None,

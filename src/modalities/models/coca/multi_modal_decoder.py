@@ -7,7 +7,7 @@ from torch import nn
 
 from modalities.models.gpt2.gpt2_model import ActivationType, LayerNorm
 from modalities.models.model import NNModel
-from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAttention
+from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 from modalities.nn.mlp import MLP
 
 
@@ -36,7 +36,7 @@ class MultiModalBlock(nn.Module):
             raise NotImplementedError(f"activation type {activation} not implemented")
 
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = MultiheadAttention(
+        self.attn = MultiHeadAttention(
             n_embd=n_embd, n_head=n_head, bias=bias, attention_config=attention_config, attention_type=attention_type
         )
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
@@ -44,7 +44,7 @@ class MultiModalBlock(nn.Module):
 
         if self.with_context:
             self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-            self.cross_attn = MultiheadAttention(
+            self.cross_attn = MultiHeadAttention(
                 n_embd=n_embd,
                 n_head=n_head,
                 bias=bias,

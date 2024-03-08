@@ -2,14 +2,14 @@ import torch
 from torch import nn
 
 from modalities.models.gpt2.gpt2_model import LayerNorm
-from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAttention
+from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 
 
 class AttentionPooling(nn.Module):
     def __init__(self, n_embd: int, n_head: int, bias: bool, epsilon: float, attention_config: AttentionConfig = None):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.attn = MultiheadAttention(
+        self.attn = MultiHeadAttention(
             n_embd=n_embd,
             n_head=n_head,
             attention_config=attention_config,
