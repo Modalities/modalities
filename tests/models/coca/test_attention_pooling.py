@@ -1,6 +1,6 @@
 import torch
 
-from modalities.nn.attention_pooling import AttentionPooling
+from modalities.models.coca.attention_pooling import AttentionPooling
 
 
 def test_attention_pooling_forward():

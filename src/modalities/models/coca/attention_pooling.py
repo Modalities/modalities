@@ -6,7 +6,7 @@ from modalities.nn.attention import AttentionConfig, AttentionType, MultiheadAtt
 
 
 class AttentionPooling(nn.Module):
-    def __init__(self, n_embd: int, n_head: int, bias: bool, epsilon: float, attention_config: AttentionConfig):
+    def __init__(self, n_embd: int, n_head: int, bias: bool, epsilon: float, attention_config: AttentionConfig = None):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
         self.attn = MultiheadAttention(

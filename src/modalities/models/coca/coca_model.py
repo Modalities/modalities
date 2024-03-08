@@ -7,13 +7,13 @@ from einops import repeat
 from pydantic import BaseModel, Field
 from torch import nn
 
+from modalities.models.coca.attention_pooling import AttentionPooling
 from modalities.models.coca.multi_modal_decoder import MultiModalDecoder
 from modalities.models.coca.text_decoder import TextDecoder
 from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Config, WeightInitailizationConfig
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
-from modalities.nn.attention_pooling import AttentionPooling
 
 
 class TextDecoderConfig(BaseModel):
