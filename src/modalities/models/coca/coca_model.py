@@ -49,7 +49,14 @@ class CoCaConfig(BaseModel):
 
 
 class CoCa(NNModel):
-    """Contrastive Captioner"""
+    """CoCa
+
+    The Contrastive Captioner (CoCa) is an encoder-decoder model that integrates the concepts of CLIP
+    and generative models such as SimVLM by using contrastive and captioning losses for training.
+
+    Paper: `CoCa: Contrastive Captioners are Image-Text Foundation Models`
+    Link: https://arxiv.org/abs/2205.01917
+    """
 
     def __init__(
         self,
