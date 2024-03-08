@@ -23,12 +23,12 @@ data:
         config:
           num_samples: 4
           sample_definition:
-            - - images
-              - [3, 224, 224]
-              - float
-            - - input_ids
-              - [1024]
-              - int
+            - sample_key: images
+              sample_shape: [3, 224, 224]
+              sample_type: float
+            - sample_key: input_ids
+              sample_shape: [1024]
+              sample_type: int
       batch_sampler:
         type_hint: BatchSampler
         config:
@@ -61,12 +61,12 @@ data:
           config:
             num_samples: 4
             sample_definition:
-              - - images
-                - [3, 224, 224]
-                - float
-              - - input_ids
-                - [1024]
-                - int
+              - sample_key: images
+                sample_shape: [3, 224, 224]
+                sample_type: float
+              - sample_key: input_ids
+                sample_shape: [1024]
+                sample_type: int
         batch_sampler:
           type_hint: BatchSampler
           config:

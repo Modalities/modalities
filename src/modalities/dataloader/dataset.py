@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import pickle
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
+from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
@@ -25,8 +27,24 @@ class Dataset(TorchdataSet):
             raise IndexError
 
 
+class DummySampleDataType(str, Enum):
+    FLOAT = "float"
+    INT = "int"
+
+
+class DummySampleConfig(BaseModel):
+    sample_key: str
+    sample_shape: Tuple[int, ...]
+    sample_type: DummySampleDataType
+
+
+class DummyDatasetConfig(BaseModel):
+    num_samples: int
+    sample_definition: List[DummySampleConfig]
+
+
 class DummyDataset(Dataset):
-    def __init__(self, num_samples: int, sample_definition: List[Tuple[str, Tuple, str]]):
+    def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
         """
         :param num_samples: Number of samples the dataset should generate.
         :param sample_definition: A list of tuples defining the dataset output.
@@ -44,14 +62,14 @@ class DummyDataset(Dataset):
 
     def _create_random_sample(self):
         sample = dict()
-        for sample_key, sample_shape, sample_type in self.sample_definition:
-            if sample_type == "float":
-                data = np.random.randn(*sample_shape)
-            elif sample_type == "int":
-                data = np.random.randint(low=0, high=512, size=sample_shape)
+        for s in self.sample_definition:
+            if s.sample_type == DummySampleDataType.FLOAT:
+                data = np.random.randn(*s.sample_shape)
+            elif s.sample_type == DummySampleDataType.INT:
+                data = np.random.randint(low=0, high=512, size=s.sample_shape)
             else:
-                raise NotImplementedError(f"DummyDataset does not support type {sample_type}")
-            sample[sample_key] = data
+                raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
+            sample[s.sample_key] = data
         return sample
 
 

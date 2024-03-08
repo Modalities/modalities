@@ -2,7 +2,7 @@ import json
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
 from transformers import PretrainedConfig
@@ -22,6 +22,7 @@ from modalities.config.lookup_types import (
     TokenizerTypes,
 )
 from modalities.config.types import ProcessGroupBackendType
+from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.models.coca.coca_model import CoCaConfig
 from modalities.models.gpt2.gpt2_model import GPT2Config
 from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModelConfig
@@ -54,10 +55,6 @@ class TokenizerConfig(BaseModel):
 
 
 class DatasetConfig(BaseModel):
-    class DummyDatasetConfig(BaseModel):
-        num_samples: int
-        sample_definition: List[Tuple[str, Tuple, str]]
-
     class MemMapDatasetConfig(BaseModel):
         raw_data_path: FilePath
         index_path: Optional[FilePath] = None
