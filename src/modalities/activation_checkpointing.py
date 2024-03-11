@@ -8,11 +8,11 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
 
-from modalities.models.gpt2.gpt2_model import Block
+from modalities.models.gpt2.gpt2_model import GPT2Block
 
 
 def is_module_to_apply_activation_checkpointing(submodule: torch.nn.Module) -> bool:
-    return isinstance(submodule, Block)
+    return isinstance(submodule, GPT2Block)
 
 
 def apply_activation_checkpointing_inplace(model: torch.nn.Module):

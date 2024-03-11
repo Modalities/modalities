@@ -1,42 +1,32 @@
 #!/usr/bin/env python
 
 import logging
+import os
+import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import click
 import click_pathlib
-import torch
-import torch.nn as nn
-from omegaconf import OmegaConf
-from torch.optim import Optimizer
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
-from modalities.checkpointing.checkpointing import Checkpointing, CheckpointingIF
-from modalities.checkpointing.checkpointing_factory import CheckpointingFactory
-from modalities.config.config import AppConfig, ModalitiesSetupConfig, RunMode
-from modalities.config.lookup_types import TokenizerTypes
+from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import PackedDataGenerator
-from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.dataloader.dataloader_factory import DataloaderFactory
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
-    DummyProgressSubscriber,
-    RichProgressSubscriber,
-)
-from modalities.logging_broker.subscriber_impl.results_subscriber import WandBEvaluationResultSubscriber
-from modalities.loss_functions import Loss
-from modalities.resolver_register import ResolverRegister
-from modalities.running_env.fsdp.fsdp_running_env import RunningEnv
+from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
+from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters, get_date_of_run
+from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
 from modalities.utils.generate_text import main as generate_text_main
 
 
@@ -54,8 +44,7 @@ def main() -> None:
 )
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    config = AppConfig.model_validate(config_dict)
-    main = Main(config)
+    main = Main(config_dict, config_file_path)
     main.run()
 
 
@@ -83,7 +72,15 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
     generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
 
 
-@main.command(name="create_memmap_index")
+@main.group(name="data")
+def data():
+    """
+    Collection of utilities to preprocess, analyse and modify training data.
+    """
+    pass
+
+
+@data.command(name="create_raw_index")
 @click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
@@ -91,7 +88,13 @@ def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_create_memmap_index(src_path, index_path):
+def entry_point_data_create_raw_index(src_path, index_path):
+    """
+    Utility for indexing a large jsonl-file's content.
+    Background is the ability to further process the respective file without loading it,
+    while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
+    It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
+    """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
@@ -102,7 +105,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     generator.create_index(index_path)
 
 
-@main.command(name="create_packed_data")
+@data.command(name="pack_encoded_data")
 @click.argument("src_path", type=Path)
 @click.option(
     "--dst_path",
@@ -137,7 +140,21 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=".text",
     help="jq pattern to extract the data from the json line.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
+@click.option(
+    "--num-cpus",
+    type=int,
+    show_default=True,
+    default=os.cpu_count(),
+    help="Specify the number of tokenization workers. Default is the number of available CPUs.",
+)
+def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus):
+    """
+    Utility to encode an indexed, large jsonl-file.
+
+    (see also `create_index` for more information)
+    Returns .pbin-file, which can be inserted into a training process directly
+    and does not require its original jsonl-file or the respective index file anymore.
+    """
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
     #  This is based on its connection to the overall `AppConfig`.
@@ -145,205 +162,139 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
+    generator = PackedDataGenerator(
+        src_path,
+        index_path=index_path,
+        tokenizer=tokenizer,
+        jq_pattern=jq_pattern,
+        number_of_processes=num_cpus,
+    )
     generator.run(dst_path)
 
 
-def load_app_config_dict(config_file_path: Path) -> Dict:
-    cfg = OmegaConf.load(config_file_path)
-    logging.info(f"Config\n {OmegaConf.to_yaml(cfg, resolve=True)}")
-    return OmegaConf.to_container(cfg, resolve=True)
+@data.command(name="merge_packed_data")
+@click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
+@click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
+def entry_point_merge_packed_data(src_paths, target_path):
+    """
+    Utility for merging different pbin-files into one.
+    This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
+    that the overall process was done in chunks.
+    It is important that the same tokenizer got used for all chunks.
+
+    Specify an arbitrary amount of pbin-files and/or directory containing such as input.
+    """
+    input_files = []
+    for p in src_paths:
+        p: Path
+        if p.is_dir():
+            input_files.extend(p.glob("**/*.pbin"))
+        else:
+            input_files.append(p)
+    embedded_datasets = list(map(EmbeddedStreamData, input_files))
+    join_embedded_stream_data(embedded_datasets, target_path)
 
 
 class Main:
-    def __init__(self, config: AppConfig) -> None:
-        self.config = config
-        self.experiment_id = get_date_of_run()
+    def __init__(self, config_dict: Dict, config_path: Path) -> None:
+        self.config_dict = config_dict
+        self.config_path = config_path
 
-        self.resolvers = ResolverRegister(config=config)
-        self.running_env: RunningEnv = self.resolvers.build_component_by_config(config=self.config.running_env)
+        self.registry = Registry(COMPONENTS)
+        self.component_factory = ComponentFactory(registry=self.registry)
+
+    def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
+        self.registry.add_entity(
+            component_key=component_key,
+            variant_key=variant_key,
+            component_type=custom_component,
+            component_config_type=custom_config,
+        )
 
     def run(self):
-        with self.running_env as running_env:
-            (
-                gym,
-                train_dataloader,
-                eval_data_loaders,
-                checkpointing,
-                wrapped_model,
-                optimizer,
-            ) = self.construct_components(resolvers=self.resolvers, config=self.config, running_env=running_env)
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            components: ComponentsModel = self.component_factory.build_components(
+                config_dict=self.config_dict, components_model_type=ComponentsModel
+            )
 
+            # save the config file to the checkpointing path
+            if components.settings.cuda_env.global_rank == 0:
+                experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+                os.makedirs(experiment_path, exist_ok=True)
+                shutil.copy(self.config_path, experiment_path / self.config_path.name)
+
+            evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+                progress_subscriber=components.batch_progress_subscriber,
+                results_subscriber=components.evaluation_subscriber,
+                global_rank=components.settings.cuda_env.global_rank,
+                local_rank=components.settings.cuda_env.local_rank,
+            )
+
+            # Trainer
+            trainer = Trainer(
+                local_rank=components.settings.cuda_env.local_rank,
+                batch_progress_publisher=batch_processed_publisher,
+                evaluation_result_publisher=evaluation_result_publisher,
+                gradient_acc_steps=components.settings.training.gradient_acc_steps,
+            )
+
+            # Evaluator
+            evaluator = Evaluator(
+                local_rank=components.settings.cuda_env.local_rank,
+                batch_progress_publisher=batch_processed_publisher,
+                evaluation_result_publisher=evaluation_result_publisher,
+            )
+
+            # Gym
+            gym = Gym(
+                trainer=trainer,
+                evaluator=evaluator,
+                loss_fun=components.loss_fn,
+                num_ranks=components.settings.cuda_env.world_size,
+            )
+            wrapped_model = components.wrapped_model
             logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
+            if components.settings.training.do_apply_activation_checkpointing:
+                apply_activation_checkpointing_inplace(wrapped_model)
+
+            callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
+                callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
+                local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
+                gradient_acc_steps=components.settings.training.gradient_acc_steps,
+                world_size=components.settings.cuda_env.world_size,
+            )
+
             gym.run(
-                callback_interval_in_batches=self.config.training.callback_interval_in_batches_per_rank,
-                train_data_loader=train_dataloader,
-                evaluation_data_loaders=eval_data_loaders,
-                checkpointing=checkpointing,
+                callback_interval_in_batches=callback_interval_in_batches_per_rank,
+                train_data_loader=components.train_dataloader,
+                evaluation_data_loaders=components.eval_dataloaders,
+                checkpointing=components.checkpointing,
                 model=wrapped_model,
-                optimizer=optimizer,
+                optimizer=components.optimizer,
             )
-
-    def construct_components(
-        self, resolvers: ResolverRegister, config: AppConfig, running_env: RunningEnv
-    ) -> Tuple[Gym, LLMDataLoader, List[LLMDataLoader], CheckpointingIF, nn.Module, Optimizer]:
-        # Checkpointing
-
-        checkpointing = CheckpointingFactory.get_checkpointing(
-            resolvers=self.resolvers,
-            config=config.checkpointing,
-            running_env=running_env,
-            experiment_id=self.experiment_id,
-            num_ranks=config.training.world_size,
-        )
-
-        # Model and optimizer
-        wrapped_model, optimizer = self.get_model_and_optimizer(
-            config=config, running_env=running_env, checkpointing=checkpointing
-        )
-        if config.training.do_apply_activation_checkpointing:
-            apply_activation_checkpointing_inplace(wrapped_model)
-            logging.info("Applied activation checkpointing!")
-
-        # Loss function
-        loss_fun: Loss = resolvers.build_component_by_config(config=config.loss)
-
-        # Dataloaders
-        # skip_num_samples = 0
-        # if run_mode == RunMode.WARM_START:
-        #     skip_num_samples = config.modalities_setup.settings.checkpoint_num_seen_samples
-
-        skip_num_local_train_batches = config.training.skip_num_local_train_batches
-        train_dataloader = DataloaderFactory.get_dataloader(
-            resolvers=resolvers, config=config.data.train_dataloader, skip_num_batches=skip_num_local_train_batches
-        )
-        eval_dataloaders = [
-            DataloaderFactory.get_dataloader(resolvers=resolvers, config=dataloader_config)
-            for dataloader_config in config.data.eval_dataloaders
-        ]
-
-        # Logging
-        eval_split_lengths = {
-            dataloader.dataloader_tag: len(dataloader) * config.training.world_size * dataloader.sampler_batch_size
-            for dataloader in eval_dataloaders
-        }
-
-        # TODO: check why not *config.training.world_size
-        #  and consider just using config.training.num_training_samples for progress Subscriber
-        train_split_lengths = {
-            train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
-            * config.training.world_size
-            * train_dataloader.sampler_batch_size
-        }
-
-        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-            config=config, train_split_lengths=train_split_lengths, eval_split_lengths=eval_split_lengths
-        )
-
-        # Trainer
-        trainer = Trainer(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-            gradient_acc_step=config.training.gradient_acc_step,
-        )
-
-        # Evaluator
-        evaluator = Evaluator(
-            local_rank=config.training.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-        )
-
-        # Gym
-        gym = Gym(trainer=trainer, evaluator=evaluator, loss_fun=loss_fun, num_ranks=config.training.world_size)
-
-        return gym, train_dataloader, eval_dataloaders, checkpointing, wrapped_model, optimizer
-
-    def get_model_and_optimizer(
-        self, config: AppConfig, running_env: RunningEnv, checkpointing: Checkpointing
-    ) -> Tuple[nn.Module, Optimizer]:
-        run_mode = config.modalities_setup.run_mode
-
-        model: torch.nn.Module = self.resolvers.build_component_by_config(config=config.model)
-
-        if run_mode == RunMode.WARM_START:
-            warm_start_settings: ModalitiesSetupConfig.WarmStartSettings = config.modalities_setup.settings
-            wrapped_model = checkpointing.load_model_checkpoint(
-                file_path=warm_start_settings.checkpoint_model_path,
-                model=model,
-            )
-
-            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-            )
-
-            # TODO improve this
-            if warm_start_settings.checkpoint_optimizer_path is None:
-                raise (
-                    NotImplementedError(
-                        "So far we always have to provide an optimizer checkpoint. "
-                        "For fine-tuning a pre-trained, we might not want to load "
-                        "an optimizer checkpoint."
-                    )
-                )
-
-            optimizer = checkpointing.load_optimizer_checkpoint(
-                optimizer=optimizer, model=wrapped_model, file_path=warm_start_settings.checkpoint_optimizer_path
-            )
-
-        else:
-            wrapped_model = running_env.wrap_model(model=model, sync_module_states=False)
-            optimizer: torch.optim.Optimizer = self.resolvers.build_component_by_config(
-                config=config.optimizer, extra_kwargs=dict(params=wrapped_model.parameters())
-            )
-
-        # TODO implement scheduler
-        # scheduler = self.resolvers.build_component_by_config(
-        #     config=config.scheduler, extra_kwargs=dict(optimizer=self.optimizer)
-        # )
-
-        return wrapped_model, optimizer
+            print("done")
 
     def get_logging_publishers(
-        self, config: AppConfig, train_split_lengths: Dict[str, int], eval_split_lengths: Dict[str, int]
+        self,
+        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
+        results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
+        global_rank: int,
+        local_rank: int,
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
-        # Message Broker
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
+            global_rank=global_rank,
+            local_rank=local_rank,
         )
         evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
             message_broker=message_broker,
-            global_rank=config.training.global_rank,
-            local_rank=config.training.local_rank,
+            global_rank=global_rank,
+            local_rank=local_rank,
         )
 
-        # TODO make logging rank configurable
-        # TODO: make this instantiation of subscribers configurable via config.yml and use "build_component_by_config"
-        if config.training.global_rank == 0:
-            progress_subscriber = RichProgressSubscriber(
-                num_ranks=config.training.world_size,
-                train_split_num_samples=train_split_lengths,
-                eval_splits_num_samples=eval_split_lengths,
-            )
-            evaluation_result_subscriber = WandBEvaluationResultSubscriber(
-                num_ranks=config.training.world_size,
-                project=config.wandb.project_name,
-                experiment_id=self.experiment_id,
-                mode=config.wandb.mode,
-                dir=config.wandb.dir,
-                experiment_config=config,
-            )
-            message_broker.add_subscriber(
-                subscription=MessageTypes.EVALUATION_RESULT, subscriber=evaluation_result_subscriber
-            )
-
-        else:
-            progress_subscriber = DummyProgressSubscriber()
+        message_broker.add_subscriber(subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber)
         message_broker.add_subscriber(
             subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
             subscriber=progress_subscriber,
