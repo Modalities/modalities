@@ -100,14 +100,22 @@ class CausalSelfAttention(nn.Module):
             ' For more details, read about "Grouped Query Attention"'
         )
 
-        _joint_projection_factor = (
-            3  # the projection matrices for query, key & values are concatenated to a single matrix
-        )
+        self.n_rep = n_head_q // n_head_kv
 
-        # key, query, value projections for all heads, but in a batch
-        self.c_attn = nn.Linear(
+        # query, key, value projections (separate)
+        self.q_attn = nn.Linear(
             in_features=n_embd,
-            out_features=_joint_projection_factor * n_embd,
+            out_features=n_embd,
+            bias=bias,
+        )
+        self.k_attn = nn.Linear(
+            in_features=n_embd,
+            out_features=n_embd // self.n_rep,
+            bias=bias,
+        )
+        self.v_attn = nn.Linear(
+            in_features=n_embd,
+            out_features=n_embd // self.n_rep,
             bias=bias,
         )
 
@@ -136,17 +144,20 @@ class CausalSelfAttention(nn.Module):
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, C = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
+        B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
-        q = q.view(B, T, self.n_head_q, C // self.n_head_q).transpose(1, 2)  # (B, nh_q, T, hs)
-        k = k.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh_kv, T, hs)
-        v = v.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh_kv, T, hs)
+        q = self.q_attn(x)  # (B, T, n_embd)
+        k = self.k_attn(x)  # (B, T, n_embd / n_rep)
+        v = self.v_attn(x)  # (B, T, n_embd / n_rep)
 
-        # repeat k/v heads if n_kv_heads < n_heads
-        k = repeat_kv(k, self.n_head_q // self.n_head_kv)  # (B, nh_q, T, hs)
-        v = repeat_kv(v, self.n_head_q // self.n_head_kv)  # (B, nh_q, T, hs)
+        q = q.view(B, T, self.n_head_q, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_q, T, hs)
+        k = k.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_kv, T, hs)
+        v = v.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_kv, T, hs)
+
+        # repeat k/v heads if self.n_rep > 1
+        k = repeat_kv(k, self.n_rep)  # (B, nh_q, T, hs)
+        v = repeat_kv(v, self.n_rep)  # (B, nh_q, T, hs)
 
         # causal self-attention; Self-attend: (B, nh_q, T, hs) x (B, nh_q, hs, T) -> (B, nh_q, T, T)
         if self.flash:
@@ -166,7 +177,7 @@ class CausalSelfAttention(nn.Module):
             att = F.softmax(att, dim=-1)
             att = self.attn_dropout(att)
             y = att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hs) -> (B, nh_q, T, hs)
-        y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+        y = y.transpose(1, 2).contiguous().view(B, T, self.n_embd)  # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
