@@ -24,12 +24,6 @@ class ActivationType(str, Enum):
     FUSED_SWIGLU = "fused_swiglu"
 
 
-class AttentionConfig(BaseModel):
-    attention_type: AttentionType
-    # TODO: Is this parameter really necessary? Or can it be always 3?
-    scaling_factor: Annotated[int, Field(strict=True, ge=1)]
-
-
 class WeightInitailizationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
     std: Annotated[float, Field(strict=True, ge=0.0)]
@@ -50,7 +44,7 @@ class GPT2LLMConfig(BaseModel):
 
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention: AttentionConfig
+    attention_type: AttentionType
     activation: ActivationType
     epsilon: Annotated[float, Field(strict=True, ge=0.0)]
     weight_init: WeightInitailizationConfig
@@ -91,7 +85,7 @@ class CausalSelfAttention(nn.Module):
         n_head_q: int,
         n_head_kv: int,
         n_embd: int,
-        attention: AttentionConfig,
+        attention_type: AttentionType,
         bias: bool,
         dropout: float,
         block_size: int,
@@ -105,10 +99,15 @@ class CausalSelfAttention(nn.Module):
             "It is necessary to have `n_head_q` divisible by `n_head_kv`."
             ' For more details, read about "Grouped Query Attention"'
         )
+
+        _joint_projection_factor = (
+            3  # the projection matrices for query, key & values are concatenated to a single matrix
+        )
+
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
             in_features=n_embd,
-            out_features=attention.scaling_factor * n_embd,
+            out_features=_joint_projection_factor * n_embd,
             bias=bias,
         )
 
@@ -127,7 +126,7 @@ class CausalSelfAttention(nn.Module):
 
         self.n_embd = n_embd
         self.dropout = dropout
-        self.flash = attention.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
+        self.flash = attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -203,7 +202,7 @@ class GPT2Block(nn.Module):
         activation: ActivationType,
         n_head_q: int,
         n_head_kv: int,
-        attention: AttentionConfig,
+        attention_type: AttentionType,
         dropout: float,
         block_size: int,
         ffn_hidden: int,
@@ -214,7 +213,7 @@ class GPT2Block(nn.Module):
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
             n_embd=n_embd,
-            attention=attention,
+            attention_type=attention_type,
             bias=bias,
             dropout=dropout,
             block_size=block_size,
@@ -249,7 +248,7 @@ class GPT2LLM(NNModel):
         ffn_hidden: int,
         dropout: float,
         bias: bool,
-        attention: AttentionConfig,
+        attention_type: AttentionType,
         activation: ActivationType,
         epsilon: float,
         weight_init: WeightInitailizationConfig,
@@ -276,7 +275,7 @@ class GPT2LLM(NNModel):
                             activation=activation,
                             n_head_q=n_head_q,
                             n_head_kv=n_head_kv,
-                            attention=attention,
+                            attention_type=attention_type,
                             dropout=dropout,
                             block_size=block_size,
                             ffn_hidden=ffn_hidden,
