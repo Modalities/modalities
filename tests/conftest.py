@@ -2,6 +2,7 @@ import dataclasses
 import os
 import pickle
 from pathlib import Path
+from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,9 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
-from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.checkpointing import CheckpointingIF
-from modalities.config.config import AppConfig
+from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -30,10 +30,11 @@ _ROOT_DIR = Path(__file__).parents[1]
 def dummy_packed_data_path(tmpdir) -> Path:
     data = b""
     header_size_in_bytes = 8
-    int_size_in_bytes = 4
+    token_size_in_bytes = 4
     tokens = list(range(20))
-    data += (len(tokens) * int_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="big")
-    data += b"".join([t.to_bytes(int_size_in_bytes, byteorder="big") for t in tokens])
+    data += (len(tokens) * token_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="big")
+    data += token_size_in_bytes.to_bytes(4, byteorder="big")
+    data += b"".join([t.to_bytes(token_size_in_bytes, byteorder="big") for t in tokens])
     index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
     dummy_packed_data_path = Path(tmpdir, "dummy.pbin")
@@ -42,14 +43,13 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 
 @pytest.fixture
-def dummy_config(monkeypatch) -> AppConfig:
+def dummy_config(monkeypatch) -> Dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
     dummy_config_path = _ROOT_DIR / Path("config_files/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    app_config = AppConfig.model_validate(config_dict)
-    return app_config
+    return config_dict, dummy_config_path
 
 
 @dataclasses.dataclass
@@ -77,7 +77,7 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
 
 @pytest.fixture
 def gpt2_tokenizer() -> GPT2TokenizerFast:
-    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer.json")
+    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer_gpt2.json")
     assert default_gpt2_tokenizer_path.is_file()
     return GPT2TokenizerFast(tokenizer_file=str(default_gpt2_tokenizer_path))
 
@@ -123,7 +123,7 @@ def trainer(progress_publisher_mock):
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
-        gradient_acc_step=1,
+        gradient_acc_steps=1,
     )
 
 

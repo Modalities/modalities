@@ -10,15 +10,16 @@ import sys
 from pathlib import Path
 
 import torch
-from omegaconf import OmegaConf
 from torch.nn import functional as F
 from transformers import PreTrainedTokenizer
 
-from modalities.config.config import AppConfig
-from modalities.resolver_register import ResolverRegister
+from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import ComponentsInferenceModel, load_app_config_dict
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 
 chat_prefix = """
-This is a converstation between a user and a helpful bot, which answers the user's questsions as good as possible.
+This is a conversation between a user and a helpful bot, which answers the user's questions as good as possible.
 
 user: What is 1+1?
 bot: 1+1 is 2.
@@ -95,11 +96,15 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
     state_dict = torch.load(path)
     print(f"using {model_path}")
 
-    config_dict = OmegaConf.load(config_path)
-    config_dict = OmegaConf.to_container(config_dict, resolve=True)
-    config = AppConfig.model_validate(config_dict)
-    resolvers = ResolverRegister(config=config)
-    model: torch.nn.Module = resolvers.build_component_by_config(config=config.model)
+    config_dict = load_app_config_dict(config_path)
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
+    components = component_factory.build_components(
+        config_dict=config_dict, components_model_type=ComponentsInferenceModel
+    )
+
+    model = components.wrapped_model
+
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -109,11 +114,11 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, config.model.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, config.model.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
         except KeyboardInterrupt:
             print("closing app...")
             break

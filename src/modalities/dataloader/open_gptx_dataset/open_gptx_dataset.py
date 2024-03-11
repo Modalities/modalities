@@ -417,23 +417,3 @@ class OpenGPTXMMapDataset(Dataset):
 
         # Sample is of length sequence_len + 1 because target toke is part of the sample
         return {self.sample_key: np.array(sample, dtype=np.int64)}
-
-
-class OpenGPTXMMapDatasetFactory:
-    @staticmethod
-    def create_dataset(num_samples: int, path: FilePath, sample_key: str, sequence_len: int) -> OpenGPTXMMapDataset:
-        # dataset_dir = path.parents[0]
-        # dataset_filename_prefix = path.stem
-        # text_dataset = make_dataset(path=dataset_dir.joinpath(dataset_filename_prefix))
-
-        # instances = OpenGPTXDataset(
-        #     sample_key=sample_key,
-        #     text_dataset=text_dataset,
-        #     doc_idx=np.arange(0, len(text_dataset)),
-        #     dataset_dir=dataset_dir,
-        #     num_samples=num_samples,
-        #     dataset_name=dataset_filename_prefix,
-        #     sequence_len=sequence_len,
-        # )
-        # return instances
-        pass

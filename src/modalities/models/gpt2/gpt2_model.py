@@ -1,12 +1,12 @@
 import math
 from enum import Enum
 from functools import partial
-from typing import Dict
+from typing import Annotated, Dict
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, confloat, conint, model_validator
+from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
 from modalities.models.model import NNModel
@@ -26,33 +26,36 @@ class ActivationType(str, Enum):
 
 class AttentionConfig(BaseModel):
     attention_type: AttentionType
-    scaling_factor: conint(ge=1)
+    scaling_factor: Annotated[int, Field(strict=True, ge=1)]
 
 
 class WeightInitailizationConfig(BaseModel):
-    mean: confloat(ge=0.0)
-    std: confloat(ge=0.0)
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)]
 
 
-class GPT2Config(BaseModel):
+class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
-    block_size: conint(ge=1)
-    vocab_size: conint(ge=1)  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: conint(ge=1)
-    n_head_q: conint(ge=1)
-    n_head_kv: conint(ge=1)
-    n_embd: conint(ge=1)
-    ffn_hidden: conint(ge=1)
-    dropout: confloat(ge=0.0)
+    block_size: Annotated[int, Field(strict=True, ge=1)]
+    vocab_size: Annotated[
+        int, Field(strict=True, ge=1)
+    ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: Annotated[int, Field(strict=True, ge=1)]
+    n_head_q: Annotated[int, Field(strict=True, ge=1)]
+    n_head_kv: Annotated[int, Field(strict=True, ge=1)]
+    n_embd: Annotated[int, Field(strict=True, ge=1)]
+    ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
+
+    dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention: AttentionConfig
     activation: ActivationType
-    epsilon: confloat(ge=0.0)
+    epsilon: Annotated[float, Field(strict=True, ge=0.0)]
     weight_init: WeightInitailizationConfig
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "GPT2Config":
+    def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
             [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):
@@ -83,7 +86,14 @@ class LayerNorm(nn.Module):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self, n_head_q: int, n_head_kv: int, n_embd: int, attention: AttentionConfig, bias: bool, dropout: float, block_size: int
+        self,
+        n_head_q: int,
+        n_head_kv: int,
+        n_embd: int,
+        attention: AttentionConfig,
+        bias: bool,
+        dropout: float,
+        block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0
@@ -176,7 +186,7 @@ class TransformerMLP(nn.Module):
         return x
 
 
-class Block(nn.Module):
+class GPT2Block(nn.Module):
     def __init__(
         self,
         n_embd: int,
@@ -193,7 +203,13 @@ class Block(nn.Module):
         super().__init__()
         self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
         self.attn = CausalSelfAttention(
-            n_head_q=n_head_q, n_head_kv=n_head_kv, n_embd=n_embd, attention=attention, bias=bias, dropout=dropout, block_size=block_size
+            n_head_q=n_head_q,
+            n_head_kv=n_head_kv,
+            n_embd=n_embd,
+            attention=attention,
+            bias=bias,
+            dropout=dropout,
+            block_size=block_size,
         )
         self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
 
@@ -245,7 +261,7 @@ class GPT2LLM(NNModel):
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
-                        Block(
+                        GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
                             epsilon=epsilon,

@@ -1,14 +1,42 @@
 import time
+import warnings
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Callable, Dict, Generic, TypeVar
+from typing import Callable, Dict, Generic, Type, TypeVar
 
 import torch
 import torch.distributed as dist
+from pydantic import ValidationError
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
+
+
+def get_callback_interval_in_batches_per_rank(
+    callback_interval_in_samples: int, local_train_micro_batch_size: int, world_size: int, gradient_acc_steps: int
+):
+    num_local_train_micro_batches_exact = callback_interval_in_samples / local_train_micro_batch_size / world_size
+    num_local_train_micro_batches_ret = max(
+        callback_interval_in_samples // local_train_micro_batch_size // world_size, 1
+    )
+    if num_local_train_micro_batches_exact != num_local_train_micro_batches_ret:
+        warnings.warn(
+            f"Calculated callback_interval_in_batches_per_rank is not an integer."
+            f"Clipping {num_local_train_micro_batches_exact} to {num_local_train_micro_batches_ret} "
+        )
+    assert (
+        num_local_train_micro_batches_ret % gradient_acc_steps == 0
+    ), "callback_interval_in_batches_per_rank must be divisible by gradient_acc_steps"
+    return num_local_train_micro_batches_ret
+
+
+def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+    try:
+        val = enum_type[name]
+        return val
+    except KeyError:
+        raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 
 def get_date_of_run():
