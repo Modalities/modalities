@@ -140,11 +140,15 @@ class CausalSelfAttention(nn.Module):
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
-        k = k.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head_q, C // self.n_head_q).transpose(1, 2)  # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh, T, hs)
+        q = q.view(B, T, self.n_head_q, C // self.n_head_q).transpose(1, 2)  # (B, nh_q, T, hs)
+        k = k.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh_kv, T, hs)
+        v = v.view(B, T, self.n_head_kv, C // self.n_head_kv).transpose(1, 2)  # (B, nh_kv, T, hs)
 
-        # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+        # repeat k/v heads if n_kv_heads < n_heads
+        k = repeat_kv(k, self.n_head_q // self.n_head_kv)  # (B, nh_q, T, hs)
+        v = repeat_kv(v, self.n_head_q // self.n_head_kv)  # (B, nh_q, T, hs)
+
+        # causal self-attention; Self-attend: (B, nh_q, T, hs) x (B, nh_q, hs, T) -> (B, nh_q, T, T)
         if self.flash:
             # efficient attention using Flash Attention CUDA kernels
             y = torch.nn.functional.scaled_dot_product_attention(
@@ -161,7 +165,7 @@ class CausalSelfAttention(nn.Module):
             att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
             att = F.softmax(att, dim=-1)
             att = self.attn_dropout(att)
-            y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+            y = att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hs) -> (B, nh_q, T, hs)
         y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
 
         # output projection
@@ -327,3 +331,15 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+    """
+    Source code adopted from
+      https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
+    Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
+    """
+    B, nh_kv, T, hs = x.shape
+    if n_rep == 1:
+        return x
+    return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)
