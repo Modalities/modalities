@@ -15,7 +15,7 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import PackedDataGenerator
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
@@ -76,7 +76,15 @@ def entry_point_generate_text(model_path, config_file_path, tokenizer_type, toke
     generate_text_main(model_path, config_file_path, tokenizer, max_new_tokens, chat)
 
 
-@main.command(name="create_memmap_index")
+@main.group(name="data")
+def data():
+    """
+    Collection of utilities to preprocess, analyse and modify training data.
+    """
+    pass
+
+
+@data.command(name="create_raw_index")
 @click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
@@ -84,7 +92,13 @@ def entry_point_generate_text(model_path, config_file_path, tokenizer_type, toke
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_create_memmap_index(src_path, index_path):
+def entry_point_data_create_raw_index(src_path, index_path):
+    """
+    Utility for indexing a large jsonl-file's content.
+    Background is the ability to further process the respective file without loading it,
+    while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
+    It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
+    """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
@@ -95,7 +109,7 @@ def entry_point_create_memmap_index(src_path, index_path):
     generator.create_index(index_path)
 
 
-@main.command(name="create_packed_data")
+@data.command(name="pack_encoded_data")
 @click.argument("src_path", type=Path)
 @click.option(
     "--dst_path",
@@ -130,7 +144,21 @@ def entry_point_create_memmap_index(src_path, index_path):
     default=".text",
     help="jq pattern to extract the data from the json line.",
 )
-def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern):
+@click.option(
+    "--num-cpus",
+    type=int,
+    show_default=True,
+    default=os.cpu_count(),
+    help="Specify the number of tokenization workers. Default is the number of available CPUs.",
+)
+def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus):
+    """
+    Utility to encode an indexed, large jsonl-file.
+
+    (see also `create_index` for more information)
+    Returns .pbin-file, which can be inserted into a training process directly
+    and does not require its original jsonl-file or the respective index file anymore.
+    """
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
     #  This is based on its connection to the overall `AppConfig`.
@@ -138,11 +166,16 @@ def entry_point_create_packed_data(src_path, dst_path, index_path, tokenizer_typ
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generator = PackedDataGenerator(src_path, index_path=index_path, tokenizer=tokenizer, jq_pattern=jq_pattern)
+    generator = PackedDataGenerator(
+        src_path,
+        index_path=index_path,
+        tokenizer=tokenizer,
+        jq_pattern=jq_pattern,
+        number_of_processes=num_cpus,
+    )
     generator.run(dst_path)
 
 
-# FIXME
 @main.command(name="convert_pytorch_to_hf_checkpoint")
 @click.option(
     "--checkpoint_dir",
@@ -175,6 +208,29 @@ def entry_point_convert_pytorch_to_hf_checkpoint(
 ):
     cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
     cp.convert_pytorch_to_hf_checkpoint()
+
+
+@data.command(name="merge_packed_data")
+@click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
+@click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
+def entry_point_merge_packed_data(src_paths, target_path):
+    """
+    Utility for merging different pbin-files into one.
+    This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
+    that the overall process was done in chunks.
+    It is important that the same tokenizer got used for all chunks.
+
+    Specify an arbitrary amount of pbin-files and/or directory containing such as input.
+    """
+    input_files = []
+    for p in src_paths:
+        p: Path
+        if p.is_dir():
+            input_files.extend(p.glob("**/*.pbin"))
+        else:
+            input_files.append(p)
+    embedded_datasets = list(map(EmbeddedStreamData, input_files))
+    join_embedded_stream_data(embedded_datasets, target_path)
 
 
 class Main:
