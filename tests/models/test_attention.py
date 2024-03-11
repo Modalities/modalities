@@ -7,11 +7,16 @@ from modalities.models.gpt2.gpt2_model import AttentionType, CausalSelfAttention
 @pytest.mark.parametrize(
     "n_head_q, n_head_kv, n_embd, attention_type, successful",
     [
-        # TODO: Flash Atttention
-        #        (4, 4, 32, AttentionType.DEFAULT_ATTENTION, True),
+        # Flash Attention
+        (4, 4, 32, AttentionType.PYTORCH_FLASH_ATTENTION, True),
+        (8, 2, 32, AttentionType.PYTORCH_FLASH_ATTENTION, True),
+        (9, 8, 32, AttentionType.PYTORCH_FLASH_ATTENTION, False),
+        (8, 3, 32, AttentionType.PYTORCH_FLASH_ATTENTION, False),
+        # Default Attention
+        (4, 4, 32, AttentionType.DEFAULT_ATTENTION, True),
         (8, 2, 32, AttentionType.DEFAULT_ATTENTION, True),
-        #        (9, 8, 32, AttentionType.DEFAULT_ATTENTION, False),
-        #        (8, 3, 32, AttentionType.DEFAULT_ATTENTION, False),
+        (9, 8, 32, AttentionType.DEFAULT_ATTENTION, False),
+        (8, 3, 32, AttentionType.DEFAULT_ATTENTION, False),
     ],
 )
 def test_grouped_query_attention_forward(n_head_q, n_head_kv, n_embd, attention_type, successful):
