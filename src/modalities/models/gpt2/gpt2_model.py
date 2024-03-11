@@ -26,6 +26,7 @@ class ActivationType(str, Enum):
 
 class AttentionConfig(BaseModel):
     attention_type: AttentionType
+    # TODO: Is this parameter really necessary? Or can it be always 3?
     scaling_factor: Annotated[int, Field(strict=True, ge=1)]
 
 
