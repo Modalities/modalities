@@ -1,10 +1,7 @@
 import pickle
-import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
-
-import numpy as np
 
 
 class BaseReader(ABC):
@@ -17,7 +14,6 @@ class BaseReader(ABC):
         raise NotImplementedError
 
 
-# TODO: benchmark tokenized version vs plain text version (regarding speed and storage consumption)
 class LargeFileLinesReader(BaseReader):
     def __init__(self, raw_data_path: Path, index_path: Path = None):
         """
@@ -33,7 +29,7 @@ class LargeFileLinesReader(BaseReader):
         if not self.raw_data_path.is_file():
             raise FileNotFoundError("Raw data file does not exist")
         if not self.index_path.is_file():
-            raise FileNotFoundError("Index file does not exist. Use `modalities create_memmap_index` to create one.")
+            raise FileNotFoundError("Index file does not exist. Use `modalities data create_raw_index` to create one.")
 
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
@@ -56,21 +52,6 @@ class LargeFileLinesReader(BaseReader):
         return self.__read_from_raw_file(offset, sample_length_in_bytes)
 
     def __read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
-        def safe_decoder(byte_char):
-            try:
-                # TODO: verify why iso-8859-1 was necessary here in the path.
-                #   Maybe there was an issue with the actual loading of the jsonl-files
-                c = byte_char.decode("utf8")
-            except Exception as exception:
-                c = ""
-                warnings.warn(f'Encountered invalid char: "{byte_char}".')
-                warnings.warn(f"Encountered problem: {exception}")
-            return c
-
-        string = (
-            np.memmap(self.raw_data_path, mode="r", offset=offset, shape=(sample_length_in_bytes,)).view("S1").tolist()
-        )
-        decoded_string = []
-        for c in string:
-            decoded_string.append(safe_decoder(c))
-        return "".join(decoded_string)
+        f = self.raw_data_path.open()
+        f.seek(offset)
+        return f.read(sample_length_in_bytes)

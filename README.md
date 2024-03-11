@@ -4,7 +4,7 @@
 
 # Getting started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
-Also, see our WIki and API reference documentation: https://modalities.github.io/modalities/
+Also, see our Wiki and API reference documentation: https://modalities.github.io/modalities/
 
 # Installation
 
@@ -20,7 +20,7 @@ then, install the repository via
 pip install -e . 
 ```
 
-If you want to contribute, have look at `CONTRIBUTING.md`.
+If you want to contribute, have a look at `CONTRIBUTING.md`.
 
 
 
@@ -57,7 +57,7 @@ Or, if you are a VsCode user, add this to your `launch.json`:
 
 # Pydantic and ClassResolver
 
-The mechanismn introduced to instantiate classes via `type_hint` in the `config.yaml`, utilizes 
+The mechanism introduced to instantiate classes via `type_hint` in the `config.yaml`, utilizes 
 1) Omegaconf to load the config yaml file
 2) Pydantic for the validation of the config
 3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
@@ -117,7 +117,7 @@ class SchedulerConfig(BaseModel):
     config: StepLRConfig | ConstantLRConfig
 ```
 
-To allow a user-friendly instantiation, all class resolvers are defined in the `ResolverRegistry` and `build_component_by_config` as convenience function is introduced. Dependecies can be passed-through with the `extra_kwargs` argument:
+To allow a user-friendly instantiation, all class resolvers are defined in the `ResolverRegistry` and `build_component_by_config` as convenience function is introduced. Dependencies can be passed-through with the `extra_kwargs` argument:
 ```python
 resolvers = ResolverRegister(config=config)
 optimizer = ...  # our example dependency
@@ -189,20 +189,20 @@ Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_p
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
 ```sh
-modalities create_memmap_index <path/to/jsonl/file>
+modalities data create_raw_index <path/to/jsonl/file>
 ```
 
-The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_memmap_index --help`.
+The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities data create_raw_index --help`.
 
 ## Packed Dataset Generator
 
 The `PackedMemMapDatasetContinuous` and `PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a `MemMapDataset` index file as described [above](#memmapdataset-index-generator). Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
 ```sh
-modalities create_packed_data <path/to/jsonl/file>
+modalities data pack_encoded_data <path/to/jsonl/file>
 ```
 
-The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_packed_data --help`.
+The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities data pack_encoded_data --help`.
 
 ### Packed Data Format
 
