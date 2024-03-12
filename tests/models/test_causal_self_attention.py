@@ -4,6 +4,22 @@ import torch
 from modalities.models.gpt2.gpt2_model import AttentionType, CausalSelfAttention
 
 
+def _get_random_input_seq(embedding_shape):
+    return torch.rand(size=embedding_shape, dtype=torch.float32)
+
+
+def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, attention_type, block_size):
+    return CausalSelfAttention(
+        n_head_q=n_head_q,
+        n_head_kv=n_head_kv,
+        n_embd=n_embd,
+        attention_type=attention_type,
+        bias=False,
+        dropout=0.0,
+        block_size=block_size,
+    )
+
+
 @pytest.mark.parametrize(
     "n_head_q, n_head_kv, n_embd, attention_type, successful",
     [
@@ -23,24 +39,20 @@ def test_forward_pass_success(n_head_q, n_head_kv, n_embd, attention_type, succe
     batch_size = 2
     block_size = 10
     embedding_shape = (batch_size, block_size, n_embd)
-    embedded_input_seq = torch.rand(size=embedding_shape, dtype=torch.float32)
 
-    def forward_pass(n_head_q, n_head_kv, n_embd, attention_type, block_size, embedded_input_seq):
-        attention_layer = CausalSelfAttention(
-            n_head_q=n_head_q,
-            n_head_kv=n_head_kv,
-            n_embd=n_embd,
-            attention_type=attention_type,
-            bias=False,
-            dropout=0.0,
-            block_size=block_size,
-        )
-        output_tensor: torch.Tensor = attention_layer(embedded_input_seq)
-        return output_tensor
+    attention_layer_args = {
+        "n_head_q": n_head_q,
+        "n_head_kv": n_head_kv,
+        "n_embd": n_embd,
+        "attention_type": attention_type,
+        "block_size": block_size,
+    }
 
     if not successful:
         with pytest.raises(Exception):
-            forward_pass(n_head_q, n_head_kv, n_embd, attention_type, block_size, embedded_input_seq)
+            _get_random_attention_layer(**attention_layer_args)
     else:
-        output_tensor = forward_pass(n_head_q, n_head_kv, n_embd, attention_type, block_size, embedded_input_seq)
+        attention_layer = _get_random_attention_layer(**attention_layer_args)
+        embedded_input_seq = _get_random_input_seq(embedding_shape)
+        output_tensor = attention_layer(embedded_input_seq)
         assert output_tensor.shape == embedding_shape
