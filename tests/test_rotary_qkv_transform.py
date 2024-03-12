@@ -4,7 +4,6 @@ from modalities.models.gpt2.gpt2_model import RotaryTransform
 
 
 def test_rotary_transform():
-    print("hello")
     bs = 1
     n_heads = 2
     embedding_dim = 8
@@ -12,19 +11,15 @@ def test_rotary_transform():
     head_dim = embedding_dim // n_heads
 
     q = torch.ones(bs, n_heads, seq_lenght, head_dim) + 1
-    q[head_dim // 2 :] = q[head_dim // 2 :] + 1
+    q[:, :, :, head_dim // 2 :] = q[:, :, :, head_dim // 2 :] + 1
     k = torch.ones(bs, n_heads, seq_lenght, head_dim) + 2
-    k[head_dim // 2 :] = k[head_dim // 2 :] + 1
+    k[:, :, :, head_dim // 2 :] = k[:, :, :, head_dim // 2 :] + 1
     v = torch.ones(bs, n_heads, seq_lenght, head_dim)
 
     rotary_transform = RotaryTransform(n_embd=embedding_dim, n_head=n_heads)
 
     q_rot, k_rot, v_rot = rotary_transform(q=q, k=k, v=v)
 
-    assert not torch.equal(q, q_rot)
-    assert q.shape == q_rot.shape
-    assert not torch.equal(k, k_rot)
-    assert k.shape == k_rot.shape
     assert torch.equal(v, v_rot)
     assert v.shape == v_rot.shape
 
@@ -39,6 +34,10 @@ def test_rotary_transform():
     cos_m_theta = m_theta.cos()
     sin_m_theta = m_theta.sin()
 
-    q_h_1, q_h_2 = q.chunk(2, dim=-1)
-    q_rot_h = torch.cat([-q_h_2, q_h_1], dim=-1)
-    q * cos_m_theta + q_rot_h * sin_m_theta
+    for comp, comp_rot in zip([q, k], [q_rot, k_rot]):
+        assert not torch.equal(comp, comp_rot)
+        assert comp.shape == comp_rot.shape
+        comp_h_1, comp_h_2 = comp.chunk(2, dim=-1)
+        comp_rot_h = torch.cat([-comp_h_2, comp_h_1], dim=-1)
+        comp_rot_expected = comp * cos_m_theta + comp_rot_h * sin_m_theta
+        assert torch.equal(comp_rot_expected, comp_rot)
