@@ -36,6 +36,7 @@ def test_pretrained_gpt_model(tmp_path):
     )
 
     model = GPT2LLM(**pretrained_config)
+    model.save_pretrained(tmp_path)
     model = model.eval()
 
     # register config and model
