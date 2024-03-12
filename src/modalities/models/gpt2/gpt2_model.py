@@ -49,9 +49,10 @@ class RotaryTransform(QueryKeyValueTransform):
     XFormers implementation and removed in this implementation.
     """
 
-    def __init__(self, n_embd: int, n_head: int):
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
         super().__init__()
         dim_model = n_embd // n_head
+        self.seq_length_dim = seq_length_dim
         inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
         self.register_buffer("inv_freq", inv_freq)
 
@@ -63,14 +64,14 @@ class RotaryTransform(QueryKeyValueTransform):
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
 
-    def _update_cos_sin_tables(self, x, seq_dimension=1):
-        seq_len = x.shape[seq_dimension]
+    def _update_cos_sin_tables(self, x):
+        seq_len = x.shape[self.seq_length_dim]
 
         # Reset the tables if the sequence length has changed,
         # or if we're on a new device (possibly due to tracing for instance)
         if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
             self._seq_len_cached = seq_len
-            t = torch.arange(x.shape[seq_dimension], device=x.device, dtype=torch.float32)
+            t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
 
@@ -83,15 +84,15 @@ class RotaryTransform(QueryKeyValueTransform):
         # NOTE: This could probably be moved to Triton
 
         # Handle a possible sequence length mismatch in between q and k
-        cos = cos[:, :, : x.shape[-2], :]
-        sin = sin[:, :, : x.shape[-2], :]
+        cos = cos[:, :, : x.shape[self.seq_length_dim], :]
+        sin = sin[:, :, : x.shape[self.seq_length_dim], :]
 
         return (x * cos) + (self.rotate_half(x) * sin)
 
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k, seq_dimension=-2)
+        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
         k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
 
@@ -121,6 +122,7 @@ class AttentionConfig(BaseModel):
         class RotaryTransformConfig(BaseModel):
             n_embd: Annotated[int, Field(strict=True, ge=0)]
             n_head: Annotated[int, Field(strict=True, ge=0)]
+            seq_length_dim: Annotated[int, Field(strict=True)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
