@@ -1,4 +1,3 @@
-import logging
 import math
 from enum import Enum
 from functools import partial
@@ -374,13 +373,10 @@ class GPT2LLM(NNModel):
         else:
             raise TypeError(f"{poe_type} not supported")
 
-        if poe_type is PositionTypes.ABSOLUTE and RotaryTransform in [
+        if poe_type is not PositionTypes.NOPE and RotaryTransform in [
             config.type_hint.value for config in attention.qkv_transforms
         ]:
-            logging.warning(
-                "You are using RotaryTransform together with absolute position embeddings."
-                ' It is expected to use "RotaryTransform" together with "NOPE."'
-            )
+            raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
 
         self.transformer = nn.ModuleDict(
             dict(
