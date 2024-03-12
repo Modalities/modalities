@@ -189,20 +189,20 @@ Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_p
 The `MemMapDataset` requires an index file providing the necessary pointers into the raw data file. The `MemMapDataset` can create the index file lazily, however, it is advised to create it beforehand. This can be done by running
 
 ```sh
-modalities create_memmap_index <path/to/jsonl/file>
+modalities data create_raw_index <path/to/jsonl/file>
 ```
 
-The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_memmap_index --help`.
+The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities data create_raw_index --help`.
 
 ## Packed Dataset Generator
 
 The `PackedMemMapDatasetContinuous` and `PackedMemMapDatasetMegatron` require a packed data file. To create the data file, you first have to generate a `MemMapDataset` index file as described [above](#memmapdataset-index-generator). Assuming the index and raw data are located in the same directory, you can simply execute the following command:
 
 ```sh
-modalities create_packed_data <path/to/jsonl/file>
+modalities data pack_encoded_data <path/to/jsonl/file>
 ```
 
-The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities create_packed_data --help`.
+The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via `modalities data pack_encoded_data --help`.
 
 ### Packed Data Format
 
