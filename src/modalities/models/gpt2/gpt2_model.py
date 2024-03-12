@@ -1,7 +1,6 @@
 import logging
-from enum import Enum
-
 import math
+from enum import Enum
 from functools import partial
 from typing import Annotated, Dict, List, Tuple
 
@@ -10,14 +9,13 @@ import torch.nn as nn
 import xformers.ops as xops
 from pydantic import BaseModel, Field, model_validator, validator
 from torch.nn import functional as F
-from xformers.components.positional_embedding import RotaryEmbedding
 
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name
 
-
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
 
 class PositionTypes(str, Enum):
     ABSOLUTE = "ABSOLUTE"
@@ -25,7 +23,6 @@ class PositionTypes(str, Enum):
 
 
 class QueryKeyValueTransform(nn.Module):
-
     def forward(
         self,
         q: torch.Tensor,
@@ -36,7 +33,6 @@ class QueryKeyValueTransform(nn.Module):
 
 
 class IdentityTransform(QueryKeyValueTransform):
-
     def forward(
         self,
         q: torch.Tensor,
@@ -49,21 +45,20 @@ class IdentityTransform(QueryKeyValueTransform):
 class RotaryTransform(QueryKeyValueTransform):
     """Implementation of Rotary Positioanl Embeddings
     Source: https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py
-    We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the XFormers implementation 
-    and removed in this implementatiom.
+    We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the
+    XFormers implementation and removed in this implementation.
     """
 
     def __init__(self, n_embd: int, n_head: int):
         super().__init__()
-        dim_model=n_embd/n_head
+        dim_model = n_embd // n_head
         inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
         self._cos_cached = None
         self._sin_cached = None
-    
-    
+
     def rotate_half(self, x):
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
@@ -73,15 +68,9 @@ class RotaryTransform(QueryKeyValueTransform):
 
         # Reset the tables if the sequence length has changed,
         # or if we're on a new device (possibly due to tracing for instance)
-        if (
-            seq_len != self._seq_len_cached
-            or self._cos_cached.device != x.device
-            or self._cos_cached.dtype != x.dtype
-        ):
+        if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
             self._seq_len_cached = seq_len
-            t = torch.arange(
-                x.shape[seq_dimension], device=x.device, dtype=torch.float32
-            )
+            t = torch.arange(x.shape[seq_dimension], device=x.device, dtype=torch.float32)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
 
@@ -89,7 +78,6 @@ class RotaryTransform(QueryKeyValueTransform):
             self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
 
         return self._cos_cached, self._sin_cached
-
 
     def apply_rotary_pos_emb(self, x, cos, sin):
         # NOTE: This could probably be moved to Triton
@@ -99,13 +87,16 @@ class RotaryTransform(QueryKeyValueTransform):
         sin = sin[:, :, : x.shape[-2], :]
 
         return (x * cos) + (self.rotate_half(x) * sin)
-    
-    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+
+    def forward(
+        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k, seq_dimension=-2)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
         k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
 
-        return q, k,v 
+        return q, k, v
+
 
 class QueryKeyValueTransformType(Enum):
     IdentityTransform = IdentityTransform
@@ -207,7 +198,6 @@ class CausalSelfAttention(nn.Module):
         bias: bool,
         dropout: float,
         block_size: int,
-
     ):
         super().__init__()
         assert n_embd % n_head == 0
@@ -236,9 +226,8 @@ class CausalSelfAttention(nn.Module):
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
-            transform_config.type_hint.value(
-                **convert_base_model_config_to_dict(transform_config.config)
-            ) for transform_config in attention.qkv_transforms
+            transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
+            for transform_config in attention.qkv_transforms
         )
 
         if not self.flash:
@@ -257,7 +246,7 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
 
-        #TODO: move logic into a function
+        # TODO: move logic into a function
         for qkv_transform in self.qkv_transforms:
             q, k, v = qkv_transform(q, k, v)
 
@@ -386,8 +375,10 @@ class GPT2LLM(NNModel):
         if poe_type is PositionTypes.ABSOLUTE and RotaryTransform in [
             config.type_hint.value for config in attention.qkv_transforms
         ]:
-            logging.warning("You are using RotaryTransform together with absolute position embeddings."
-                            " It is expected to use \"RotaryTransform\" together with \"NOPE.\"")
+            logging.warning(
+                "You are using RotaryTransform together with absolute position embeddings."
+                ' It is expected to use "RotaryTransform" together with "NOPE."'
+            )
 
         self.transformer = nn.ModuleDict(
             dict(
