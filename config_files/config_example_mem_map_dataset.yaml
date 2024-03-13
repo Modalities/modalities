@@ -136,6 +136,7 @@ model:
     sample_key: ${settings.referencing_keys.sample_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
     block_size: ${settings.training.sequence_length}
+    poe_type: NOPE
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
     n_head: 12
@@ -146,34 +147,16 @@ model:
     attention_config:
       attention_type: pytorch_flash_attention
       scaling_factor: 3
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model.config.n_embd}
+            n_head: ${model.config.n_head}
+            seq_length_dim: -2
     activation_type: gelu
     weight_init:
       mean: 0.0
       std: 0.02
-    # attention_norm:
-    #   component_key: layer_norm
-    #   variant_key: layer_norm
-    #   config:
-    #     normalized_shape: ${model.config.n_embd}
-    #     elementwise_affine: true
-    #     bias: true
-    #     eps: 1e-5
-    # ffn_norm:
-    #   component_key: layer_norm
-    #   variant_key: layer_norm
-    #   config:
-    #     normalized_shape: ${model.config.n_embd}
-    #     elementwise_affine: true
-    #     bias: true
-    #     eps: 1e-5
-    # lm_head_norm:
-    #   component_key: layer_norm
-    #   variant_key: layer_norm
-    #   config:
-    #     normalized_shape: ${model.config.n_embd}
-    #     elementwise_affine: true
-    #     bias: true
-    #     eps: 1e-5
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
