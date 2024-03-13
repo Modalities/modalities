@@ -158,12 +158,10 @@ class GPT2LLMConfig(BaseModel):
     bias: bool  # True: bias in Linears like GPT-2. False: a bit better and faster
     attention_config: AttentionConfig
     activation_type: ActivationType
-    weight_init: WeightInitailizationConfig
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
-
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
@@ -185,7 +183,6 @@ class CausalSelfAttention(nn.Module):
         bias: bool,
         dropout: float,
         block_size: int,
-
     ):
         super().__init__()
         assert n_embd % n_head == 0
@@ -215,7 +212,7 @@ class CausalSelfAttention(nn.Module):
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
             transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
-            for transform_config in attention.qkv_transforms
+            for transform_config in attention_config.qkv_transforms
         )
 
         if not self.flash:
@@ -268,7 +265,7 @@ class TransformerMLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=n_embd,
-            out_features=ffn_hidden,  # 4 * n_embd,
+            out_features=ffn_hidden,  # best practice: 4 * n_embd,
             bias=bias,
         )
         self.gelu = nn.GELU()
@@ -370,7 +367,7 @@ class GPT2LLM(NNModel):
             raise TypeError(f"{poe_type} not supported")
 
         if poe_type is not PositionTypes.NOPE and RotaryTransform in [
-            config.type_hint.value for config in attention.qkv_transforms
+            config.type_hint.value for config in attention_config.qkv_transforms
         ]:
             raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
 
