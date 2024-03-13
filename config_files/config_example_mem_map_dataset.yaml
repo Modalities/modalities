@@ -150,28 +150,51 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
+    # attention_norm:
+    #   component_key: layer_norm
+    #   variant_key: layer_norm
+    #   config:
+    #     normalized_shape: ${model.config.n_embd}
+    #     elementwise_affine: true
+    #     bias: true
+    #     eps: 1e-5
+    # ffn_norm:
+    #   component_key: layer_norm
+    #   variant_key: layer_norm
+    #   config:
+    #     normalized_shape: ${model.config.n_embd}
+    #     elementwise_affine: true
+    #     bias: true
+    #     eps: 1e-5
+    # lm_head_norm:
+    #   component_key: layer_norm
+    #   variant_key: layer_norm
+    #   config:
+    #     normalized_shape: ${model.config.n_embd}
+    #     elementwise_affine: true
+    #     bias: true
+    #     eps: 1e-5
     attention_norm:
       component_key: layer_norm
-      variant_key: z_layer_norm
+      variant_key: rms_norm
       config:
         ndim: ${model.config.n_embd}
         bias: true
-        eps: 1e-5
+        epsilon: 1e-5
     ffn_norm:
       component_key: layer_norm
-      variant_key: z_layer_norm
+      variant_key: rms_norm
       config:
         ndim: ${model.config.n_embd}
         bias: true
-        eps: 1e-5
+        epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
-      variant_key: z_layer_norm
+      variant_key: rms_norm
       config:
         ndim: ${model.config.n_embd}
         bias: true
-        eps: 1e-5
-
+        epsilon: 1e-5
 
 wrapped_model:
   component_key: model
