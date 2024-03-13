@@ -21,7 +21,7 @@ class RMSLayerNorm(nn.Module):
         """
         super().__init__()
         self.epsilon = epsilon
-        self.weight = nn.Parameter(torch.ones(ndim))
+        self.gain = nn.Parameter(torch.ones(ndim))
         if bias:
             self.bias_tensor = nn.Parameter(torch.zeros(ndim))
         else:
@@ -33,9 +33,9 @@ class RMSLayerNorm(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         output = self._norm(x.float()).type_as(x)
         if self.bias_tensor is None:
-            return output * self.weight
+            return output * self.gain
         else:
-            return output * self.weight + self.bias_tensor
+            return output * self.gain + self.bias_tensor
 
 
 class LayerNorms(LookupEnum):
