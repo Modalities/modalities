@@ -8,7 +8,7 @@ from modalities.config.lookup_enum import LookupEnum
 
 
 class RMSLayerNorm(nn.Module):
-    def __init__(self, ndim: int, bias: bool = True, epsilon: float = 1e-6):
+    def __init__(self, ndim: int, bias: bool = True, epsilon: float = 1e-5):
         """
         Initialize the RMSNorm normalization layer.
         Original paper: https://arxiv.org/pdf/1910.07467.pdf
