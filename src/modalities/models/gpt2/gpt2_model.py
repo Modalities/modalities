@@ -2,18 +2,107 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-from typing import Annotated, Dict
+from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, validator
 from torch.nn import functional as F
 
 from modalities.config.config import PydanticPytorchModuleType
+from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
+from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+class PositionTypes(str, Enum):
+    ABSOLUTE = "ABSOLUTE"
+    NOPE = "NOPE"
+
+
+class QueryKeyValueTransform(nn.Module):
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pass
+
+
+class IdentityTransform(QueryKeyValueTransform):
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return q, k, v
+
+
+class RotaryTransform(QueryKeyValueTransform):
+    """Implementation of Rotary Positioanl Embeddings
+    Source: https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py
+    We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the
+    XFormers implementation and removed in this implementation.
+    """
+
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
+        super().__init__()
+        dim_model = n_embd // n_head
+        self.seq_length_dim = seq_length_dim
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        self.register_buffer("inv_freq", inv_freq)
+
+        self._seq_len_cached = None
+        self._cos_cached = None
+        self._sin_cached = None
+
+    def rotate_half(self, x):
+        x1, x2 = x.chunk(2, dim=-1)
+        return torch.cat((-x2, x1), dim=-1)
+
+    def _update_cos_sin_tables(self, x):
+        seq_len = x.shape[self.seq_length_dim]
+
+        # Reset the tables if the sequence length has changed,
+        # or if we're on a new device (possibly due to tracing for instance)
+        if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
+            self._seq_len_cached = seq_len
+            t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
+            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
+
+            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
+            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
+
+        return self._cos_cached, self._sin_cached
+
+    def apply_rotary_pos_emb(self, x, cos, sin):
+        # NOTE: This could probably be moved to Triton
+
+        # Handle a possible sequence length mismatch in between q and k
+        cos = cos[:, :, : x.shape[self.seq_length_dim], :]
+        sin = sin[:, :, : x.shape[self.seq_length_dim], :]
+
+        return (x * cos) + (self.rotate_half(x) * sin)
+
+    def forward(
+        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
+        q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
+        k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
+
+        return q, k, v
+
+
+class QueryKeyValueTransformType(Enum):
+    IdentityTransform = IdentityTransform
+    RotaryTransform = RotaryTransform
 
 
 class AttentionType(str, Enum):
@@ -27,11 +116,28 @@ class ActivationType(str, Enum):
 
 
 class AttentionConfig(BaseModel):
+    class QueryKeyValueTransformConfig(BaseModel):
+        class IdentityTransformConfig(BaseModel):
+            pass
+
+        class RotaryTransformConfig(BaseModel):
+            n_embd: Annotated[int, Field(strict=True, ge=0)]
+            n_head: Annotated[int, Field(strict=True, ge=0)]
+            seq_length_dim: Annotated[int, Field(strict=True)]
+
+        @validator("type_hint", pre=True, always=True)
+        def parse_sharding_strategy_by_name(cls, name):
+            return parse_enum_by_name(name=name, enum_type=QueryKeyValueTransformType)
+
+        type_hint: QueryKeyValueTransformType
+        config: RotaryTransformConfig | IdentityTransformConfig
+
     attention_type: AttentionType
+    qkv_transforms: List[QueryKeyValueTransformConfig]
     scaling_factor: Annotated[int, Field(strict=True, ge=1)]
 
 
-class WeightInitailizationConfig(BaseModel):
+class WeightInitializationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
     std: Annotated[float, Field(strict=True, ge=0.0)]
 
@@ -39,6 +145,7 @@ class WeightInitailizationConfig(BaseModel):
 class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
+    poe_type: PositionTypes
     block_size: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
         int, Field(strict=True, ge=1)
@@ -47,7 +154,6 @@ class GPT2LLMConfig(BaseModel):
     n_head: Annotated[int, Field(strict=True, ge=1)]
     n_embd: Annotated[int, Field(strict=True, ge=1)]
     ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
-
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears like GPT-2. False: a bit better and faster
     attention_config: AttentionConfig
@@ -56,6 +162,8 @@ class GPT2LLMConfig(BaseModel):
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
+    weight_init: WeightInitializationConfig
+
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
@@ -70,14 +178,22 @@ class GPT2LLMConfig(BaseModel):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self, n_head: int, n_embd: int, attention_config: AttentionConfig, bias: bool, dropout: float, block_size: int
+        self,
+        n_head: int,
+        n_embd: int,
+        attention_config: AttentionConfig,
+        bias: bool,
+        dropout: float,
+        block_size: int,
+
     ):
         super().__init__()
         assert n_embd % n_head == 0
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(
             in_features=n_embd,
-            out_features=attention_config.scaling_factor * n_embd,
+            # 3, because we have queries, keys, and values
+            out_features=3 * n_embd,
             bias=bias,
         )
 
@@ -96,6 +212,12 @@ class CausalSelfAttention(nn.Module):
         self.dropout = dropout
         self.flash = attention_config.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
 
+        # TODO: inject QKVTransforms from outside
+        self.qkv_transforms = nn.ModuleList(
+            transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
+            for transform_config in attention.qkv_transforms
+        )
+
         if not self.flash:
             # causal mask to ensure that attention is only applied to the left in the input sequence
             self.register_buffer(
@@ -111,6 +233,10 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+
+        # TODO: move logic into a function
+        for qkv_transform in self.qkv_transforms:
+            q, k, v = qkv_transform(q, k, v)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
@@ -207,6 +333,7 @@ class GPT2LLM(NNModel):
         self,
         sample_key: str,
         prediction_key: str,
+        poe_type: PositionTypes,
         block_size: int,
         vocab_size: int,
         n_layer: int,
@@ -217,7 +344,7 @@ class GPT2LLM(NNModel):
         bias: bool,
         attention_config: AttentionConfig,
         activation_type: ActivationType,
-        weight_init: WeightInitailizationConfig,
+        weight_init: WeightInitializationConfig,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
@@ -226,14 +353,31 @@ class GPT2LLM(NNModel):
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
+        self.poe_type = poe_type
 
         assert vocab_size is not None
         assert block_size is not None
 
+        # TODO: dependency injection
+        if poe_type is PositionTypes.ABSOLUTE:
+            wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
+        elif poe_type is PositionTypes.NOPE:
+            # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
+            # https://github.com/huggingface/accelerate/issues/807
+            # wpe = nn.Embedding.from_pretrained(torch.zeros(block_size, n_embd))
+            wpe = nn.Identity()
+        else:
+            raise TypeError(f"{poe_type} not supported")
+
+        if poe_type is not PositionTypes.NOPE and RotaryTransform in [
+            config.type_hint.value for config in attention.qkv_transforms
+        ]:
+            raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
+
         self.transformer = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
-                wpe=nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd),
+                wpe=wpe,
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
@@ -269,7 +413,7 @@ class GPT2LLM(NNModel):
             if pn.endswith("c_proj.weight"):
                 torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
 
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):
+    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
             if module.bias is not None:
@@ -286,8 +430,14 @@ class GPT2LLM(NNModel):
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
-        x = self.transformer.drop(tok_emb + pos_emb)
+
+        if self.poe_type is PositionTypes.ABSOLUTE:
+            pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
+            tok_emb = tok_emb + pos_emb
+
+        # TODO: use drop out also without absolute position embedding?
+        x = self.transformer.drop(tok_emb)
+
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)

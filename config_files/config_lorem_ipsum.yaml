@@ -186,9 +186,10 @@ model:
   component_key: model
   variant_key: gpt2
   config:
-    sample_key: "input_ids" # TODO reference this
-    prediction_key: "logits" # TODO reference this
-    block_size: 256  # TODO reference this (same as sequence length)
+    sample_key: ${settings.referencing_keys.sample_key}
+    poe_type: "NOPE"
+    block_size: ${settings.training.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head: 4
@@ -197,8 +198,14 @@ model:
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention:
-      attention_type: default_attention # pytorch_flash_attention
+      attention_type: pytorch_flash_attention
       scaling_factor: 3
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model.config.n_embd}
+            n_head: ${model.config.n_head}
+            seq_length_dim: -2
     activation: gelu
     epsilon: 1e-5
     weight_init:
