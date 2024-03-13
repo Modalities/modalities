@@ -112,7 +112,6 @@ training:
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
   do_apply_activation_checkpointing: True
-
 checkpointing:
   checkpointing_strategy:
     type_hint: SaveKMostRecentCheckpointsStrategy
