@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Type
 
+import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 from transformers import GPT2TokenizerFast
@@ -43,6 +44,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ResultsSubscriberFactory,
 )
 from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_models import (
@@ -154,4 +156,7 @@ COMPONENTS = [
         ResultsSubscriberFactory.get_wandb_result_subscriber,
         WandBEvaluationResultSubscriberConfig,
     ),
+    # layer norms
+    ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
+    ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
 ]
