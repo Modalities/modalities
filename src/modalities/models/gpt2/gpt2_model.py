@@ -1,5 +1,5 @@
 import math
-from copy import copy
+from copy import deepcopy
 from enum import Enum
 from functools import partial
 from typing import Annotated, Dict
@@ -10,8 +10,7 @@ import xformers.ops as xops
 from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
-from modalities.config.config import PydanticLayerNormIFType
-from modalities.models.components.layer_norms import LayerNormIF
+from modalities.config.config import PydanticPytorchModuleType
 from modalities.models.model import NNModel
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -54,9 +53,9 @@ class GPT2LLMConfig(BaseModel):
     attention_config: AttentionConfig
     activation_type: ActivationType
     weight_init: WeightInitailizationConfig
-    attention_norm: PydanticLayerNormIFType
-    ffn_norm: PydanticLayerNormIFType
-    lm_head_norm: PydanticLayerNormIFType
+    attention_norm: PydanticPytorchModuleType
+    ffn_norm: PydanticPytorchModuleType
+    lm_head_norm: PydanticPytorchModuleType
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
@@ -173,8 +172,8 @@ class GPT2Block(nn.Module):
         dropout: float,
         block_size: int,
         ffn_hidden: int,
-        attention_norm: LayerNormIF,
-        ffn_norm: LayerNormIF,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
     ):
         super().__init__()
         self.attention_norm = attention_norm
@@ -219,9 +218,9 @@ class GPT2LLM(NNModel):
         attention_config: AttentionConfig,
         activation_type: ActivationType,
         weight_init: WeightInitailizationConfig,
-        attention_norm: LayerNormIF,
-        ffn_norm: LayerNormIF,
-        lm_head_norm: LayerNormIF,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
+        lm_head_norm: nn.Module,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -247,8 +246,8 @@ class GPT2LLM(NNModel):
                             dropout=dropout,
                             block_size=block_size,
                             ffn_hidden=ffn_hidden,
-                            attention_norm=copy(attention_norm),
-                            ffn_norm=copy(ffn_norm),
+                            attention_norm=deepcopy(attention_norm),
+                            ffn_norm=deepcopy(ffn_norm),
                         )
                         for _ in range(n_layer)
                     ]
