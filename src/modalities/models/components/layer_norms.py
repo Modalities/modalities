@@ -3,21 +3,12 @@ from typing import Annotated
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field
-from torch.nn import functional as F
 
 from modalities.config.lookup_enum import LookupEnum
 
 
-class LayerNormIF(nn.Module):
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError
-
-    def __copy__(self):
-        raise NotImplementedError
-
-
-class RMSLayerNorm(LayerNormIF):
-    def __init__(self, ndim: int, epsilon: float = 1e-6):
+class RMSLayerNorm(nn.Module):
+    def __init__(self, ndim: int, bias: bool = True, epsilon: float = 1e-6):
         """
         Initialize the RMSNorm normalization layer.
         Original paper: https://arxiv.org/pdf/1910.07467.pdf
@@ -25,51 +16,26 @@ class RMSLayerNorm(LayerNormIF):
 
         Args:
             ndim (int): The dimension of the input tensor.
-            eps (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
-
-        Attributes:
-            eps (float): A small value added to the denominator for numerical stability.
-            weight (nn.Parameter): Learnable scaling parameter.
-
+            epsilon (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
+            bias (bool, optional): If True, the layer will learn an additive bias. Default is True.
         """
         super().__init__()
         self.epsilon = epsilon
         self.weight = nn.Parameter(torch.ones(ndim))
+        if bias:
+            self.bias_tensor = nn.Parameter(torch.zeros(ndim))
+        else:
+            self.bias_tensor = None
 
     def _norm(self, x: torch.Tensor) -> torch.Tensor:
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.epsilon)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         output = self._norm(x.float()).type_as(x)
-        return output * self.weight
-
-    def __copy__(self):
-        copied_instance = RMSLayerNorm(self.weight.shape[0], self.epsilon)
-        return copied_instance
-
-
-class ZLayerNorm(LayerNormIF):
-    """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
-
-    def __init__(self, ndim: int, bias: bool, epsilon: float = 1e-6):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(ndim))
-        self.bias_tensor = nn.Parameter(torch.zeros(ndim)) if bias else None
-        self.epsilon = epsilon
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        normalized_x = F.layer_norm(
-            input=x,
-            normalized_shape=self.weight.shape,
-            weight=self.weight,
-            bias=self.bias_tensor,
-            eps=self.epsilon,
-        )
-        return normalized_x
-
-    def __copy__(self):
-        copied_instance = ZLayerNorm(self.weight.shape[0], self.bias_tensor is not None, self.epsilon)
-        return copied_instance
+        if self.bias_tensor is None:
+            return output * self.weight
+        else:
+            return output * self.weight + self.bias_tensor
 
 
 class LayerNorms(LookupEnum):
@@ -78,15 +44,17 @@ class LayerNorms(LookupEnum):
     """
 
     RMSNorm = RMSLayerNorm
-    ZLayerNorm = ZLayerNorm
+    LayerNorm = nn.LayerNorm
 
 
-class ZLayerNormConfig(BaseModel):
-    ndim: Annotated[int, Field(strict=True, ge=1)]
-    bias: Annotated[bool, Field(default=True)]
-    epsilon: Annotated[float, Field(gt=0, default=1e-6)]
+class LayerNormConfig(BaseModel):
+    normalized_shape: Annotated[int, Field(strict=True, ge=1)]
+    eps: Annotated[float, Field(strict=True, gt=0, default=1e-6)]
+    elementwise_affine: Annotated[bool, Field(strict=True, default=True)]
+    bias: Annotated[bool, Field(strict=True, default=True)]
 
 
 class RMSLayerNormConfig(BaseModel):
     ndim: Annotated[int, Field(strict=True, ge=1)]
     epsilon: Annotated[float, Field(gt=0, default=1e-6)]
+    bias: Annotated[bool, Field(strict=True, default=True)]
