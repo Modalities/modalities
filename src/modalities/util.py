@@ -36,14 +36,6 @@ def get_callback_interval_in_batches_per_rank(
     return num_local_train_micro_batches_ret
 
 
-def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
-    try:
-        val = enum_type[name]
-        return val
-    except KeyError:
-        raise ValidationError(f"Invalid {enum_type} member name: {name}")
-
-
 def get_date_of_run():
     """create date and time for file save uniqueness
     example: 2022-05-07__14-31-22'
