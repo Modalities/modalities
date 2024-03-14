@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Dict, Optional
 
-import rich
+from rich import print as rprint
 from rich.console import Group
 from rich.panel import Panel
 
@@ -44,7 +44,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             group_content.append("\nMetrics:")
             group_content.extend(metrics)
         if losses or metrics:
-            rich.print(Panel(Group(*group_content)))
+            rprint(Panel(Group(*group_content)))
 
 
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
