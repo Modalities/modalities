@@ -7,7 +7,7 @@ import torch
 import torch.distributed as dist
 
 from modalities.batch import InferenceResultBatch
-from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
+from modalities.evaluation.measure import AggregatedMeasure, AggregatedMeasureFactory
 from modalities.loss_functions import CLMCrossEntropyLoss
 
 
@@ -16,7 +16,7 @@ class PerplexityKeys(Enum):
     NUM_SAMPLES = "num_samples"
 
 
-class AggregativePerplexity(AggregativeMeasure[PerplexityKeys]):
+class AggregativePerplexity(AggregatedMeasure[PerplexityKeys]):
     def __init__(self, target_key: str, prediction_key: str, local_rank: int) -> None:
         super().__init__(
             aggregate_keys=list(PerplexityKeys),
@@ -41,12 +41,12 @@ class AggregativePerplexity(AggregativeMeasure[PerplexityKeys]):
         return values[PerplexityKeys.PERPLEXITY] / values[PerplexityKeys.NUM_SAMPLES]
 
 
-class AggregativePerplexityFactory(AggregativeMeasureFactory[PerplexityKeys]):
+class AggregativePerplexityFactory(AggregatedMeasureFactory[PerplexityKeys]):
     def __init__(self, target_key: str, prediction_key: str) -> None:
         self._target_key = target_key
         self._prediction_key = prediction_key
 
-    def create(self, local_rank: int) -> AggregativeMeasure[PerplexityKeys]:
+    def create(self, local_rank: int) -> AggregatedMeasure[PerplexityKeys]:
         return AggregativePerplexity(
             target_key=self._target_key,
             prediction_key=self._prediction_key,

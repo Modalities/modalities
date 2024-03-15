@@ -10,12 +10,12 @@ from modalities.batch import InferenceResultBatch
 from modalities.evaluation.aggregator import Aggregator, KeyType
 
 
-class AggregativeMeasureFactory(Generic[KeyType]):
-    def create(self, local_rank: int) -> AggregativeMeasure:
+class AggregatedMeasureFactory(Generic[KeyType]):
+    def create(self, local_rank: int) -> AggregatedMeasure:
         raise NotImplementedError
 
 
-class AggregativeMeasure(Generic[KeyType], ABC):
+class AggregatedMeasure(Generic[KeyType], ABC):
     def __init__(
         self,
         aggregate_keys: List[KeyType],

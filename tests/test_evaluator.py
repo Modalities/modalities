@@ -8,18 +8,18 @@ import torch
 
 from modalities.batch import DatasetBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
+from modalities.evaluation.measure import AggregatedMeasure, AggregatedMeasureFactory
 from modalities.evaluation.throughput_aggregator import ThroughputAggregator
 from modalities.evaluator import Evaluator
 from tests.conftest import set_env_cpu
 
 
-class MockAggregativeMeasureFactory(AggregativeMeasureFactory):
+class MockAggregativeMeasureFactory(AggregatedMeasureFactory):
     def __init__(self):
         self.created_mocks = []
 
-    def create(self, local_rank: int) -> AggregativeMeasure:
-        measure_mock = MagicMock(spec=AggregativeMeasure)
+    def create(self, local_rank: int) -> AggregatedMeasure:
+        measure_mock = MagicMock(spec=AggregatedMeasure)
         measure_mock.compute.return_value = 0.0
         self.created_mocks.append(measure_mock)
         return measure_mock

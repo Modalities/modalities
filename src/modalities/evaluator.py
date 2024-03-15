@@ -4,7 +4,7 @@ import torch
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.evaluation.measure import AggregativeMeasure, AggregativeMeasureFactory
+from modalities.evaluation.measure import AggregatedMeasure, AggregatedMeasureFactory
 from modalities.evaluation.throughput_aggregator import ThroughputAggregationContext, ThroughputAggregator
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
@@ -15,8 +15,8 @@ class Evaluator:
     def __init__(
         self,
         local_rank: int,
-        loss_factories: List[AggregativeMeasureFactory],
-        metric_factories: List[AggregativeMeasureFactory],
+        loss_factories: List[AggregatedMeasureFactory],
+        metric_factories: List[AggregatedMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
@@ -112,8 +112,8 @@ class Evaluator:
         self,
         batch: DatasetBatch,
         model: NNModel,
-        loss_functions: List[AggregativeMeasure],
-        metrics: List[AggregativeMeasure],
+        loss_functions: List[AggregatedMeasure],
+        metrics: List[AggregatedMeasure],
     ) -> None:
         with torch.no_grad():
             result_batch = model_predict_batch(model=model, batch=batch)
