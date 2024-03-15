@@ -70,9 +70,6 @@ class TimeRecorder:
         self.time_s: float = -1
         self._state: TimeRecorderStates = TimeRecorderStates.STOPPED
 
-    def is_running(self) -> bool:
-        return self._state == TimeRecorderStates.RUNNING
-
     def start(self):
         if self._state == TimeRecorderStates.RUNNING:
             raise TimeRecorderStateError("Cannot start a running TimeRecorder.")

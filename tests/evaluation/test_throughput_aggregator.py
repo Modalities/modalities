@@ -5,6 +5,7 @@ from modalities.evaluation.throughput_aggregator import (
     ThroughputAggregator,
     start_throughput_measurement,
 )
+from modalities.util import TimeRecorderStates
 from tests.conftest import set_env_cpu
 
 
@@ -53,4 +54,4 @@ def test_throughput_context_stops_aggregation():
     with ThroughputAggregationContext(11, 0) as context:
         pass
 
-    assert not context._agg._recorder.is_running()
+    assert not context._agg._recorder._state == TimeRecorderStates.RUNNING
