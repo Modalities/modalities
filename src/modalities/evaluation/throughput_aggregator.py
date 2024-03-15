@@ -79,9 +79,20 @@ class ThroughputAggregationContext:
     def samples_per_second(self) -> torch.Tensor:
         return self._samples_per_second
 
-    def __enter__(self):
+    def add_num_samples(self, num: int):
+        self._num_samples += num
+
+    def stop(self):
+        self._agg.stop(self._num_samples)
+        self._samples_per_second = self._agg.compute_samples_per_second(self._local_rank)
+
+    def restart_anew(self, num_samples: int = 0):
+        self._num_samples = num_samples
         self._agg = self._throughput_aggregator_factory()
         self._agg.start()
+
+    def __enter__(self):
+        self.restart_anew(self._num_samples)
         return self
 
     def __exit__(
@@ -90,5 +101,4 @@ class ThroughputAggregationContext:
         value: None | BaseException,
         traceback: None | TracebackType,
     ):
-        self._agg.stop(self._num_samples)
-        self._samples_per_second = self._agg.compute_samples_per_second(self._local_rank)
+        self.stop()

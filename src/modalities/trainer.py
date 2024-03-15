@@ -6,7 +6,7 @@ from torch.optim import Optimizer
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.evaluation.throughput_aggregator import ThroughputAggregator, start_throughput_measurement
+from modalities.evaluation.throughput_aggregator import ThroughputAggregationContext, ThroughputAggregator
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -50,50 +50,51 @@ class Trainer:
         # TODO: why do we need a barrier here?
         dist.barrier()
 
-        for thoughput_aggregator, (batch_id, batch) in start_throughput_measurement(
-            enumerate(train_loader), self._throughput_aggregator_factory
-        ):
-            local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # Train single batch
-            batch_loss = self._train_batch(
-                batch=batch,
-                model=model,
-                optimizer=optimizer,
-                loss_fun=loss_fun,
-                batch_id=batch_id,
-                data_loader=train_loader,
-            )
-            thoughput_aggregator.stop(len(batch))
-            # Save the batch loss
-            cumulated_loss[0] += batch_loss.item()
-            cumulated_loss[1] += 1
-            self._publish_progress(
-                batch_progress_publisher=self.batch_progress_publisher,
-                local_batch_id=local_train_batch_id,
-                batch_size=train_loader.batch_size,
-                dataloader_tag=train_loader.dataloader_tag,
-                local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
-            )
+        with ThroughputAggregationContext(
+            0, self.local_rank, self._throughput_aggregator_factory
+        ) as throughput_aggregator:
+            for batch_id, batch in enumerate(train_loader):
+                local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
+                # Train single batch
+                batch_loss = self._train_batch(
+                    batch=batch,
+                    model=model,
+                    optimizer=optimizer,
+                    loss_fun=loss_fun,
+                    batch_id=batch_id,
+                    data_loader=train_loader,
+                )
+                throughput_aggregator.add_num_samples(len(batch))
+                # Save the batch loss
+                cumulated_loss[0] += batch_loss.item()
+                cumulated_loss[1] += 1
+                self._publish_progress(
+                    batch_progress_publisher=self.batch_progress_publisher,
+                    local_batch_id=local_train_batch_id,
+                    batch_size=train_loader.batch_size,
+                    dataloader_tag=train_loader.dataloader_tag,
+                    local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
+                )
 
-            # Check, if model should be evaluated
-            if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
-                if local_train_batch_id > 0:
-                    local_train_sample_id = Trainer._get_local_sample_id(
-                        batch_id=local_train_batch_id, batch_size=train_loader.batch_size
-                    )
-                    self._compute_publish_loss_and_throughput(
-                        train_loader.dataloader_tag,
-                        loss_fun.tag,
-                        local_sample_id_to_global_sample_id,
-                        cumulated_loss,
-                        thoughput_aggregator,
-                        local_train_sample_id,
-                    )
-                    epoch_done_callback(local_train_sample_id=local_train_sample_id)
-                    model.train()
+                # Check, if model should be evaluated
+                if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
+                    if local_train_batch_id > 0:
+                        local_train_sample_id = Trainer._get_local_sample_id(
+                            batch_id=local_train_batch_id, batch_size=train_loader.batch_size
+                        )
+                        self._compute_publish_loss_and_throughput(
+                            train_loader.dataloader_tag,
+                            loss_fun.tag,
+                            local_sample_id_to_global_sample_id,
+                            cumulated_loss,
+                            throughput_aggregator,
+                            local_train_sample_id,
+                        )
+                        epoch_done_callback(local_train_sample_id=local_train_sample_id)
+                        model.train()
 
-                # TODO early stopping
-                cumulated_loss = self._reset_loss()
+                    # TODO early stopping
+                    cumulated_loss = self._reset_loss()
 
     def _train_batch(
         self,
@@ -119,11 +120,11 @@ class Trainer:
         loss_fun_tag: str,
         local_sample_id_to_global_sample_id: Callable[[int], int],
         cummulated_loss: torch.Tensor,
-        thoughput_aggregator: ThroughputAggregator,
+        throughput_aggregator: ThroughputAggregationContext,
         local_train_sample_id: int,
     ):
-        synced_num_samples_per_second = thoughput_aggregator.compute_samples_per_second(self.local_rank)
-        thoughput_aggregator.reset()
+        throughput_aggregator.stop()
+        synced_num_samples_per_second = throughput_aggregator.samples_per_second
         # TODO: insert reducer from outside so Trainer is independent of FSDP
         train_loss = Reducer.reduce(
             tensor=cummulated_loss,
@@ -144,6 +145,7 @@ class Trainer:
             evaluation_result_publisher=self.evaluation_result_publisher,
             evaluation_result=evaluation_result,
         )
+        throughput_aggregator.restart_anew(num_samples=0)
 
     def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
