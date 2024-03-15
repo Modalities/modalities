@@ -73,7 +73,7 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
-    # EvalLosses
+    # Evaluation losses
     ComponentEntity(
         "eval_measures",
         "clm_cross_entropy_loss",
