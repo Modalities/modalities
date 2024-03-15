@@ -38,8 +38,8 @@ class AggregatedMeasure(Generic[KeyType], ABC):
     def tag(self) -> str:
         return self._tag
 
-    def add(self, batch_result: InferenceResultBatch) -> None:
-        res = self._postprocess_result_batch(batch_result)
+    def add(self, result_batch: InferenceResultBatch) -> None:
+        res = self._postprocess_result_batch(result_batch)
 
         for key, value in res.items():
             self._aggregator.add_value(key, value.to(self._device))
@@ -55,7 +55,7 @@ class AggregatedMeasure(Generic[KeyType], ABC):
         return self._calc_measure(synced_vals)
 
     @abstractmethod
-    def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[KeyType, torch.Tensor]:
+    def _postprocess_result_batch(self, result_batch: InferenceResultBatch) -> Dict[KeyType, torch.Tensor]:
         raise NotImplementedError
 
     @abstractmethod

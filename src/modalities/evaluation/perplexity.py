@@ -27,14 +27,14 @@ class AggregativePerplexity(AggregatedMeasure[PerplexityKeys]):
         self._target_key = target_key
         self._loss = CLMCrossEntropyLoss(target_key=target_key, prediction_key=prediction_key, reduction="none")
 
-    def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[PerplexityKeys, torch.Tensor]:
-        loss = self._loss(batch_result)  # shape: (batch_size * seq_len)
-        batch_size, seq_len = batch_result.get_targets(self._target_key).shape
+    def _postprocess_result_batch(self, result_batch: InferenceResultBatch) -> Dict[PerplexityKeys, torch.Tensor]:
+        loss = self._loss(result_batch)  # shape: (batch_size * seq_len)
+        batch_size, seq_len = result_batch.get_targets(self._target_key).shape
         loss = loss.view(batch_size, seq_len)  # shape: (batch_size, seq_len)
         perplexity = torch.exp(loss.sum(-1) / seq_len)
         return {
             PerplexityKeys.PERPLEXITY: perplexity.sum(),
-            PerplexityKeys.NUM_SAMPLES: torch.tensor(len(batch_result)),
+            PerplexityKeys.NUM_SAMPLES: torch.tensor(len(result_batch)),
         }
 
     def _calc_measure(self, values: Dict[PerplexityKeys, torch.Tensor]) -> torch.Tensor:

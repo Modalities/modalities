@@ -26,11 +26,11 @@ class AggregativeCLMCrossEntropyLoss(AggregatedMeasure[LossKeys]):
         )
         self._loss = CLMCrossEntropyLoss(target_key=target_key, prediction_key=prediction_key, reduction="sum")
 
-    def _postprocess_result_batch(self, batch_result: InferenceResultBatch) -> Dict[LossKeys, torch.Tensor]:
-        loss = self._loss(batch_result)
+    def _postprocess_result_batch(self, result_batch: InferenceResultBatch) -> Dict[LossKeys, torch.Tensor]:
+        loss = self._loss(result_batch)
         return {
             LossKeys.CLM_CROSS_ENTROPY: loss,
-            LossKeys.NUM_SAMPLES: torch.tensor(len(batch_result)),
+            LossKeys.NUM_SAMPLES: torch.tensor(len(result_batch)),
         }
 
     def _calc_measure(self, values: Dict[LossKeys, torch.Tensor]) -> torch.Tensor:
