@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import torch.nn as nn
 from omegaconf import OmegaConf
@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveI
 from pydantic_core import core_schema
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
@@ -59,6 +60,7 @@ PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
 PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
+PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
@@ -132,9 +134,62 @@ class CheckpointingConfig(BaseModel):
     checkpointing_execution: PydanticCheckpointingExecutionIFType
 
 
+class AdamOptimizerConfig(BaseModel):
+    lr: float
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
 class AdamWOptimizerConfig(BaseModel):
     lr: float
     wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
+class StepLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    step_size: int
+    gamma: float
+    last_epoch: int = -1
+    verbose: bool = False
+
+
+class OneCycleLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    max_lr: float | List
+    total_steps: int
+    epochs: Optional[int] = None
+    steps_per_epoch: Optional[int] = None
+    pct_start: float
+    anneal_strategy: str
+    cycle_momentum: bool = True
+    base_momentum: float | List = 0.85
+    max_momentum: float | List = 0.95
+    div_factor: float
+    final_div_factor: float
+    three_phase: bool = False
+    last_epoch: int = -1
+    verbose: bool = False
+
+
+class ConstantLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    factor: float
+    total_iters: int
+    last_epoch: int = -1
+    verbose: bool = False
+
+
+class CosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    t_max: int
+    eta_min: int
+    last_epoch: int = -1
+    verbose: bool = False
 
 
 class CheckpointedOptimizerConfig(BaseModel):
@@ -305,6 +360,7 @@ class Settings(BaseModel):
 class ComponentsModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
+    scheduler: PydanticLRSchedulerIFType
     loss_fn: PydanticLossIFType
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]

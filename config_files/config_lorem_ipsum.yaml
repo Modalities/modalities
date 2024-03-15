@@ -232,17 +232,29 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-# scheduler:
-#   type_hint: StepLR
-#   config:
-#     step_size: 1
-#     gamma: 0.1
+
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 4
+    pct_start: 0.01
+    anneal_strategy: cos
 
 optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE

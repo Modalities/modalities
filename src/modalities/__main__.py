@@ -272,6 +272,7 @@ class Main:
                 checkpointing=components.checkpointing,
                 model=wrapped_model,
                 optimizer=components.optimizer,
+                scheduler=components.scheduler,
             )
             print("done")
 
