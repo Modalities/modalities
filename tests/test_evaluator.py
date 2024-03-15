@@ -20,7 +20,7 @@ class MockAggregativeMeasureFactory(AggregatedMeasureFactory):
 
     def create(self, local_rank: int) -> AggregatedMeasure:
         measure_mock = MagicMock(spec=AggregatedMeasure)
-        measure_mock.compute.return_value = 0.0
+        measure_mock.aggregate.return_value = 0.0
         self.created_mocks.append(measure_mock)
         return measure_mock
 
@@ -94,7 +94,7 @@ def test_evaluate_calls_add_for_all_losses_and_batches(
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
-def test_evaluate_calls_compute_on_all_losses(
+def test_evaluate_calls_aggregate_on_all_losses(
     nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
@@ -108,9 +108,9 @@ def test_evaluate_calls_compute_on_all_losses(
         throughput_aggregator,
         num_batches2=num_batches2,
     )
-    compute_call_counts = [loss.compute.call_count for loss in loss_factories[0].created_mocks]
+    aggregate_call_counts = [loss.aggregate.call_count for loss in loss_factories[0].created_mocks]
     expected_call_counts = [1] * len(loss_factories) * (2 if num_batches2 > 0 else 1)
-    unittest.TestCase().assertListEqual(compute_call_counts, expected_call_counts)
+    unittest.TestCase().assertListEqual(aggregate_call_counts, expected_call_counts)
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
@@ -153,7 +153,7 @@ def test_evaluate_calls_add_for_all_metrics_and_batches(
 
 
 @pytest.mark.usefixtures(set_env_cpu.__name__)
-def test_evaluate_calls_compute_on_all_metrics(
+def test_evaluate_calls_aggregate_on_all_metrics(
     nn_model_mock, llm_data_loader_mock, llm_data_loader_mock2, progress_publisher_mock, throughput_aggregator
 ):
     num_batches = 4
@@ -167,9 +167,9 @@ def test_evaluate_calls_compute_on_all_metrics(
         throughput_aggregator,
         num_batches2=num_batches2,
     )
-    compute_call_counts = [loss.compute.call_count for loss in metric_factories[0].created_mocks]
+    aggregate_call_counts = [loss.aggregate.call_count for loss in metric_factories[0].created_mocks]
     expected_call_counts = [1] * len(metric_factories) * (2 if num_batches2 > 0 else 1)
-    unittest.TestCase().assertListEqual(compute_call_counts, expected_call_counts)
+    unittest.TestCase().assertListEqual(aggregate_call_counts, expected_call_counts)
 
 
 def _run_loss_and_metrics_test(
