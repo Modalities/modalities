@@ -96,7 +96,7 @@ def test_perplexity_computed_correctly_batch_size_one(
     aggregative_perplexity: AggregativePerplexity, batch_size_one_data: InferenceResultBatch
 ):
     aggregative_perplexity.add(result_batch=batch_size_one_data)
-    perplexity = aggregative_perplexity.compute().item()
+    perplexity = aggregative_perplexity.aggregate().item()
     assert perplexity == pytest.approx(9.965, 0.01)
     assert perplexity == pytest.approx(compute_average_expected_perplexity(batch_size_one_data), 0.01)
 
@@ -106,7 +106,7 @@ def test_perplexity_computed_correctly_batch_size_greater_one(
     aggregative_perplexity: AggregativePerplexity, batch_size_two_data: InferenceResultBatch
 ):
     aggregative_perplexity.add(result_batch=batch_size_two_data)
-    perplexity = aggregative_perplexity.compute().item()
+    perplexity = aggregative_perplexity.aggregate().item()
     assert perplexity == pytest.approx(compute_average_expected_perplexity(batch_size_two_data), 0.01)
 
 

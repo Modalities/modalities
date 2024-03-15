@@ -44,7 +44,7 @@ class AggregatedMeasure(Generic[KeyType], ABC):
         for key, value in res.items():
             self._aggregator.add_value(key, value.to(self._device))
 
-    def compute(self) -> torch.Tensor:
+    def aggregate(self) -> torch.Tensor:
         synced_vals: Dict[KeyType, torch.Tensor] = {}
         for key in self._aggregate_keys:
             synced_vals[key] = self._aggregator.get_all_reduced_value(

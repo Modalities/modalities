@@ -106,7 +106,7 @@ class Evaluator:
                 dataloader_tag=data_loader.dataloader_tag,
             )
 
-        return {loss: loss.compute() for loss in losses}, {metric: metric.compute() for metric in metrics}
+        return {loss: loss.aggregate() for loss in losses}, {metric: metric.aggregate() for metric in metrics}
 
     def evaluate_batch(
         self,
