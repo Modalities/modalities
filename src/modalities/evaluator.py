@@ -47,7 +47,7 @@ class Evaluator:
             )  # TODO why is this in the beginning of the for loop, not at the end?
 
             with ThroughputAggregationContext(
-                _extract_num_samples(data_loader), self.local_rank, self._throughput_aggregator_factory
+                Evaluator._extract_num_samples(data_loader), self.local_rank, self._throughput_aggregator_factory
             ) as thoughput_agg:
                 total_losses, total_metrics = self._process_batches_in_data_loader(
                     model=model,
@@ -150,9 +150,9 @@ class Evaluator:
     def _get_local_sample_id(batch_id: int, batch_size: int) -> int:
         return (batch_id + 1) * batch_size - 1
 
-
-def _extract_num_samples(data_loader: LLMDataLoader) -> int:
-    num_samples = len(data_loader.dataset)
-    if data_loader.batch_size is not None and data_loader.drop_last:
-        num_samples = (num_samples // data_loader.batch_size) * data_loader.batch_size
-    return num_samples
+    @staticmethod
+    def _extract_num_samples(data_loader: LLMDataLoader) -> int:
+        num_samples = len(data_loader.dataset)
+        if data_loader.batch_size is not None and data_loader.drop_last:
+            num_samples = (num_samples // data_loader.batch_size) * data_loader.batch_size
+        return num_samples
