@@ -3,14 +3,12 @@ import warnings
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Callable, Dict, Generic, Type, TypeVar
+from typing import Type
 
 import torch
-import torch.distributed as dist
 from pydantic import ValidationError
 
 from modalities.exceptions import TimeRecorderStateError
-from modalities.running_env.fsdp.reducer import Reducer
 
 
 def get_callback_interval_in_batches_per_rank(
