@@ -41,11 +41,14 @@ class ThroughputAggregator:
                 ThroughputAggregationKeys.FORWARD_BACKWARD_TIME: recorded_time,
             }
         )
-        synced_num_samples = aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+        synced_num_samples = aggregator.get_all_reduced_value(
+            ThroughputAggregationKeys.NUM_SAMPLES, reduce_operation=dist.ReduceOp.SUM
+        )
         synced_foward_backward_time = aggregator.get_all_reduced_value(
             ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
         )
         return synced_num_samples / synced_foward_backward_time
+
 
 T = TypeVar("T", bound=Any)
 
@@ -62,7 +65,6 @@ def start_throughput_measurement(
 
 
 class ThroughputAggregationContext:
-
     def __init__(
         self,
         num_samples: int,
