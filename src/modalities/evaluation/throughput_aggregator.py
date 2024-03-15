@@ -44,10 +44,10 @@ class ThroughputAggregator:
         synced_num_samples = aggregator.get_all_reduced_value(
             ThroughputAggregationKeys.NUM_SAMPLES, reduce_operation=dist.ReduceOp.SUM
         )
-        synced_foward_backward_time = aggregator.get_all_reduced_value(
+        synced_forward_backward_time = aggregator.get_all_reduced_value(
             ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
         )
-        return synced_num_samples / synced_foward_backward_time
+        return synced_num_samples / synced_forward_backward_time
 
 
 T = TypeVar("T", bound=Any)
@@ -55,9 +55,9 @@ T = TypeVar("T", bound=Any)
 
 def start_throughput_measurement(
     iterable: Iterable[T],
-    throughput_aggregatgor_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
+    throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
 ) -> Iterable[Tuple[ThroughputAggregator, T]]:
-    a = throughput_aggregatgor_factory()
+    a = throughput_aggregator_factory()
     a.start()
     for e in iterable:
         yield a, e
