@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
@@ -30,9 +30,10 @@ class MemMapDataset(Dataset):
         raw_data_path: Path,
         block_size: int,
         tokenizer: PreTrainedTokenizer,
-        sample_key: str,
+        sample_key: str, # TODO Max: is sample key really necessary?
+        tokenization_jq_patterns: Dict[str, str],
+        pass_through_jq_patterns: Dict[str, str] = None,
         index_path: Optional[Path] = None,
-        jq_pattern: str = ".text",
     ):
         """
         Pytorch Dataset with mmap support.
@@ -49,23 +50,38 @@ class MemMapDataset(Dataset):
                            TODO: If this setting should support multi-modal features using separately encoded inputs,
                             this needs to get replaced with a list of sample keys!
         """
-        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
+        super().__init__(raw_data_path=raw_data_path,
+                          block_size=block_size, sample_key=sample_key)
+
+        self.tokenization_jq_filter = {key: jq.compile(pattern) for key, pattern in tokenization_jq_patterns.items()}
+        self.pass_through_jq_filter = {key: jq.compile(pattern) for key, pattern in pass_through_jq_patterns.items()} if pass_through_jq_patterns else {}
 
         self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
-        self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer = tokenizer
 
     def __len__(self) -> int:
         return len(self.reader)
 
-    def __getitem__(self, idx: int) -> BatchEncoding:
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
         self._check_if_inbounds(idx)
-        return self.tokenizer(
-            self.jq_filter.input_text(self.reader[idx]).first(),
-            max_length=self.block_size,
-            padding="max_length",
-            truncation=True,
-        )
+
+        item = {}
+        # applying jq filter for which we want to tokenize the text
+        for key, jq_filter in self.tokenization_jq_filter.items():
+            text = jq_filter.input_text(self.reader[idx]).first()
+
+            tokens = self.tokenizer(
+                jq_filter.input_text(self.reader[idx]).first(),
+                max_length=self.block_size,
+                padding="max_length",
+                truncation=True,
+            )
+            item[key] = tokens
+
+        # applying jq filter for which we want to pass through the raw data without tokenization
+        for key, jq_filter in self.pass_through_jq_filter.items():
+            item[key] = jq_filter.input_text(self.reader[idx]).first()
+        return item
 
 
 class PackedMemMapDatasetBase(Dataset):
@@ -157,3 +173,47 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class DictMemMapDataset(Dataset):
+    def __init__(
+        self,
+        raw_data_path: Path,
+        block_size: int,
+        tokenizer: PreTrainedTokenizer,
+        sample_key: str,
+        index_path: Optional[Path] = None,
+        jq_pattern: str = ".text",
+    ):
+        """
+        Pytorch Dataset with mmap support.
+
+        :param raw_data_path: Path to a jsonl file, which holds text data
+        :param block_size: alias for max sequence length. The amount of tokens the model can handle.
+        :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
+        :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
+        :param index_path: Path to an index file, which indicates the start character/byte position
+                           and length of samples given in `raw_data_path`.
+                           If not defined, an index next to `raw_data_path` is picked,
+                           by replacing its suffix with ".idx".
+        :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
+                           TODO: If this setting should support multi-modal features using separately encoded inputs,
+                            this needs to get replaced with a list of sample keys!
+        """
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
+
+        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
+        self.jq_filter = jq.compile(jq_pattern)
+        self.tokenizer = tokenizer
+
+    def __len__(self) -> int:
+        return len(self.reader)
+
+    def __getitem__(self, idx: int) -> BatchEncoding:
+        self._check_if_inbounds(idx)
+        return self.tokenizer(
+            self.jq_filter.input_text(self.reader[idx]).first(),
+            max_length=self.block_size,
+            padding="max_length",
+            truncation=True,
+        )

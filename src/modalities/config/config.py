@@ -191,7 +191,8 @@ class MemMapDatasetConfig(BaseModel):
     index_path: Optional[FilePath] = None
     block_size: Annotated[int, Field(strict=True, gt=0)]
     tokenizer: PydanticTokenizerIFType
-    jq_pattern: str
+    tokenization_jq_patterns: Dict[str, str]
+    pass_through_jq_patterns: Optional[Dict[str, str]] = None
     sample_key: str
 
 
