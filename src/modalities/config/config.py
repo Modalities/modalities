@@ -84,10 +84,13 @@ class WandbMode(LookupEnum):
 
 
 class GradientClippingMode(LookupEnum):
-    NONE = "NONE"
-    VALUE = "value"
-    P2_NORM = "p2_norm"
-    MAX_NORM = "max_norm"
+    NONE = "NONE"  # Do not apply gradient clipping.
+    VALUE = "value"  # Clip all gradient values independently.
+    # For norm based clipping modes, the norm is computed over
+    # all gradients together, as if they were concatenated
+    # into a single vector.
+    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
+    MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
 class ReferenceConfig(BaseModel):
