@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
@@ -100,6 +101,11 @@ def nn_model_mock():
 @pytest.fixture(scope="function")
 def optimizer_mock():
     return MagicMock(spec=Optimizer)
+
+
+@pytest.fixture(scope="function")
+def scheduler_mock():
+    return MagicMock(spec=LRScheduler)
 
 
 @pytest.fixture(scope="function")
