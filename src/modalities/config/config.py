@@ -83,6 +83,13 @@ class WandbMode(LookupEnum):
     DISABLED = "DISABLED"
 
 
+class GradientClippingMode(LookupEnum):
+    NONE = "NONE"
+    VALUE = "value"
+    P2_NORM = "p2_norm"
+    MAX_NORM = "max_norm"
+
+
 class ReferenceConfig(BaseModel):
     instance_key: str
     pass_type: PassType
@@ -291,6 +298,8 @@ class Settings(BaseModel):
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
+        gradient_clipping_mode: GradientClippingMode
+        gradient_clipping_threshold: Annotated[float, Field(strict=True, gt=0.0)] = 1.0
 
     class Paths(BaseModel):
         checkpointing_path: Path
