@@ -53,7 +53,7 @@ PydanticCheckpointingStrategyIFType = Annotated[
 PydanticCheckpointingExecutionIFType = Annotated[
     CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
 ]
-PydanticModelIFType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
@@ -136,24 +136,24 @@ class CheckpointingConfig(BaseModel):
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
 
 
 class CheckpointedOptimizerConfig(BaseModel):
     checkpointing: PydanticCheckpointingIFType
     checkpoint_path: Path
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
     checkpointing: PydanticCheckpointingIFType
     checkpoint_path: Path
-    model: PydanticModelIFType
+    model: PydanticPytorchModuleType
 
 
 class FSDPWrappedModelConfig(BaseModel):
-    model: PydanticModelIFType
+    model: PydanticPytorchModuleType
     sync_module_states: bool
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
@@ -305,7 +305,7 @@ class Settings(BaseModel):
 
 
 class ComponentsModel(BaseModel):
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     loss_fn: PydanticLossIFType
     evaluation_measures: List[PydanticMeasureFactoryIFType]
@@ -318,7 +318,7 @@ class ComponentsModel(BaseModel):
 
 
 class ComponentsInferenceModel(BaseModel):
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     cuda_env: CudaEnv
 
 

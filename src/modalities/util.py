@@ -10,6 +10,11 @@ from pydantic import ValidationError
 
 from modalities.exceptions import TimeRecorderStateError
 
+def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+    try:
+        return enum_type[name]
+    except KeyError:
+        raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 def get_callback_interval_in_batches_per_rank(
     callback_interval_in_samples: int, local_train_micro_batch_size: int, world_size: int, gradient_acc_steps: int
