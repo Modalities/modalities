@@ -6,8 +6,8 @@ from pydantic import BaseModel
 
 from modalities.checkpointing.checkpointing_execution import PytorchToDiscCheckpointing
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import GPT2HuggingFaceAdapterConfig, PydanticModelIFType, load_app_config_dict
-from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
+from modalities.config.config import PydanticModelIFType, load_app_config_dict
+from modalities.models.gpt2.gpt2_model import GPT2HuggingFaceAdapterConfig, GPT2LLMConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -36,7 +36,6 @@ class CheckpointConversion:
         if not config_file_path.exists():
             raise ValueError(f"Could not find {self.config_file_name} in {checkpoint_dir}")
 
-        # TODO resolve config hierarchically
         self.config_dict = load_app_config_dict(config_file_path)
         logging.info(f"Config\n{self.config_dict}")
 

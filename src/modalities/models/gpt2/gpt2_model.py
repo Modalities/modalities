@@ -1,3 +1,4 @@
+import json
 import math
 from enum import Enum
 from functools import partial
@@ -9,6 +10,7 @@ import xformers.ops as xops
 from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
+from modalities.config.config import HuggingFaceAdapterConfig
 from modalities.models.model import NNModel
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -301,3 +303,30 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
+    model_type = "modalities_gpt2"
+
+    def __init__(self, config: GPT2LLMConfig | Dict, **kwargs):
+
+        if isinstance(config, dict):
+            config = GPT2LLMConfig(**config)
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        if self.config:
+            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
+            json_dict["config"]["attention"] = {
+                "attention_type": self.config.attention.attention_type.value,
+                "scaling_factor": self.config.attention.scaling_factor,
+            }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std,
+            }
+        else:
+            json_dict = {}
+        return json.dumps(json_dict)

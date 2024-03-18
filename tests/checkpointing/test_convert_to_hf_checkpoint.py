@@ -7,7 +7,7 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.checkpointing import checkpoint_conversion
-from modalities.config.config import GPT2HuggingFaceAdapterConfig
+from modalities.models.gpt2.gpt2_model import GPT2HuggingFaceAdapterConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 
 

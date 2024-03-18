@@ -25,7 +25,7 @@ If you want to contribute, have a look at `CONTRIBUTING.md`.
 
 
 # Usage
-For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/modalities/__main__.py run --config_file_path config_files/config.yaml`.
+For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/modalities/__main__.py run --config_file_path config_files/config_lorem_ipsum.yaml`.
 
 Or, if you are a VsCode user, add this to your `launch.json`:
 ```json
@@ -47,7 +47,7 @@ Or, if you are a VsCode user, add this to your `launch.json`:
                 "src/modalities/__main__.py",
                 "run",
                 "--config_file_path",
-                "config_files/config.yaml",
+                "config_files/config_lorem_ipsum.yaml",
             ],
             "console": "integratedTerminal",
             "justMyCode": true,
@@ -57,7 +57,7 @@ Or, if you are a VsCode user, add this to your `launch.json`:
 
 # Pydantic and ClassResolver
 
-The mechanism introduced to instantiate classes via `type_hint` in the `config.yaml`, utilizes 
+The mechanism introduced to instantiate classes via `type_hint` in the `config_lorem_ipsum.yaml`, utilizes 
 1) Omegaconf to load the config yaml file
 2) Pydantic for the validation of the config
 3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
@@ -178,9 +178,9 @@ With
 [project.scripts]
 modalities = "modalities.__main__:main"
 ```
-in our `pyproject.toml`, we can start only main with `modalities` (which does nothing), or a specific sub-entrypoint e.g. `modalities do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+in our `pyproject.toml`, we can start only main with `modalities` (which does nothing), or a specific sub-entrypoint e.g. `modalities do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.
 
-Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.
 
 # MemMap Datasets
 

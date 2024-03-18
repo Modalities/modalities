@@ -3,8 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from modalities.config.config import GPT2HuggingFaceAdapterConfig
-from modalities.models.gpt2.gpt2_model import GPT2LLM
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2HuggingFaceAdapterConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 
 

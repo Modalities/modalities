@@ -1,4 +1,3 @@
-import json
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -24,7 +23,6 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
-from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
 from modalities.util import get_date_of_run, parse_enum_by_name
 
@@ -253,32 +251,6 @@ class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
     @abstractmethod
     def to_json_string():
         raise NotImplementedError()
-
-
-class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
-    model_type = "modalities_gpt2"
-
-    def __init__(self, config: GPT2LLMConfig = None, **kwargs):
-        if isinstance(config, dict):
-            config = GPT2LLMConfig(**config)
-        self.config = config
-
-        super().__init__(**kwargs)
-
-    def to_json_string(self, use_diff: bool = True) -> str:
-        if self.config:
-            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
-            json_dict["config"]["attention"] = {
-                "attention_type": self.config.attention.attention_type.value,
-                "scaling_factor": self.config.attention.scaling_factor,
-            }
-            json_dict["config"]["weight_init"] = {
-                "mean": self.config.weight_init.mean,
-                "std": self.config.weight_init.std,
-            }
-        else:
-            json_dict = {}
-        return json.dumps(json_dict)
 
 
 class DummyProgressSubscriberConfig(BaseModel):

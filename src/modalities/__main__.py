@@ -204,7 +204,7 @@ def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type
     help="Converted hf checkpoint will be written to this directory.",
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
-    checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir
+    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
 ):
     cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
     cp.convert_pytorch_to_hf_checkpoint()

@@ -6,8 +6,7 @@ import torch.nn as nn
 from transformers import PreTrainedModel
 from transformers.utils import ModelOutput
 
-from modalities.config.config import GPT2HuggingFaceAdapterConfig
-from modalities.models.gpt2.gpt2_model import GPT2LLM
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2HuggingFaceAdapterConfig
 
 
 class HuggingFaceModel(PreTrainedModel):
