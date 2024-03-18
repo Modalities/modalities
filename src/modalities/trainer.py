@@ -4,6 +4,7 @@ from typing import Callable
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -38,6 +39,7 @@ class Trainer:
         batch: DatasetBatch,
         model: NNModel,
         optimizer: Optimizer,
+        scheduler: LRScheduler,
         loss_fun: Loss,
         batch_id: int,
         data_loader: LLMDataLoader,
@@ -48,6 +50,7 @@ class Trainer:
 
         if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
+            scheduler.step()
             optimizer.zero_grad()
         return loss
 
@@ -55,7 +58,8 @@ class Trainer:
         self,
         model: NNModel,
         train_loader: LLMDataLoader,
-        optimizer,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
         loss_fun: Loss,
         callback_interval_in_batches: int,
         # TODO: remove
@@ -82,6 +86,7 @@ class Trainer:
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
+                scheduler=scheduler,
                 loss_fun=loss_fun,
                 batch_id=batch_id,
                 data_loader=train_loader,

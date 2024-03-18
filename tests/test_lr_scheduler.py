@@ -4,7 +4,7 @@ from modalities.gym import Gym
 from tests.test_utils import configure_dataloader_mock
 
 
-def test_run_cpu_only(
+def test_run_scheduler(
     monkeypatch,
     checkpointing_mock,
     evaluator_mock,
@@ -39,4 +39,4 @@ def test_run_cpu_only(
         checkpointing=checkpointing_mock,
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
-    optimizer_mock.step.assert_called()
+    scheduler_mock.step.assert_called()

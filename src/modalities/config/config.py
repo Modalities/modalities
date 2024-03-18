@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import torch.nn as nn
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator
+from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
 from pydantic_core import core_schema
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
@@ -59,6 +60,7 @@ PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
 PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
+PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
@@ -132,9 +134,72 @@ class CheckpointingConfig(BaseModel):
     checkpointing_execution: PydanticCheckpointingExecutionIFType
 
 
+class AdamOptimizerConfig(BaseModel):
+    lr: float
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
 class AdamWOptimizerConfig(BaseModel):
     lr: float
     wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
+class StepLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    step_size: Annotated[int, Field(strict=True, gt=0)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+
+class OneCycleLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
+    total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
+    anneal_strategy: str
+    cycle_momentum: bool = True
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.85
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.95
+    div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    three_phase: bool = False
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+    @model_validator(mode="after")
+    def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
+        if self.total_steps is None and (self.epochs is None or self.steps_per_epoch is None):
+            raise ValueError("Please define total_steps or (epochs and steps_per_epoch).")
+        return self
+
+
+class ConstantLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    total_iters: Annotated[int, Field(strict=True, gt=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+
+class CosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    t_max: Annotated[int, Field(strict=True, gt=0)]
+    eta_min: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
 
 
 class CheckpointedOptimizerConfig(BaseModel):
@@ -305,6 +370,7 @@ class Settings(BaseModel):
 class ComponentsModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
+    scheduler: PydanticLRSchedulerIFType
     loss_fn: PydanticLossIFType
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
