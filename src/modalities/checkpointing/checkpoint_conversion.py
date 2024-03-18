@@ -23,7 +23,6 @@ class CheckpointConversion:
     ):
         self.initial_model = None
         self.config_dict = None
-        self.components = None
         self.checkpoint_dir = checkpoint_dir
         self.config_file_name = config_file_name
         self.model_file_name = model_file_name
@@ -55,11 +54,11 @@ class CheckpointConversion:
         class ModelConfig(BaseModel):
             model: PydanticModelIFType
 
-        self.components = self.component_factory.build_components(
+        components = self.component_factory.build_components(
             config_dict=self.config_dict, components_model_type=ModelConfig
         )
 
-        return self.components.model
+        return components.model
 
     def _get_model_from_checkpoint(self, model: torch.nn.Module):
         if torch.distributed.is_initialized():
