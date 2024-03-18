@@ -1,23 +1,22 @@
 import pytest
 import torch
 
-from modalities.models.gpt2.gpt2_model import AttentionType, CausalSelfAttention
-
+from modalities.models.gpt2.gpt2_model import CausalSelfAttention, AttentionConfig
 
 def _get_random_input_seq(embedding_shape):
     flash_attn_supported_dtype = torch.bfloat16
     return torch.rand(size=embedding_shape, dtype=flash_attn_supported_dtype)
 
 
-def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, attention_type, block_size):
+def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, block_size, attention_config):
     self_attention_layer = CausalSelfAttention(
         n_head_q=n_head_q,
         n_head_kv=n_head_kv,
         n_embd=n_embd,
-        attention_type=attention_type,
         bias=False,
         dropout=0.0,
         block_size=block_size,
+        attention_config=attention_config
     ).cuda()
     self_attention_layer.q_attn = self_attention_layer.q_attn.bfloat16()
     self_attention_layer.k_attn = self_attention_layer.k_attn.bfloat16()
@@ -40,13 +39,13 @@ def test_forward_pass_success(n_head_q, n_head_kv, n_embd, successful):
     batch_size = 2
     block_size = 10
     embedding_shape = (batch_size, block_size, n_embd)
-
+    attention_config = AttentionConfig(qkv_transforms=[])
     attention_layer_args = {
         "n_head_q": n_head_q,
         "n_head_kv": n_head_kv,
         "n_embd": n_embd,
-        "attention_type": AttentionType.DEFAULT_ATTENTION,
         "block_size": block_size,
+        "attention_config": attention_config
     }
 
     if not successful:

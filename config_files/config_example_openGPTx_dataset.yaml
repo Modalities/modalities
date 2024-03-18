@@ -151,7 +151,6 @@ model:
     n_embd: 768
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention_type: pytorch_flash_attention
     activation: fused_swiglu
     epsilon: 1e-5
     weight_init:

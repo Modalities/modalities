@@ -112,7 +112,6 @@ training:
   train_batch_size: ${data.train_dataloader.config.batch_sampler.config.batch_size}
   global_num_seen_samples: ${modalities_setup.settings.global_num_seen_samples}
   do_apply_activation_checkpointing: True
-
 checkpointing:
   checkpointing_strategy:
     type_hint: SaveKMostRecentCheckpointsStrategy
@@ -148,7 +147,6 @@ model:
     n_embd: 768
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention_type: pytorch_flash_attention
     activation: gelu
     epsilon: 1e-5
     weight_init:

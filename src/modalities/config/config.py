@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import torch.nn as nn
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator
+from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
 from pydantic_core import core_schema
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
@@ -52,13 +53,14 @@ PydanticCheckpointingStrategyIFType = Annotated[
 PydanticCheckpointingExecutionIFType = Annotated[
     CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
 ]
-PydanticModelIFType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
 PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
+PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
@@ -81,6 +83,16 @@ class WandbMode(LookupEnum):
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"
     DISABLED = "DISABLED"
+
+
+class GradientClippingMode(LookupEnum):
+    NONE = "NONE"  # Do not apply gradient clipping.
+    VALUE = "value"  # Clip all gradient values independently.
+    # For norm based clipping modes, the norm is computed over
+    # all gradients together, as if they were concatenated
+    # into a single vector.
+    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
+    MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
 class ReferenceConfig(BaseModel):
@@ -132,26 +144,89 @@ class CheckpointingConfig(BaseModel):
     checkpointing_execution: PydanticCheckpointingExecutionIFType
 
 
+class AdamOptimizerConfig(BaseModel):
+    lr: float
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
 class AdamWOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
+class StepLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    step_size: Annotated[int, Field(strict=True, gt=0)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+
+class OneCycleLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
+    total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
+    anneal_strategy: str
+    cycle_momentum: bool = True
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.85
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.95
+    div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    three_phase: bool = False
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+    @model_validator(mode="after")
+    def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
+        if self.total_steps is None and (self.epochs is None or self.steps_per_epoch is None):
+            raise ValueError("Please define total_steps or (epochs and steps_per_epoch).")
+        return self
+
+
+class ConstantLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    total_iters: Annotated[int, Field(strict=True, gt=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+
+class CosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    t_max: Annotated[int, Field(strict=True, gt=0)]
+    eta_min: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
 
 
 class CheckpointedOptimizerConfig(BaseModel):
     checkpointing: PydanticCheckpointingIFType
     checkpoint_path: Path
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
     checkpointing: PydanticCheckpointingIFType
     checkpoint_path: Path
-    model: PydanticModelIFType
+    model: PydanticPytorchModuleType
 
 
 class FSDPWrappedModelConfig(BaseModel):
-    model: PydanticModelIFType
+    model: PydanticPytorchModuleType
     sync_module_states: bool
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
@@ -284,6 +359,18 @@ class CudaEnv(BaseModel):
 
 class Settings(BaseModel):
     class Training(BaseModel):
+        class GradientClipping(BaseModel):
+            mode: GradientClippingMode
+            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
+
+            @model_validator(mode="after")
+            def check_mode_none_iff_threshold_none(self) -> BaseModel:
+                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
+                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
+                if self.mode != GradientClippingMode.NONE and self.threshold is None:
+                    raise ValueError("A threshold value is required when gradient clipping is used.")
+                return self
+
         callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
@@ -291,6 +378,7 @@ class Settings(BaseModel):
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
+        gradient_clipping: GradientClipping
 
     class Paths(BaseModel):
         checkpointing_path: Path
@@ -303,8 +391,9 @@ class Settings(BaseModel):
 
 
 class ComponentsModel(BaseModel):
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
+    scheduler: PydanticLRSchedulerIFType
     loss_fn: PydanticLossIFType
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
@@ -315,7 +404,7 @@ class ComponentsModel(BaseModel):
 
 
 class ComponentsInferenceModel(BaseModel):
-    wrapped_model: PydanticModelIFType
+    wrapped_model: PydanticPytorchModuleType
     cuda_env: CudaEnv
 
 
