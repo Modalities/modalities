@@ -173,6 +173,13 @@ loss_fn:
     target_key: target_ids
     prediction_key: logits
 
+evaluation_measures:
+  - component_key: eval_measures
+    variant_key: clm_cross_entropy_loss
+    config:
+      target_key: target_ids
+      prediction_key: logits
+
 wrapped_model:
   component_key: model
   variant_key: fsdp_wrapped

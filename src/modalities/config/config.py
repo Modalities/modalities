@@ -20,6 +20,7 @@ from modalities.checkpointing.checkpointing_execution import CheckpointingExecut
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.evaluation.measure import AggregatedMeasureFactory
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
@@ -62,6 +63,7 @@ PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
 PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
+PydanticMeasureFactoryIFType = Annotated[AggregatedMeasureFactory, PydanticThirdPartyTypeIF(AggregatedMeasureFactory)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
 
@@ -395,6 +397,7 @@ class ComponentsModel(BaseModel):
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
     loss_fn: PydanticLossIFType
+    evaluation_measures: List[PydanticMeasureFactoryIFType]
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType

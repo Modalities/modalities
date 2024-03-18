@@ -1,109 +1,66 @@
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Tuple
 
 import torch
-import torch.distributed as dist
 
-from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
+from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.evaluation.measure import AggregatedMeasure, AggregatedMeasureFactory
+from modalities.evaluation.throughput_aggregator import ThroughputAggregationContext, ThroughputAggregator
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import NNModel, model_predict_batch
-from modalities.running_env.fsdp.reducer import Reducer
-from modalities.trainer import ThroughputAggregationKeys
-from modalities.util import Aggregator, TimeRecorder
 
 
 class Evaluator:
     def __init__(
         self,
         local_rank: int,
+        loss_factories: List[AggregatedMeasureFactory],
+        metric_factories: List[AggregatedMeasureFactory],
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
+        throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self.local_rank = local_rank
+        self._loss_factories = loss_factories
+        self._metric_factories = metric_factories
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
-
-    def evaluate_batch(
-        self,
-        batch: DatasetBatch,
-        model: NNModel,
-        loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-    ):
-        with torch.no_grad():
-            result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
-        return loss
+        self._throughput_aggregator_factory = throughput_aggregator_factory
 
     def evaluate(
         self,
         model: NNModel,
         data_loaders: List[LLMDataLoader],
-        loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         global_train_sample_id: int,
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
-
         for data_loader in data_loaders:
-            cumulated_loss = torch.zeros(3).to(device)
-
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 global_train_sample_id=global_train_sample_id,
                 global_dataset_sample_id=-1,
                 dataloader_tag=data_loader.dataloader_tag,
-            )
-            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
-            with TimeRecorder() as forward_backward_timer_recorder:
-                for batch_id, batch in enumerate(data_loader):
-                    batch_loss = self.evaluate_batch(
-                        batch=batch,
-                        model=model,
-                        loss_fun=loss_fun,
-                    )
+            )  # TODO why is this in the beginning of the for loop, not at the end?
 
-                    cumulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cumulated_loss[1] += len(batch)
-                    batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
-
-                    local_dataset_sample_id = Evaluator._get_local_sample_id(
-                        batch_id=batch_id, batch_size=data_loader.batch_size
-                    )
-
-                    global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
-
-                    Evaluator._publish_progress(
-                        batch_progress_publisher=self.batch_progress_publisher,
-                        global_train_sample_id=global_train_sample_id,
-                        global_dataset_sample_id=global_dataset_sample_id,
-                        dataloader_tag=data_loader.dataloader_tag,
-                    )
-            # TODO: insert reducer from outside so Evaluator is independent of FSDP
-            total_loss = Reducer.reduce(
-                tensor=cumulated_loss,
-                operation=dist.ReduceOp.SUM,
-                post_processing_fun=lambda t: t[0] / t[1],
-            )
-
-            forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
-            thoughput_aggregator.add_value(
-                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
-            )
-            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-            synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
-                ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
-            )
-            num_samples_per_second = synced_num_samples / synced_forward_backward_time
+            with ThroughputAggregationContext(
+                Evaluator._extract_num_samples(data_loader), self.local_rank, self._throughput_aggregator_factory
+            ) as thoughput_agg:
+                total_losses, total_metrics = self._process_batches_in_data_loader(
+                    model=model,
+                    data_loader=data_loader,
+                    global_train_sample_id=global_train_sample_id,
+                    local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
+                )
 
             evaluation_result = EvaluationResultBatch(
-                losses={loss_fun.tag: total_loss},
+                losses=total_losses,
+                metrics=total_metrics,
                 # TODO: hardcoded metric key
-                throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
+                throughput_metrics={"evaluation_num_samples_per_second": thoughput_agg.samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
                 global_train_sample_id=global_train_sample_id,
             )
@@ -119,6 +76,51 @@ class Evaluator:
         #     dataloader_tag=data_loader.dataloader_tag,
         # )
         return result_dict
+
+    def _process_batches_in_data_loader(
+        self,
+        model: NNModel,
+        data_loader: LLMDataLoader,
+        global_train_sample_id: int,
+        local_sample_id_to_global_sample_id: Callable[[int], int],
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        losses = [f.create(self.local_rank) for f in self._loss_factories]
+        metrics = [f.create(self.local_rank) for f in self._metric_factories]
+
+        for batch_id, batch in enumerate(data_loader):
+            self.evaluate_batch(
+                batch=batch,
+                model=model,
+                loss_functions=losses,
+                metrics=metrics,
+            )
+
+            local_dataset_sample_id = Evaluator._get_local_sample_id(
+                batch_id=batch_id, batch_size=data_loader.batch_size
+            )
+            global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
+            Evaluator._publish_progress(
+                batch_progress_publisher=self.batch_progress_publisher,
+                global_train_sample_id=global_train_sample_id,
+                global_dataset_sample_id=global_dataset_sample_id,
+                dataloader_tag=data_loader.dataloader_tag,
+            )
+
+        return {loss: loss.aggregate() for loss in losses}, {metric: metric.aggregate() for metric in metrics}
+
+    def evaluate_batch(
+        self,
+        batch: DatasetBatch,
+        model: NNModel,
+        loss_functions: List[AggregatedMeasure],
+        metrics: List[AggregatedMeasure],
+    ) -> None:
+        with torch.no_grad():
+            result_batch = model_predict_batch(model=model, batch=batch)
+        for loss_fun in loss_functions:
+            loss_fun.add(result_batch)
+        for metric_fun in metrics:
+            metric_fun.add(result_batch)
 
     @staticmethod
     def _publish_progress(
@@ -147,3 +149,10 @@ class Evaluator:
     @staticmethod
     def _get_local_sample_id(batch_id: int, batch_size: int) -> int:
         return (batch_id + 1) * batch_size - 1
+
+    @staticmethod
+    def _extract_num_samples(data_loader: LLMDataLoader) -> int:
+        num_samples = len(data_loader.dataset)
+        if data_loader.batch_size is not None and data_loader.drop_last:
+            num_samples = (num_samples // data_loader.batch_size) * data_loader.batch_size
+        return num_samples

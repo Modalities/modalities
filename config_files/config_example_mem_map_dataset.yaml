@@ -206,6 +206,13 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+evaluation_measures:
+  - component_key: eval_measures
+    variant_key: clm_cross_entropy_loss
+    config:
+      target_key: ${data.target_key}
+      prediction_key: ${model.config.prediction_key}
+
 optimizer:  
   component_key: optimizer
   variant_key: adam_w
