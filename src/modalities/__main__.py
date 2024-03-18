@@ -28,6 +28,7 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
 from modalities.utils.generate_text import main as generate_text_main
+from modalities.utils.gradient_clipping import build_gradient_clipper
 
 
 @click.group()
@@ -236,6 +237,10 @@ class Main:
                 batch_progress_publisher=batch_processed_publisher,
                 evaluation_result_publisher=evaluation_result_publisher,
                 gradient_acc_steps=components.settings.training.gradient_acc_steps,
+                gradient_clipper=build_gradient_clipper(
+                    gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
+                    gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
+                ),
             )
 
             # Evaluator

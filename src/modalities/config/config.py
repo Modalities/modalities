@@ -85,6 +85,16 @@ class WandbMode(LookupEnum):
     DISABLED = "DISABLED"
 
 
+class GradientClippingMode(LookupEnum):
+    NONE = "NONE"  # Do not apply gradient clipping.
+    VALUE = "value"  # Clip all gradient values independently.
+    # For norm based clipping modes, the norm is computed over
+    # all gradients together, as if they were concatenated
+    # into a single vector.
+    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
+    MAX_NORM = "max_norm"  # Maximum norm based clipping.
+
+
 class ReferenceConfig(BaseModel):
     instance_key: str
     pass_type: PassType
@@ -349,6 +359,18 @@ class CudaEnv(BaseModel):
 
 class Settings(BaseModel):
     class Training(BaseModel):
+        class GradientClipping(BaseModel):
+            mode: GradientClippingMode
+            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
+
+            @model_validator(mode="after")
+            def check_mode_none_iff_threshold_none(self) -> BaseModel:
+                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
+                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
+                if self.mode != GradientClippingMode.NONE and self.threshold is None:
+                    raise ValueError("A threshold value is required when gradient clipping is used.")
+                return self
+
         callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
@@ -356,6 +378,7 @@ class Settings(BaseModel):
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
+        gradient_clipping: GradientClipping
 
     class Paths(BaseModel):
         checkpointing_path: Path

@@ -28,11 +28,13 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
+        gradient_clipper: Callable[[NNModel], None],
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
+        self.gradient_clipper = gradient_clipper
 
     def _train_batch(
         self,
@@ -47,6 +49,7 @@ class Trainer:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch) / self.gradient_acc_steps
         loss.backward()
+        self.gradient_clipper(model)
 
         if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
