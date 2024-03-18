@@ -291,6 +291,10 @@ class CudaEnv(BaseModel):
 
 class Settings(BaseModel):
     class Training(BaseModel):
+        class GradientClipping(BaseModel):
+            mode: GradientClippingMode
+            threshold: Annotated[float, Field(strict=True, gt=0.0)] = 1.0
+
         callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
@@ -298,8 +302,7 @@ class Settings(BaseModel):
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
         sequence_length: Annotated[int, Field(strict=True, ge=1)]
-        gradient_clipping_mode: GradientClippingMode
-        gradient_clipping_threshold: Annotated[float, Field(strict=True, gt=0.0)] = 1.0
+        gradient_clipping: GradientClipping
 
     class Paths(BaseModel):
         checkpointing_path: Path

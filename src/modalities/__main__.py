@@ -238,8 +238,8 @@ class Main:
                 evaluation_result_publisher=evaluation_result_publisher,
                 gradient_acc_steps=components.settings.training.gradient_acc_steps,
                 gradient_clipper=build_gradient_clipper(
-                    gradient_clipping_mode=components.settings.training.gradient_clipping_mode,
-                    gradient_clipping_threshold=components.settings.training.gradient_clipping_threshold,
+                    gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
+                    gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
                 ),
             )
 

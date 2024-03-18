@@ -11,8 +11,9 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
     sequence_length: 256
-    gradient_clipping_mode: p2_norm
-    gradient_clipping_threshold: 1.0
+    gradient_clipping:
+      mode: p2_norm
+      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
