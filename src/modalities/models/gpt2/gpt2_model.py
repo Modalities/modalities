@@ -6,6 +6,7 @@ from typing import Annotated, Dict
 import torch
 import torch.nn as nn
 import xformers.ops as xops
+from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator
 from torch.nn import functional as F
 
@@ -127,21 +128,13 @@ class CausalSelfAttention(nn.Module):
         )
 
         # regularization
-        self.attn_dropout = nn.Dropout(dropout)
-        self.resid_dropout = nn.Dropout(dropout)
+        self._dropout = dropout
+        self.resid_dropout = nn.Dropout(self._dropout)
         self.n_head_q = n_head_q
         self.n_head_kv = n_head_kv
 
         self.n_embd = n_embd
         self.dropout = dropout
-        self.flash = attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
-
-        if not self.flash:
-            # causal mask to ensure that attention is only applied to the left in the input sequence
-            self.register_buffer(
-                "bias",
-                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
-            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
@@ -151,35 +144,15 @@ class CausalSelfAttention(nn.Module):
         k = self.k_attn(x)  # (B, T, n_embd / n_rep)
         v = self.v_attn(x)  # (B, T, n_embd / n_rep)
 
-        q = q.view(B, T, self.n_head_q, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_q, T, hs)
-        k = k.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_kv, T, hs)
-        v = v.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q).transpose(1, 2)  # (B, nh_kv, T, hs)
+        q = q.view(B, T, self.n_head_q, self.n_embd // self.n_head_q)  # (B, T, nh_q, hs)
+        k = k.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
+        v = v.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
 
-        # repeat k/v heads if self.n_rep > 1
-        k = repeat_kv(k, self.n_rep)  # (B, nh_q, T, hs)
-        v = repeat_kv(v, self.n_rep)  # (B, nh_q, T, hs)
-
-        # causal self-attention; Self-attend: (B, nh_q, T, hs) x (B, nh_q, hs, T) -> (B, nh_q, T, T)
-        if self.flash:
-            # efficient attention using Flash Attention CUDA kernels
-            y = torch.nn.functional.scaled_dot_product_attention(
-                query=q,
-                key=k,
-                value=v,
-                attn_mask=None,
-                dropout_p=self.dropout if self.training else 0,
-                is_causal=True,
-            )
-        else:
-            # manual implementation of attention
-            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))  # (B, nh_q, T, T)
-            att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
-            att = F.softmax(att, dim=-1)
-            att = self.attn_dropout(att)
-            y = att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hs) -> (B, nh_q, T, hs)
-        y = (
-            y.transpose(1, 2).contiguous().view(B, T, self.n_embd)
-        )  # (B, T, n_embd), re-assemble all head outputs side by side
+        # TODO: make parameters configurable
+        y = flash_attn_func(
+            q, k, v, dropout_p=self._dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
+        ).reshape(B, T, self.n_embd)
+        # (B, T, n_embd), re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))  # (B, T, n_embd)
