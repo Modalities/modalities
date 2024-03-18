@@ -124,6 +124,7 @@ def trainer(progress_publisher_mock):
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
+        gradient_clipper=lambda model: None,
     )
 
 
