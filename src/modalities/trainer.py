@@ -3,6 +3,7 @@ from typing import Callable
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -21,19 +22,40 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
+        gradient_clipper: Callable[[NNModel], None],
         throughput_aggregator_factory: Callable[[], ThroughputAggregator] = ThroughputAggregator,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
+        self.gradient_clipper = gradient_clipper
         self._throughput_aggregator_factory = throughput_aggregator_factory
+
+    def _train_batch(
+        self,
+        batch: DatasetBatch,
+        model: NNModel,
+        optimizer: Optimizer,
+        loss_fun: Loss,
+        batch_id: int,
+        data_loader: LLMDataLoader,
+    ) -> torch.Tensor:
+        result_batch = model_predict_batch(model=model, batch=batch)
+        loss = loss_fun(result_batch) / self.gradient_acc_steps
+        loss.backward()
+
+        if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
+            optimizer.step()
+            optimizer.zero_grad()
+        return loss
 
     def train(
         self,
         model: NNModel,
         train_loader: LLMDataLoader,
-        optimizer,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
         loss_fun: Loss,
         callback_interval_in_batches: int,
         # TODO: remove
@@ -60,6 +82,7 @@ class Trainer:
                     batch=batch,
                     model=model,
                     optimizer=optimizer,
+                    scheduler=scheduler,
                     loss_fun=loss_fun,
                     batch_id=batch_id,
                     data_loader=train_loader,

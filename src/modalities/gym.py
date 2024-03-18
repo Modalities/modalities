@@ -2,6 +2,7 @@ from functools import partial
 from typing import List
 
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpointing import Checkpointing
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -22,6 +23,7 @@ class Gym:
         self,
         model: NNModel,
         optimizer: Optimizer,
+        scheduler: LRScheduler,
         callback_interval_in_batches: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
@@ -42,6 +44,7 @@ class Gym:
             train_loader=train_data_loader,
             loss_fun=self.loss_fun,
             optimizer=optimizer,
+            scheduler=scheduler,
             callback_interval_in_batches=callback_interval_in_batches,
             epoch_done_callback=partial(  # TODO rename to something more meaningful
                 self._run_evaluation_and_checkpointing,

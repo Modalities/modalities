@@ -1,20 +1,32 @@
+from typing import Tuple
+
 import torch.nn as nn
-from torch.optim import AdamW, Optimizer
+from torch.optim import Adam, AdamW, Optimizer
 
 from modalities.checkpointing.checkpointing import Checkpointing
 
 
 class OptimizerFactory:
     @staticmethod
-    def get_adam_w(lr: float, wrapped_model: nn.Module):
+    def get_adam(
+        lr: float, betas: Tuple[float, float], eps: float, weight_decay: float, wrapped_model: nn.Module
+    ) -> Optimizer:
         model_parameters = wrapped_model.parameters()
-        optimizer = AdamW(params=model_parameters, lr=lr)
+        optimizer = Adam(params=model_parameters, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+        return optimizer
+
+    @staticmethod
+    def get_adam_w(
+        lr: float, betas: Tuple[float, float], eps: float, weight_decay: float, wrapped_model: nn.Module
+    ) -> Optimizer:
+        model_parameters = wrapped_model.parameters()
+        optimizer = AdamW(params=model_parameters, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         return optimizer
 
     @staticmethod
     def get_checkpointed_optimizer(
         checkpointing: Checkpointing, checkpoint_path, wrapped_model: nn.Module, optimizer: Optimizer
-    ):
+    ) -> Optimizer:
         wrapped_optimizer = checkpointing.load_optimizer_checkpoint(
             file_path=checkpoint_path, optimizer=optimizer, wrapped_model=wrapped_model
         )
