@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Optional
 
 import torch.nn as nn
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator
+from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
 from pydantic_core import core_schema
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
@@ -296,7 +296,15 @@ class Settings(BaseModel):
     class Training(BaseModel):
         class GradientClipping(BaseModel):
             mode: GradientClippingMode
-            threshold: Annotated[float, Field(strict=True, gt=0.0)] = 1.0
+            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
+
+            @model_validator(mode="after")
+            def check_mode_none_iff_threshold_none(self) -> BaseModel:
+                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
+                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
+                if self.mode != GradientClippingMode.NONE and self.threshold is None:
+                    raise ValueError("A threshold value is required when gradient clipping is used.")
+                return self
 
         callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]

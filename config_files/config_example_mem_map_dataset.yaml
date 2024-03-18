@@ -14,7 +14,7 @@ settings:
     sequence_length: 4096
     gradient_clipping:
       mode: none
-      threshold: 1.0
+      threshold:
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}

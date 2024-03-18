@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 import pytest
 import torch
@@ -18,7 +18,7 @@ def test_clipping_gradients_makes_them_smaller(gradient_clipping_mode: GradientC
 
 
 def test_gradient_clipping_mode_none_does_not_change_gradients():
-    grad_sum1, grad_sum2 = _run_gradient_clipping_experiment(GradientClippingMode.NONE)
+    grad_sum1, grad_sum2 = _run_gradient_clipping_experiment(GradientClippingMode.NONE, threshold=None)
     assert grad_sum1 == grad_sum2
 
 
@@ -36,14 +36,14 @@ class TestModel(NNModel):
         return self._weights.weight.grad.sum().item()
 
 
-def _run_gradient_clipping_experiment(gradient_clipping_mode):
+def _run_gradient_clipping_experiment(gradient_clipping_mode: GradientClippingMode, threshold: Optional[float] = 0.001):
     model = TestModel()
-    inputs = {"input": torch.rand(2, 2)}
+    inputs = {"input": torch.ones(2, 2)}
     output: torch.Tensor = model(inputs)["output"]
     loss = output.sum()
     loss.backward()
     grad_sum1 = model.get_grad_sum()
-    clipper = build_gradient_clipper(gradient_clipping_mode, 0.001)
+    clipper = build_gradient_clipper(gradient_clipping_mode, threshold)
     clipper(model)
     grad_sum2 = model.get_grad_sum()
     return grad_sum1, grad_sum2
