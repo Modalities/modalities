@@ -2,6 +2,11 @@ import pytest
 import torch
 
 from modalities.models.gpt2.gpt2_model import CausalSelfAttention, AttentionConfig
+import torch
+import torch.nn.functional as F
+import torch.nn as nn
+from einops import einsum,rearrange
+from flash_attn import flash_attn_func
 
 def _get_random_input_seq(embedding_shape):
     flash_attn_supported_dtype = torch.bfloat16
@@ -35,6 +40,7 @@ def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, block_size, attenti
         (8, 3, 32, False),
     ],
 )
+
 def test_forward_pass_success(n_head_q, n_head_kv, n_embd, successful):
     batch_size = 2
     block_size = 10
@@ -56,3 +62,32 @@ def test_forward_pass_success(n_head_q, n_head_kv, n_embd, successful):
         embedded_input_seq = _get_random_input_seq(embedding_shape).cuda()
         output_tensor = attention_layer(embedded_input_seq)
         assert output_tensor.shape == embedding_shape
+        
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")        
+def test_forward_equality():
+    # shapes: (batch_size, seq_len, num_heads, head_dim)
+    query_orig = torch.rand(1, 256, 8, 64, dtype=torch.bfloat16).cuda()
+    key_orig = torch.rand(1, 256, 2, 64, dtype=torch.bfloat16).cuda()
+    value_orig = torch.rand(1, 256, 2, 64, dtype=torch.bfloat16).cuda()
+    # define number of heads in one group, in this toy example we have 2 kv_heads,
+    # so this means we will have 2 groups of size 4 each
+    num_head_groups = query_orig.shape[2] // key_orig.shape[2]
+    scale = query_orig.size(-1) ** 0.5
+    # Swap seq len with num_heads to accelerate computations
+    query = rearrange(query_orig, "b n h d -> b h n d")
+    key = rearrange(key_orig, "b s h d -> b h s d")
+    value = rearrange(value_orig, "b s h d -> b h s d")
+    # split query num heads in groups by introducing additional 'g' dimension
+    query = rearrange(query, "b (h g) n d -> b g h n d", g=num_head_groups)
+    # calculate the attention scores and sum over the group dim to perform averaging
+    scores = einsum(query, key, "b g h n d, b h s d -> b h n s")
+    attention = F.softmax(scores / scale, dim=-1)
+    # apply weights to the value head
+    out = einsum(attention, value, "b h n s, b h s d -> b h n d")
+    # reshape back to original dimensions
+    out = rearrange(out, "b h n d -> b n h d")
+    
+    # FlasAttention
+    q_t, k_t, v_t = CausalSelfAttention.execute_qkv_transforms(query_orig, key_orig, value_orig, nn.ModuleList(), 8)
+    out_flash = CausalSelfAttention.execute_flash_attention(q_t, k_t, v_t, dropout=0.0)
+    assert torch.equal(out, out_flash)

@@ -206,7 +206,7 @@ model:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #TODO check if either head_q or head_kv is needed here
+            n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
     weight_init:
