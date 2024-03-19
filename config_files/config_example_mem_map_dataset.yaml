@@ -153,7 +153,7 @@ model:
           config:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head}
-            seq_length_dim: -3
+            seq_length_dim: -2
     activation_type: gelu
     weight_init:
       mean: 0.0

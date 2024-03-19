@@ -77,8 +77,8 @@ class RotaryTransform(QueryKeyValueTransform):
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
             #TODO check if that is correct
-            self._cos_cached = emb.cos()[None, :, None, :].to(x.dtype)
-            self._sin_cached = emb.sin()[None, :, None, :].to(x.dtype)
+            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
+            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
 
         return self._cos_cached, self._sin_cached
 
@@ -157,8 +157,13 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
-    epsilon: Annotated[float, Field(strict=True, ge=0.0)]
 
+    @model_validator(mode="after")
+    def check_divisibility(self) -> "GPT2LLMConfig":
+        if self.n_head_q % self.n_head_kv != 0:
+            raise ValueError(f'n_head_q must be divisible by n_head_kv')
+        return self
+    
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
@@ -240,15 +245,18 @@ class CausalSelfAttention(nn.Module):
         k = self.k_attn(x)  # (B, T, n_embd / n_rep)
         v = self.v_attn(x)  # (B, T, n_embd / n_rep)
         
-        q = q.view(B, T, self.n_head_q, self.n_embd // self.n_head_q)  # (B, T, nh_q, hs)
-        k = k.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
-        v = v.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
-
+        q = q.view(B, self.n_head_q, T,  self.n_embd // self.n_head_q)  # (B, nh_q, T, hs)
+        k = k.view(B, self.n_head_kv, T,  self.n_embd // self.n_head_q)  # (B, nh_kv, T, hs)
+        v = v.view(B, self.n_head_kv, T,  self.n_embd // self.n_head_q)  # (B, nh_kv, T, hs)
 
         # TODO: move logic into a function
         for qkv_transform in self.qkv_transforms:
             q, k, v = qkv_transform(q, k, v)
 
+        q = q.view(B, T, self.n_head_q, self.n_embd // self.n_head_q)  # (B, T, nh_q, hs)
+        k = k.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
+        v = v.view(B, T, self.n_head_kv, self.n_embd // self.n_head_q)  # (B, T, nh_kv, hs)
+        
         # TODO: make parameters configurable
         y = flash_attn_func(
             q, k, v, dropout_p=self._dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
@@ -289,7 +297,6 @@ class GPT2Block(nn.Module):
         self,
         n_embd: int,
         bias: bool,
-        epsilon: float,
         n_head_q: int,
         n_head_kv: int,
         activation_type: ActivationType,
@@ -344,7 +351,6 @@ class GPT2LLM(NNModel):
         dropout: float,
         bias: bool,
         activation_type: ActivationType,
-        epsilon: float,
         weight_init: WeightInitializationConfig,
         attention_config: AttentionConfig,
         attention_norm: nn.Module,
@@ -386,7 +392,6 @@ class GPT2LLM(NNModel):
                         GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
-                            epsilon=epsilon,
                             n_head_q=n_head_q,
                             n_head_kv=n_head_kv,
                             activation_type=activation_type,
@@ -450,15 +455,3 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
-
-
-def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
-    """
-    Source code adopted from
-      https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
-    Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
-    """
-    B, nh_kv, T, hs = x.shape
-    if n_rep == 1:
-        return x
-    return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)

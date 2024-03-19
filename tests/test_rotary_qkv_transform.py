@@ -10,11 +10,11 @@ def test_rotary_transform():
     seq_lenght = 2
     head_dim = embedding_dim // n_heads
 
-    q = torch.ones(bs, seq_lenght, n_heads, head_dim) + 1
+    q = torch.ones(bs, n_heads, seq_lenght, head_dim) + 1
     q[:, :, :, head_dim // 2 :] = q[:, :, :, head_dim // 2 :] + 1
-    k = torch.ones(bs, seq_lenght, n_heads, head_dim) + 2
+    k = torch.ones(bs, n_heads, seq_lenght, head_dim) + 2
     k[:, :, :, head_dim // 2 :] = k[:, :, :, head_dim // 2 :] + 1
-    v = torch.ones(bs, seq_lenght, n_heads, head_dim)
+    v = torch.ones(bs, n_heads, seq_lenght ,head_dim)
 
     rotary_transform = RotaryTransform(n_embd=embedding_dim, n_head=n_heads)
 
