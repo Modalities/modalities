@@ -66,9 +66,9 @@ def test_forward_equality():
     # Source: https://medium.com/@maxshapp/grouped-query-attention-gqa-explained-with-code-e56ee2a1df5a
 
     # shapes: (batch_size, seq_len, num_heads, head_dim)
-    query_orig = torch.rand(1, 256, 8, 64, dtype=torch.bfloat16).cuda()
-    key_orig = torch.rand(1, 256, 2, 64, dtype=torch.bfloat16).cuda()
-    value_orig = torch.rand(1, 256, 2, 64, dtype=torch.bfloat16).cuda()
+    query_orig = torch.rand(1, 12, 8, 16, dtype=torch.bfloat16).cuda()
+    key_orig = torch.rand(1, 12, 2, 16, dtype=torch.bfloat16).cuda()
+    value_orig = torch.rand(1, 12, 2, 16, dtype=torch.bfloat16).cuda()
 
     # define number of heads in one group, in this toy example we have 2 kv_heads,
     # so this means we will have 2 groups of size 4 each
@@ -76,19 +76,19 @@ def test_forward_equality():
     scale = query_orig.size(-1) ** 0.5
 
     # Swap seq len with num_heads to accelerate computations
-    query = rearrange(query_orig, "b n h d -> b h n d")
-    key = rearrange(key_orig, "b s h d -> b h s d")
-    value = rearrange(value_orig, "b s h d -> b h s d")
+    query = rearrange(query_orig, "b s hq d -> b hq s d")
+    key = rearrange(key_orig, "b s hk d -> b hk s d")
+    value = rearrange(value_orig, "b s hv d -> b hv s d")
 
     # split query num heads in groups by introducing additional 'g' dimension
-    query = rearrange(query, "b (h g) n d -> b g h n d", g=num_head_groups)
+    query = rearrange(query, "b (h g) s d -> b g h s d", g=num_head_groups)
 
     # calculate the attention scores and sum over the group dim to perform averaging
-    scores = einsum(query, key, "b g h n d, b h s d -> b h n s")
+    scores = einsum(query, key, "b g h s d, b hk s d -> b g h s d").reshape(1, 12, 8, 16)
     attention = F.softmax(scores / scale, dim=-1)
 
     # apply weights to the value head
-    out = einsum(attention, value, "b h n s, b h s d -> b h n d")
+    out = einsum(attention, value, "b s h d, b hk s d -> b h s d")
 
     # reshape back to original dimensions
     out = rearrange(out, "b h n d -> b n h d")
