@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
@@ -103,6 +104,11 @@ def optimizer_mock():
 
 
 @pytest.fixture(scope="function")
+def scheduler_mock():
+    return MagicMock(spec=LRScheduler)
+
+
+@pytest.fixture(scope="function")
 def loss_mock():
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
 
@@ -124,6 +130,7 @@ def trainer(progress_publisher_mock):
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
+        gradient_clipper=lambda model: None,
     )
 
 

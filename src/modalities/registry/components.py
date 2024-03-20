@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Type
 
+import torch
 import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
@@ -13,12 +14,15 @@ from modalities.checkpointing.checkpointing_strategies import (
     SaveKMostRecentCheckpointsStrategy,
 )
 from modalities.config.config import (
+    AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
     CheckpointingConfig,
     CLMCrossEntropyLossConfig,
+    ConstantLRSchedulerConfig,
+    CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
@@ -28,6 +32,7 @@ from modalities.config.config import (
     GPT2TokenizerFastConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    OneCycleLRSchedulerConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -35,6 +40,7 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    StepLRSchedulerConfig,
     WandBEvaluationResultSubscriberConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
@@ -74,14 +80,18 @@ COMPONENTS = [
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
+    ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
     ),
     # schedulers
-    # ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, None),  # TODO
-    # ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, None),  # TODO
-    # ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, None),  # TODO
+    ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
+    ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
+    ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
+    ComponentEntity(
+        "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+    ),
     # tokenizers
     ComponentEntity("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFast, GPT2TokenizerFastConfig),
     # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO

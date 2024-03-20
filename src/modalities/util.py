@@ -12,11 +12,13 @@ from pydantic import ValidationError
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
 
+
 def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
     try:
         return enum_type[name]
     except KeyError:
         raise ValidationError(f"Invalid {enum_type} member name: {name}")
+
 
 def get_callback_interval_in_batches_per_rank(
     callback_interval_in_samples: int, local_train_micro_batch_size: int, world_size: int, gradient_acc_steps: int
@@ -34,14 +36,6 @@ def get_callback_interval_in_batches_per_rank(
         num_local_train_micro_batches_ret % gradient_acc_steps == 0
     ), "callback_interval_in_batches_per_rank must be divisible by gradient_acc_steps"
     return num_local_train_micro_batches_ret
-
-
-def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
-    try:
-        val = enum_type[name]
-        return val
-    except KeyError:
-        raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 
 def get_date_of_run():
