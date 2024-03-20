@@ -14,7 +14,7 @@ def test_rotary_transform():
     q[:, :, :, head_dim // 2 :] = q[:, :, :, head_dim // 2 :] + 1
     k = torch.ones(bs, n_heads, seq_lenght, head_dim) + 2
     k[:, :, :, head_dim // 2 :] = k[:, :, :, head_dim // 2 :] + 1
-    v = torch.ones(bs, n_heads, seq_lenght ,head_dim)
+    v = torch.ones(bs, n_heads, seq_lenght, head_dim)
 
     rotary_transform = RotaryTransform(n_embd=embedding_dim, n_head=n_heads)
 

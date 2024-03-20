@@ -1,7 +1,5 @@
 import pytest
 import torch
-import torch.nn.functional as F
-from einops import einsum, rearrange
 
 from modalities.models.gpt2.gpt2_model import AttentionConfig, CausalSelfAttention
 
@@ -69,7 +67,7 @@ def test_forward_equality():
     query_orig = torch.rand(1, 8, 12, 16, dtype=torch.bfloat16).cuda()
     key_orig = torch.rand(1, 2, 12, 16, dtype=torch.bfloat16).cuda()
     value_orig = torch.rand(1, 2, 12, 16, dtype=torch.bfloat16).cuda()
-    
+
     out_flash = CausalSelfAttention.execute_flash_attention(query_orig, key_orig, value_orig, dropout=0.0)
 
     assert out_flash.shape == (1, 12, 8, 16)
