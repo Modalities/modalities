@@ -23,7 +23,7 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.trainer import Trainer
-from modalities.models.gpt2.gpt2_model import AttentionConfig
+
 _ROOT_DIR = Path(__file__).parents[1]
 
 

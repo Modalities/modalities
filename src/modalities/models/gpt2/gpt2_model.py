@@ -9,7 +9,6 @@ import torch.nn as nn
 import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
-from torch.nn import functional as F
 
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
@@ -160,9 +159,9 @@ class GPT2LLMConfig(BaseModel):
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
         if self.n_head_q % self.n_head_kv != 0:
-            raise ValueError(f'n_head_q must be divisible by n_head_kv')
+            raise ValueError("n_head_q must be divisible by n_head_kv")
         return self
-    
+
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
@@ -226,7 +225,7 @@ class CausalSelfAttention(nn.Module):
         self.n_head_kv = n_head_kv
 
         self.n_embd = n_embd
-        #TODO: we might want different values for attention_dropout and linear_dropout
+        # TODO: we might want different values for attention_dropout and linear_dropout
         self.dropout = dropout
         self.resid_dropout = nn.Dropout(self.dropout)
 
@@ -239,37 +238,44 @@ class CausalSelfAttention(nn.Module):
     def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
-    
+
     @staticmethod
-    def execute_qkv_transforms(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q:int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def execute_qkv_transforms(
+        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size = q.shape[0]
         block_size = q.shape[1]
         n_head_dim = q.shape[2] // n_head_q
-        q = q.view(batch_size, -1, block_size,  n_head_dim)  # (B, nh_q, T, hs)
-        k = k.view(batch_size, -1, block_size,  n_head_dim)  # (B, nh_kv, T, hs)
-        v = v.view(batch_size, -1, block_size,  n_head_dim)  # (B, nh_kv, T, hs)
+
+        q = q.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_q, T, hd)
+        k = k.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
+
         return q, k, v
-    
+
     @staticmethod
-    def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout:float) -> torch.Tensor:
-        batch_size = q.shape[0]
-        block_size = q.shape[2]
-        n_head_dim = q.shape[3]        
-        q = q.view(batch_size, block_size, -1, n_head_dim)  # (B, T, nh_q, hs)
-        k = k.view(batch_size, block_size, -1, n_head_dim)  # (B, T, nh_kv, hs)
-        v = v.view(batch_size, block_size, -1, n_head_dim)  # (B, T, nh_kv, hs)
+    def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
+        q = q.transpose(1, 2)  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2)  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
+
         # TODO: make parameters configurable
         return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
-        q, k, v = self.projection(x) # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
-        q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q) # q: (B, nh_q, T, hs), k: (B, nh_kv, T, hs), v: (B, nh_kv, T, hs)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout) # (B, T, nh_q, hs)
-        y = y.reshape(B, T, self.n_embd) # (B, T, n_embd), re-assemble all head outputs side by side
-        return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection 
+        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
+
+        # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
+        q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
+        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
+        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
+
+        return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
+
 
 class TransformerMLP(nn.Module):
     def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, dropout: float):
