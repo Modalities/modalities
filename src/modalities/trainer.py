@@ -136,7 +136,10 @@ class Trainer:
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
                         # TODO: hardcoded metric key
-                        throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
+                        throughput_metrics={
+                            "training_synced_num_samples_per_second": synced_num_samples_per_second,
+                            "lr": scheduler.get_last_lr() if scheduler is not None else optimizer.param_groups[0]["lr"],
+                        },
                         dataloader_tag=train_loader.dataloader_tag,
                         global_train_sample_id=global_train_sample_id,
                     )
