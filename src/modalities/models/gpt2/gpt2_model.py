@@ -50,7 +50,7 @@ class RotaryTransform(QueryKeyValueTransform):
     XFormers implementation and removed in this implementation.
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -3):
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
@@ -263,7 +263,7 @@ class CausalSelfAttention(nn.Module):
         v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
 
         # TODO: make parameters configurable
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        return flash_attn_func(q, k, v, dropout_p=dropout, causal=False, softmax_scale=None, window_size=(-1, -1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
