@@ -195,22 +195,20 @@ model:
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
-    n_head: 4
+    n_head_q: 8
+    n_head_kv: 8
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
-      attention_type: pytorch_flash_attention
-      scaling_factor: 3
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
-    epsilon: 1e-5
     weight_init:
       mean: 0.0
       std: 0.02
@@ -285,7 +283,6 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
-    
