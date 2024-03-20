@@ -185,14 +185,8 @@ class CausalSelfAttention(nn.Module):
         block_size: int,
     ):
         super().__init__()
-        assert n_embd % n_head_q == 0, (
-            "Embeddings get passed to `n_head_q` different heads "
-            "and their dimension needs to be divisible by `n_head_q`."
-        )
-        assert n_head_q % n_head_kv == 0, (
-            "It is necessary to have `n_head_q` divisible by `n_head_kv`."
-            ' For more details, read about "Grouped Query Attention"'
-        )
+        assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
+        assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
 
         self.n_rep = n_head_q // n_head_kv
 
