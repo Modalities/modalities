@@ -22,7 +22,7 @@ class MultiModalBlock(nn.Module):
         dropout: float,
         ffn_hidden: int,
         attention_config: AttentionConfig = None,
-        attention_type: AttentionType = AttentionType.NON_CAUSAL_ATTENTION,
+        attention_type: AttentionType = AttentionType.NON_CAUSAL_SELF_ATTENTION,
         with_context: bool = True,
     ):
         super().__init__()

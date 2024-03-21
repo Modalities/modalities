@@ -77,7 +77,7 @@ class VisionTransformerBlock(nn.Module):
             n_embd=n_embd,
             n_head=n_head,
             attention_config=attention_config,
-            attention_type=AttentionType.NON_CAUSAL_ATTENTION,
+            attention_type=AttentionType.NON_CAUSAL_SELF_ATTENTION,
         )
         self.norm2 = nn.LayerNorm(n_embd)
         self.mlp = MLP(in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
