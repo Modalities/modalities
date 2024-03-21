@@ -24,7 +24,8 @@ text_decoder_config:
   prediction_key: text_embeddings
   block_size: 1024
   vocab_size: 50304
-  n_layer: 12
+  n_layer_text: 6
+  n_layer_multimodal_text: 6
   attention_config:
     attention_engine_type: pytorch_flash_attention
   n_head: 12
@@ -38,7 +39,6 @@ n_pool_head: 8
 n_vision_queries: 256
 bias_attn_pool: False
 epsilon_attn_pool: 1e-5
-n_shared_layer: 6
 weight_init:
   mean: 0.0
   std: 0.02

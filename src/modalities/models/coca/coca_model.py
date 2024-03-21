@@ -10,7 +10,7 @@ from torch import nn
 from modalities.models.coca.attention_pooling import AttentionPooling
 from modalities.models.coca.multi_modal_decoder import MultiModalTextDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Config, WeightInitailizationConfig
+from modalities.models.gpt2.gpt2_model import ActivationType, WeightInitailizationConfig
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
@@ -21,7 +21,8 @@ class TextDecoderConfig(BaseModel):
     prediction_key: str
     block_size: Annotated[int, Field(ge=1)]
     vocab_size: Annotated[int, Field(ge=1)]
-    n_layer: Annotated[int, Field(ge=1)]
+    n_layer_text: Annotated[int, Field(ge=1)]
+    n_layer_multimodal_text: Annotated[int, Field(ge=1)]
     n_head: Annotated[int, Field(ge=1)]
     n_embd: Annotated[int, Field(ge=1)]
     ffn_hidden: Annotated[int, Field(ge=1)]
@@ -44,7 +45,6 @@ class CoCaConfig(BaseModel):
     n_vision_queries: Annotated[int, Field(ge=1)]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
-    n_shared_layer: Annotated[int, Field(ge=1)]
     weight_init: WeightInitailizationConfig
 
 
@@ -70,8 +70,7 @@ class CoCa(NNModel):
         bias_attn_pool: bool,
         epsilon_attn_pool: float,
         vision_encoder_config: VisionTransformerConfig,
-        text_decoder_config: GPT2Config,
-        n_shared_layer: int,
+        text_decoder_config: TextDecoderConfig,
         weight_init: WeightInitailizationConfig,
     ) -> None:
         super().__init__()
@@ -86,7 +85,7 @@ class CoCa(NNModel):
             sample_key=text_decoder_config.sample_key,
             prediction_key=text_embd_prediction_key,
             block_size=text_decoder_config.block_size + 1,  # +1 for the class token
-            n_layer=text_decoder_config.n_layer - n_shared_layer,
+            n_layer=text_decoder_config.n_layer_text,
             vocab_size=text_decoder_config.vocab_size,
             n_head=text_decoder_config.n_head,
             n_embd=text_decoder_config.n_embd,
@@ -101,7 +100,7 @@ class CoCa(NNModel):
             sample_key=text_embd_prediction_key,
             prediction_key=text_decoder_config.prediction_key,
             block_size=text_decoder_config.block_size,
-            n_layer=n_shared_layer,
+            n_layer=text_decoder_config.n_layer_multimodal_text,
             vocab_size=text_decoder_config.vocab_size,
             n_head=text_decoder_config.n_head,
             n_embd=text_decoder_config.n_embd,
@@ -133,7 +132,10 @@ class CoCa(NNModel):
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
                 torch.nn.init.normal_(
-                    p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * text_decoder_config.n_layer)
+                    p,
+                    mean=weight_init.mean,
+                    std=weight_init.std
+                    / math.sqrt(2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)),
                 )
 
     def _init_weights(self, module: nn.Module, weight_init: WeightInitailizationConfig):

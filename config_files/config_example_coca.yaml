@@ -149,7 +149,8 @@ model:
       prediction_key: logits
       block_size: 1024
       vocab_size: 50304
-      n_layer: 2
+      n_layer_text: 1
+      n_layer_multimodal_text: 1
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
@@ -163,7 +164,6 @@ model:
     n_vision_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
-    n_shared_layer: 1
     weight_init:
       mean: 0.0
       std: 0.02
