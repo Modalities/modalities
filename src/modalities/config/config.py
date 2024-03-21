@@ -1,156 +1,103 @@
-import json
-import warnings
-from enum import Enum
+import os
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field, FilePath, PositiveFloat, PositiveInt, confloat, conint, model_validator
-from transformers import PretrainedConfig
+import torch.nn as nn
+from omegaconf import OmegaConf
+from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
+from pydantic_core import core_schema
+from torch.distributed.fsdp import ShardingStrategy
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import Sampler
+from torch.utils.data.dataset import Dataset
+from transformers import GPT2TokenizerFast
+from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
-from modalities.config.lookup_types import (
-    BatchSamplerTypes,
-    CheckpointingExectionTypes,
-    CheckpointingStrategyTypes,
-    CollatorTypes,
-    DataloaderTypes,
-    DatasetTypes,
-    LossTypes,
-    ModelTypes,
-    OptimizerTypes,
-    SamplerTypes,
-    SchedulerTypes,
-    TokenizerTypes,
-)
-from modalities.config.types import ProcessGroupBackendType
-from modalities.dataloader.dataset import DummyDatasetConfig
-from modalities.models.coca.coca_model import CoCaConfig
-from modalities.models.gpt2.gpt2_model import GPT2Config
-from modalities.models.huggingface.huggingface_models import HuggingFacePretrainedModelConfig
-from modalities.running_env.fsdp.fsdp_running_env import RunningEnvConfig
-
-
-class WandbConfig(BaseModel):
-    class WandbMode(Enum):
-        ONLINE = "ONLINE"
-        OFFLINE = "OFFLINE"
-        DISABLED = "DISABLED"
-
-    project_name: str
-    mode: WandbMode
-    dir: Optional[Path] = Field(default_factory=lambda: Path("."))
+from modalities.checkpointing.checkpointing import CheckpointingIF
+from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
+from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
+from modalities.config.lookup_enum import LookupEnum
+from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.loss_functions import Loss
+from modalities.models.gpt2.collator import CollateFnIF
+from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.util import get_date_of_run, parse_enum_by_name
 
 
-class CudaKwargsConfig(BaseModel):
-    num_workers: conint(ge=0)
-    pin_memory: bool
-    shuffle: bool
+class PydanticThirdPartyTypeIF:
+    def __init__(self, third_party_type):
+        self.third_party_type = third_party_type
+
+    def __get_pydantic_core_schema__(
+        self,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.is_instance_schema(self.third_party_type),
+            python_schema=core_schema.is_instance_schema(self.third_party_type),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     lambda instance: instance.x
+            # ),
+        )
 
 
-class TokenizerConfig(BaseModel):
-    class GPT2TokenizerFastConfig(BaseModel):
-        tokenizer_file: str  # FilePath not possible, since transformers.PretrainedTokenizers can only handle strings
-
-    type_hint: TokenizerTypes
-    config: GPT2TokenizerFastConfig
-
-
-class DatasetConfig(BaseModel):
-    class MemMapDatasetConfig(BaseModel):
-        raw_data_path: FilePath
-        index_path: Optional[FilePath] = None
-        block_size: conint(gt=0)
-        tokenizer: TokenizerConfig
-        jq_pattern: str
-        sample_key: str
-
-    class PackedMemMapDatasetContinuousConfig(BaseModel):
-        raw_data_path: Path
-        block_size: conint(gt=0)
-        sample_key: str
-
-    class PackedMemMapDatasetMegatronConfig(BaseModel):
-        raw_data_path: Path
-        block_size: conint(gt=0)
-        sample_key: str
-
-    class MMapIndexedDatasetConfig(BaseModel):
-        path: Path
-        skip_warmup: bool
-
-    class OpenGPTXMMapDatasetConfig(BaseModel):
-        num_samples: conint(ge=1)
-        path: FilePath
-        sample_key: str
-        sequence_len: PositiveInt
-
-    type_hint: DatasetTypes
-    config: Union[
-        DummyDatasetConfig,
-        MemMapDatasetConfig,
-        OpenGPTXMMapDatasetConfig,
-        PackedMemMapDatasetContinuousConfig,
-        PackedMemMapDatasetMegatronConfig,
-        MMapIndexedDatasetConfig,
-    ] = Field(union_mode="left_to_right")
+PydanticCheckpointingIFType = Annotated[CheckpointingIF, PydanticThirdPartyTypeIF(CheckpointingIF)]
+PydanticCheckpointingStrategyIFType = Annotated[
+    CheckpointingStrategyIF, PydanticThirdPartyTypeIF(CheckpointingStrategyIF)
+]
+PydanticCheckpointingExecutionIFType = Annotated[
+    CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
+]
+PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
+PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
+PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
+PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
+PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
+PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
+PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
+PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
+PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
 
-class SamplerConfig(BaseModel):
-    class DistributedSamplerConfig(BaseModel):
-        rank: conint(ge=0)
-        num_replicas: conint(ge=0)
-        shuffle: bool
-
-    type_hint: SamplerTypes
-    config: DistributedSamplerConfig
+class ProcessGroupBackendType(LookupEnum):
+    nccl = "nccl"
 
 
-class BatchSamplerConfig(BaseModel):
-    class StandardBatchSamplerConfig(BaseModel):
-        sampler: SamplerConfig
-        batch_size: conint(gt=0)
-        drop_last: bool
-
-    type_hint: BatchSamplerTypes
-    config: StandardBatchSamplerConfig
+class TokenizerTypes(LookupEnum):
+    GPT2TokenizerFast = GPT2TokenizerFast
+    LlamaTokenizerFast = LlamaTokenizerFast
 
 
-class CollatorConfig(BaseModel):
-    class GPT2LLMCollatorConfig(BaseModel):
-        sample_key: str
-        target_key: str
-
-    class CoCaCollatorConfig(BaseModel):
-        sample_keys: List[str]
-        target_keys: List[str]
-        text_sample_key: str
-        text_target_key: str
-
-    type_hint: CollatorTypes
-    config: GPT2LLMCollatorConfig | CoCaCollatorConfig
+class PassType(LookupEnum):
+    BY_VALUE = "by_value"
+    BY_REFERENCE = "by_reference"
 
 
-class DataLoaderConfig(BaseModel):
-    class LLMDataLoaderConfig(CudaKwargsConfig):
-        dataloader_tag: str
-        dataset: DatasetConfig
-        batch_sampler: BatchSamplerConfig
-        collate_fn: CollatorConfig
-
-    type_hint: DataloaderTypes
-    config: LLMDataLoaderConfig
+class WandbMode(LookupEnum):
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    DISABLED = "DISABLED"
 
 
-class DataConfig(BaseModel):
-    sample_key: str
-    target_key: str
-    sequence_len: int
-    train_dataloader: DataLoaderConfig
-    eval_dataloaders: List[DataLoaderConfig]
+class GradientClippingMode(LookupEnum):
+    NONE = "NONE"  # Do not apply gradient clipping.
+    VALUE = "value"  # Clip all gradient values independently.
+    # For norm based clipping modes, the norm is computed over
+    # all gradients together, as if they were concatenated
+    # into a single vector.
+    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
+    MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
-class ModelConfig(BaseModel):
-    type_hint: ModelTypes
-    config: HuggingFacePretrainedModelConfig | GPT2Config | CoCaConfig
+class ReferenceConfig(BaseModel):
+    instance_key: str
+    pass_type: PassType
 
 
 class CLMCrossEntropyLossConfig(BaseModel):
@@ -158,199 +105,325 @@ class CLMCrossEntropyLossConfig(BaseModel):
     prediction_key: str
 
 
-class LossConfig(BaseModel):
-    type_hint: LossTypes
-    config: CLMCrossEntropyLossConfig
+# Checkpointing
+class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
+    k: PositiveInt
 
 
-class TrainingConfig(BaseModel):
-    # TODO: use this in Progress Logging
-    global_num_training_samples: conint(gt=0)
-    callback_interval_in_samples: conint(gt=0)
-    process_group_backend: ProcessGroupBackendType
-    local_rank: conint(ge=0)
-    global_rank: conint(ge=0)
-    world_size: conint(ge=0)
-    main_rank: conint(ge=0)
-    local_train_micro_batch_size: conint(gt=0)
-    global_num_seen_samples: conint(ge=0)
-    do_apply_activation_checkpointing: bool
-    gradient_acc_step: conint(gt=0)
-
-    @property
-    def local_train_batch_size(self):
-        return self.local_train_micro_batch_size * self.gradient_acc_step
-
-    @property
-    def global_train_batch_size(self):
-        return self.local_train_batch_size * self.world_size
-
-    @property
-    def local_num_train_samples(self):
-        exact = self.global_num_training_samples / self.world_size
-        ret = self.global_num_training_samples // self.world_size
-        if exact != ret:
-            print(f"Calculated local_num_training_samples is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def local_num_seen_train_samples(self):
-        exact = self.global_num_seen_samples / self.world_size
-        ret = self.global_num_seen_samples // self.world_size
-        if exact != ret:
-            print(f"Calculated global_num_seen_samples is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def skip_num_local_train_batches(self) -> int:
-        exact = self.global_num_seen_samples / self.world_size / self.local_train_micro_batch_size
-        ret = self.global_num_seen_samples // self.world_size // self.local_train_micro_batch_size
-        if exact != ret:
-            print(f"Calculated skip_num_local_train_batches is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def num_training_batches(self) -> int:
-        exact = self.global_num_training_samples / self.local_train_micro_batch_size
-        ret = self.global_num_training_samples // self.local_train_micro_batch_size
-        if exact != ret:
-            warnings.warn(f"Calculated num_training_batches is not an integer. Clipping {exact} to {ret} ")
-        return ret
-
-    @property
-    def callback_interval_in_batches_per_rank(self):
-        exact = self.callback_interval_in_samples / self.local_train_micro_batch_size / self.world_size
-        ret = max(self.callback_interval_in_samples // self.local_train_micro_batch_size // self.world_size, 1)
-        if exact != ret:
-            warnings.warn(
-                f"Calculated callback_interval_in_batches_per_rank is not an integer. Clipping {exact} to {ret} "
-            )
-        return ret
+class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
+    k: Annotated[int, Field(strict=True, ge=-1)]
 
 
-class AdamWConfig(BaseModel):
-    lr: confloat(ge=0.0)
+class FSDPToDiscCheckpointingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+    block_names: List[str]
+    mixed_precision_settings: MixedPrecisionSettings
+    sharding_strategy: ShardingStrategy
 
+    @field_validator("mixed_precision_settings", mode="before")
+    def parse_mixed_precision_setting_by_name(cls, name):
+        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
+            name=name, enum_type=MixedPrecisionSettings
+        )
+        if not has_bfloat_support() and (
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return mixed_precision_settings
 
-class OptimizerConfig(BaseModel):
-    type_hint: OptimizerTypes
-    config: AdamWConfig
-
-
-class OneCycleLRConfig(BaseModel):
-    max_lr: PositiveFloat
-    total_steps: conint(ge=1)
-    pct_start: confloat(ge=0.0)
-    anneal_strategy: str
-    cycle_momentum: bool
-    base_momentum: float | List
-    max_momentum: float | List
-    div_factor: PositiveFloat
-    final_div_factor: PositiveFloat
-    three_phase: bool
-    last_epochs: int
-    verbose: bool
-
-
-class StepLRConfig(BaseModel):
-    step_size: conint(ge=1)
-    gamma: confloat(ge=0.0)
-
-
-class ConstantLRConfig(BaseModel):
-    factor: PositiveFloat
-    total_iters: PositiveInt
-
-
-class SchedulerConfig(BaseModel):
-    type_hint: SchedulerTypes
-    config: StepLRConfig | ConstantLRConfig | OneCycleLRConfig
+    @field_validator("sharding_strategy", mode="before")
+    def parse_sharding_strategy_by_name(cls, name):
+        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
 class CheckpointingConfig(BaseModel):
-    class CheckpointingStrategyConfig(BaseModel):
-        class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
-            k: PositiveInt
-
-        class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
-            k: conint(ge=-1)
-
-        type_hint: CheckpointingStrategyTypes
-        config: SaveEveryKStepsCheckpointingStrategyConfig | SaveKMostRecentCheckpointsStrategyConfig
-
-    class CheckpointingExecutionConfig(BaseModel):
-        class FSDPToDiscCheckpointingConfig(BaseModel):
-            checkpoint_path: Path
-            global_rank: conint(ge=0)
-
-        type_hint: CheckpointingExectionTypes
-        config: FSDPToDiscCheckpointingConfig
-
-    checkpointing_strategy: CheckpointingStrategyConfig
-    checkpointing_execution: CheckpointingExecutionConfig
+    checkpointing_strategy: PydanticCheckpointingStrategyIFType
+    checkpointing_execution: PydanticCheckpointingExecutionIFType
 
 
-class RunMode(Enum):
-    FROM_SCRATCH = "FROM_SCRATCH"
-    WARM_START = "WARM_START"
+class AdamOptimizerConfig(BaseModel):
+    lr: float
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
 
 
-class ModalitiesSetupConfig(BaseModel):
-    class WarmStartSettings(BaseModel):
-        checkpoint_model_path: Path
-        global_num_seen_samples: conint(gt=0)
-        checkpoint_optimizer_path: Optional[Path] = None
-        checkpoint_lr_scheduler_path: Optional[Path] = None
+class AdamWOptimizerConfig(BaseModel):
+    lr: float
+    wrapped_model: PydanticPytorchModuleType
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
 
-    class FromScratchSettings(BaseModel):
-        global_num_seen_samples: int = 0
 
-    run_mode: RunMode
-    settings: FromScratchSettings
-    # settings: WarmStartSettings
+class DummyLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+
+
+class StepLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    step_size: Annotated[int, Field(strict=True, gt=0)]
+    gamma: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+
+
+class OneCycleLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
+    total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
+    anneal_strategy: str
+    cycle_momentum: bool = True
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.85
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[
+        Annotated[float, Field(strict=True, gt=0.0)]
+    ] = 0.95
+    div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    three_phase: bool = False
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
 
     @model_validator(mode="after")
-    def check_global_num_samples_equal_0_when_from_scratch(self) -> "ModalitiesSetupConfig":
-        if self.run_mode == RunMode.FROM_SCRATCH:
-            if self.settings.global_num_seen_samples != 0:
-                raise ValueError("When starting from scratch, global_num_seen_samples must be 0.")
+    def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
+        if self.total_steps is None and (self.epochs is None or self.steps_per_epoch is None):
+            raise ValueError("Please define total_steps or (epochs and steps_per_epoch).")
         return self
 
 
-class AppConfig(BaseModel):
-    modalities_setup: ModalitiesSetupConfig
-    data: DataConfig
-    training: TrainingConfig
-    running_env: RunningEnvConfig
-    model: ModelConfig
-    optimizer: OptimizerConfig
-    scheduler: SchedulerConfig
-    checkpointing: CheckpointingConfig
-    wandb: WandbConfig
-    loss: LossConfig
+class ConstantLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    total_iters: Annotated[int, Field(strict=True, gt=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
 
 
-class PretrainedGPTConfig(PretrainedConfig):
-    model_type = "modalities_gpt2"
+class CosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    t_max: Annotated[int, Field(strict=True, gt=0)]
+    eta_min: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
 
-    def __init__(self, config: GPT2Config = None, **kwargs):
-        if type(config) == dict:
-            config = GPT2Config(**config)
-        self.config = config
 
-        super().__init__(**kwargs)
+class CheckpointedOptimizerConfig(BaseModel):
+    checkpointing: PydanticCheckpointingIFType
+    checkpoint_path: Path
+    wrapped_model: PydanticPytorchModuleType
+    optimizer: PydanticOptimizerIFType
 
-    def to_json_string(self, use_diff: bool = True) -> str:
-        if self.config:
-            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
-            json_dict["config"]["attention"] = {
-                "attention_type": self.config.attention.attention_type.value,
-                "scaling_factor": self.config.attention.scaling_factor,
-            }
-            json_dict["config"]["weight_init"] = {
-                "mean": self.config.weight_init.mean,
-                "std": self.config.weight_init.std,
-            }
-        else:
-            json_dict = {}
-        return json.dumps(json_dict)
+
+class CheckpointedModelConfig(BaseModel):
+    checkpointing: PydanticCheckpointingIFType
+    checkpoint_path: Path
+    model: PydanticPytorchModuleType
+
+
+class FSDPWrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    sync_module_states: bool
+    mixed_precision_settings: MixedPrecisionSettings
+    sharding_strategy: ShardingStrategy
+    block_names: List[str]
+
+    @field_validator("mixed_precision_settings", mode="before")
+    def parse_mixed_precision_setting_by_name(cls, name):
+        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
+            name=name, enum_type=MixedPrecisionSettings
+        )
+        if not has_bfloat_support() and (
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return mixed_precision_settings
+
+    @field_validator("sharding_strategy", mode="before")
+    def parse_sharding_strategy_by_name(cls, name):
+        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class GPT2TokenizerFastConfig(BaseModel):
+    # Note: huggingface tokenizers expect file path as string
+    tokenizer_file: str
+
+
+class DistributedSamplerConfig(BaseModel):
+    rank: Annotated[int, Field(strict=True, ge=0)]
+    num_replicas: Annotated[int, Field(strict=True, ge=0)]
+    shuffle: bool
+    dataset: PydanticDatasetIFType
+
+
+class MemMapDatasetConfig(BaseModel):
+    raw_data_path: FilePath
+    index_path: Optional[FilePath] = None
+    block_size: Annotated[int, Field(strict=True, gt=0)]
+    tokenizer: PydanticTokenizerIFType
+    jq_pattern: str
+    sample_key: str
+
+
+class PackedMemMapDatasetContinuousConfig(BaseModel):
+    raw_data_path: Path
+    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sample_key: str
+
+
+class PackedMemMapDatasetMegatronConfig(BaseModel):
+    raw_data_path: Path
+    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sample_key: str
+
+
+class MMapIndexedDatasetConfig(BaseModel):
+    path: Path
+    skip_warmup: bool
+
+
+class OpenGPTXMMapDatasetConfig(BaseModel):
+    num_samples: Annotated[int, Field(strict=True, ge=1)]
+    path: FilePath
+    sample_key: str
+    sequence_len: PositiveInt
+
+
+class BatchSamplerConfig(BaseModel):
+    sampler: PydanticSamplerIFType
+    batch_size: Annotated[int, Field(strict=True, gt=0)]
+    drop_last: bool
+
+
+class ResumableBatchSamplerConfig(BaseModel):
+    sampler: PydanticSamplerIFType
+    start_index: Annotated[int, Field(strict=True, gt=0)]
+
+
+class GPT2LLMCollateFnConfig(BaseModel):
+    sample_key: str
+    target_key: str
+
+
+class LLMDataLoaderConfig(BaseModel):
+    dataloader_tag: str
+    dataset: PydanticDatasetIFType
+    batch_sampler: PydanticSamplerIFType
+    collate_fn: PydanticCollateFnIFType
+    num_workers: Annotated[int, Field(strict=True, ge=0)]
+    pin_memory: bool
+    shuffle: bool
+    skip_num_batches: Optional[int] = 0
+
+
+class DummyProgressSubscriberConfig(BaseModel):
+    pass
+
+
+class RichProgressSubscriberConfig(BaseModel):
+    train_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    world_size: int
+    global_num_seen_samples: int
+    local_rank: int
+
+
+class DummyResultSubscriberConfig(BaseModel):
+    pass
+
+
+class WandBEvaluationResultSubscriberConfig(BaseModel):
+    local_rank: int
+    project: str
+    experiment_id: str
+    mode: WandbMode
+    directory: Path
+    experiment_config: Optional[Dict] = None
+
+
+class RichResultSubscriberConfig(BaseModel):
+    num_ranks: int
+    local_rank: int
+
+
+class CudaEnv(BaseModel):
+    local_rank: Annotated[int, Field(strict=True, ge=0)]
+    world_size: Annotated[int, Field(strict=True, ge=1)]
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+
+
+class Settings(BaseModel):
+    class Training(BaseModel):
+        class GradientClipping(BaseModel):
+            mode: GradientClippingMode
+            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
+
+            @model_validator(mode="after")
+            def check_mode_none_iff_threshold_none(self) -> BaseModel:
+                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
+                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
+                if self.mode != GradientClippingMode.NONE and self.threshold is None:
+                    raise ValueError("A threshold value is required when gradient clipping is used.")
+                return self
+
+        callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
+        global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
+        global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
+        do_apply_activation_checkpointing: bool
+        gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
+        local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
+        sequence_length: Annotated[int, Field(strict=True, ge=1)]
+        gradient_clipping: GradientClipping
+
+    class Paths(BaseModel):
+        checkpointing_path: Path
+
+    experiment_id: str
+    referencing_keys: Dict[str, str]
+    training: Training
+    cuda_env: CudaEnv
+    paths: Paths
+
+
+class ComponentsModel(BaseModel):
+    wrapped_model: PydanticPytorchModuleType
+    optimizer: PydanticOptimizerIFType
+    scheduler: PydanticLRSchedulerIFType
+    loss_fn: PydanticLossIFType
+    train_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
+    batch_progress_subscriber: PydanticMessageSubscriberIFType
+    evaluation_subscriber: PydanticMessageSubscriberIFType
+    checkpointing: PydanticCheckpointingIFType
+    settings: Settings
+
+
+class ComponentsInferenceModel(BaseModel):
+    wrapped_model: PydanticPytorchModuleType
+    cuda_env: CudaEnv
+
+
+def load_app_config_dict(config_file_path: Path) -> Dict:
+    def cuda_env_resolver_fun(var_name: str) -> int:
+        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
+        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
+
+    def modalities_env_resolver_fun(var_name: str) -> int:
+        if var_name == "experiment_id":
+            return get_date_of_run()
+
+    OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
+    OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
+
+    cfg = OmegaConf.load(config_file_path)
+    config_dict = OmegaConf.to_container(cfg, resolve=True)
+    return config_dict

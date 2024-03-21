@@ -55,6 +55,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage_html_report
 *.cover
 .hypothesis/
 .pytest_cache/
@@ -120,6 +121,8 @@ venv.bak/
 # Vscode
 .vscode/
 .history/
+env_modalities/*
+.devcontainer/*
 
 # Created by https://www.toptal.com/developers/gitignore/api/vim
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim
@@ -151,3 +154,5 @@ checkpoints
 data
 docs/source/generated
 docs/source/api
+pyenv*
+.devcontainer/*
