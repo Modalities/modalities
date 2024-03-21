@@ -64,12 +64,12 @@ class ImagePatchEmbedding(nn.Module):
 class VisionTransformerBlock(nn.Module):
     def __init__(
         self,
-        attention_config: AttentionConfig = None,
         n_embd: int = 768,
         n_head: int = 8,
         ffn_hidden: int = 3072,
         bias: bool = True,
         dropout: float = 0.0,
+        attention_config: AttentionConfig = None,
     ) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(n_embd)
@@ -128,12 +128,12 @@ class VisionTransformer(nn.Module):
         self.blocks = nn.ModuleList(
             [
                 VisionTransformerBlock(
-                    attention_config=attention_config,
                     n_embd=n_embd,
                     n_head=n_head,
                     ffn_hidden=ffn_hidden,
                     bias=bias,
                     dropout=dropout,
+                    attention_config=attention_config,
                 )
                 for _ in range(n_layer)
             ]
