@@ -120,7 +120,7 @@ class VisionTransformer(nn.Module):
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
-        self.block_size = self._calcualte_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
+        self.block_size = self._calculate_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
 
         self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
         self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)
@@ -163,7 +163,8 @@ class VisionTransformer(nn.Module):
         return {self.prediction_key: x}
 
     @staticmethod
-    def _calcualte_block_size(img_size, patch_size, patch_stride, add_cls_token):
+    def _calculate_block_size(img_size: Tuple[int, int], patch_size: int, patch_stride: int, add_cls_token: bool):
+        # See https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html for details
         block_size = (floor((img_size[0] - patch_size) / patch_stride) + 1) * (
             floor((img_size[1] - patch_size) / patch_stride) + 1
         ) + int(add_cls_token)

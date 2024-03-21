@@ -48,5 +48,5 @@ def test_vision_transformer():
     ],
 )
 def test_vision_transformer_block_size(img_size, patch_size, patch_stride, add_cls_token, target_block_size):
-    block_size = VisionTransformer._calcualte_block_size(img_size, patch_size, patch_stride, add_cls_token)
+    block_size = VisionTransformer._calculate_block_size(img_size, patch_size, patch_stride, add_cls_token)
     assert block_size == target_block_size
