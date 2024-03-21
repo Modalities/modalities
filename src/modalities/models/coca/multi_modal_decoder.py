@@ -24,9 +24,11 @@ class TransformerBlock(nn.Module):
         with_context: bool,
         attention_type: AttentionType,
         attention_config: AttentionConfig = None,
+        add_extra_mlp: bool = False,
     ):
         super().__init__()
         self.with_context = with_context
+        self.add_extra_mlp = add_extra_mlp or not with_context
 
         if activation == ActivationType.GELU:
             mlp = partial(MLP, in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
@@ -39,8 +41,10 @@ class TransformerBlock(nn.Module):
         self.attn = MultiHeadAttention(
             n_embd=n_embd, n_head=n_head, bias=bias, attention_config=attention_config, attention_type=attention_type
         )
-        self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
-        self.mlp = mlp()
+
+        if not self.with_context or self.add_extra_mlp:
+            self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.mlp = mlp()
 
         if self.with_context:
             self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
@@ -56,7 +60,8 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
         x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
+        if not self.with_context or self.add_extra_mlp:
+            x = x + self.mlp(self.ln_2(x))
         if self.with_context:
             x = x + self.cross_attn(self.ln_3(x), context=context)
             x = x + self.mlp_2(self.ln_4(x))
