@@ -160,6 +160,10 @@ class AdamWOptimizerConfig(BaseModel):
     weight_decay: float
 
 
+class DummyLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+
+
 class StepLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
     step_size: Annotated[int, Field(strict=True, gt=0)]
