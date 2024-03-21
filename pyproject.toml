@@ -21,7 +21,9 @@ dependencies = [
     "jq",
     "xformers",
     "class_resolver",
-    "wandb"
+    "wandb",
+    "webdataset>=0.2.86",
+    "timm>=0.9.16",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +72,7 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
-    ]
+]
 
 
 ignore_errors = true

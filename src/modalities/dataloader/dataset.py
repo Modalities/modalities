@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
+import webdataset as wds
+from pydantic import BaseModel
+from timm.data import create_transform
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
@@ -157,3 +161,50 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class ImageTransformConfig(BaseModel):
+    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    is_training: bool = False
+    no_aug: bool = False
+    train_crop_mode: Optional[str] = None
+    scale: Optional[Tuple[float, float]] = None
+    ratio: Optional[Tuple[float, float]] = None
+    hflip: float = 0.5
+    vflip: float = 0.0
+    color_jitter: Union[float, Tuple[float, ...]] = 0.4
+    color_jitter_prob: Optional[float] = None
+    grayscale_prob: float = 0.0
+    gaussian_blur_prob: float = 0.0
+    auto_augment: Optional[str] = None
+    interpolation: str = "bilinear"
+    mean: Tuple[float, ...] = IMAGENET_DEFAULT_MEAN
+    std: Tuple[float, ...] = IMAGENET_DEFAULT_STD
+    re_prob: float = 0.0
+    re_mode: str = "const"
+    re_count: int = 1
+    re_num_splits: int = 0
+    crop_pct: Optional[float] = None
+    crop_mode: Optional[str] = None
+    crop_border_pixels: Optional[int] = None
+    tf_preprocessing: bool = False
+    use_prefetcher: bool = False
+    separate: bool = False
+
+
+class WebDatasetConfig(BaseModel):
+    urls: Union[List[str], str]
+    key_mapping: Optional[Dict[str, str]] = None
+    image_preprocessing: ImageTransformConfig = ImageTransformConfig()
+
+
+class WebDataset(wds.WebDataset):
+    def __init__(
+        self, urls: Union[List[str], str], key_mapping: Dict[str, str], image_transform_config: ImageTransformConfig
+    ):
+        super().__init__(urls=urls)
+        if key_mapping is not None:
+            self.append(wds.filters.map(lambda x: {key_mapping[k]: v for k, v in x.items() if k in key_mapping.keys()}))
+        if image_transform_config is not None:
+            transform = create_transform(**image_transform_config.model_dump())
+            self.append(wds.filters.map(lambda x: transform(x)))
