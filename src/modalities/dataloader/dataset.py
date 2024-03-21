@@ -34,6 +34,8 @@ class MemMapDataset(Dataset):
         tokenization_jq_patterns: Dict[str, str],
         pass_through_jq_patterns: Dict[str, str] = None,
         index_path: Optional[Path] = None,
+        special_tokens_map: Optional[Dict[str, str]] = None,
+        # {"bos_token": "<s>", "eos_token": "</s>", "pad_token": "<pad>", "unk_token": "<unk>", "mask_token": "<mask}
     ):
         """
         Pytorch Dataset with mmap support.
@@ -58,6 +60,8 @@ class MemMapDataset(Dataset):
 
         self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
         self.tokenizer = tokenizer
+        if special_tokens_map:
+            self.special_tokens_map = {k: self.tokenizer.tokenizer(v) for k, v in special_tokens_map.items()}
 
     def __len__(self) -> int:
         return len(self.reader)
@@ -71,7 +75,7 @@ class MemMapDataset(Dataset):
             text = jq_filter.input_text(self.reader[idx]).first()
 
             tokens = self.tokenizer(
-                jq_filter.input_text(self.reader[idx]).first(),
+                text,
                 max_length=self.block_size,
                 padding="max_length",
                 truncation=True,
@@ -81,6 +85,7 @@ class MemMapDataset(Dataset):
         # applying jq filter for which we want to pass through the raw data without tokenization
         for key, jq_filter in self.pass_through_jq_filter.items():
             item[key] = jq_filter.input_text(self.reader[idx]).first()
+        item = {**item, **self.special_tokens_map}
         return item
 
 

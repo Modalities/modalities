@@ -1,7 +1,7 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
   referencing_keys:
-    sample_key: input_ids
+    sample_key: tokenized_input
     target_key: target_ids
   training:
     callback_interval_in_samples: 6
@@ -17,6 +17,7 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
+
 tokenizer:
   component_key: tokenizer
   variant_key: gpt2_tokenizer_fast
@@ -34,10 +35,20 @@ train_dataset:
   component_key: dataset
   variant_key: mem_map_dataset
   config:
-    raw_data_path: data/lorem_ipsum.jsonl
-    index_path: data/lorem_ipsum.idx
+    raw_data_path: data/lorem_ipsum_instruct_multi_turn.jsonl
+    index_path: data/lorem_ipsum_instruct_multi_turn.idx
     block_size: ${settings.training.sequence_length}
-    jq_pattern: ".text"
+    tokenization_jq_patterns: 
+      ${settings.referencing_keys.sample_key}: .conversations
+    pass_through_jq_patterns:
+      raw_text:  .conversations
+
+    # tokenization_jq_patterns: 
+    #   - new_key: input_ids # ${settings.referencing_keys.sample_key}
+    #     jq_pattern: .text
+    # pass_through_jq_patterns:
+    #   - new_key: raw_text
+    #     jq_pattern: .text
     sample_key:  ${settings.referencing_keys.sample_key}
     tokenizer:
       instance_key: tokenizer
