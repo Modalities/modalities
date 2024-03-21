@@ -14,8 +14,8 @@ class AttentionEngineType(str, Enum):
 
 
 class AttentionType(str, Enum):
-    CAUSAL_ATTENTION = "causal_attention"
-    NON_CAUSAL_ATTENTION = "non_causal_attention"
+    CAUSAL_SELF_ATTENTION = "causal_self_attention"
+    NON_CAUSAL_SELF_ATTENTION = "non_causal_self_attention"
     CROSS_ATTENTION = "cross_attention"
 
 
@@ -27,7 +27,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(
         self,
         attention_config: AttentionConfig = None,
-        attention_type: AttentionType = AttentionType.CAUSAL_ATTENTION,
+        attention_type: AttentionType = AttentionType.CAUSAL_SELF_ATTENTION,
         n_embd: int = 768,
         n_head: int = 8,
         bias: bool = True,
@@ -43,7 +43,7 @@ class MultiHeadAttention(nn.Module):
         self.n_embd = n_embd
         self.dropout = dropout
         self.use_flash = attention_config.attention_engine_type == AttentionEngineType.PYTORCH_FLASH_ATTENTION
-        self.is_causal = attention_type == AttentionType.CAUSAL_ATTENTION
+        self.is_causal = attention_type == AttentionType.CAUSAL_SELF_ATTENTION
         self.use_cross_attention = attention_type == AttentionType.CROSS_ATTENTION
 
         self.wq = nn.Linear(in_features=n_embd, out_features=n_embd, bias=bias)

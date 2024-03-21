@@ -4,7 +4,9 @@ import torch
 from modalities.nn.attention import AttentionType, MultiHeadAttention
 
 
-@pytest.mark.parametrize("attention_type", [AttentionType.CAUSAL_ATTENTION, AttentionType.NON_CAUSAL_ATTENTION])
+@pytest.mark.parametrize(
+    "attention_type", [AttentionType.CAUSAL_SELF_ATTENTION, AttentionType.NON_CAUSAL_SELF_ATTENTION]
+)
 def test_attention_forward(attention_type):
     model = MultiHeadAttention(n_embd=64, n_head=8, attention_type=attention_type)
     dummy_input = torch.randn(1, 256, 64)
