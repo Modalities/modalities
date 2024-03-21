@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 from torch import nn
 
-from modalities.models.coca.multi_modal_decoder import MultiModalBlock
+from modalities.models.coca.multi_modal_decoder import TransformerBlock
 from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel
 from modalities.nn.attention import AttentionConfig, AttentionType
@@ -39,17 +39,17 @@ class TextDecoder(NNModel):
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
-                        MultiModalBlock(
+                        TransformerBlock(
                             n_embd=n_embd,
                             bias=bias,
                             epsilon=epsilon,
                             activation=activation,
-                            attention_config=attention_config,
                             n_head=n_head,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
-                            attention_type=AttentionType.CAUSAL_ATTENTION,
                             with_context=False,
+                            attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
+                            attention_config=attention_config,
                         )
                         for _ in range(n_layer)
                     ]

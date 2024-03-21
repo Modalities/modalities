@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from torch import nn
 
 from modalities.models.coca.attention_pooling import AttentionPooling
-from modalities.models.coca.multi_modal_decoder import MultiModalDecoder
+from modalities.models.coca.multi_modal_decoder import MultiModalTextDecoder
 from modalities.models.coca.text_decoder import TextDecoder
 from modalities.models.gpt2.gpt2_model import ActivationType, GPT2Config, WeightInitailizationConfig
 from modalities.models.model import NNModel
@@ -97,7 +97,7 @@ class CoCa(NNModel):
             activation=text_decoder_config.activation,
             epsilon=text_decoder_config.epsilon,
         )
-        self.multimodal_decoder = MultiModalDecoder(
+        self.multimodal_decoder = MultiModalTextDecoder(
             sample_key=text_embd_prediction_key,
             prediction_key=text_decoder_config.prediction_key,
             block_size=text_decoder_config.block_size,

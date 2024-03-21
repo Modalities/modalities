@@ -11,7 +11,7 @@ from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAtt
 from modalities.nn.mlp import MLP
 
 
-class MultiModalBlock(nn.Module):
+class TransformerBlock(nn.Module):
     def __init__(
         self,
         n_embd: int,
@@ -21,9 +21,9 @@ class MultiModalBlock(nn.Module):
         n_head: int,
         dropout: float,
         ffn_hidden: int,
+        with_context: bool,
+        attention_type: AttentionType,
         attention_config: AttentionConfig = None,
-        attention_type: AttentionType = AttentionType.NON_CAUSAL_SELF_ATTENTION,
-        with_context: bool = True,
     ):
         super().__init__()
         self.with_context = with_context
@@ -63,7 +63,7 @@ class MultiModalBlock(nn.Module):
         return x
 
 
-class MultiModalDecoder(NNModel):
+class MultiModalTextDecoder(NNModel):
     def __init__(
         self,
         sample_key: str,
@@ -76,9 +76,9 @@ class MultiModalDecoder(NNModel):
         ffn_hidden: int,
         dropout: float,
         bias: bool,
-        attention_config: AttentionConfig,
         activation: ActivationType,
         epsilon: float,
+        attention_config: AttentionConfig,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -89,15 +89,17 @@ class MultiModalDecoder(NNModel):
             dict(
                 h=nn.ModuleList(
                     [
-                        MultiModalBlock(
+                        TransformerBlock(
                             n_embd=n_embd,
                             bias=bias,
                             epsilon=epsilon,
                             activation=activation,
-                            attention_config=attention_config,
                             n_head=n_head,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
+                            with_context=True,
+                            attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
+                            attention_config=attention_config,
                         )
                         for _ in range(n_layer)
                     ]
