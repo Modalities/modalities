@@ -24,6 +24,7 @@ from modalities.config.config import (
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
+    DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     FSDPToDiscCheckpointingConfig,
@@ -58,6 +59,7 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 
 
@@ -86,6 +88,7 @@ COMPONENTS = [
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
     ),
     # schedulers
+    ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
     ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
