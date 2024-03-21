@@ -112,3 +112,71 @@ def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
     doc_idx_last = _build_doc_idx(documents, 1, np_rng, False)
     return np.concatenate((doc_idx_first, doc_idx_last))
 ```
+
+
+# Fine-tuning Datasets
+
+## Instruction Tuning
+Datasets, such as Bactrian or LIMA, come in different formats. Before instruction-tuning a model with one of these datasets the user has to 
+transform the dataset into the following format JSONL, inspired by Fast Chat. The listing below showcases an exemplary sample from the JSONL file. 
+The `id` represents the incremental sample id. `Conversations` contains the multi-turn messages between different parties. Here, we depicted messages 
+between a human and a gpt model. Finally, the format allows for the specification of further, arbitrary key-value pairs such as instructions and roles.
+
+```JSON
+{
+    "id": 0,
+    "conversations": [
+      {
+        "from": "human",
+        "value": "What is up?"
+      },
+      {
+        "from": "gpt",
+        "value": "Hello! How can I help you today?"
+      },
+      {
+        "from": "human",
+        "value": "Who are you?"
+      },
+      {
+        "from": "gpt",
+        "value": "You can call me Vicuna, and I was trained by Large Model Systems Organization (LMSYS) researchers as a language model."
+      },
+      {
+        "from": "human",
+        "value": "Goodbye"
+      },
+      {
+        "from": "gpt",
+        "value": "Goodbye! If you have any more questions in the future, don't hesitate to ask."
+      }
+    ]
+    
+    # optional / arbitrary key value pairs e.g.:
+    "instruction": "Role: Vicuna, trained by Large Model Systems Organization (LMSYS) researchers"
+    "role": "Vicuna, trained by Large Model Systems Organization (LMSYS) researchers"
+}
+```
+
+During the instantiation of the MemMap file, we specify the JQ patterns that determine which fields in the JSON are supposed to be tokenized and additionally pass a list of special tokens e.g., `<s>`, `</s>`, `<eod>` etc. to the constructor. 
+Each one of the special tokens is mapped to a single, individual token id once during the instantation of the MemMap file. 
+
+When the dataloader iterates over the MemMap file, the `__get_item__()` method tokenizes the sample as specified in the JQ patterns list and enriches the resulting dictionary with the token ids of the special tokens. 
+
+The dataloader packs multiple samples to a `DatasetBatch` and calls the `Collator` for bringing the samples in the correct format training. 
+
+The collator is instantiated with information on how to assemble the entire prompt from the `conversations` and the optional key-value pairs. 
+In practice, the YAML configuration has the following structure
+
+```YAML
+special_tokens:
+    bos_token: <s>
+    eos_token: </s>
+
+loss_masking_jq_patterns:
+    - .conversations | select(.from == "human")
+    - .instruction
+    - .role
+
+message_construction: [role, instruction, conversations]
+```
