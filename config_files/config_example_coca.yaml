@@ -133,7 +133,7 @@ model:
       prediction_key: vision_embeddings
       img_size: 224
       n_classes: Null # Disable vision transformer head
-      n_layer: 2
+      n_layer: 12
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
@@ -149,8 +149,8 @@ model:
       prediction_key: logits
       block_size: 1024
       vocab_size: 50304
-      n_layer_text: 1
-      n_layer_multimodal_text: 1
+      n_layer_text: 12
+      n_layer_multimodal_text: 12
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
