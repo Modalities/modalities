@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from modalities.checkpointing.checkpointing_execution import PytorchToDiscCheckpointing
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import HuggingFaceAdapterConfig, PydanticModelIFType, load_app_config_dict
+from modalities.config.config import HuggingFaceAdapterConfig, PydanticPytorchModuleType, load_app_config_dict
 from modalities.models.gpt2.gpt2_model import GPT2HuggingFaceAdapterConfig, GPT2LLMConfig
 from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 from modalities.registry.components import COMPONENTS
@@ -48,7 +48,7 @@ class CheckpointConversion:
 
     def _setup_model(self):
         class ModelConfig(BaseModel):
-            model: PydanticModelIFType
+            model: PydanticPytorchModuleType
 
         components = self.component_factory.build_components(
             config_dict=self.config_dict, components_model_type=ModelConfig
