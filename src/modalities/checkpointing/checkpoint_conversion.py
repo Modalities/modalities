@@ -15,11 +15,7 @@ from modalities.registry.registry import Registry
 
 class CheckpointConversion:
     def __init__(
-        self,
-        checkpoint_dir: Path,
-        config_file_name: str,
-        model_file_name: str,
-        output_hf_checkpoint_dir: Path
+        self, checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
     ):
         self.initial_model = None
         self.config_dict = None
