@@ -249,7 +249,7 @@ class LLMDataLoaderConfig(BaseModel):
 
 class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
     @abstractmethod
-    def to_json_string():
+    def to_json_string(self, use_diff: bool = True) -> str:
         raise NotImplementedError()
 
 
