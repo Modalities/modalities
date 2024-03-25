@@ -466,20 +466,8 @@ class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
 
     def __init__(self, config: GPT2LLMConfig, **kwargs):
         self.config = config
-
         super().__init__(**kwargs)
 
     def to_json_string(self, use_diff: bool = True) -> str:
-        if self.config:
-            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
-            json_dict["config"]["attention"] = {
-                "attention_type": self.config.attention.attention_type.value,
-                "scaling_factor": self.config.attention.scaling_factor,
-            }
-            json_dict["config"]["weight_init"] = {
-                "mean": self.config.weight_init.mean,
-                "std": self.config.weight_init.std,
-            }
-        else:
-            json_dict = {}
-        return json.dumps(json_dict)
+        cfg = dict(config=self.config.model_dump(), model_type=self.model_type)
+        return json.dumps(cfg)
