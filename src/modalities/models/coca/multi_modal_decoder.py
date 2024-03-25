@@ -5,7 +5,7 @@ import torch
 import xformers.ops as xops
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, LayerNorm
+from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel
 from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 from modalities.nn.mlp import MLP
@@ -37,17 +37,17 @@ class TransformerBlock(nn.Module):
         else:
             raise NotImplementedError(f"activation type {activation} not implemented")
 
-        self.ln_1 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+        self.ln_1 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
         self.attn = MultiHeadAttention(
             n_embd=n_embd, n_head=n_head, bias=bias, attention_config=attention_config, attention_type=attention_type
         )
 
         if not self.with_context or self.add_extra_mlp:
-            self.ln_2 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.ln_2 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.mlp = mlp()
 
         if self.with_context:
-            self.ln_3 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.ln_3 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.cross_attn = MultiHeadAttention(
                 n_embd=n_embd,
                 n_head=n_head,
@@ -55,7 +55,7 @@ class TransformerBlock(nn.Module):
                 attention_config=attention_config,
                 attention_type=AttentionType.CROSS_ATTENTION,
             )
-            self.ln_4 = LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon)
+            self.ln_4 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.mlp_2 = mlp()
 
     def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
@@ -109,7 +109,7 @@ class MultiModalTextDecoder(NNModel):
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=LayerNorm(ndim=n_embd, bias=bias, epsilon=epsilon),
+                ln_f=nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon),
             )
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)

@@ -2,11 +2,20 @@ from dataclasses import field
 from typing import Dict, List
 
 import torch
+from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch
+from modalities.models.gpt2.collator import CollateFnIF
 
 
-class CoCaCollator:
+class CoCaCollateFnConfig(BaseModel):
+    sample_keys: List[str]
+    target_keys: List[str]
+    text_sample_key: str
+    text_target_key: str
+
+
+class CoCaCollatorFn(CollateFnIF):
     def __init__(self, sample_keys: List[str], target_keys: List[str], text_sample_key: str, text_target_key: str):
         self.device: torch.device = field(default_factory=lambda: torch.device("cpu"))
         if text_sample_key not in sample_keys:

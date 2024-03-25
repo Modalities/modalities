@@ -4,10 +4,8 @@ import pytest
 import torch
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.config import AppConfig
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from tests.conftest import _ROOT_DIR
-from tests.test_main import no_gpu_available
 
 
 def test_coca():
@@ -43,9 +41,7 @@ def test_coca():
     assert out["text_cls"].shape == (1, 1, 768)
 
 
-@pytest.mark.skipif(
-    no_gpu_available(), reason="This e2e test verifies a GPU-Setup and uses components, which do not support CPU-only."
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
@@ -56,10 +52,9 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     # Load config
     dummy_config_path = _ROOT_DIR / Path("config_files/config_example_coca.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    dummy_config = AppConfig.model_validate(config_dict)
 
     # Disable checkpointing
-    dummy_config.checkpointing.checkpointing_strategy.config.k = 0
+    config_dict["checkpointing"]["config"]["checkpointing_strategy"]["config"]["k"] = 0
 
-    main = Main(dummy_config)
+    main = Main(config_dict, dummy_config_path)
     main.run()
