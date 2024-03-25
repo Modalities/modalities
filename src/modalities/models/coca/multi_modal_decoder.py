@@ -28,7 +28,7 @@ class TransformerBlock(nn.Module):
     ):
         super().__init__()
         self.with_context = with_context
-        self.add_extra_mlp = add_extra_mlp or not with_context
+        self.add_extra_mlp = add_extra_mlp
 
         if activation == ActivationType.GELU:
             mlp = partial(MLP, in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
@@ -105,6 +105,7 @@ class MultiModalTextDecoder(NNModel):
                             with_context=True,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
+                            add_extra_mlp=False,
                         )
                         for _ in range(n_layer)
                     ]
