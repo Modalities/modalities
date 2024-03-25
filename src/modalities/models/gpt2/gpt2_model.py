@@ -308,10 +308,7 @@ class GPT2LLM(NNModel):
 class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
     model_type = "modalities_gpt2"
 
-    def __init__(self, config: GPT2LLMConfig | Dict, **kwargs):
-
-        if isinstance(config, dict):
-            config = GPT2LLMConfig(**config)
+    def __init__(self, config: GPT2LLMConfig, **kwargs):
         self.config = config
 
         super().__init__(**kwargs)
