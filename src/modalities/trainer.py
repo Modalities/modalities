@@ -4,6 +4,7 @@ from typing import Callable
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -27,17 +28,20 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
+        gradient_clipper: Callable[[NNModel], None],
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
+        self.gradient_clipper = gradient_clipper
 
     def _train_batch(
         self,
         batch: DatasetBatch,
         model: NNModel,
         optimizer: Optimizer,
+        scheduler: LRScheduler,
         loss_fun: Loss,
         batch_id: int,
         data_loader: LLMDataLoader,
@@ -45,9 +49,11 @@ class Trainer:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch) / self.gradient_acc_steps
         loss.backward()
+        self.gradient_clipper(model)
 
         if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
+            scheduler.step()
             optimizer.zero_grad()
         return loss
 
@@ -55,7 +61,8 @@ class Trainer:
         self,
         model: NNModel,
         train_loader: LLMDataLoader,
-        optimizer,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
         loss_fun: Loss,
         callback_interval_in_batches: int,
         # TODO: remove
@@ -82,6 +89,7 @@ class Trainer:
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
+                scheduler=scheduler,
                 loss_fun=loss_fun,
                 batch_id=batch_id,
                 data_loader=train_loader,
@@ -131,7 +139,13 @@ class Trainer:
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
                         # TODO: hardcoded metric key
-                        throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
+                        throughput_metrics={
+                            "training_synced_num_samples_per_second": synced_num_samples_per_second,
+                            "lr_mean": torch.tensor(scheduler.get_last_lr()).mean(),
+                            "lr_min": torch.tensor(scheduler.get_last_lr()).min(),
+                            "lr_max": torch.tensor(scheduler.get_last_lr()).max(),
+                            "lr_first": torch.tensor(scheduler.get_last_lr())[0],
+                        },
                         dataloader_tag=train_loader.dataloader_tag,
                         global_train_sample_id=global_train_sample_id,
                     )

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from transformers import GPT2TokenizerFast
 
@@ -103,6 +104,32 @@ def optimizer_mock():
 
 
 @pytest.fixture(scope="function")
+def optimizer_with_param_groups_mock():
+    mock_optimizer = MagicMock(spec=Optimizer, param_groups=[{"lr": 0.1}, {"lr": 0.2}, {"lr": 0.3}])
+
+    def custom_step_function(lr_decay_factor):
+        # Iterate over each parameter group and update the lr based on some logic
+        for param_group in mock_optimizer.param_groups:
+            param_group["lr"] += -0.01
+        return mock_optimizer
+
+    mock_optimizer.step = custom_step_function
+    # These are some hacks that fixes issues when the pytorch  LRScheduler super constructor
+    # is implicitly instantiated. They seem to monkey patch the step function, making sure that
+    # the lr scheduler step function is called after the optimizer step function.
+    # See: https://github.com/pytorch/pytorch/blob/0b68a28c87df2c6eb2cf530be4659b5a2f8a95b0/torch/optim/lr_scheduler.py#L54
+    mock_optimizer.step.__self__ = mock_optimizer
+    mock_optimizer.step.__func__ = custom_step_function
+
+    return mock_optimizer
+
+
+@pytest.fixture(scope="function")
+def scheduler_mock():
+    return MagicMock(spec=LRScheduler)
+
+
+@pytest.fixture(scope="function")
 def loss_mock():
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
 
@@ -124,6 +151,7 @@ def trainer(progress_publisher_mock):
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
+        gradient_clipper=lambda model: None,
     )
 
 

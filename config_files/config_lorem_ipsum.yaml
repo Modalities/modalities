@@ -11,6 +11,9 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
     sequence_length: 256
+    gradient_clipping:
+      mode: p2_norm
+      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -186,36 +189,73 @@ model:
   component_key: model
   variant_key: gpt2
   config:
-    sample_key: "input_ids" # TODO reference this
-    prediction_key: "logits" # TODO reference this
-    block_size: 256  # TODO reference this (same as sequence length)
+    sample_key: ${settings.referencing_keys.sample_key}
+    poe_type: NOPE
+    block_size: ${settings.training.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
-    n_head: 4
+    n_head_q: 8
+    n_head_kv: 8
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention:
-      attention_type: default_attention # pytorch_flash_attention
-      scaling_factor: 3
-    activation: gelu
-    epsilon: 1e-5
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model.config.n_embd}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+    activation_type: gelu
     weight_init:
       mean: 0.0
       std: 0.02
+    attention_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5
 
-# scheduler:
-#   type_hint: StepLR
-#   config:
-#     step_size: 1
-#     gamma: 0.1
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 4
+    pct_start: 0.01
+    anneal_strategy: cos
 
 optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -246,4 +286,3 @@ evaluation_subscriber:
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
-    
