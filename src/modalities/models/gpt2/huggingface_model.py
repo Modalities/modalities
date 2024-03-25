@@ -6,13 +6,14 @@ import torch.nn as nn
 from transformers import PreTrainedModel
 from transformers.utils import ModelOutput
 
+from modalities.config.config import HuggingFaceAdapterConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2HuggingFaceAdapterConfig
 
 
 class HuggingFaceModel(PreTrainedModel):
     config_class = GPT2HuggingFaceAdapterConfig
 
-    def __init__(self, config: GPT2HuggingFaceAdapterConfig, model: nn.Module = None):
+    def __init__(self, config: HuggingFaceAdapterConfig, model: nn.Module = None):
         super().__init__(config)
         # TODO offloading the parameters like this is ugly
         if model is None:
