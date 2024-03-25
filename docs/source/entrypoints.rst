@@ -63,6 +63,6 @@ With
   [project.scripts]
   modalities = "modalities.__main__:main"
 
-in our :file:`pyproject.toml`, we can start only main with :python:`modalities` (which does nothing), or a specific sub-entrypoint e.g. :bash:`modalities do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+in our :file:`pyproject.toml`, we can start only main with :python:`modalities` (which does nothing), or a specific sub-entrypoint e.g. :bash:`modalities do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.
 
-Alternatively, directly use :bash:`src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+Alternatively, directly use :bash:`src/modalities/__main__.py do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.

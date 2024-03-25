@@ -155,6 +155,11 @@ def trainer(progress_publisher_mock):
     )
 
 
+def torch_distributed_cleanup():
+    if torch.distributed.is_initialized():
+        torch.distributed.destroy_process_group()
+
+
 @pytest.fixture(scope="function")
 def set_env_cpu(monkeypatch):
     monkeypatch.setenv("RANK", "0")
@@ -164,11 +169,6 @@ def set_env_cpu(monkeypatch):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("MASTER_ADDR", "localhost")
     monkeypatch.setenv("MASTER_PORT", "9948")
-
-    def torch_distributed_cleanup():
-        if torch.distributed.is_initialized():
-            torch.distributed.destroy_process_group()
-
     torch_distributed_cleanup()
     # gloo for CPU testing with reduce
     torch.distributed.init_process_group(backend="gloo")

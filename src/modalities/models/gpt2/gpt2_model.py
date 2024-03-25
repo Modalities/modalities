@@ -1,3 +1,4 @@
+import json
 import math
 from copy import deepcopy
 from enum import Enum
@@ -10,7 +11,7 @@ import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 
-from modalities.config.config import PydanticPytorchModuleType
+from modalities.config.config import HuggingFaceAdapterConfig, PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name
@@ -458,3 +459,27 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+class GPT2HuggingFaceAdapterConfig(HuggingFaceAdapterConfig):
+    model_type = "modalities_gpt2"
+
+    def __init__(self, config: GPT2LLMConfig, **kwargs):
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def to_json_string(self, use_diff: bool = True) -> str:
+        if self.config:
+            json_dict = {"config": self.config.__dict__.copy(), "model_type": self.model_type}
+            json_dict["config"]["attention"] = {
+                "attention_type": self.config.attention.attention_type.value,
+                "scaling_factor": self.config.attention.scaling_factor,
+            }
+            json_dict["config"]["weight_init"] = {
+                "mean": self.config.weight_init.mean,
+                "std": self.config.weight_init.std,
+            }
+        else:
+            json_dict = {}
+        return json.dumps(json_dict)

@@ -11,6 +11,7 @@ import click_pathlib
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
+from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
@@ -36,13 +37,16 @@ def main() -> None:
     pass
 
 
-@main.command(name="run")
-@click.option(
+config_file_path_option = click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Path to a file with the YAML config file.",
 )
+
+
+@main.command(name="run")
+@config_file_path_option
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
     main = Main(config_dict, config_file_path)
@@ -51,7 +55,7 @@ def entry_point_run_modalities(config_file_path: Path):
 
 @main.command(name="generate_text")
 @click.argument("model_path", type=Path)
-@click.argument("config_path", type=Path)
+@config_file_path_option
 @click.option(
     "--tokenizer_type",
     type=TokenizerTypes,
@@ -63,14 +67,14 @@ def entry_point_run_modalities(config_file_path: Path):
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).resolve().parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
+def entry_point_generate_text(model_path, config_file_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+    generate_text_main(model_path, config_file_path, tokenizer, max_new_tokens, chat)
 
 
 @main.group(name="data")
@@ -131,7 +135,7 @@ def entry_point_data_create_raw_index(src_path, index_path):
     "--tokenizer_file",
     type=Path,
     show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
+    default=Path(__file__).resolve().parents[2] / Path("data/tokenizer/tokenizer.json"),
     help="path to tokenizer json",
 )
 @click.option(
@@ -171,6 +175,40 @@ def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type
         number_of_processes=num_cpus,
     )
     generator.run(dst_path)
+
+
+@main.command(name="convert_pytorch_to_hf_checkpoint")
+@click.option(
+    "--checkpoint_dir",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Load pytorch checkpoint from this directory.",
+)
+@click.option(
+    "--config_file_name",
+    type=str,
+    required=False,
+    default="model_config.yaml",
+    help="Name of the config file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
+)
+@click.option(
+    "--model_file_name",
+    type=str,
+    required=False,
+    default="model.bin",
+    help="Name of the model file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
+)
+@click.option(
+    "--output_hf_checkpoint_dir",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Converted hf checkpoint will be written to this directory.",
+)
+def entry_point_convert_pytorch_to_hf_checkpoint(
+    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+):
+    cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
+    cp.convert_pytorch_to_hf_checkpoint()
 
 
 @data.command(name="merge_packed_data")
@@ -287,7 +325,10 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[
+        MessagePublisher[EvaluationResultBatch],
+        MessagePublisher[BatchProgressUpdate],
+    ]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
