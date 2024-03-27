@@ -1,0 +1,85 @@
+modalities.dataloader package
+=============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.dataloader.open_gptx_dataset
+
+Submodules
+----------
+
+modalities.dataloader.create\_index module
+------------------------------------------
+
+.. automodule:: modalities.dataloader.create_index
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.create\_packed\_data module
+-------------------------------------------------
+
+.. automodule:: modalities.dataloader.create_packed_data
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.dataloader module
+---------------------------------------
+
+.. automodule:: modalities.dataloader.dataloader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.dataloader\_factory module
+------------------------------------------------
+
+.. automodule:: modalities.dataloader.dataloader_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.dataset module
+------------------------------------
+
+.. automodule:: modalities.dataloader.dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.dataset\_factory module
+---------------------------------------------
+
+.. automodule:: modalities.dataloader.dataset_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.large\_file\_lines\_reader module
+-------------------------------------------------------
+
+.. automodule:: modalities.dataloader.large_file_lines_reader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.samplers module
+-------------------------------------
+
+.. automodule:: modalities.dataloader.samplers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.dataloader
+   :members:
+   :undoc-members:
+   :show-inheritance:

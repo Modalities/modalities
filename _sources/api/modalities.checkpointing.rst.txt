@@ -1,0 +1,45 @@
+modalities.checkpointing package
+================================
+
+Submodules
+----------
+
+modalities.checkpointing.checkpointing module
+---------------------------------------------
+
+.. automodule:: modalities.checkpointing.checkpointing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.checkpointing.checkpointing\_execution module
+--------------------------------------------------------
+
+.. automodule:: modalities.checkpointing.checkpointing_execution
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.checkpointing.checkpointing\_instruction module
+----------------------------------------------------------
+
+.. automodule:: modalities.checkpointing.checkpointing_instruction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.checkpointing.checkpointing\_strategies module
+---------------------------------------------------------
+
+.. automodule:: modalities.checkpointing.checkpointing_strategies
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.checkpointing
+   :members:
+   :undoc-members:
+   :show-inheritance:

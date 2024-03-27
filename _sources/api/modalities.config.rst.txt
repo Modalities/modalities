@@ -1,0 +1,53 @@
+modalities.config package
+=========================
+
+Submodules
+----------
+
+modalities.config.component\_factory module
+-------------------------------------------
+
+.. automodule:: modalities.config.component_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.config.config module
+-------------------------------
+
+.. automodule:: modalities.config.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.config.look\_up\_enum module
+---------------------------------------
+
+.. automodule:: modalities.config.look_up_enum
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.config.lookup\_enum module
+-------------------------------------
+
+.. automodule:: modalities.config.lookup_enum
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.config.utils module
+------------------------------
+
+.. automodule:: modalities.config.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.config
+   :members:
+   :undoc-members:
+   :show-inheritance:

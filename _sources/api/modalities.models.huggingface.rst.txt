@@ -1,0 +1,21 @@
+modalities.models.huggingface package
+=====================================
+
+Submodules
+----------
+
+modalities.models.huggingface.huggingface\_models module
+--------------------------------------------------------
+
+.. automodule:: modalities.models.huggingface.huggingface_models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.huggingface
+   :members:
+   :undoc-members:
+   :show-inheritance:
