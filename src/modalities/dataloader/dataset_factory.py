@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from pydantic import FilePath
 from torch.utils.data.dataset import Dataset
@@ -32,9 +32,11 @@ class DatasetFactory:
         block_size: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
+        tokenization_jq_patterns: Dict[str, str],
         index_path: Optional[Path] = None,
-        jq_pattern: str = ".text",
+        pass_through_jq_patterns: Optional[Dict[str, str]] = None
     ) -> MemMapDataset:
+        
         # TODO this was part of the old Dataloader implementation.
         # we need to check if this is actually wanted generally.
         tokenizer.pad_token = tokenizer.eos_token
@@ -45,7 +47,8 @@ class DatasetFactory:
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
-            jq_pattern=jq_pattern,
+            tokenization_jq_patterns=tokenization_jq_patterns,
+            pass_through_jq_patterns=pass_through_jq_patterns
         )
         return dataset
 
