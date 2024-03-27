@@ -1,11 +1,12 @@
 prediction_key: logits
-vision_embd_prediction_key: vision_embeddings
+modality_key: modality
+modality_embd_prediction_key: modality_embeddings
 text_embd_prediction_key: text_embeddings
-vision_cls_prediction_key: vision_cls
+modality_cls_prediction_key: modality_cls
 text_cls_prediction_key: text_cls
-vision_encoder_config:
+modality_encoder_config:
   sample_key: images
-  prediction_key: vision_embeddings
+  prediction_key: modality_embeddings
   img_size: 224
   n_classes: Null # Disable vision transformer head
   n_layer: 6
@@ -37,6 +38,7 @@ text_decoder_config:
   epsilon: 1e-5
 n_pool_head: 8
 n_vision_queries: 256
+n_audio_queries: Null
 bias_attn_pool: False
 epsilon_attn_pool: 1e-5
 weight_init:
