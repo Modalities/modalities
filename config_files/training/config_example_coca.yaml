@@ -36,6 +36,7 @@ collate_fn:
     sample_keys:
       - images
       - ${settings.referencing_keys.sample_key}
+      - modality
     target_keys: []
     text_sample_key: ${settings.referencing_keys.sample_key}
     text_target_key: ${settings.referencing_keys.target_key}
@@ -52,6 +53,9 @@ train_dataset:
       - sample_key: input_ids
         sample_shape: [256]
         sample_type: int
+      - sample_key: modality
+        sample_shape: [0]
+        sample_type: const
 
 val_dataset:
   component_key: dataset
@@ -65,6 +69,9 @@ val_dataset:
       - sample_key: input_ids
         sample_shape: [256]
         sample_type: int
+      - sample_key: modality
+        sample_shape: [0]
+        sample_type: const
 
 train_dataloader:
   component_key: data_loader
@@ -190,13 +197,14 @@ model:
   variant_key: coca
   config:
     prediction_key: logits
-    vision_embd_prediction_key: vision_embeddings
+    modality_key: modality
+    modality_embd_prediction_key: modality_embeddings
     text_embd_prediction_key: text_embeddings
-    vision_cls_prediction_key: vision_cls
+    modality_cls_prediction_key: modality_cls
     text_cls_prediction_key: text_cls
-    vision_encoder_config:
+    modality_encoder_config:
       sample_key: images
-      prediction_key: vision_embeddings
+      prediction_key: modality_embeddings
       img_size: 256 # 288 in the original coca
       n_classes: Null # Disable vision transformer head
       n_layer: 12
@@ -228,6 +236,7 @@ model:
       epsilon: 1e-5
     n_pool_head: 12
     n_vision_queries: 256
+    n_audio_queries: Null
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
     weight_init:
