@@ -29,6 +29,7 @@ class Dataset(TorchdataSet):
 class DummySampleDataType(str, Enum):
     FLOAT = "float"
     INT = "int"
+    CONSTANT = "const"
 
 
 class DummySampleConfig(BaseModel):
@@ -53,6 +54,8 @@ class DummyDataset(Dataset):
         self.num_samples = num_samples
         self.sample_definition = sample_definition
 
+        self.VISION = 1
+
     def __len__(self) -> int:
         return self.num_samples
 
@@ -66,6 +69,8 @@ class DummyDataset(Dataset):
                 data = np.random.randn(*s.sample_shape)
             elif s.sample_type == DummySampleDataType.INT:
                 data = np.random.randint(low=0, high=512, size=s.sample_shape)
+            elif s.sample_type == DummySampleDataType.CONSTANT:
+                data = self.VISION
             else:
                 raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
             sample[s.sample_key] = data
