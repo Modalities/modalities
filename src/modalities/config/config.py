@@ -258,12 +258,10 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Annotated[int, Field(strict=True, ge=0)]
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[Dict[str, str]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
     model_file: str
-    special_tokens: Optional[Dict[str, str]] = None
 
 
 class DistributedSamplerConfig(BaseModel):
@@ -371,10 +369,11 @@ class CudaEnv(BaseModel):
 
 class PackedDatasetSettings(BaseModel):
     src_path: FilePath
-    dst_path: Optional[FilePath] = None
+    dst_path: Optional[Path] = None
     index_path: Optional[FilePath] = None
     jq_pattern: str
     num_cpus: Optional[Annotated[int, Field(strict=True, ge=1)]] = os.cpu_count()
+    eod_token: str
 
 
 class TrainingSettings(BaseModel):
@@ -442,9 +441,13 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
         if var_name == "experiment_id":
             return get_date_of_run()
 
+    def node_env_resolver_fun(var_name: str) -> int:
+        if var_name == "num_cpus":
+            return os.cpu_count()
+
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
     OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver("os_num_cpus", lambda: os.cpu_count())
+    OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
     config_dict = OmegaConf.to_container(cfg, resolve=True)
