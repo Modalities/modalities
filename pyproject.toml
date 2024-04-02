@@ -21,12 +21,15 @@ dependencies = [
     "jq",
     "xformers",
     "class_resolver",
-    "wandb"
+    "wandb",
+    "einops>=0.7.0",
+    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
 ]
 
 [project.optional-dependencies]
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov"]
+install_helper = ["ninja"]
 
 [project.scripts]
 modalities = "modalities.__main__:main"
@@ -70,7 +73,7 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
-    ]
+]
 
 
 ignore_errors = true

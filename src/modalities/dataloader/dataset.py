@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
+from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding, PreTrainedTokenizer
@@ -22,6 +24,52 @@ class Dataset(TorchdataSet):
     def _check_if_inbounds(self, idx: int):
         if not 0 <= idx < len(self):
             raise IndexError
+
+
+class DummySampleDataType(str, Enum):
+    FLOAT = "float"
+    INT = "int"
+
+
+class DummySampleConfig(BaseModel):
+    sample_key: str
+    sample_shape: Tuple[int, ...]
+    sample_type: DummySampleDataType
+
+
+class DummyDatasetConfig(BaseModel):
+    num_samples: int
+    sample_definition: List[DummySampleConfig]
+
+
+class DummyDataset(Dataset):
+    def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
+        """
+        :param num_samples: Number of samples the dataset should generate.
+        :param sample_definition: A list of tuples defining the dataset output.
+            Each touple contains the sample key, shape and data type.
+        """
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+        self.num_samples = num_samples
+        self.sample_definition = sample_definition
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, idx: int) -> Dict:
+        return self._create_random_sample()
+
+    def _create_random_sample(self):
+        sample = dict()
+        for s in self.sample_definition:
+            if s.sample_type == DummySampleDataType.FLOAT:
+                data = np.random.randn(*s.sample_shape)
+            elif s.sample_type == DummySampleDataType.INT:
+                data = np.random.randint(low=0, high=512, size=s.sample_shape)
+            else:
+                raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
+            sample[s.sample_key] = data
+        return sample
 
 
 class MemMapDataset(Dataset):
