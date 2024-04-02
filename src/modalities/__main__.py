@@ -141,6 +141,7 @@ def entry_point_pack_encoded_data(config_path: FilePath):
         components.settings.src_path,
         index_path=components.settings.index_path,
         tokenizer=tokenizer,
+        eod_token=components.settings.eod_token,
         jq_pattern=components.settings.jq_pattern,
         number_of_processes=components.settings.num_cpus,
     )
