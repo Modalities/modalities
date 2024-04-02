@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
+import sentencepiece as spm
 from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
@@ -13,6 +14,43 @@ from transformers import BatchEncoding, PreTrainedTokenizer
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import EmbeddedStreamData
+
+
+class TokenizerWrapper:
+    def __call__(
+        self,
+        text: str,
+        max_length: Optional[int] = None,
+        padding: Optional[bool] = None,
+        truncation: Optional[bool] = None,
+    ):
+        raise NotImplementedError("Tokenizer must be implemented by a subclass.")
+
+
+class PreTrainedHFTokenizer(TokenizerWrapper):
+    def __init__(self, tokenizer: PreTrainedTokenizer) -> None:
+        self.tokenizer = tokenizer
+
+    def __call__(self, text, max_length, padding, truncation):
+        return self.tokenizer.__call__(text, max_length=max_length, padding=padding, truncation=truncation)
+
+
+class PreTrainedSPTokenizer(TokenizerWrapper):
+    def __init__(self, tokenizer: spm.SentencePieceProcessor = None):
+        self.tokenizer = tokenizer
+        self.tokenizer_config = None
+        self.continuation_tokenizer = None
+        self.add_prefix_space = None
+        self.read_model_proto()
+
+    def __call__(
+        self,
+        text: str,
+        max_length: Optional[int] = None,
+        padding: Optional[bool] = None,
+        truncation: Optional[bool] = None,
+    ):
+        return self.tokenizer.encode(text)
 
 
 class Dataset(TorchdataSet):
@@ -77,7 +115,7 @@ class MemMapDataset(Dataset):
         self,
         raw_data_path: Path,
         block_size: int,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: TokenizerWrapper,
         sample_key: str,
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
