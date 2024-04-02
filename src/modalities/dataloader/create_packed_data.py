@@ -11,9 +11,9 @@ import jq
 import numpy as np
 from pydantic import FilePath
 from tqdm import tqdm
-from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,8 @@ class PackedDataGenerator:
     def __init__(
         self,
         src_path: FilePath,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: TokenizerWrapper,
+        eod_token: str,
         number_of_processes: int,
         index_path: FilePath,
         jq_pattern: str,
@@ -44,9 +45,12 @@ class PackedDataGenerator:
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
+        self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
-        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
+        encoded_eod_tokens = self.tokenizer.tokenize(self.eod_token)
+        assert len(encoded_eod_tokens) == 1, "EOD Token must be a single token."
+        encoded_eod_token = encoded_eod_tokens[0]
+        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
@@ -174,7 +178,7 @@ class PackedDataGenerator:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
-        tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
+        tokens = self.tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
         return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
