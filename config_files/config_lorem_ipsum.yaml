@@ -22,9 +22,10 @@ settings:
     checkpointing_path: data/checkpoints
 tokenizer:
   component_key: tokenizer
-  variant_key: gpt2_tokenizer_fast
+  variant_key: pretrained_hf_tokenizer
   config:
-    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
+    pretrained_model_name_or_path: /workspaces/modalities/data/tokenizer/hf_gpt2
+    max_length: ${settings.training.sequence_length}
 
 collate_fn:  
   component_key: collate_fn
@@ -35,7 +36,7 @@ collate_fn:
 
 train_dataset:  
   component_key: dataset
-  variant_key: mem_map_dataset
+  variant_key: packed_mem_map_dataset_continuous
   config:
     raw_data_path: data/lorem_ipsum.jsonl
     index_path: data/lorem_ipsum.idx

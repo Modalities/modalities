@@ -9,6 +9,7 @@ from typing import Callable, Iterator, List, Tuple
 
 import jq
 import numpy as np
+from pydantic import FilePath
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
@@ -24,11 +25,11 @@ class EmptySampleError(RuntimeError):
 class PackedDataGenerator:
     def __init__(
         self,
-        src_path: Path,
+        src_path: FilePath,
         tokenizer: PreTrainedTokenizer,
-        index_path: Path = None,
-        jq_pattern: str = ".text",
-        number_of_processes: int = os.cpu_count(),
+        number_of_processes: int,
+        index_path: FilePath,
+        jq_pattern: str,
     ):
         """
         Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.

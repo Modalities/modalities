@@ -1,7 +1,7 @@
 from typing import List
 
 import sentencepiece as spm
-from transformers import PreTrainedTokenizer
+from transformers import AutoTokenizer
 
 
 class TokenizerWrapper:
@@ -11,9 +11,9 @@ class TokenizerWrapper:
 
 class PreTrainedHFTokenizer(TokenizerWrapper):
     def __init__(
-        self, tokenizer: PreTrainedTokenizer, max_length: int, truncation: bool, padding: str = "max_length"
+        self, pretrained_model_name_or_path: str, max_length: int, truncation: bool = True, padding: str = "max_length"
     ) -> None:
-        self.tokenizer = tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=pretrained_model_name_or_path)
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
@@ -28,8 +28,9 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
 
 
 class PreTrainedSPTokenizer(TokenizerWrapper):
-    def __init__(self, tokenizer: spm.SentencePieceProcessor = None):
-        self.tokenizer = tokenizer
+    def __init__(self, model_file: str):
+        self.tokenizer = spm.SentencePieceProcessor()
+        self.tokenizer.Load(model_file)
 
     def tokenize(self, text: str) -> List[int]:
         return self.tokenizer.encode(text)
