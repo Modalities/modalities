@@ -5,7 +5,11 @@ from transformers import AutoTokenizer
 
 
 class TokenizerWrapper:
-    def tokenize(self, text: str):
+    def tokenize(self, text: str) -> List[int]:
+        raise NotImplementedError("Tokenizer must be implemented by a subclass.")
+
+    @property
+    def vocab_size(self) -> int:
         raise NotImplementedError("Tokenizer must be implemented by a subclass.")
 
 
@@ -17,6 +21,10 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size
 
     def tokenize(self, text: str) -> List[int]:
         return self.tokenizer.__call__(
@@ -34,3 +42,7 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
 
     def tokenize(self, text: str) -> List[int]:
         return self.tokenizer.encode(text)
+
+    @property
+    def vocab_size(self) -> int:
+        return self.tokenizer.vocab_size()

@@ -1,10 +1,10 @@
 settings:
-  src_path: data/lorem_ipsum.jsonl
-  dst_path: data/
+  src_path: /workspaces/modalities/data/lorem_ipsum.jsonl
+  dst_path: /workspaces/modalities/data/lorem_ipsum.pbin
   index_path: /workspaces/modalities/data/lorem_ipsum.idx
   jq_pattern: .text
-  num_cpus: ${os_num_cpus}
-  eod_token: ${tokenizer.config.special_tokens.eod_token}
+  num_cpus: ${node_env:num_cpus}
+  eod_token: <|endoftext|>
 
 tokenizer:
   component_key: tokenizer
@@ -13,5 +13,3 @@ tokenizer:
     pretrained_model_name_or_path: /workspaces/modalities/data/tokenizer/hf_gpt2
     padding: false
     max_length: 512
-    special_tokens:
-      eod_token: <|EOD|>
