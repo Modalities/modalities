@@ -6,51 +6,15 @@ from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
-import sentencepiece as spm
 from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
-from transformers import BatchEncoding, PreTrainedTokenizer
+from transformers import BatchEncoding
+
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import EmbeddedStreamData
-
-
-class TokenizerWrapper:
-    def __call__(
-        self,
-        text: str,
-        max_length: Optional[int] = None,
-        padding: Optional[bool] = None,
-        truncation: Optional[bool] = None,
-    ):
-        raise NotImplementedError("Tokenizer must be implemented by a subclass.")
-
-
-class PreTrainedHFTokenizer(TokenizerWrapper):
-    def __init__(self, tokenizer: PreTrainedTokenizer) -> None:
-        self.tokenizer = tokenizer
-
-    def __call__(self, text, max_length, padding, truncation):
-        return self.tokenizer.__call__(text, max_length=max_length, padding=padding, truncation=truncation)
-
-
-class PreTrainedSPTokenizer(TokenizerWrapper):
-    def __init__(self, tokenizer: spm.SentencePieceProcessor = None):
-        self.tokenizer = tokenizer
-        self.tokenizer_config = None
-        self.continuation_tokenizer = None
-        self.add_prefix_space = None
-        self.read_model_proto()
-
-    def __call__(
-        self,
-        text: str,
-        max_length: Optional[int] = None,
-        padding: Optional[bool] = None,
-        truncation: Optional[bool] = None,
-    ):
-        return self.tokenizer.encode(text)
 
 
 class Dataset(TorchdataSet):
@@ -146,12 +110,7 @@ class MemMapDataset(Dataset):
 
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
-        return self.tokenizer(
-            self.jq_filter.input_text(self.reader[idx]).first(),
-            max_length=self.block_size,
-            padding="max_length",
-            truncation=True,
-        )
+        return self.tokenizer.tokenize(text=self.jq_filter.input_text(self.reader[idx]).first())
 
 
 class PackedMemMapDatasetBase(Dataset):
