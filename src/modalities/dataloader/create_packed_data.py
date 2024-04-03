@@ -47,9 +47,7 @@ class PackedDataGenerator:
         self.tokenizer = tokenizer
         self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
-        encoded_eod_tokens = self.tokenizer.tokenize(self.eod_token)
-        assert len(encoded_eod_tokens) == 1, "EOD Token must be a single token."
-        encoded_eod_token = encoded_eod_tokens[0]
+        encoded_eod_token = self.tokenizer.get_token_id(self.eod_token)
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
