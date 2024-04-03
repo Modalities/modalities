@@ -155,4 +155,4 @@ data
 docs/source/generated
 docs/source/api
 pyenv*
-.devcontainer/*
+.devcontainer/
