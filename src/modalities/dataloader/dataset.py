@@ -117,12 +117,12 @@ class PackedMemMapDatasetBase(Dataset):
     DATA_SECTION_LENGTH_IN_BYTES = EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES
     TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
     HEADER_SIZE_IN_BYTES = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
-    np_dtype_from_num_bytes = {
-        1: np.dtype(np.uint8).newbyteorder(">"),
-        2: np.dtype(np.uint16).newbyteorder(">"),
-        4: np.dtype(np.uint32).newbyteorder(">"),
-        8: np.dtype(np.uint64).newbyteorder(">"),
+    np_dtype_of_tokens_on_disk_from_bytes = {
+        1: np.dtype(np.uint8).newbyteorder("<"),
+        2: np.dtype(np.uint16).newbyteorder("<"),
+        4: np.dtype(np.uint32).newbyteorder("<"),
     }
+    type_converter_for_torch = {1: np.uint8, 2: np.int32, 4: np.int64}
 
     def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
         """
@@ -143,7 +143,8 @@ class PackedMemMapDatasetBase(Dataset):
         self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
         self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
         try:
-            self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
+            self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
+            self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
         except KeyError:
             raise RuntimeError(
                 f"Encountered a required token representation with {self._token_size_in_bytes},"
@@ -160,7 +161,11 @@ class PackedMemMapDatasetBase(Dataset):
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
         offset, length = self._index[idx]
-        tokens = np.frombuffer(self._embedded_stream_data.data, dtype=self._token_dtype, count=length, offset=offset)
+        tokens = np.frombuffer(
+            self._embedded_stream_data.data, dtype=self._token_dtype_on_disk, count=length, offset=offset
+        )
+        # torch can't convert most uint-formats, therefore we infer regular int types
+        tokens = tokens.astype(self._token_dtype_in_ram)
         return BatchEncoding(data={self.sample_key: tokens})
 
 
