@@ -36,9 +36,9 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
 
 
 class PreTrainedSPTokenizer(TokenizerWrapper):
-    def __init__(self, model_file: str):
+    def __init__(self, tokenizer_model_file: str):
         self.tokenizer = spm.SentencePieceProcessor()
-        self.tokenizer.Load(model_file)
+        self.tokenizer.Load(tokenizer_model_file)
 
     def tokenize(self, text: str) -> List[int]:
         return self.tokenizer.encode(text)

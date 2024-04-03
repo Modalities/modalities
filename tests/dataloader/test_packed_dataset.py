@@ -5,6 +5,7 @@ import pytest
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from modalities.models.gpt2.collator import GPT2LLMCollateFn
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
@@ -85,3 +86,21 @@ def test_join_packed_datasets(dummy_packed_data_path, tmpdir):
     assert [v for batch in loaded_dataset for v in batch["whatever"]] == [
         v for ds in original_datasets for batch in ds for v in batch["whatever"]
     ]
+
+
+@pytest.mark.parametrize("token_size_in_bytes", [1, 2, 4])
+def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_bytes: int):
+    src_pbin_path = Path(__file__).parents[2] / "data/lorem_ipsum.pbin"
+    pbin_path = Path(tmpdir, "lorem_ipsum.pbin")
+    pbin_path.write_bytes(src_pbin_path.read_bytes())
+    with pbin_path.open("r+b") as fin:
+        fin.seek(8)
+        fin.write(token_size_in_bytes.to_bytes(4, byteorder="little"))
+    assert pbin_path.is_file()
+    sample_key = "input_ids"
+    ds = PackedMemMapDatasetContinuous(raw_data_path=pbin_path, block_size=10, sample_key=sample_key)
+    assert list(ds)
+
+    collator = GPT2LLMCollateFn(sample_key=sample_key, target_key="abc")
+    for batch in zip(ds, ds):
+        collator(list(batch))
