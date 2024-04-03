@@ -27,12 +27,13 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         return self.tokenizer.vocab_size
 
     def tokenize(self, text: str) -> List[int]:
-        return self.tokenizer.__call__(
+        tokens = self.tokenizer.__call__(
             text,
             max_length=self.max_length,
             padding=self.padding,
             truncation=self.truncation,
         )["input_ids"]
+        return tokens
 
 
 class PreTrainedSPTokenizer(TokenizerWrapper):
@@ -41,7 +42,8 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         self.tokenizer.Load(tokenizer_model_file)
 
     def tokenize(self, text: str) -> List[int]:
-        return self.tokenizer.encode(text)
+        tokens =  self.tokenizer.encode(text)
+        return tokens
 
     @property
     def vocab_size(self) -> int:

@@ -5,7 +5,6 @@ settings:
     target_key: target_ids
   training:
     callback_interval_in_samples: 6
-    global_num_training_samples: 12
     global_num_seen_samples: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
@@ -20,6 +19,7 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
+
 tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
@@ -63,7 +63,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -94,7 +94,7 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: 3
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -125,7 +125,7 @@ test_dataloader:
       variant_key: default
       config:
         batch_size: 3
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -245,7 +245,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4
+    total_steps: 5
     pct_start: 0.01
     anneal_strategy: cos
 
