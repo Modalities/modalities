@@ -8,14 +8,14 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
 
 
 def test_hf_tokenize():
-    model_file = "data/tokenizer/hf_gpt2"
+    tokenizer_model_file = "data/tokenizer/hf_gpt2"
     tokenizer = PreTrainedHFTokenizer(
-        pretrained_model_name_or_path=model_file, max_length=20, truncation=False, padding=False
+        pretrained_model_name_or_path=tokenizer_model_file, max_length=20, truncation=False, padding=False
     )
     _assert_tokenization(tokenizer)
 
 
 def test_sp_tokenize():
-    model_file = "data/tokenizer/sentencepiece/bpe_tokenizer.model"
-    tokenizer = PreTrainedSPTokenizer(model_file=model_file)
+    tokenizer_model_file = "data/tokenizer/sentencepiece/bpe_tokenizer.model"
+    tokenizer = PreTrainedSPTokenizer(model_file=tokenizer_model_file)
     _assert_tokenization(tokenizer)
