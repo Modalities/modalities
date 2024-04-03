@@ -95,7 +95,7 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
     pbin_path.write_bytes(src_pbin_path.read_bytes())
     with pbin_path.open("r+b") as fin:
         fin.seek(8)
-        fin.write(token_size_in_bytes.to_bytes(4, byteorder="big"))
+        fin.write(token_size_in_bytes.to_bytes(4, byteorder="little"))
     assert pbin_path.is_file()
     sample_key = "input_ids"
     ds = PackedMemMapDatasetContinuous(raw_data_path=pbin_path, block_size=10, sample_key=sample_key)

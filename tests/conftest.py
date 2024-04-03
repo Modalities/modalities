@@ -33,8 +33,8 @@ def dummy_packed_data_path(tmpdir) -> Path:
     header_size_in_bytes = 8
     token_size_in_bytes = 4
     tokens = list(range(20))
-    data += (len(tokens) * token_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="big")
-    data += token_size_in_bytes.to_bytes(4, byteorder="big")
+    data += (len(tokens) * token_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="little")
+    data += token_size_in_bytes.to_bytes(4, byteorder="little")
     data += b"".join([t.to_bytes(token_size_in_bytes, byteorder="little") for t in tokens])
     index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
