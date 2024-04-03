@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
@@ -32,12 +32,9 @@ class MemMapDataset(Dataset):
         raw_data_path: Path,
         block_size: int,
         tokenizer: PreTrainedTokenizer,
-        sample_key: str,  # TODO Max: is sample key really necessary?
-        tokenization_jq_patterns: Dict[str, str],
-        pass_through_jq_patterns: Dict[str, str] = None,
+        sample_key: str,
         index_path: Optional[Path] = None,
-        special_tokens_map: Optional[Dict[str, str]] = None,
-        # {"bos_token": "<s>", "eos_token": "</s>", "pad_token": "<pad>", "unk_token": "<unk>", "mask_token": "<mask}
+        jq_pattern: str = ".text",
     ):
         """
         Pytorch Dataset with mmap support.
@@ -55,44 +52,22 @@ class MemMapDataset(Dataset):
                             this needs to get replaced with a list of sample keys!
         """
         super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
-        self.sample_key = sample_key
-
-        self.tokenization_jq_filter = {key: jq.compile(pattern) for key, pattern in tokenization_jq_patterns.items()}
-        self.pass_through_jq_filter = (
-            {key: jq.compile(pattern) for key, pattern in pass_through_jq_patterns.items()}
-            if pass_through_jq_patterns
-            else {}
-        )
 
         self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
+        self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer = tokenizer
-        if special_tokens_map is not None:
-            self.special_tokens_map = {k: self.tokenizer.tokenizer(v) for k, v in special_tokens_map.items()}
 
     def __len__(self) -> int:
         return len(self.reader)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
-
-        item = {}
-        # applying jq filter for which we want to tokenize the text
-        for key, jq_filter in self.tokenization_jq_filter.items():
-            text = jq_filter.input_text(self.reader[idx]).first()
-
-            tokens = self.tokenizer(
-                text,
-                max_length=self.block_size,
-                padding="max_length",
-                truncation=True,
-            )
-            item[key] = tokens
-
-        # applying jq filter for which we want to pass through the raw data without tokenization
-        for key, jq_filter in self.pass_through_jq_filter.items():
-            item[key] = jq_filter.input_text(self.reader[idx]).first()
-        item = {**item, **self.special_tokens_map}
-        return item
+        return self.tokenizer(
+            self.jq_filter.input_text(self.reader[idx]).first(),
+            max_length=self.block_size,
+            padding="max_length",
+            truncation=True,
+        )
 
 
 class PackedMemMapDatasetBase(Dataset):
@@ -121,9 +96,10 @@ class PackedMemMapDatasetBase(Dataset):
                            TODO: If this setting should support multi-modal features using separately encoded inputs,
                             this needs to get replaced with a list of sample keys!
         """
-        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size)
         self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
         self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
+        self.sample_key = sample_key
         try:
             self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
         except KeyError:
