@@ -117,17 +117,15 @@ def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
 # Fine-tuning Datasets
 
 ## Instruction Tuning
-Datasets, such as Bactrian or LIMA, come in different formats. Before instruction-tuning a model with one of these datasets the user has to 
-transform the dataset into the following format JSONL, inspired by Fast Chat. The listing below showcases an exemplary sample from the JSONL file. 
-The `id` represents the incremental sample id. `Conversations` contains the multi-turn messages between different parties. Here, we depicted messages 
-between a human and a gpt model. Finally, the format allows for the specification of further, arbitrary key-value pairs such as instructions and roles.
+Instruction tuning datasets, such as Bactrian or LIMA, generally come in diverse formats. Therefore, before instruction-tuning a model with one of these datasets the user has to transform the dataset into the following format JSONL, inspired by Fast Chat. The listing below showcases an exemplary sample from the JSONL file. 
+The `id` represents the incremental sample id. `Conversations` contains the multi-turn messages between different parties. Here, we depicted messages between a human and a gpt model. Finally, the format allows for the specification of further, arbitrary key-value pairs such as instructions and roles.
 
 ```JSON
 {
     "id": 0,
     "conversations": [
       {
-        "from": "human",
+        "from": "human_1",
         "value": "What is up?"
       },
       {
@@ -135,15 +133,15 @@ between a human and a gpt model. Finally, the format allows for the specificatio
         "value": "Hello! How can I help you today?"
       },
       {
-        "from": "human",
+        "from": "human_1",
         "value": "Who are you?"
       },
       {
         "from": "gpt",
-        "value": "You can call me Vicuna, and I was trained by Large Model Systems Organization (LMSYS) researchers as a language model."
+        "value": "You can call me Mody, and I was trained by the modalities team as a language model."
       },
       {
-        "from": "human",
+        "from": "human_2",
         "value": "Goodbye"
       },
       {
@@ -153,17 +151,74 @@ between a human and a gpt model. Finally, the format allows for the specificatio
     ]
     
     # optional / arbitrary key value pairs e.g.:
-    "instruction": "Role: Vicuna, trained by Large Model Systems Organization (LMSYS) researchers"
-    "role": "Vicuna, trained by Large Model Systems Organization (LMSYS) researchers"
+    "instruction": "You are Mody, a helpful LLM trained by the modalities team"
+    "role": "Mody, a helpful LLM trained by the modalities team"
 }
 ```
+All JSONL files for instruction tuning have to follow this format.
 
+Given a prepared JSONL file, the training / processing flow can be described as follows:
 During the instantiation of the MemMap file, we specify the JQ patterns that determine which fields in the JSON are supposed to be tokenized and additionally pass a list of special tokens e.g., `<s>`, `</s>`, `<eod>` etc. to the constructor. 
 Each one of the special tokens is mapped to a single, individual token id once during the instantation of the MemMap file. 
 
-When the dataloader iterates over the MemMap file, the `__get_item__()` method tokenizes the sample as specified in the JQ patterns list and enriches the resulting dictionary with the token ids of the special tokens. 
+When the dataloader iterates over the MemMap file, the `__get_item__()` method tokenizes the sample as specified in the JQ patterns list and enriches the resulting dictionary with the token ids of the special tokens that we pre-computed during the MemMap file instantiation. 
+In other words, we extract the desired keys from the raw text dictionary, tokenize the content, build a new dictionary with the tokenized data and add the representation of special tokens to it.
 
-The dataloader packs multiple samples to a `DatasetBatch` and calls the `Collator` for bringing the samples in the correct format training. 
+Given the MemMap parameterization
+
+```
+  tokenization_jq_patterns = [".conversations .value", ".instruction", ".role"]
+  pass_through_jq_patterns = [".id"]
+  special_tokens_map = {"b_instruction_token": "place_holder_token_100", ... }
+```
+
+```JSON
+{
+    "id": 0,
+    "conversations": [
+      {
+        "from": "human_1",
+        "from_tokenized": "<human_1>",
+        "value": "<What is up?>"
+      },
+      {
+        "from": "gpt",
+        "from_tokenized": "<gpt>",
+        "value": "<Hello! How can I help you today?>"
+      },
+      {
+        "from": "human_1",
+        "from_tokenized": "<human_1>",
+        "value": "<Who are you?>"
+      },
+      {
+        "from": "gpt",
+        "from_tokenized": "<gpt>",
+        "value": "<You can call me Mody, and I was trained by the modalities team as a language model.>"
+      },
+      {
+        "from": "human_2",
+        "from_tokenized": "<human_2>",
+        "value": "<Goodbye>"
+      },
+      {
+        "from": "gpt",
+        "from_tokenized": "<gpt>",
+        "value": "<Goodbye! If you have any more questions in the future, don't hesitate to ask.>"
+      }
+    ]
+    
+    # optional / arbitrary key value pairs e.g.:
+    "instruction": "<You are Mody, a helpful LLM trained by the modalities team>"
+    "role": "<Mody, a helpful LLM trained by the modalities team>"
+    "special_tokens": {"bos_token": "<bos_token_id>", "eos_token": "eos_token_id>", ... "unk_token", "mask_token", 
+                    "b_role_token", "e_role_token", "b_instruction_token", 
+                    "e_instruction_token"}
+}
+```
+
+
+The dataloader packs multiple samples to a `DatasetBatch` and calls the `Collator` for bringing the batch of samples into the correct format training. 
 
 The collator is instantiated with information on how to assemble the entire prompt from the `conversations` and the optional key-value pairs. 
 In practice, the YAML configuration has the following structure
@@ -172,11 +227,60 @@ In practice, the YAML configuration has the following structure
 special_tokens:
     bos_token: <s>
     eos_token: </s>
+    b_role_token: <r>
+    e_role_token: </r>
+    b_instruction_token: <i>
+    e_instruction_token: </i>
 
 loss_masking_jq_patterns:
     - .conversations | select(.from == "human")
     - .instruction
     - .role
 
-message_construction: [role, instruction, conversations]
+message_construction: 
+  - b_role_token
+  - role
+  - e_role_token
+  - b_instruction_token
+  - instruction
+  - e_instruction_token
+  - conversations
+
+  assistant_role: gpt
+```
+
+To reduce the complexity of this example, we assume that each word is resembled by exactly one token and disregard punctuation. Similarly, we also did not replace each word by its token id. 
+
+Given the simplification, the batch is represented by the following data structure: 
+
+
+```JSON
+[
+  "samples" : torch.Tensor([
+    
+    <
+    (b_instruction_token)
+    You are Mody, a helpful LLM trained by the modalities team
+    (e_instruction_token)
+    
+    (b_role_token)
+    Mody, a helpful LLM trained by the modalities team
+    (b_role_token)
+
+    human_1: What is up?
+    gpt: Hello! How can I help you today?
+
+    human_1: Who are you?
+    gpt:
+    (b_assistant_token) 
+    You can call me Mody, and I was trained by the modalities team as a language model.
+    (e_assistant_token) 
+
+    human_2: Goodbye
+    gpt: Goodbye! If you have any more questions in the future, don't hesitate to ask.>
+    ...
+  ]
+  "targets": <equals samples just shifted by one token>
+  "loss_mask": 
+]
 ```
