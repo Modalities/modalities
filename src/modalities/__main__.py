@@ -8,7 +8,7 @@ from typing import Dict, Tuple
 
 import click
 import click_pathlib
-from pydantic import FilePath
+from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
@@ -186,6 +186,12 @@ class Main:
             component_type=custom_component,
             component_config_type=custom_config,
         )
+
+    def build_components(self, components_model_type: BaseModel) -> BaseModel:
+        components: TrainingComponentsModel = self.component_factory.build_components(
+                config_dict=self.config_dict, components_model_type=components_model_type
+            )
+        return components
 
     def run(self):
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):

@@ -22,6 +22,7 @@ from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
+from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
 
 _ROOT_DIR = Path(__file__).parents[1]
@@ -75,13 +76,12 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
 
-
 @pytest.fixture
-def gpt2_tokenizer() -> GPT2TokenizerFast:
-    default_gpt2_tokenizer_path = Path(__file__).parents[1] / Path("data", "tokenizer", "tokenizer_gpt2.json")
-    assert default_gpt2_tokenizer_path.is_file()
-    return GPT2TokenizerFast(tokenizer_file=str(default_gpt2_tokenizer_path))
-
+def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
+    gpt2_tokenizer_folder_path = Path(__file__).parents[1] / Path("data", "tokenizer", "hf_gpt2")
+    tokenizer = PreTrainedHFTokenizer(pretrained_model_name_or_path=gpt2_tokenizer_folder_path, 
+                          max_length=None, truncation=None, padding=False)
+    return tokenizer
 
 @pytest.fixture(scope="function")
 def checkpointing_mock():
@@ -126,7 +126,9 @@ def optimizer_with_param_groups_mock():
 
 @pytest.fixture(scope="function")
 def scheduler_mock():
-    return MagicMock(spec=LRScheduler)
+    mocked_lr_schdeduler = MagicMock(spec=LRScheduler)
+    mocked_lr_schdeduler.get_last_lr = lambda: [0.0]
+    return mocked_lr_schdeduler
 
 
 @pytest.fixture(scope="function")
