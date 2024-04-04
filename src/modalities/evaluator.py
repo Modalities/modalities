@@ -2,12 +2,13 @@ from typing import Callable, Dict, List
 
 import torch
 import torch.distributed as dist
+import torch.nn as nn
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.models.model import NNModel, model_predict_batch
+from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
 from modalities.util import Aggregator, TimeRecorder
@@ -27,7 +28,7 @@ class Evaluator:
     def evaluate_batch(
         self,
         batch: DatasetBatch,
-        model: NNModel,
+        model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
     ):
         with torch.no_grad():
@@ -37,7 +38,7 @@ class Evaluator:
 
     def evaluate(
         self,
-        model: NNModel,
+        model: nn.Module,
         data_loaders: List[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         global_train_sample_id: int,

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import torch.nn as nn
 from torch.optim import Optimizer
@@ -52,10 +52,10 @@ class Checkpointing(CheckpointingIF):
     def save_checkpoint(
         self,
         global_train_sample_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
+        evaluation_result: Optional[Dict[str, EvaluationResultBatch]] = None,
     ):
         checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
             global_train_sample_id=global_train_sample_id,

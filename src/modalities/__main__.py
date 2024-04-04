@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Type
 
 import click
 import click_pathlib
@@ -187,10 +187,10 @@ class Main:
             component_config_type=custom_config,
         )
 
-    def build_components(self, components_model_type: BaseModel) -> BaseModel:
-        components: TrainingComponentsModel = self.component_factory.build_components(
-                config_dict=self.config_dict, components_model_type=components_model_type
-            )
+    def build_components(self, components_model_type: Type[BaseModel]) -> BaseModel:
+        components = self.component_factory.build_components(
+            config_dict=self.config_dict, components_model_type=components_model_type
+        )
         return components
 
     def run(self):
@@ -244,21 +244,22 @@ class Main:
             if components.settings.training.do_apply_activation_checkpointing:
                 apply_activation_checkpointing_inplace(wrapped_model)
 
-            callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
-                callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
+            local_training_log_interval_in_batches = get_callback_interval_in_batches_per_rank(
+                local_callback_interval_in_samples=components.settings.training.local_training_log_interval_in_samples,
                 local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
                 gradient_acc_steps=components.settings.training.gradient_acc_steps,
-                world_size=components.settings.cuda_env.world_size,
             )
 
             gym.run(
-                callback_interval_in_batches=callback_interval_in_batches_per_rank,
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=components.eval_dataloaders,
                 checkpointing=components.checkpointing,
                 model=wrapped_model,
                 optimizer=components.optimizer,
                 scheduler=components.scheduler,
+                local_checkpointing_interval_in_samples=components.settings.training.local_checkpointing_interval_in_samples,
+                local_evaluation_interval_in_samples=components.settings.training.local_evaluation_interval_in_samples,
+                local_training_log_interval_in_batches=local_training_log_interval_in_batches,
             )
             print("done")
 
