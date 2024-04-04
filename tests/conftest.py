@@ -49,7 +49,7 @@ def dummy_config(monkeypatch) -> Dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    dummy_config_path = _ROOT_DIR / Path("config_files/config_lorem_ipsum.yaml")
+    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
     return config_dict, dummy_config_path
 
