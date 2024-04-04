@@ -14,7 +14,7 @@ from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
-from modalities.checkpointing.checkpointing import CheckpointingIF
+from modalities.checkpointing.checkpointing import Checkpointing
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
 from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
@@ -46,7 +46,7 @@ class PydanticThirdPartyTypeIF:
         )
 
 
-PydanticCheckpointingIFType = Annotated[CheckpointingIF, PydanticThirdPartyTypeIF(CheckpointingIF)]
+PydanticCheckpointingType = Annotated[Checkpointing, PydanticThirdPartyTypeIF(Checkpointing)]
 PydanticCheckpointingStrategyIFType = Annotated[
     CheckpointingStrategyIF, PydanticThirdPartyTypeIF(CheckpointingStrategyIF)
 ]
@@ -217,14 +217,14 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpointing: PydanticCheckpointingIFType
+    checkpointing: PydanticCheckpointingType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
-    checkpointing: PydanticCheckpointingIFType
+    checkpointing: PydanticCheckpointingType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
@@ -372,7 +372,7 @@ class PackedDatasetSettings(BaseModel):
     dst_path: Optional[Path] = None
     index_path: Optional[FilePath] = None
     jq_pattern: str
-    num_cpus: Optional[Annotated[int, Field(strict=True, ge=1)]] = os.cpu_count()
+    num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
     eod_token: str
 
 
@@ -390,7 +390,9 @@ class TrainingSettings(BaseModel):
                     raise ValueError("A threshold value is required when gradient clipping is used.")
                 return self
 
-        callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
+        local_training_log_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
+        local_checkpointing_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
+        local_evaluation_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
@@ -417,7 +419,7 @@ class TrainingComponentsModel(BaseModel):
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
-    checkpointing: PydanticCheckpointingIFType
+    checkpointing: PydanticCheckpointingType
     settings: TrainingSettings
 
 
