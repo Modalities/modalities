@@ -16,6 +16,6 @@ def test_hf_tokenize():
 
 
 def test_sp_tokenize():
-    tokenizer_model_file = "data/tokenizer/sentencepiece/bpe_tokenizer.model"
-    tokenizer = PreTrainedSPTokenizer(model_file=tokenizer_model_file)
+    tokenizer_model_file = "data/tokenizer/opengptx_unigram/unigram_tokenizer.model"
+    tokenizer = PreTrainedSPTokenizer(tokenizer_model_file=tokenizer_model_file)
     _assert_tokenization(tokenizer)
