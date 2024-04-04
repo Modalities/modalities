@@ -6,6 +6,7 @@ import pytest
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
@@ -39,10 +40,11 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
 
 
-def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer):
+def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
     block_size = 5
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_data_path.raw_data_path, tokenizer=gpt2_tokenizer, number_of_processes=2
+        src_path=indexed_dummy_data_path.raw_data_path, tokenizer=wrapped_gpt2_tokenizer, number_of_processes=2, eod_token="<|endoftext|>",
+        index_path=indexed_dummy_data_path.index_path, jq_pattern=".text"
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
@@ -52,7 +54,7 @@ def test_create_packed_dataset(indexed_dummy_data_path, gpt2_tokenizer):
     )
 
     start_of_jsonl_content = "0 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
-    tokenized_start_of_jsonl_content = gpt2_tokenizer(start_of_jsonl_content)["input_ids"]
+    tokenized_start_of_jsonl_content = wrapped_gpt2_tokenizer.tokenize(start_of_jsonl_content)
     packed_dataset_iterator = iter(packed_dataset)
     np.testing.assert_equal(tokenized_start_of_jsonl_content[:block_size], next(packed_dataset_iterator)["input_ids"])
     np.testing.assert_equal(
