@@ -1,14 +1,14 @@
 from typing import Callable, Optional
 
+import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 
 from modalities.config.config import GradientClippingMode
-from modalities.models.model import NNModel
 
 
 def build_gradient_clipper(
     gradient_clipping_mode: GradientClippingMode, gradient_clipping_threshold: Optional[float]
-) -> Callable[[NNModel], None]:
+) -> Callable[[nn.Module], None]:
     """Returns a function that applies gradient clipping to a given model (in place).
 
     :param gradient_clipping_mode: Selection between different norm based modes,
@@ -17,7 +17,7 @@ def build_gradient_clipper(
     :param gradient_clipping_threshold: Value at which will be clipped.
     :type gradient_clipping_threshold: float
     :return: A function taking a model as input and producing no output.
-    :rtype: Callable[[NNModel], None]
+    :rtype: Callable[[nn.Module], None]
     """
     if (gradient_clipping_threshold is None) != (gradient_clipping_mode == GradientClippingMode.NONE):
         raise ValueError(

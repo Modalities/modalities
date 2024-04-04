@@ -21,7 +21,7 @@ class NNModel(nn.Module):
         return {name: param for name, param in self.named_parameters()}
 
 
-def model_predict_batch(model: NNModel, batch: DatasetBatch) -> InferenceResultBatch:
+def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
     forward_result = model.forward(batch.samples)
     result_batch = InferenceResultBatch(targets=batch.targets, predictions=forward_result)
     return result_batch
