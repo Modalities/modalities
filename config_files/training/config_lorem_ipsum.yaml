@@ -5,7 +5,6 @@ settings:
     target_key: target_ids
   training:
     callback_interval_in_samples: 6
-    global_num_training_samples: 12
     global_num_seen_samples: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
@@ -20,11 +19,13 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
+
 tokenizer:
   component_key: tokenizer
-  variant_key: gpt2_tokenizer_fast
+  variant_key: pretrained_hf_tokenizer
   config:
-    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
+    pretrained_model_name_or_path: /workspaces/modalities/data/tokenizer/hf_gpt2
+    max_length: ${settings.training.sequence_length}
 
 collate_fn:  
   component_key: collate_fn
@@ -35,10 +36,10 @@ collate_fn:
 
 train_dataset:  
   component_key: dataset
-  variant_key: mem_map_dataset
+  variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: data/lorem_ipsum.jsonl
-    index_path: data/lorem_ipsum.idx
+    raw_data_path: /workspaces/modalities/data/lorem_ipsum.pbin
+    index_path: /workspaces/modalities/data/lorem_ipsum.idx
     block_size: ${settings.training.sequence_length}
     jq_pattern: ".text"
     sample_key:  ${settings.referencing_keys.sample_key}
@@ -62,7 +63,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -93,7 +94,7 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: 3
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -124,7 +125,7 @@ test_dataloader:
       variant_key: default
       config:
         batch_size: 3
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -244,7 +245,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4
+    total_steps: 5
     pct_start: 0.01
     anneal_strategy: cos
 

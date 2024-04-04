@@ -46,10 +46,6 @@ class DatasetFactory:
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
     ) -> MemMapDataset:
-        # TODO this was part of the old Dataloader implementation.
-        # we need to check if this is actually wanted generally.
-        tokenizer.pad_token = tokenizer.eos_token
-
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
             block_size=block_size,

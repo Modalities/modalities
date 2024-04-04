@@ -8,6 +8,7 @@ from tests.test_utils import configure_dataloader_mock
 
 
 def test_run_scheduler(
+    set_env_cpu,
     checkpointing_mock,
     evaluator_mock,
     nn_model_mock,

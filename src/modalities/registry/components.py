@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
-from transformers import GPT2TokenizerFast
 
 from modalities.checkpointing.checkpointing import Checkpointing
 from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
@@ -30,13 +29,14 @@ from modalities.config.config import (
     FSDPToDiscCheckpointingConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
-    GPT2TokenizerFastConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
+    PreTrainedHFTokenizerConfig,
+    PreTrainedSPTokenizerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
@@ -64,6 +64,7 @@ from modalities.models.huggingface.huggingface_models import (
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 
 
 @dataclass
@@ -100,7 +101,8 @@ COMPONENTS = [
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
     ),
     # tokenizers
-    ComponentEntity("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFast, GPT2TokenizerFastConfig),
+    ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
+    ComponentEntity("tokenizer", "pretrained_sp_tokenizer", PreTrainedSPTokenizer, PreTrainedSPTokenizerConfig),
     # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
     ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),

@@ -12,7 +12,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
 
-def test_resumable_dataloader() -> LLMDataLoader:
+def test_resumable_dataloader():
     batch_size = 3
     start_index = 2
     dataset = list(range(12))[::-1]
@@ -43,7 +43,7 @@ def test_dataloader_from_config(dummy_config: Dict):
     dataset = dataloader_1.dataset
     resumable_batch_sampler: ResumableBatchSampler = dataloader_1.batch_sampler
     distributed_sampler = resumable_batch_sampler.underlying_batch_sampler.sampler
-    batch_sampler = BatchSampler(sampler=distributed_sampler, batch_size=dataloader_1.batch_size, drop_last=False)
+    batch_sampler = BatchSampler(sampler=distributed_sampler, batch_size=dataloader_1.batch_size, drop_last=True)
     dataloader_2 = LLMDataLoader(
         dataloader_tag="train", dataset=dataset, batch_sampler=batch_sampler, collate_fn=dataloader_1.collate_fn
     )
@@ -51,7 +51,7 @@ def test_dataloader_from_config(dummy_config: Dict):
     samples_1 = [batch for _, batch in zip(range(10), dataloader_1)]
     samples_2 = [batch for _, batch in zip(range(10), dataloader_2)]
 
-    assert dataloader_1.batch_size * len(dataloader_2) == len(dataset)
+    assert len(dataloader_2) == len(dataset) // dataloader_1.batch_size
 
     assert len(dataloader_1) + start_index == len(dataloader_2)
 

@@ -13,7 +13,6 @@ from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
-from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from modalities.checkpointing.checkpointing import CheckpointingIF
 from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
@@ -24,6 +23,7 @@ from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.util import get_date_of_run, parse_enum_by_name
 
 
@@ -54,7 +54,7 @@ PydanticCheckpointingExecutionIFType = Annotated[
     CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
-PydanticTokenizerIFType = Annotated[PreTrainedTokenizerFast, PydanticThirdPartyTypeIF(PreTrainedTokenizerFast)]
+PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
@@ -253,9 +253,15 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-class GPT2TokenizerFastConfig(BaseModel):
-    # Note: huggingface tokenizers expect file path as string
-    tokenizer_file: str
+class PreTrainedHFTokenizerConfig(BaseModel):
+    pretrained_model_name_or_path: str
+    max_length: Annotated[int, Field(strict=True, ge=0)]
+    truncation: bool = False
+    padding: bool | str = False
+
+
+class PreTrainedSPTokenizerConfig(BaseModel):
+    tokenizer_model_file: str
 
 
 class DistributedSamplerConfig(BaseModel):
@@ -361,7 +367,16 @@ class CudaEnv(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
-class Settings(BaseModel):
+class PackedDatasetSettings(BaseModel):
+    src_path: FilePath
+    dst_path: Optional[Path] = None
+    index_path: Optional[FilePath] = None
+    jq_pattern: str
+    num_cpus: Optional[Annotated[int, Field(strict=True, ge=1)]] = os.cpu_count()
+    eod_token: str
+
+
+class TrainingSettings(BaseModel):
     class Training(BaseModel):
         class GradientClipping(BaseModel):
             mode: GradientClippingMode
@@ -376,7 +391,6 @@ class Settings(BaseModel):
                 return self
 
         callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
-        global_num_training_samples: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
@@ -394,7 +408,7 @@ class Settings(BaseModel):
     paths: Paths
 
 
-class ComponentsModel(BaseModel):
+class TrainingComponentsModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
@@ -404,7 +418,12 @@ class ComponentsModel(BaseModel):
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpointing: PydanticCheckpointingIFType
-    settings: Settings
+    settings: TrainingSettings
+
+
+class PackedDatasetComponentsModel(BaseModel):
+    tokenizer: PydanticTokenizerIFType
+    settings: PackedDatasetSettings
 
 
 class ComponentsInferenceModel(BaseModel):
@@ -421,9 +440,15 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
         if var_name == "experiment_id":
             return get_date_of_run()
 
+    def node_env_resolver_fun(var_name: str) -> int:
+        if var_name == "num_cpus":
+            return os.cpu_count()
+
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
     OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
+    OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
     config_dict = OmegaConf.to_container(cfg, resolve=True)
+
     return config_dict

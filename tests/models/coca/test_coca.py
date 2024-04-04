@@ -50,7 +50,7 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     monkeypatch.setenv("MASTER_PORT", "9948")
 
     # Load config
-    dummy_config_path = _ROOT_DIR / Path("config_files/config_example_coca.yaml")
+    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_example_coca.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
 
     # Disable checkpointing
