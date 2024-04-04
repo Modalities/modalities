@@ -12,7 +12,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
 
-def test_resumable_dataloader() -> LLMDataLoader:
+def test_resumable_dataloader():
     batch_size = 3
     start_index = 2
     dataset = list(range(12))[::-1]
