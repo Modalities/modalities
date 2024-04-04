@@ -1,6 +1,7 @@
 from functools import partial
-from typing import List
+from typing import Callable, List
 
+import torch.nn as nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -8,7 +9,6 @@ from modalities.checkpointing.checkpointing import Checkpointing
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
-from modalities.models.model import NNModel
 from modalities.trainer import Trainer
 
 
@@ -21,22 +21,37 @@ class Gym:
 
     def run(
         self,
-        model: NNModel,
+        model: nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        callback_interval_in_batches: int,
+        local_training_log_interval_in_batches: int,
+        local_checkpointing_interval_in_samples: int,
+        local_evaluation_interval_in_samples: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
     ):
-        self._run_evaluation_and_checkpointing(
+        self._run_evaluation(
             model=model,
-            optimizer=optimizer,
             # here, fast_forward_sample_id points to the next sample_id that we would
             # perform forward over. Therefore, -1 one for the current sample_id.
             local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
+            local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
             evaluation_data_loaders=evaluation_data_loaders,
+        )
+        evaluation_callback: Callable[[int], None] = partial(
+            self._run_evaluation,
+            model=model,
+            evaluation_data_loaders=evaluation_data_loaders,
+            local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
+        )
+
+        checkpointing_callback: Callable[[int], None] = partial(
+            self._run_checkpointing,
+            model=model,
+            optimizer=optimizer,
             checkpointing=checkpointing,
+            local_checkpointing_interval_in_samples=local_checkpointing_interval_in_samples,
         )
 
         self.trainer.train(
@@ -45,43 +60,47 @@ class Gym:
             loss_fun=self.loss_fun,
             optimizer=optimizer,
             scheduler=scheduler,
-            callback_interval_in_batches=callback_interval_in_batches,
-            epoch_done_callback=partial(  # TODO rename to something more meaningful
-                self._run_evaluation_and_checkpointing,
-                model=model,
-                optimizer=optimizer,
-                evaluation_data_loaders=evaluation_data_loaders,
-                checkpointing=checkpointing,
-            ),
+            evaluation_callback=evaluation_callback,
+            checkpointing_callback=checkpointing_callback,
+            local_training_log_interval_in_batches=local_training_log_interval_in_batches,
             local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
         )
 
-    def _run_evaluation_and_checkpointing(
+    def _run_checkpointing(
         self,
-        model: NNModel,
+        model: nn.Module,
         optimizer: Optimizer,
         local_train_sample_id: int,
-        evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
+        local_checkpointing_interval_in_samples: int,
     ):
-        global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
+        if (local_train_sample_id + 1) % local_checkpointing_interval_in_samples == 0:
+            global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
+            checkpointing.save_checkpoint(
+                global_train_sample_id=global_train_sample_id,
+                evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
+                model=model,
+                optimizer=optimizer,
+                early_stoppping_criterion_fulfilled=False,  # TODO: implement early stopping
+            )
 
-        eval_result = self.evaluator.evaluate(
-            model=model,
-            data_loaders=evaluation_data_loaders,
-            loss_fun=self.loss_fun,
-            global_train_sample_id=global_train_sample_id,
-            local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
-        )
+    def _run_evaluation(
+        self,
+        model: nn.Module,
+        local_train_sample_id: int,
+        evaluation_data_loaders: List[LLMDataLoader],
+        local_evaluation_interval_in_samples: int,
+    ):
+        if (local_train_sample_id + 1) % local_evaluation_interval_in_samples == 0:
+            global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
 
-        # TODO: implement early stopping
-        checkpointing.save_checkpoint(
-            global_train_sample_id=global_train_sample_id,
-            evaluation_result=eval_result,
-            model=model,
-            optimizer=optimizer,
-            early_stoppping_criterion_fulfilled=False,
-        )
+            self.evaluator.evaluate(
+                model=model,
+                data_loaders=evaluation_data_loaders,
+                loss_fun=self.loss_fun,
+                global_train_sample_id=global_train_sample_id,
+                local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
+            )
 
     def _local_sample_id_to_global_sample_id(self, local_sample_id: int) -> int:
         """Calculates the global sample id as an aggregation over all ranks
