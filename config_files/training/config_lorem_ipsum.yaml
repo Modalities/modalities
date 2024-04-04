@@ -4,11 +4,13 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    callback_interval_in_samples: 6
+    local_training_log_interval_in_samples: 4
+    local_checkpointing_interval_in_samples: 4
+    local_evaluation_interval_in_samples: 4
     global_num_seen_samples: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 3
+    local_train_micro_batch_size: 2
     sequence_length: 256
     gradient_clipping:
       mode: p2_norm
@@ -245,7 +247,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 5
+    total_steps: 8
     pct_start: 0.01
     anneal_strategy: cos
 
