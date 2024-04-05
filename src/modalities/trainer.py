@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable
+from typing import Callable, Tuple
 
 import torch
 import torch.distributed as dist
@@ -28,7 +28,7 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
-        gradient_clipper: Callable[[NNModel], None],
+        gradient_clipper: Callable[[NNModel], torch.Tensor],
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
@@ -45,17 +45,17 @@ class Trainer:
         loss_fun: Loss,
         batch_id: int,
         data_loader: LLMDataLoader,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch) / self.gradient_acc_steps
         loss.backward()
-        self.gradient_clipper(model)
+        gradient_norm_score = self.gradient_clipper(model)
 
         if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-        return loss
+        return loss, gradient_norm_score
 
     def train(
         self,
@@ -70,7 +70,7 @@ class Trainer:
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
-        cumulated_loss = self._reset_loss()
+        cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
@@ -85,7 +85,7 @@ class Trainer:
             # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
-            batch_loss = self._train_batch(
+            batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
@@ -96,8 +96,9 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_loss[0] += batch_loss.item()
-            cumulated_loss[1] += len(batch)
+            cumulated_loss_and_gradient_norm[0] += batch_loss.item()
+            cumulated_loss_and_gradient_norm[1] += gradient_norm_score.item()
+            cumulated_loss_and_gradient_norm[-1] += len(batch)
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
@@ -125,10 +126,14 @@ class Trainer:
                     )
                     synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
-                    train_loss = Reducer.reduce(
-                        tensor=cumulated_loss,
+                    reduced_loss_and_gradient_norm = Reducer.reduce(
+                        tensor=cumulated_loss_and_gradient_norm,
                         operation=dist.ReduceOp.SUM,
-                        post_processing_fun=lambda t: t[0] / t[1],
+                        post_processing_fun=lambda t: t[0:-1] / t[-1],
+                    )
+                    train_loss, train_gradient_norm = (
+                        reduced_loss_and_gradient_norm[0],
+                        reduced_loss_and_gradient_norm[1],
                     )
                     local_train_sample_id = Trainer._get_local_sample_id(
                         batch_id=local_train_batch_id, batch_size=train_loader.batch_size
@@ -138,6 +143,7 @@ class Trainer:
 
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
+                        metrics={"grad_norm": train_gradient_norm},
                         # TODO: hardcoded metric key
                         throughput_metrics={
                             "training_synced_num_samples_per_second": synced_num_samples_per_second,
@@ -158,19 +164,19 @@ class Trainer:
                     model.train()
 
                 # TODO early stopping
-                cumulated_loss = self._reset_loss()
+                cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
 
-    def _reset_loss(self):
+    def _reset_loss_and_gradient_norm(self):
         # TODO: we should handle the device assignment more centrally.
-        cumulated_loss = torch.zeros(2)
+        cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
-            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
         else:
-            cumulated_loss = cumulated_loss.to("cpu")
-        return cumulated_loss
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
+        return cumulated_loss_and_gradient_norm
 
     @staticmethod
     def _publish_progress(
