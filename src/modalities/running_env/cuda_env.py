@@ -21,7 +21,5 @@ class CudaEnv:
         return self
 
     def __exit__(self, type, value, traceback):
-        pass
-        # TODO uncomment part below
-        # dist.barrier()    # TODO check for concurrency issues
-        # dist.destroy_process_group()
+        dist.barrier()
+        dist.destroy_process_group()
