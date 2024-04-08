@@ -1,11 +1,17 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from pydantic import FilePath
 from torch.utils.data.dataset import Dataset
 from transformers import PreTrainedTokenizer
 
-from modalities.dataloader.dataset import MemMapDataset, PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from modalities.dataloader.dataset import (
+    DummyDataset,
+    DummySampleConfig,
+    MemMapDataset,
+    PackedMemMapDatasetContinuous,
+    PackedMemMapDatasetMegatron,
+)
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 
 
@@ -27,6 +33,11 @@ class OpenGPTXDatasetWrapper(Dataset):
 
 class DatasetFactory:
     @staticmethod
+    def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:
+        dataset = DummyDataset(num_samples=num_samples, sample_definition=sample_definition)
+        return dataset
+
+    @staticmethod
     def get_mem_map_dataset(
         raw_data_path: Path,
         block_size: int,
@@ -35,10 +46,6 @@ class DatasetFactory:
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
     ) -> MemMapDataset:
-        # TODO this was part of the old Dataloader implementation.
-        # we need to check if this is actually wanted generally.
-        tokenizer.pad_token = tokenizer.eos_token
-
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
             block_size=block_size,

@@ -9,10 +9,11 @@ from typing import Callable, Iterator, List, Tuple
 
 import jq
 import numpy as np
+from pydantic import FilePath
 from tqdm import tqdm
-from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,12 @@ class EmptySampleError(RuntimeError):
 class PackedDataGenerator:
     def __init__(
         self,
-        src_path: Path,
-        tokenizer: PreTrainedTokenizer,
-        index_path: Path = None,
-        jq_pattern: str = ".text",
-        number_of_processes: int = os.cpu_count(),
+        src_path: FilePath,
+        tokenizer: TokenizerWrapper,
+        eod_token: str,
+        number_of_processes: int,
+        index_path: FilePath,
+        jq_pattern: str,
     ):
         """
         Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.
@@ -43,9 +45,10 @@ class PackedDataGenerator:
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
+        self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
-        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
+        encoded_eod_token = self.tokenizer.get_token_id(self.eod_token)
+        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
@@ -58,7 +61,7 @@ class PackedDataGenerator:
         return math.ceil(math.log(math.log2(int_to_get_repr), 8))
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
-        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="big", signed=False)
+        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
 
     def _default_destination_path(self, destination_path: Path = None) -> Path:
         if destination_path is None:
@@ -123,10 +126,10 @@ class PackedDataGenerator:
             with dst_path.open("wb") as f:
                 # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
                 # not possible to prepend header after determining size of data section
-                f.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+                f.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"))
                 f.write(
                     self._token_size_in_bytes.to_bytes(
-                        EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big"
+                        EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little"
                     )
                 )
                 curr_offset = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
@@ -163,7 +166,7 @@ class PackedDataGenerator:
         start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
         length_of_byte_encoded_data_section = start_of_index_in_bytes - EmbeddedStreamData.HEADER_SIZE_IN_BYTES
         data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
-            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"
+            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
         )
         with dst_path.open("rb+") as fout:
             fout.seek(0)
@@ -173,7 +176,7 @@ class PackedDataGenerator:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
-        tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
+        tokens = self.tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
         return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
@@ -198,12 +201,12 @@ class EmbeddedStreamData:
         with self._data_path.open("rb") as f:
             # get number of bytes in data section
             data_section_length_in_bytes = f.read(self.DATA_SECTION_LENGTH_IN_BYTES)
-            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="big")
+            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="little")
 
             # get number of bytes for encoding a single token
             f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
             token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
-            self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
+            self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="little", signed=False)
 
             # get index
             f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
@@ -238,9 +241,9 @@ def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file
             curr_offset -= embedded_stream_data.HEADER_SIZE_IN_BYTES
 
     with target_file.open("wb") as fout:
-        fout.write(data_len.to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+        fout.write(data_len.to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"))
         fout.write(
-            token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big")
+            token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little")
         )
         for data_chunk in tqdm(data_stream_generator, total=num_data_chunks, desc="Writing Data Chunks..."):
             fout.write(data_chunk)

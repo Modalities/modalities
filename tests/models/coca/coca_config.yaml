@@ -1,0 +1,44 @@
+prediction_key: logits
+vision_embd_prediction_key: vision_embeddings
+text_embd_prediction_key: text_embeddings
+vision_cls_prediction_key: vision_cls
+text_cls_prediction_key: text_cls
+vision_encoder_config:
+  sample_key: images
+  prediction_key: vision_embeddings
+  img_size: 224
+  n_classes: Null # Disable vision transformer head
+  n_layer: 6
+  attention_config:
+    attention_engine_type: pytorch_flash_attention
+  n_head: 8
+  n_embd: 768
+  dropout: 0.0
+  patch_size: 16
+  patch_stride: 16
+  n_img_channels: 3
+  add_cls_token: False
+  bias: True
+text_decoder_config:
+  sample_key: input_ids
+  prediction_key: text_embeddings
+  block_size: 1024
+  vocab_size: 50304
+  n_layer_text: 6
+  n_layer_multimodal_text: 6
+  attention_config:
+    attention_engine_type: pytorch_flash_attention
+  n_head: 12
+  ffn_hidden: 2048
+  n_embd: 768
+  dropout: 0.0
+  bias: true
+  activation: fused_swiglu
+  epsilon: 1e-5
+n_pool_head: 8
+n_vision_queries: 256
+bias_attn_pool: False
+epsilon_attn_pool: 1e-5
+weight_init:
+  mean: 0.0
+  std: 0.02

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
+from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
-from transformers import BatchEncoding, PreTrainedTokenizer
+from transformers import BatchEncoding
+
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import EmbeddedStreamData
@@ -24,12 +28,58 @@ class Dataset(TorchdataSet):
             raise IndexError
 
 
+class DummySampleDataType(str, Enum):
+    FLOAT = "float"
+    INT = "int"
+
+
+class DummySampleConfig(BaseModel):
+    sample_key: str
+    sample_shape: Tuple[int, ...]
+    sample_type: DummySampleDataType
+
+
+class DummyDatasetConfig(BaseModel):
+    num_samples: int
+    sample_definition: List[DummySampleConfig]
+
+
+class DummyDataset(Dataset):
+    def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
+        """
+        :param num_samples: Number of samples the dataset should generate.
+        :param sample_definition: A list of tuples defining the dataset output.
+            Each touple contains the sample key, shape and data type.
+        """
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+        self.num_samples = num_samples
+        self.sample_definition = sample_definition
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, idx: int) -> Dict:
+        return self._create_random_sample()
+
+    def _create_random_sample(self):
+        sample = dict()
+        for s in self.sample_definition:
+            if s.sample_type == DummySampleDataType.FLOAT:
+                data = np.random.randn(*s.sample_shape)
+            elif s.sample_type == DummySampleDataType.INT:
+                data = np.random.randint(low=0, high=512, size=s.sample_shape)
+            else:
+                raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
+            sample[s.sample_key] = data
+        return sample
+
+
 class MemMapDataset(Dataset):
     def __init__(
         self,
         raw_data_path: Path,
         block_size: int,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: TokenizerWrapper,
         sample_key: str,
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
@@ -60,24 +110,19 @@ class MemMapDataset(Dataset):
 
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
-        return self.tokenizer(
-            self.jq_filter.input_text(self.reader[idx]).first(),
-            max_length=self.block_size,
-            padding="max_length",
-            truncation=True,
-        )
+        return self.tokenizer.tokenize(text=self.jq_filter.input_text(self.reader[idx]).first())
 
 
 class PackedMemMapDatasetBase(Dataset):
     DATA_SECTION_LENGTH_IN_BYTES = EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES
     TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
     HEADER_SIZE_IN_BYTES = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
-    np_dtype_from_num_bytes = {
-        1: np.dtype(np.uint8).newbyteorder(">"),
-        2: np.dtype(np.uint16).newbyteorder(">"),
-        4: np.dtype(np.uint32).newbyteorder(">"),
-        8: np.dtype(np.uint64).newbyteorder(">"),
+    np_dtype_of_tokens_on_disk_from_bytes = {
+        1: np.dtype(np.uint8).newbyteorder("<"),
+        2: np.dtype(np.uint16).newbyteorder("<"),
+        4: np.dtype(np.uint32).newbyteorder("<"),
     }
+    type_converter_for_torch = {1: np.uint8, 2: np.int32, 4: np.int64}
 
     def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
         """
@@ -98,7 +143,8 @@ class PackedMemMapDatasetBase(Dataset):
         self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
         self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
         try:
-            self._token_dtype = self.np_dtype_from_num_bytes[self._token_size_in_bytes]
+            self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
+            self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
         except KeyError:
             raise RuntimeError(
                 f"Encountered a required token representation with {self._token_size_in_bytes},"
@@ -115,7 +161,11 @@ class PackedMemMapDatasetBase(Dataset):
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
         offset, length = self._index[idx]
-        tokens = np.frombuffer(self._embedded_stream_data.data, dtype=self._token_dtype, count=length, offset=offset)
+        tokens = np.frombuffer(
+            self._embedded_stream_data.data, dtype=self._token_dtype_on_disk, count=length, offset=offset
+        )
+        # torch can't convert most uint-formats, therefore we infer regular int types
+        tokens = tokens.astype(self._token_dtype_in_ram)
         return BatchEncoding(data={self.sample_key: tokens})
 
 

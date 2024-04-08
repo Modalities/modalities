@@ -37,7 +37,7 @@ class CLMCrossEntropyLoss(Loss):
         # move labels to correct device to enable model parallelism
         labels = labels.to(lm_logits.device)
         shift_logits = lm_logits.contiguous()
-        shift_labels = labels.contiguous()
+        shift_labels = labels.contiguous().long()
         # Flatten the tokens
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
