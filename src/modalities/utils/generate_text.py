@@ -57,32 +57,34 @@ chat_prompt_template = """user: {prompt}
 bot: """
 
 
-def generate(
+def generate_tokens(
     model: torch.nn.Module,
     tokenizer: TokenizerWrapper,
     context: str,
     seq_len: int,
     max_new_tokens: int,
     temperature: float = 1.0,
+    eod_token: str = "<eod>",
 ):
     in_batch = tokenizer.tokenize(context)
     # TODO: check device
-    in_batch = torch.Tensor(in_batch).to(torch.int64).cuda()
+    in_batch = torch.Tensor(in_batch).to(torch.int64).cuda().unsqueeze(0)
+    in_batch_dict = {"input_ids": in_batch}
 
     for _ in range(max_new_tokens):
         # TODO: refactor
         # in_batch = (
         #     in_batch if in_batch.size(1) <= seq_len else in_batch[:, -seq_len:]
         # )
-        logits = model.forward(in_batch)["logits"]
+        logits = model.forward(in_batch_dict)["logits"]
         logits = logits[:, -1, :] / temperature
         probs = F.softmax(logits, dim=-1)
         idx_next = torch.multinomial(probs, num_samples=1)
-        # TODO: refactor
-        idx_next_str = tokenizer.tokenizer.decode(idx_next[0])
 
-        # TODO: refactor
-        if idx_next_str == "<eod>":  # tokenizer.eod_token:
+        token_id: int = idx_next[0, 0].item()
+        idx_next_str = tokenizer.decode([token_id])
+
+        if idx_next_str == eod_token:
             print("\n<reached eos token>", end="")
             break
         else:
@@ -111,7 +113,7 @@ def main(config_path: Path, chat: bool):
     print(f"using {model_path}")
 
     model = components.model
-    model = model.cuda()
+    model = model.cuda().to(torch.bfloat16)
     tokenizer = components.tokenizer
     max_new_tokens = components.settings.max_new_tokens
 
@@ -124,11 +126,15 @@ def main(config_path: Path, chat: bool):
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, model.block_size, max_new_tokens)
+                generate_tokens(
+                    model, tokenizer, prompt, model.block_size, max_new_tokens, eod_token=components.settings.eod_token
+                )
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, model.block_size, max_new_tokens)
+                generate_tokens(
+                    model, tokenizer, prompt, model.block_size, max_new_tokens, eod_token=components.settings.eod_token
+                )
         except KeyboardInterrupt:
             print("closing app...")
             break
