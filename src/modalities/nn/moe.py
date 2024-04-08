@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
@@ -17,28 +17,20 @@ class MoEFFNConfig(BaseModel):
 
 
 class MoERouter(nn.Module):
-    def __init__(
-        self,
-        hidden_size: int,
-        moe_num_experts: int,
-        moe_top_k: int,
-        moe_normalize_expert_weights: Optional[float],
-        uniform_expert_assignment: bool,
-        moe_jitter_eps: float,
-    ):
+    def __init__(self, hidden_size: int, moe_config: MoEFFNConfig):
         super().__init__()
         self.hidden_size = hidden_size
-        self.moe_num_experts = moe_num_experts
-        self.moe_top_k = moe_top_k
-        self.moe_normalize_expert_weights = moe_normalize_expert_weights
-        self.uniform_expert_assignment = uniform_expert_assignment
-        self.moe_jitter_eps = moe_jitter_eps
+        self.moe_num_experts = moe_config.moe_num_experts
+        self.moe_top_k = moe_config.moe_top_k
+        self.moe_normalize_expert_weights = moe_config.moe_normalize_expert_weights
+        self.uniform_expert_assignment = moe_config.uniform_expert_assignment
+        self.moe_jitter_eps = moe_config.moe_jitter_eps
 
         self.layer = nn.Linear(self.hidden_size, self.moe_num_experts, bias=False)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.LongTensor]:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.LongTensor]:
         if self.training and self.moe_jitter_eps is not None:
-            x = x * self.__jitter(x)
+            x = x * self._jitter(x)
 
         weights = self.layer(x.view(-1, x.shape[-1])).softmax(dim=-1, dtype=torch.float32)
         top_weights, top_experts = torch.topk(weights, self.moe_top_k, dim=-1)
@@ -59,9 +51,9 @@ class MoERouter(nn.Module):
 
         weights = weights.to(x.dtype)
         top_weights = top_weights.to(x.dtype)
-        return weights, top_weights, top_experts  # type: ignore
+        return top_weights, top_experts
 
-    def __jitter(self, x: torch.Tensor) -> torch.Tensor:
+    def _jitter(self, x: torch.Tensor) -> torch.Tensor:
         if self.moe_jitter_eps is None:
             raise RuntimeError("The router does not have moe_jitter_eps set.")
         low = 1.0 - self.moe_jitter_eps
@@ -107,9 +99,7 @@ class MoEExperts(nn.Module):
             hidden_size=hidden_size, ffn_hidden_size=ffn_hidden_size, moe_num_experts=moe_num_experts, act_fn=act_fn
         )
 
-    def forward(
-        self, x: torch.Tensor, weights: torch.Tensor, top_weights: torch.Tensor, top_experts: torch.LongTensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, top_weights: torch.Tensor, top_experts: torch.LongTensor) -> torch.Tensor:
         bsz, q_len, hidden_size = x.shape
         x = x.view(-1, hidden_size)
         out = torch.zeros_like(x)
@@ -136,16 +126,7 @@ class MoEFFN(nn.Module):
     def __init__(self, hidden_size: int, config: MoEFFNConfig):
         super().__init__()
         self.config = config
-
-        self.router = MoERouter(
-            hidden_size,
-            moe_num_experts=self.config.moe_num_experts,
-            moe_top_k=self.config.moe_top_k,
-            moe_normalize_expert_weights=self.config.moe_normalize_expert_weights,
-            uniform_expert_assignment=self.config.uniform_expert_assignment,
-            moe_jitter_eps=self.config.moe_jitter_eps,
-        )
-
+        self.router = MoERouter(hidden_size, config)
         self.experts = MoEExperts(
             hidden_size=hidden_size,
             ffn_hidden_size=self.config.ffn_hidden_size,
@@ -154,6 +135,6 @@ class MoEFFN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        weights, top_weights, top_experts = self.router(x)
-        out = self.experts(x, weights, top_weights, top_experts)
+        top_weights, top_experts = self.router(x)
+        out = self.experts(x, top_weights, top_experts)
         return out
