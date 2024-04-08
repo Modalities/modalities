@@ -2,7 +2,7 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-from typing import Annotated, Dict, List, Tuple
+from typing import Annotated, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
+from modalities.src.modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -309,6 +310,7 @@ class GPT2Block(nn.Module):
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
+        moe_config: Optional[MoEFFNConfig] = None,
     ):
         super().__init__()
         self.attention_norm = attention_norm
@@ -322,13 +324,16 @@ class GPT2Block(nn.Module):
             dropout=dropout,
             block_size=block_size,
         )
-        if activation_type == ActivationType.GELU:
-            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation_type == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        if moe_config:
+            self.mlp = MoEFFN(hidden_size=ffn_hidden, config=moe_config)
         else:
-            raise NotImplementedError("unimplemented activation")
+            if activation_type == ActivationType.GELU:
+                self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+            elif activation_type == ActivationType.FUSED_SWIGLU:
+                hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+                self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+            else:
+                raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.attention_norm(x)
@@ -359,6 +364,7 @@ class GPT2LLM(NNModel):
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
+        moe_config: Optional[MoEFFNConfig] = None,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -404,6 +410,7 @@ class GPT2LLM(NNModel):
                             ffn_hidden=ffn_hidden,
                             attention_norm=deepcopy(attention_norm),
                             ffn_norm=deepcopy(ffn_norm),
+                            moe_config=moe_config,
                         )
                         for _ in range(n_layer)
                     ]
