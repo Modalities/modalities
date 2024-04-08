@@ -371,6 +371,7 @@ class InferenceSettings(BaseModel):
     model_path: FilePath
     max_new_tokens: int
     cuda_env: CudaEnv
+    eod_token: str
 
 
 class PackedDatasetSettings(BaseModel):
