@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,27 +11,21 @@ from modalities.models.gpt2.huggingface_model import HuggingFaceModel
 
 
 @pytest.fixture
-def checkpoint_dir():
-    return Path(
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkpoint", "checkpoint_for_testing")
-    )
-
-
-@pytest.fixture
-def config_path(checkpoint_dir):
-    return Path(os.path.join(checkpoint_dir, "model_config.yaml"))
-
-
-@pytest.fixture
 def device():
     return "cpu"
 
 
-def test_convert_to_hf_checkpoint(tmp_path, config_path, device):
+@pytest.fixture
+def dummy_cfg_path(dummy_config_path, dummy_config) -> Path:
+    # use `dummy_config`-fixture to initialize ENV-Variables for OmegaConfig to resolve
+    return dummy_config_path
+
+
+def test_convert_to_hf_checkpoint(tmp_path, device, dummy_cfg_path):
     # load test checkpoint
     cp = checkpoint_conversion.CheckpointConversion(
-        checkpoint_dir=config_path.parent,
-        config_file_name=config_path.name,
+        checkpoint_dir=dummy_cfg_path.parent,
+        config_file_name=dummy_cfg_path.name,
         model_file_name="",
         output_hf_checkpoint_dir=tmp_path,
     )
