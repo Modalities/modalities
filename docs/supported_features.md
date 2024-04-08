@@ -32,11 +32,11 @@ In this file, we list the already implemented, planned and in-progress features 
 | SwiGLU                         | supported         | A nonlinear activation function combining Gated Linear Units (GLU) with Swish for enhancing model capacity and learning efficiency. |
 | Weight Decay                   | supported        | Regularization technique that adds a penalty on the size of weights, encouraging smaller weights to reduce overfitting and improve generalization. |
 | RMSNorm (pre-normalization)    | supported        | Normalizes the pre-activation weights in a layer to stabilize training, often used as an alternative to LayerNorm for improved training dynamics. |
-| Rotary Positional Embeddings (RoPE) | in-progress   | Encodes sequence position information into attention mechanisms, preserving relative positional information and improving model's understanding of sequence order. |
-| Grouped-query Attention (GQA)  | in-progress      | Enhances attention mechanisms by grouping queries to reduce computation and memory footprint while maintaining or improving performance. |
-| Learning Rate Scheduler        | in-progress      | Adjusts the learning rate during training according to a predefined schedule (e.g., step decay, exponential decay) to improve convergence and performance. |
-| Gradient Clipping              | planned          | Prevents exploding gradients by clipping the gradients of an optimization algorithm to a maximum value, thereby stabilizing training. |
-| Training Warmup                | planned          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
+| Rotary Positional Embeddings (RoPE) | supported   | Encodes sequence position information into attention mechanisms, preserving relative positional information and improving model's understanding of sequence order. |
+| Grouped-query Attention (GQA)  | supported      | Enhances attention mechanisms by grouping queries to reduce computation and memory footprint while maintaining or improving performance. |
+| Learning Rate Scheduler        | supported      | Adjusts the learning rate during training according to a predefined schedule (e.g., step decay, exponential decay) to improve convergence and performance. |
+| Gradient Clipping              | supported          | Prevents exploding gradients by clipping the gradients of an optimization algorithm to a maximum value, thereby stabilizing training. |
+| Training Warmup                | supported          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
 | Loss Masking                   | planned          | Ignores or gives less weight to certain data points in the loss function, often used in tasks with variable-length sequences to ignore padding tokens or in more specific usecases such as GAtt. |
 | Knowledge Distillation         | planned  | Transfers knowledge from a larger, complex model to a smaller, more efficient model, improving the smaller model's performance without the computational cost of the larger model.|
 | Hyperparameter Optimization    | planned          | Grid search for various hyperparameter such as LR, Optimizer arguments etc. Also the integration of µP might be interesting |
