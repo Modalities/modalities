@@ -367,6 +367,12 @@ class CudaEnv(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
+class InferenceSettings(BaseModel):
+    model_path: FilePath
+    max_new_tokens: int
+    cuda_env: CudaEnv
+
+
 class PackedDatasetSettings(BaseModel):
     src_path: FilePath
     dst_path: Optional[Path] = None
@@ -421,14 +427,15 @@ class TrainingComponentsModel(BaseModel):
     settings: TrainingSettings
 
 
+class InferenceComponentsModel(BaseModel):
+    model: PydanticPytorchModuleType
+    tokenizer: PydanticTokenizerIFType
+    settings: InferenceSettings
+
+
 class PackedDatasetComponentsModel(BaseModel):
     tokenizer: PydanticTokenizerIFType
     settings: PackedDatasetSettings
-
-
-class ComponentsInferenceModel(BaseModel):
-    wrapped_model: PydanticPytorchModuleType
-    cuda_env: CudaEnv
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:

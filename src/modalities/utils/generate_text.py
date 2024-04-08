@@ -11,12 +11,12 @@ from pathlib import Path
 
 import torch
 from torch.nn import functional as F
-from transformers import PreTrainedTokenizer
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ComponentsInferenceModel, load_app_config_dict
+from modalities.config.config import InferenceComponentsModel, load_app_config_dict
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 chat_prefix = """
 This is a conversation between a user and a helpful bot, which answers the user's questions as good as possible.
@@ -59,51 +59,61 @@ bot: """
 
 def generate(
     model: torch.nn.Module,
-    tokenizer: PreTrainedTokenizer,
+    tokenizer: TokenizerWrapper,
     context: str,
     seq_len: int,
     max_new_tokens: int,
     temperature: float = 1.0,
 ):
-    in_batch = tokenizer([context])
-    in_batch["input_ids"] = torch.Tensor(in_batch["input_ids"]).to(torch.int64)
+    in_batch = tokenizer.tokenize(context)
+    # TODO: check device
+    in_batch = torch.Tensor(in_batch).to(torch.int64).cuda()
 
     for _ in range(max_new_tokens):
-        in_batch["input_ids"] = (
-            in_batch["input_ids"] if in_batch["input_ids"].size(1) <= seq_len else in_batch["input_ids"][:, -seq_len:]
-        )
+        # TODO: refactor
+        # in_batch = (
+        #     in_batch if in_batch.size(1) <= seq_len else in_batch[:, -seq_len:]
+        # )
         logits = model.forward(in_batch)["logits"]
         logits = logits[:, -1, :] / temperature
         probs = F.softmax(logits, dim=-1)
         idx_next = torch.multinomial(probs, num_samples=1)
-        idx_next_str = tokenizer.decode(idx_next[0])
-        if idx_next_str == tokenizer.eos_token:
+        # TODO: refactor
+        idx_next_str = tokenizer.tokenizer.decode(idx_next[0])
+
+        # TODO: refactor
+        if idx_next_str == "<eod>":  # tokenizer.eod_token:
             print("\n<reached eos token>", end="")
             break
         else:
             print(idx_next_str, end="")
             sys.stdout.flush()
-            in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
+            in_batch = torch.cat((in_batch, idx_next), dim=1)
     print("")
 
 
-def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, max_new_tokens: int, chat: bool):
+def main(config_path: Path, chat: bool):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
 
-    path = model_path
-    state_dict = torch.load(path)
-    print(f"using {model_path}")
-
     config_dict = load_app_config_dict(config_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
+
     components = component_factory.build_components(
-        config_dict=config_dict, components_model_type=ComponentsInferenceModel
+        config_dict=config_dict,
+        components_model_type=InferenceComponentsModel,
     )
 
-    model = components.wrapped_model
+    model_path = components.settings.model_path
+    state_dict = torch.load(model_path)
+    print(f"using {model_path}")
+
+    model = components.model
+    model = model.cuda()
+    tokenizer = components.tokenizer
+    max_new_tokens = components.settings.max_new_tokens
 
     model.load_state_dict(state_dict)
     model.eval()
@@ -114,11 +124,11 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, model.block_size, max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
+                generate(model, tokenizer, prompt, model.block_size, max_new_tokens)
         except KeyboardInterrupt:
             print("closing app...")
             break

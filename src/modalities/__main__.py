@@ -16,7 +16,6 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import (
     PackedDatasetComponentsModel,
     ProcessGroupBackendType,
-    TokenizerTypes,
     TrainingComponentsModel,
     load_app_config_dict,
 )
@@ -57,27 +56,10 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=Path)
-@click.argument("config_path", type=Path)
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
+@click.argument("config_path", type=FilePath)
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+def entry_point_generate_text(config_path, chat):
+    generate_text_main(config_path=config_path, chat=chat)
 
 
 @main.group(name="data")
@@ -189,8 +171,8 @@ class Main:
 
     def build_components(self, components_model_type: BaseModel) -> BaseModel:
         components: TrainingComponentsModel = self.component_factory.build_components(
-                config_dict=self.config_dict, components_model_type=components_model_type
-            )
+            config_dict=self.config_dict, components_model_type=components_model_type
+        )
         return components
 
     def run(self):
