@@ -82,9 +82,9 @@ def get_common_opts(params) -> argparse.Namespace:
     opts=parser.parse_args(params)
 
 
-    if opts.webdataset:
-        opts.webdataset = Path(opts.webdataset)
-        opts.webdataset = check_web_data(opts.webdataset)
+    if opts.webdata:
+        opts.webdata = Path(opts.webdata)
+        opts.webdata = check_web_data(opts.webdata)
         
     if opts.memmap:
         opts.memmap = Path(opts.memmap)

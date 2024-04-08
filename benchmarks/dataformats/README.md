@@ -29,7 +29,7 @@ The following results are carried out with the validation split.
 
 ### COCO dataset
 
-
-DataFormat, Preparation, Storage MB, Storage #Files,  Initialization, Iteration
-WebDataset, ?, 793.54, 5 , , ,
-Memmap, ?, 2305.35 , 1 , , ,
+| DataFormat | Preparation | Storage MB | Storage #Files | Init Time | Init Mem | Iter Time | Iter mem |
+| ---------- | ----------- | ---------- | -------------- | --------- | -------- | --------- | -------- |
+| WebDataset | ?           | 793.54     | 5              | 2.01s     | 2.01     | 17.88     | 3.48     |
+| Memmap     | ?           | 2305.35    | 1              | 2.78      | 64.33    | 35.89     | 0.02     |

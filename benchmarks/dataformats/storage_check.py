@@ -54,11 +54,11 @@ if __name__ == "__main__":
     opts = get_common_opts(sys.argv[1:])
 
     # remove file name from webdataset path
-    if opts.webdataset:
-        opts.webdataset = Path(opts.webdataset).parent
+    if opts.webdata:
+        opts.webdata = Path(opts.webdata).parent
 
     paths = {
-        "webdataset": opts.webdataset,
+        "webdataset": opts.webdata,
         "memmap": opts.memmap,
     }
 
