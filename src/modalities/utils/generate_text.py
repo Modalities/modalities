@@ -88,7 +88,7 @@ def generate_tokens(
             print("\n<reached eos token>", end="")
             break
         else:
-            print(idx_next_str, end="")
+            print(idx_next_str, end=" ")
             sys.stdout.flush()
             in_batch = torch.cat((in_batch, idx_next), dim=1)
     print("")
@@ -124,8 +124,10 @@ def main(config_path: Path, chat: bool):
         try:
             print("-" * 50)
             if chat is True:
-                prompt = input("enter question> ").strip()
-                prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
+                # TODO: discuss if we want to keep whitespaces in the prompt
+                prompt = input("enter question> ")  # .strip()
+                # TODO: make prompt template configurable, default should be an empty prompt
+                # prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
                 generate_tokens(
                     model, tokenizer, prompt, model.block_size, max_new_tokens, eod_token=components.settings.eod_token
                 )
