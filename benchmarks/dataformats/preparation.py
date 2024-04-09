@@ -2,11 +2,12 @@ import json
 import os
 import sys
 
-from benchmarks.dataformats.utils import get_common_opts
+from benchmarks.dataformats.utils import get_common_opts, profile
 import webdataset as wds
 from src.modalities.dataloader.dataset import PackedMemMapDataset
 from pathlib import Path
 
+@profile(runs=1)
 def prepare_webdataset(json_path, output_dir):
 
     shard_writer = wds.ShardWriter(f"{output_dir}/%06d.tar", maxcount=10000)
@@ -65,7 +66,7 @@ if __name__ == "__main__":
     ########################################################
 
     # create the output directory
-    web_out_dir = Path(opts.web_out)/split
+    web_out_dir = Path(opts.webout)/split
 
     # check if the dir  exists
     if not web_out_dir.exists():

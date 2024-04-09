@@ -1,8 +1,32 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Dict, List
+import time
+from memory_profiler import memory_usage
+import numpy as np
 
+
+def profile(runs=1):
+    """Decorator to profile time and memory usage of a function, running it multiple times."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            times = []
+            mem_usages = []
+            for _ in range(runs):
+                start_time = time.time()
+                mem_before = memory_usage(interval=0.1, timeout=1)
+                result = func(*args, **kwargs)
+                mem_after = memory_usage(interval=0.1, timeout=1)
+                times.append(time.time() - start_time)
+                mem_usages.append(max(mem_after) - min(mem_before))
+            avg_time = np.mean(times)
+            std_time = np.std(times)
+            avg_mem = np.mean(mem_usages)
+            std_mem = np.std(mem_usages)
+            print(f"Function {func.__name__} on average took {avg_time:.2f}s (±{std_time:.2f}) and used {avg_mem:.2f} MiB (±{std_mem:.2f}) over {runs} runs")
+            return result
+        return wrapper
+    return decorator
 
 
 def check_web_data(path2dir: Path) -> str:
