@@ -3,17 +3,16 @@ settings:
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
-    prediction_key: logits
   training:
-    callback_interval_in_samples: 32768
-    global_num_training_samples: 2048
+    callback_interval_in_samples: 6
     global_num_seen_samples: 0
-    do_apply_activation_checkpointing: false
+    do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 16
-    sequence_length: 4096
+    local_train_micro_batch_size: 3
+    sequence_length: 256
     gradient_clipping:
-      mode: none
+      mode: p2_norm
+      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -21,6 +20,12 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
+    max_length: ${settings.training.sequence_length}
 
 collate_fn:  
   component_key: collate_fn
@@ -31,11 +36,11 @@ collate_fn:
 
 train_dataset:
   component_key: dataset
-  variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ./data/lorem_ipsum.pbin
     block_size: ${settings.training.sequence_length}
-    sample_key: ${settings.referencing_keys.sample_key}
+    sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -53,7 +58,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -68,14 +73,6 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-val_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_1024.pbin
-    block_size: ${settings.training.sequence_length}
-    sample_key: ${settings.referencing_keys.sample_key}
-
 val_dataloader:
   component_key: data_loader
   variant_key: default
@@ -85,23 +82,54 @@ val_dataloader:
     shuffle: false
     dataloader_tag: "val"
     dataset:
-      instance_key: val_dataset
+      instance_key: train_dataset
       pass_type: BY_REFERENCE
     batch_sampler:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        batch_size: 3
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
           config:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
+            shuffle: false
             dataset:
-              instance_key: val_dataset
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "test"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 3
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            dataset:
+              instance_key: train_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
@@ -110,6 +138,8 @@ val_dataloader:
 eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
+  - instance_key: test_dataloader
+    pass_type: BY_REFERENCE 
 
 checkpointing:
   component_key: checkpointing
@@ -131,29 +161,48 @@ checkpointing:
         sharding_strategy: FULL_SHARD
         block_names: [GPT2Block]
 
+# resolving class types via different enums sucks...
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: target_ids
+    prediction_key: logits
+
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
 model:
   component_key: model
   variant_key: gpt2
   config:
     sample_key: ${settings.referencing_keys.sample_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
-    block_size: ${settings.training.sequence_length}
     poe_type: NOPE
+    block_size: ${settings.training.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 12
-    n_head: 12
-    ffn_hidden: 2048
-    n_embd: 768
+    n_layer: 2
+    n_head_q: 8
+    n_head_kv: 8
+    ffn_hidden: 128
+    n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
-      attention_type: pytorch_flash_attention
-      scaling_factor: 3
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
     weight_init:
@@ -181,39 +230,33 @@ model:
         bias: true
         epsilon: 1e-5
 
-wrapped_model:
-  component_key: model
-  variant_key: fsdp_wrapped
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
   config:
-    model:
-      instance_key: model
+    optimizer:
+      instance_key: optimizer
       pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
-
-# scheduler:
-#   type_hint: StepLR
-#   config:
-#     step_size: 1
-#     gamma: 0.1
-
-loss_fn:
-  component_key: loss
-  variant_key: clm_cross_entropy_loss
-  config:
-    target_key: ${settings.referencing_keys.target_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 10
+    pct_start: 0.01
+    anneal_strategy: cos
 
 optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
+
+# message subscriber
 
 batch_progress_subscriber:
   component_key: progress_subscriber
@@ -226,7 +269,7 @@ batch_progress_subscriber:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
     eval_dataloaders:
-      - instance_key: val_dataloader
+        instance_key: eval_dataloaders
         pass_type: BY_REFERENCE
 
     
@@ -236,6 +279,6 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."

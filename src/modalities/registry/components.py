@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
-from transformers import GPT2TokenizerFast
 
 from modalities.checkpointing.checkpointing import Checkpointing
 from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
@@ -24,18 +23,20 @@ from modalities.config.config import (
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
+    DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     FSDPToDiscCheckpointingConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
-    GPT2TokenizerFastConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
+    PreTrainedHFTokenizerConfig,
+    PreTrainedSPTokenizerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
@@ -44,12 +45,15 @@ from modalities.config.config import (
     WandBEvaluationResultSubscriberConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
+from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
 from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.models.coca.coca_model import CoCa, CoCaConfig
+from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -58,7 +62,9 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 
 
 @dataclass
@@ -77,6 +83,7 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
@@ -86,6 +93,7 @@ COMPONENTS = [
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
     ),
     # schedulers
+    ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
     ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
@@ -93,7 +101,8 @@ COMPONENTS = [
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
     ),
     # tokenizers
-    ComponentEntity("tokenizer", "gpt2_tokenizer_fast", GPT2TokenizerFast, GPT2TokenizerFastConfig),
+    ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
+    ComponentEntity("tokenizer", "pretrained_sp_tokenizer", PreTrainedSPTokenizer, PreTrainedSPTokenizerConfig),
     # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
     ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),
@@ -112,12 +121,14 @@ COMPONENTS = [
     ComponentEntity(
         "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
+    ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
+    ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     # ComponentEntity("data_loader", "repeating_data_loader",(RepeatingDataLoader, None), # TODO

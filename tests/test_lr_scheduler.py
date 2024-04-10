@@ -1,11 +1,14 @@
 from unittest.mock import call
 
+import numpy as np
+
 from modalities.gym import Gym
+from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from tests.test_utils import configure_dataloader_mock
 
 
 def test_run_scheduler(
-    monkeypatch,
+    set_env_cpu,
     checkpointing_mock,
     evaluator_mock,
     nn_model_mock,
@@ -13,7 +16,6 @@ def test_run_scheduler(
     scheduler_mock,
     loss_mock,
     llm_data_loader_mock,
-    set_env_cpu,
     trainer,
 ):
     num_batches = 4
@@ -40,3 +42,33 @@ def test_run_scheduler(
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
     scheduler_mock.step.assert_called()
+
+
+def test_dummy_lr_scheduler(optimizer_with_param_groups_mock):
+    # we test that the optimizer step function reduces the lr by 0.01 for each param group.
+    # we also test that the scheduler step function does not change the lr.
+
+    scheduler = DummyLRScheduler(optimizer=optimizer_with_param_groups_mock)
+    assert scheduler.get_lr() == [0.1, 0.2, 0.3]
+    assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
+    assert scheduler.get_last_lr() == [0.1, 0.2, 0.3]
+
+    optimizer_with_param_groups_mock.step()
+    assert np.allclose(scheduler.get_lr(), [0.09, 0.19, 0.29], atol=1e-6)
+    assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
+    assert scheduler.get_last_lr() == [0.1, 0.2, 0.3]
+
+    scheduler.step()
+    assert np.allclose(scheduler.get_lr(), [0.09, 0.19, 0.29], atol=1e-6)
+    assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
+    assert np.allclose(scheduler.get_last_lr(), [0.09, 0.19, 0.29], atol=1e-6)
+
+    optimizer_with_param_groups_mock.step()
+    assert np.allclose(scheduler.get_lr(), [0.08, 0.18, 0.28], atol=1e-6)
+    assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
+    assert np.allclose(scheduler.get_last_lr(), [0.09, 0.19, 0.29], atol=1e-6)
+
+    scheduler.step()
+    assert np.allclose(scheduler.get_lr(), [0.08, 0.18, 0.28], atol=1e-6)
+    assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
+    assert np.allclose(scheduler.get_last_lr(), [0.08, 0.18, 0.28], atol=1e-6)

@@ -139,7 +139,13 @@ class Trainer:
                     evaluation_result = EvaluationResultBatch(
                         losses={loss_fun.tag: train_loss},
                         # TODO: hardcoded metric key
-                        throughput_metrics={"training_synced_num_samples_per_second": synced_num_samples_per_second},
+                        throughput_metrics={
+                            "training_synced_num_samples_per_second": synced_num_samples_per_second,
+                            "lr_mean": torch.tensor(scheduler.get_last_lr()).mean(),
+                            "lr_min": torch.tensor(scheduler.get_last_lr()).min(),
+                            "lr_max": torch.tensor(scheduler.get_last_lr()).max(),
+                            "lr_first": torch.tensor(scheduler.get_last_lr())[0],
+                        },
                         dataloader_tag=train_loader.dataloader_tag,
                         global_train_sample_id=global_train_sample_id,
                     )

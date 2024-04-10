@@ -7,8 +7,8 @@ from typing import Annotated, Dict, List, Tuple
 import torch
 import torch.nn as nn
 import xformers.ops as xops
+from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
-from torch.nn import functional as F
 
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
@@ -75,7 +75,6 @@ class RotaryTransform(QueryKeyValueTransform):
             t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
-
             self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
             self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
 
@@ -105,11 +104,6 @@ class QueryKeyValueTransformType(Enum):
     RotaryTransform = RotaryTransform
 
 
-class AttentionType(str, Enum):
-    DEFAULT_ATTENTION = "default_attention"
-    PYTORCH_FLASH_ATTENTION = "pytorch_flash_attention"
-
-
 class ActivationType(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
@@ -132,9 +126,7 @@ class AttentionConfig(BaseModel):
         type_hint: QueryKeyValueTransformType
         config: RotaryTransformConfig | IdentityTransformConfig
 
-    attention_type: AttentionType
     qkv_transforms: List[QueryKeyValueTransformConfig]
-    scaling_factor: Annotated[int, Field(strict=True, ge=1)]
 
 
 class WeightInitializationConfig(BaseModel):
@@ -151,7 +143,8 @@ class GPT2LLMConfig(BaseModel):
         int, Field(strict=True, ge=1)
     ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: Annotated[int, Field(strict=True, ge=1)]
-    n_head: Annotated[int, Field(strict=True, ge=1)]
+    n_head_q: Annotated[int, Field(strict=True, ge=1)]
+    n_head_kv: Annotated[int, Field(strict=True, ge=1)]
     n_embd: Annotated[int, Field(strict=True, ge=1)]
     ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
@@ -162,6 +155,12 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
+
+    @model_validator(mode="after")
+    def check_divisibility(self) -> "GPT2LLMConfig":
+        if self.n_head_q % self.n_head_kv != 0:
+            raise ValueError("n_head_q must be divisible by n_head_kv")
+        return self
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
@@ -177,7 +176,8 @@ class GPT2LLMConfig(BaseModel):
 class CausalSelfAttention(nn.Module):
     def __init__(
         self,
-        n_head: int,
+        n_head_q: int,
+        n_head_kv: int,
         n_embd: int,
         attention_config: AttentionConfig,
         bias: bool,
@@ -185,12 +185,25 @@ class CausalSelfAttention(nn.Module):
         block_size: int,
     ):
         super().__init__()
-        assert n_embd % n_head == 0
-        # key, query, value projections for all heads, but in a batch
-        self.c_attn = nn.Linear(
+        assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
+        assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
+
+        self.n_rep = n_head_q // n_head_kv
+
+        # query, key, value projections (separate)
+        self.q_attn = nn.Linear(
             in_features=n_embd,
-            # 3, because we have queries, keys, and values
-            out_features=3 * n_embd,
+            out_features=n_embd,
+            bias=bias,
+        )
+        self.k_attn = nn.Linear(
+            in_features=n_embd,
+            out_features=n_embd // self.n_rep,
+            bias=bias,
+        )
+        self.v_attn = nn.Linear(
+            in_features=n_embd,
+            out_features=n_embd // self.n_rep,
             bias=bias,
         )
 
@@ -202,12 +215,13 @@ class CausalSelfAttention(nn.Module):
         )
 
         # regularization
-        self.attn_dropout = nn.Dropout(dropout)
-        self.resid_dropout = nn.Dropout(dropout)
-        self.n_head = n_head
+        self.n_head_q = n_head_q
+        self.n_head_kv = n_head_kv
+
         self.n_embd = n_embd
+        # TODO: we might want different values for attention_dropout and linear_dropout
         self.dropout = dropout
-        self.flash = attention_config.attention_type == AttentionType.PYTORCH_FLASH_ATTENTION
+        self.resid_dropout = nn.Dropout(self.dropout)
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
@@ -215,49 +229,46 @@ class CausalSelfAttention(nn.Module):
             for transform_config in attention_config.qkv_transforms
         )
 
-        if not self.flash:
-            # causal mask to ensure that attention is only applied to the left in the input sequence
-            self.register_buffer(
-                "bias",
-                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
-            )
+    def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # calculate query, key, values for all heads in batch and move head forward to be the batch dim
+        return self.q_attn(x), self.k_attn(x), self.v_attn(x)
+
+    @staticmethod
+    def execute_qkv_transforms(
+        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch_size = q.shape[0]
+        block_size = q.shape[1]
+        n_head_dim = q.shape[2] // n_head_q
+
+        q = q.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_q, T, hd)
+        k = k.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+
+        for transform in qkv_transforms:
+            q, k, v = transform(q, k, v)
+
+        return q, k, v
+
+    @staticmethod
+    def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
+        q = q.transpose(1, 2)  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2)  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
+
+        # TODO: make parameters configurable
+        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, C = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
+        B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
+        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
 
-        # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+        # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
+        q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
+        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
+        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
 
-        # TODO: move logic into a function
-        for qkv_transform in self.qkv_transforms:
-            q, k, v = qkv_transform(q, k, v)
-
-        # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
-        if self.flash:
-            # efficient attention using Flash Attention CUDA kernels
-            y = torch.nn.functional.scaled_dot_product_attention(
-                query=q,
-                key=k,
-                value=v,
-                attn_mask=None,
-                dropout_p=self.dropout if self.training else 0,
-                is_causal=True,
-            )
-        else:
-            # manual implementation of attention
-            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-            att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
-            att = F.softmax(att, dim=-1)
-            att = self.attn_dropout(att)
-            y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
-
-        # output projection
-        y = self.resid_dropout(self.c_proj(y))
-        return y
+        return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
 class TransformerMLP(nn.Module):
@@ -289,8 +300,9 @@ class GPT2Block(nn.Module):
         self,
         n_embd: int,
         bias: bool,
+        n_head_q: int,
+        n_head_kv: int,
         activation_type: ActivationType,
-        n_head: int,
         attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -302,7 +314,8 @@ class GPT2Block(nn.Module):
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
         self.attn = CausalSelfAttention(
-            n_head=n_head,
+            n_head_q=n_head_q,
+            n_head_kv=n_head_kv,
             n_embd=n_embd,
             attention_config=attention_config,
             bias=bias,
@@ -334,14 +347,15 @@ class GPT2LLM(NNModel):
         block_size: int,
         vocab_size: int,
         n_layer: int,
-        n_head: int,
+        n_head_q: int,
+        n_head_kv: int,
         n_embd: int,
         ffn_hidden: int,
         dropout: float,
         bias: bool,
-        attention_config: AttentionConfig,
         activation_type: ActivationType,
         weight_init: WeightInitializationConfig,
+        attention_config: AttentionConfig,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
@@ -381,8 +395,9 @@ class GPT2LLM(NNModel):
                         GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
+                            n_head_q=n_head_q,
+                            n_head_kv=n_head_kv,
                             activation_type=activation_type,
-                            n_head=n_head,
                             attention_config=attention_config,
                             dropout=dropout,
                             block_size=block_size,
