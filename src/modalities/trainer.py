@@ -128,7 +128,7 @@ class Trainer:
                     train_loss = Reducer.reduce(
                         tensor=cumulated_loss,
                         operation=dist.ReduceOp.SUM,
-                        post_processing_fun=lambda t: t[0] / t[1],
+                        # post_processing_fun=lambda t: t[0] / t[1],
                     )
                     local_train_sample_id = Trainer._get_local_sample_id(
                         batch_id=local_train_batch_id, batch_size=train_loader.batch_size
