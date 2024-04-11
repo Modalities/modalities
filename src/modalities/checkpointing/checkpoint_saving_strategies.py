@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Dict
 
 from modalities.batch import EvaluationResultBatch
-from modalities.checkpointing.checkpointing_instruction import CheckpointingInstruction
+from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
 
 
-class CheckpointingStrategyIF(ABC):
+class CheckpointSavingStrategyIF(ABC):
     """
     Checkpoint Interface to get checkpoint instruction.
     """
@@ -20,7 +20,7 @@ class CheckpointingStrategyIF(ABC):
         raise NotImplementedError
 
 
-class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
+class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
     def __init__(self, k: int = -1):
         """Strategy for saving the k most recent checkpoints only.
         k=-1: keep all checkpoints
@@ -53,7 +53,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointingStrategyIF):
         return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=checkpoints_to_delete)
 
 
-class SaveEveryKStepsCheckpointingStrategy(CheckpointingStrategyIF):
+class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
     def __init__(self, k: int):
         self.k = k
 
