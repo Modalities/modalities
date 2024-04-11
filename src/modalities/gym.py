@@ -4,7 +4,7 @@ from typing import List
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from modalities.checkpointing.checkpointing import Checkpointing
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
@@ -27,7 +27,7 @@ class Gym:
         callback_interval_in_batches: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
-        checkpointing: Checkpointing,
+        checkpoint_saving: CheckpointSaving,
     ):
         self._run_evaluation_and_checkpointing(
             model=model,
@@ -36,7 +36,7 @@ class Gym:
             # perform forward over. Therefore, -1 one for the current sample_id.
             local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
             evaluation_data_loaders=evaluation_data_loaders,
-            checkpointing=checkpointing,
+            checkpoint_saving=checkpoint_saving,
         )
 
         self.trainer.train(
@@ -51,7 +51,7 @@ class Gym:
                 model=model,
                 optimizer=optimizer,
                 evaluation_data_loaders=evaluation_data_loaders,
-                checkpointing=checkpointing,
+                checkpoint_saving=checkpoint_saving,
             ),
             local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
         )
@@ -62,7 +62,7 @@ class Gym:
         optimizer: Optimizer,
         local_train_sample_id: int,
         evaluation_data_loaders: List[LLMDataLoader],
-        checkpointing: Checkpointing,
+        checkpoint_saving: CheckpointSaving,
     ):
         global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
 
@@ -75,7 +75,7 @@ class Gym:
         )
 
         # TODO: implement early stopping
-        checkpointing.save_checkpoint(
+        checkpoint_saving.save_checkpoint(
             global_train_sample_id=global_train_sample_id,
             evaluation_result=eval_result,
             model=model,
