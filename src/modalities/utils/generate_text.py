@@ -8,15 +8,20 @@ import os
 import readline  # noqa: F401
 import sys
 from pathlib import Path
+from typing import Optional
 
 import torch
 from torch.nn import functional as F
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import InferenceComponentsModel, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.inference.config import InferenceComponentConfig, InferenceComponentsModel
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.cuda_env import CudaEnv
+from modalities.running_env.env_utils import is_running_with_torchrun
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
+from modalities.utils.inference_component import InferenceComponent
 
 chat_prefix = """
 This is a conversation between a user and a helpful bot, which answers the user's questions as good as possible.
@@ -58,7 +63,7 @@ bot: """
 
 
 def generate_tokens(
-    model: torch.nn.Module,
+    inference_component: InferenceComponent,
     tokenizer: TokenizerWrapper,
     context: str,
     seq_len: int,
@@ -76,7 +81,7 @@ def generate_tokens(
         # in_batch = (
         #     in_batch if in_batch.size(1) <= seq_len else in_batch[:, -seq_len:]
         # )
-        logits = model.forward(in_batch_dict)["logits"]
+        logits = inference_component.forward(in_batch_dict)["logits"]
         logits = logits[:, -1, :] / temperature
         probs = F.softmax(logits, dim=-1)
         idx_next = torch.multinomial(probs, num_samples=1)
@@ -94,31 +99,38 @@ def generate_tokens(
     print("")
 
 
-def main(config_path: Path, chat: bool):
+def generate_text(config_path: Path, chat: bool, registry: Optional[Registry] = None):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
     os.environ["WORLD_SIZE"] = "1"
 
     config_dict = load_app_config_dict(config_path)
-    registry = Registry(COMPONENTS)
+    if registry is None:
+        registry = Registry(COMPONENTS)
+    registry.add_entity(
+        component_key="inference_component",
+        variant_key="default",
+        component_type=InferenceComponent,
+        component_config_type=InferenceComponentConfig,
+    )
     component_factory = ComponentFactory(registry=registry)
 
-    components = component_factory.build_components(
-        config_dict=config_dict,
-        components_model_type=InferenceComponentsModel,
-    )
+    if is_running_with_torchrun():
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            components = component_factory.build_components(
+                config_dict=config_dict,
+                components_model_type=InferenceComponentsModel,
+            )
 
-    model_path = components.settings.model_path
-    state_dict = torch.load(model_path)
-    print(f"using {model_path}")
+    else:
+        components = component_factory.build_components(
+            config_dict=config_dict,
+            components_model_type=InferenceComponentsModel,
+        )
+    inference_component = components.inference_component
 
-    model = components.model
-    model = model.cuda().to(torch.bfloat16)
     tokenizer = components.tokenizer
     max_new_tokens = components.settings.max_new_tokens
-
-    model.load_state_dict(state_dict)
-    model.eval()
 
     while True:
         try:
@@ -129,13 +141,23 @@ def main(config_path: Path, chat: bool):
                 # TODO: make prompt template configurable, default should be an empty prompt
                 # prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
                 generate_tokens(
-                    model, tokenizer, prompt, model.block_size, max_new_tokens, eod_token=components.settings.eod_token
+                    inference_component,
+                    tokenizer,
+                    prompt,
+                    inference_component.block_size,
+                    max_new_tokens,
+                    eod_token=components.settings.eod_token,
                 )
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
                 generate_tokens(
-                    model, tokenizer, prompt, model.block_size, max_new_tokens, eod_token=components.settings.eod_token
+                    inference_component,
+                    tokenizer,
+                    prompt,
+                    inference_component.block_size,
+                    max_new_tokens,
+                    eod_token=components.settings.eod_token,
                 )
         except KeyboardInterrupt:
             print("closing app...")

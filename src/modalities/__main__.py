@@ -33,7 +33,6 @@ from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
-from modalities.utils.generate_text import main as generate_text_main
 from modalities.utils.gradient_clipping import build_gradient_clipper
 
 
@@ -57,9 +56,17 @@ def entry_point_run_modalities(config_file_path: Path):
 
 @main.command(name="generate_text")
 @click.argument("config_path", type=FilePath)
-@click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(config_path, chat):
-    generate_text_main(config_path=config_path, chat=chat)
+@click.option("--chat", is_flag=True, show_default=True, default=False, help="Activate 'chat' mode")
+def entry_point_generate_text(config_path, chat, device_mode, gpu_id):
+    # Your existing code here
+
+    # Check if gpu-id is provided in a non-applicable context
+    if device_mode != "single-gpu" and "--gpu-id" in click.get_os_args():
+        click.echo("The --gpu-id option is only applicable when --device is set to 'single-gpu'.", err=True)
+        ctx = click.get_current_context()
+        ctx.exit(code=1)
+
+    pass
 
 
 @main.group(name="data")
@@ -237,7 +244,7 @@ class Main:
                 callback_interval_in_batches=callback_interval_in_batches_per_rank,
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=components.eval_dataloaders,
-                checkpointing=components.checkpointing,
+                checkpoint_saving=components.checkpointing,
                 model=wrapped_model,
                 optimizer=components.optimizer,
                 scheduler=components.scheduler,

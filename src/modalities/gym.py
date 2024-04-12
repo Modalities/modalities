@@ -1,6 +1,7 @@
 from functools import partial
 from typing import List
 
+import torch.nn as nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -21,7 +22,7 @@ class Gym:
 
     def run(
         self,
-        model: NNModel,
+        model: nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
         callback_interval_in_batches: int,
