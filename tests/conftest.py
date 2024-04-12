@@ -10,9 +10,8 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
-from transformers import GPT2TokenizerFast
 
-from modalities.checkpointing.checkpointing import CheckpointingIF
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -76,16 +75,19 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
 
+
 @pytest.fixture
 def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
     gpt2_tokenizer_folder_path = Path(__file__).parents[1] / Path("data", "tokenizer", "hf_gpt2")
-    tokenizer = PreTrainedHFTokenizer(pretrained_model_name_or_path=gpt2_tokenizer_folder_path, 
-                          max_length=None, truncation=None, padding=False)
+    tokenizer = PreTrainedHFTokenizer(
+        pretrained_model_name_or_path=gpt2_tokenizer_folder_path, max_length=None, truncation=None, padding=False
+    )
     return tokenizer
+
 
 @pytest.fixture(scope="function")
 def checkpointing_mock():
-    return MagicMock(spec=CheckpointingIF)
+    return MagicMock(spec=CheckpointSaving)
 
 
 @pytest.fixture(scope="function")
