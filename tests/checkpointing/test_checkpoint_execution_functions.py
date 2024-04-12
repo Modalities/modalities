@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
-from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
@@ -29,7 +29,7 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
     p = d / "<experiment_id>-200-101.bin"
     p.write_text(CONTENT)
 
-    checkpointing = FSDPToDiscCheckpointing(
+    checkpointing = FSDPCheckpointSaving(
         checkpoint_path=d,
         experiment_id=str(1),
         global_rank=0,
@@ -53,7 +53,7 @@ def test_delete_checkpoint(tmpdir):
     model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_samples_101.bin"
     model_path.write_text(CONTENT)
 
-    checkpointing = FSDPToDiscCheckpointing(
+    checkpointing = FSDPCheckpointSaving(
         checkpoint_path=directory,
         experiment_id=experiment_id,
         global_rank=0,

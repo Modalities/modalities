@@ -38,7 +38,7 @@ def test_run_scheduler(
         callback_interval_in_batches=int(num_batches),
         train_data_loader=llm_data_loader_mock,
         evaluation_data_loaders=[],
-        checkpointing=checkpointing_mock,
+        checkpoint_saving=checkpointing_mock,
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
     scheduler_mock.step.assert_called()

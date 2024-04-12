@@ -14,7 +14,8 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
-from modalities.checkpointing.checkpointing_execution import CheckpointingEntityType, FSDPToDiscCheckpointing
+from modalities.checkpointing.checkpoint_saving import CheckpointEntityType
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -159,7 +160,7 @@ class TestFSDPToDiscCheckpointing:
         experiment_id = "0"
         global_train_sample_id = 1
 
-        checkpointing = FSDPToDiscCheckpointing(
+        checkpointing = FSDPCheckpointSaving(
             checkpoint_path=temporary_checkpoint_folder_path,
             experiment_id=experiment_id,
             global_rank=dist.get_rank(),
@@ -192,7 +193,7 @@ class TestFSDPToDiscCheckpointing:
         model_checkpointing_path = checkpointing._get_checkpointing_path(
             experiment_id=experiment_id,
             global_train_sample_id=global_train_sample_id,
-            entity_type=CheckpointingEntityType.MODEL,
+            entity_type=CheckpointEntityType.MODEL,
         )
         fsdp_wrapped_model_2 = checkpointing.load_model_checkpoint(
             model=gpt2_model_2, file_path=model_checkpointing_path
@@ -203,7 +204,7 @@ class TestFSDPToDiscCheckpointing:
         optimizer_checkpointing_path = checkpointing._get_checkpointing_path(
             experiment_id=experiment_id,
             global_train_sample_id=global_train_sample_id,
-            entity_type=CheckpointingEntityType.OPTIMIZER,
+            entity_type=CheckpointEntityType.OPTIMIZER,
         )
         checkpointing.load_optimizer_checkpoint(
             optimizer=optimizer_2, wrapped_model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
