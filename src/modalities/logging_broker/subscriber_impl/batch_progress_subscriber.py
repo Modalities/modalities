@@ -18,6 +18,8 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     """A subscriber object for the RichProgress observable."""
 
+    _live_display: Live = None
+
     def __init__(
         self,
         num_ranks: int,
@@ -61,7 +63,19 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
         )
 
         live = Live(group)
+        self.register_live_display(live_display=live)
         live.start()
+
+    @classmethod
+    def register_live_display(cls, live_display: Live):
+        """
+        Only one instance of rich.live.Live can run at the same time.
+        Therefore we use a singleton approach to have only one active,
+         by storing the active reference as class-field here.
+        """
+        if cls._live_display is not None:
+            cls._live_display.stop()
+        cls._live_display = live_display
 
     def consume_message(self, message: Message[BatchProgressUpdate]):
         """Consumes a message from a message broker."""

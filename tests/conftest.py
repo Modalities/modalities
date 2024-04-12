@@ -44,13 +44,17 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 
 @pytest.fixture
-def dummy_config(monkeypatch) -> Dict:
+def dummy_config_path() -> Path:
+    return _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
+
+
+@pytest.fixture
+def dummy_config(monkeypatch, dummy_config_path) -> Dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    return config_dict, dummy_config_path
+    return config_dict
 
 
 @dataclasses.dataclass

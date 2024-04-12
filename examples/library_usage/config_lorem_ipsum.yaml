@@ -22,7 +22,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: gpt2_tokenizer_fast
   config:
-    tokenizer_file: tokenizer_gpt2.json
+    tokenizer_file: ./data/tokenizer/tokenizer_gpt2.json
 
 collate_fn:  
   component_key: collate_fn
