@@ -54,7 +54,7 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     config_dict = load_app_config_dict(dummy_config_path)
 
     # Disable checkpointing
-    config_dict["checkpointing"]["config"]["checkpointing_strategy"]["config"]["k"] = 0
+    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 0
 
     main = Main(config_dict, dummy_config_path)
     main.run()

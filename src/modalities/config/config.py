@@ -52,7 +52,7 @@ PydanticCheckpointLoadingIFType = Annotated[CheckpointLoadingIF, PydanticThirdPa
 PydanticCheckpointSavingStrategyIFType = Annotated[
     CheckpointSavingStrategyIF, PydanticThirdPartyTypeIF(CheckpointSavingStrategyIF)
 ]
-PydanticCheckpointingExecutionIFType = Annotated[
+PydanticCheckpointSavingExecutionIFType = Annotated[
     CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
@@ -179,8 +179,8 @@ class FSDPCheckpointSavingConfig(BaseModel):
 
 
 class CheckpointSavingConfig(BaseModel):
-    checkpointing_strategy: PydanticCheckpointSavingStrategyIFType
-    checkpointing_execution: PydanticCheckpointingExecutionIFType
+    checkpoint_saving_strategy: PydanticCheckpointSavingStrategyIFType
+    checkpoint_saving_execution: PydanticCheckpointSavingExecutionIFType
 
 
 class AdamOptimizerConfig(BaseModel):
@@ -456,7 +456,7 @@ class TrainingComponentsModel(BaseModel):
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
-    checkpointing: PydanticCheckpointSavingIFType
+    checkpoint_saving: PydanticCheckpointSavingIFType
     settings: TrainingSettings
 
 

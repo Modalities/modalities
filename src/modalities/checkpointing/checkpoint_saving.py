@@ -21,11 +21,11 @@ class CheckpointSaving:
 
     def __init__(
         self,
-        checkpointing_strategy: CheckpointSavingStrategyIF,
-        checkpointing_execution: CheckpointSavingExecutionABC,
+        checkpoint_saving_strategy: CheckpointSavingStrategyIF,
+        checkpoint_saving_execution: CheckpointSavingExecutionABC,
     ):
-        self.checkpointing_strategy = checkpointing_strategy
-        self.checkpointing_execution = checkpointing_execution
+        self.checkpoint_saving_strategy = checkpoint_saving_strategy
+        self.checkpoint_saving_execution = checkpoint_saving_execution
 
     def save_checkpoint(
         self,
@@ -35,13 +35,13 @@ class CheckpointSaving:
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
-        checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
+        checkpointing_instruction = self.checkpoint_saving_strategy.get_checkpoint_instruction(
             global_train_sample_id=global_train_sample_id,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
 
-        self.checkpointing_execution.run_checkpoint_instruction(
+        self.checkpoint_saving_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
             global_train_sample_id=global_train_sample_id,
             model=model,
