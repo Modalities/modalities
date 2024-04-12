@@ -244,7 +244,7 @@ class Main:
                 callback_interval_in_batches=callback_interval_in_batches_per_rank,
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=components.eval_dataloaders,
-                checkpoint_saving=components.checkpointing,
+                checkpoint_saving=components.checkpoint_saving,
                 model=wrapped_model,
                 optimizer=components.optimizer,
                 scheduler=components.scheduler,
