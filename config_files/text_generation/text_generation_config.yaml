@@ -8,34 +8,48 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
 
 
-model:
+checkpointed_model:
+  component_key: model
+  variant_key: checkpointed
+  config: 
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: 7
+    model:
+      instance_key: raw_model
+      pass_type: BY_REFERENCE
+    checkpoint_path: ${settings.model_path}
+
+
+raw_model:
   component_key: model
   variant_key: gpt2
   config:
-    sample_key: input_ids
+    sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    block_size: 2048
-    prediction_key: logits
-    vocab_size: 100352 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 32
-    n_head_q: 32
-    n_head_kv: 32
-    ffn_hidden: 6656
-    n_embd: 2560
+    block_size: ${settings.training.sequence_length}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head_q: 12
+    n_head_kv: 12
+    ffn_hidden: 2048
+    n_embd: 768
     dropout: 0.0
-    epsilon: 1e-5
-    bias: false # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
-    activation_type: fused_swiglu
+    activation_type: gelu
     weight_init:
       mean: 0.0
-      std:  0.0158
+      std: 0.02
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
@@ -57,7 +71,6 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-
 tokenizer:
   component_key: tokenizer
   variant_key: pretrained_sp_tokenizer
