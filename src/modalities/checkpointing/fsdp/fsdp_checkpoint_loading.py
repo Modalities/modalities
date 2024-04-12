@@ -12,28 +12,14 @@ from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
 class FSDPCheckpointLoading(CheckpointLoadingIF):
-    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_samples_{num_samples}.bin"
-
     def __init__(
         self,
-        checkpoint_path: Path,
-        experiment_id: str,
         global_rank: int,
         block_names: List[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
     ):
-        """
-        Implementation of checkpointing to disc via FSDP
-
-        Args:
-            checkpoint_path (Path): folder path to the checkpoint
-            experiment_id (str): ID of the experiment
-            global_rank (int): global rank within the current process group
-        """
-        self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
-        self.experiment_id = experiment_id
         self.block_names = block_names
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
