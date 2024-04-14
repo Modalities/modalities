@@ -19,6 +19,7 @@ from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
+from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -122,12 +123,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
 
     @field_validator("device", mode="before")
     def parse_device(cls, device) -> PydanticPytorchDeviceType:
-        if isinstance(device, str) and device != "cpu":
-            raise ValueError(f"Invalid device_id: {device}")
-        else:
-            device_id = f"cuda:{device}"
-        device = torch.device(device_id)
-        return device
+        return parse_torch_device(device)
 
 
 class FSDPCheckpointLoadingConfig(BaseModel):
