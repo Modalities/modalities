@@ -1,11 +1,26 @@
 settings:
-  model_path: /workspaces/modalities/checkpoints/2_6B_DE/2_6B_DE.bin
-  max_new_tokens: 512
-  eod_token: <eod>
-  cuda_env:
-    local_rank: ${cuda_env:LOCAL_RANK}
-    global_rank: ${cuda_env:RANK}
-    world_size: ${cuda_env:WORLD_SIZE}
+  referencing_keys:
+    sample_key: input_ids
+    prediction_key: logits
+  model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-10__22-39-34/eid_2024-04-10__22-39-34-model-num_samples_819200.bin
+  device: 7
+  context_length: 512
+
+text_inference_component:
+  component_key: inference_component
+  variant_key: text
+  config:
+    model:
+      instance_key: checkpointed_model
+      pass_type: BY_REFERENCE
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+    context_length: ${settings.context_length}
+    eod_token: <eod>
+    device: ${settings.device}
+    prompt_template: "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
+    temperature: 1.0
 
 
 checkpointed_model:
@@ -16,12 +31,11 @@ checkpointed_model:
       component_key: checkpoint_loading
       variant_key: torch
       config:
-        device: 7
+        device: ${settings.device}
     model:
       instance_key: raw_model
       pass_type: BY_REFERENCE
     checkpoint_path: ${settings.model_path}
-
 
 raw_model:
   component_key: model
@@ -29,7 +43,7 @@ raw_model:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    block_size: ${settings.training.sequence_length}
+    block_size: ${settings.context_length}
     prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
@@ -43,8 +57,8 @@ raw_model:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
-            n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #it has to be head_q here
+            n_embd: ${raw_model.config.n_embd}
+            n_head: ${raw_model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
     weight_init:
@@ -54,27 +68,28 @@ raw_model:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${raw_model.config.n_embd}
         bias: true
         epsilon: 1e-5
     ffn_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${raw_model.config.n_embd}
         bias: true
         epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${raw_model.config.n_embd}
         bias: true
         epsilon: 1e-5
+
 tokenizer:
   component_key: tokenizer
   variant_key: pretrained_sp_tokenizer
   config:
     tokenizer_model_file: /workspaces/modalities/data/tokenizer/endefrites_bpe/bpe_tokenizer 1.model
     padding: false
-    max_length: 512
+    max_length: ${settings.context_length}
