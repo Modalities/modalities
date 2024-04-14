@@ -1,4 +1,4 @@
-from typing import Annotated, Dict
+from typing import Annotated, Dict, Optional
 
 from pydantic import BaseModel, FilePath, field_validator
 
@@ -11,8 +11,6 @@ from modalities.config.config import (
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import parse_torch_device
 from modalities.inference.text.inference_component import TextInferenceComponent
-
-# PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 
@@ -39,15 +37,11 @@ class TextGenerationInstantiationModel(BaseModel):
     settings: TextGenerationSettings
 
 
-class InferenceComponentConfig(BaseModel):
+class TextInferenceComponentConfig(BaseModel):
     model: PydanticPytorchModuleType
     tokenizer: PydanticTokenizerIFType
-    context_length: int
-    eod_token: str
-    device: PydanticPytorchDeviceType
     prompt_template: str
-    temperature: float
-
-    @field_validator("device", mode="before")
-    def parse_device(cls, device) -> PydanticPytorchDeviceType:
-        return parse_torch_device(device)
+    chat: bool
+    context_length: int
+    temperature: Optional[float] = 1.0
+    eod_token: Optional[str] = "<eod>"

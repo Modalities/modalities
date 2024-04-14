@@ -16,14 +16,14 @@ class TextInferenceComponent:
         prompt_template: str,
         chat: bool,
         context_length: int,
-        temperature: float = 1.0,
-        eod_token: str = "<eod>",
+        temperature: float,
+        eod_token: str,
     ) -> None:
         self.model = model
         self.model.eval()
         self.tokenizer = tokenizer
         self.eod_token = eod_token
-        self.chat = chat
+        self.chat = chat  # TODO implement chat functionality
         self.prompt_template = prompt_template
         self.temperature = temperature
         self.context_length = context_length
