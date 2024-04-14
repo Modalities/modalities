@@ -6,7 +6,7 @@ from pydantic import FilePath
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.inference.text.config import TextGenerationInstantiationModel
+from modalities.inference.text.config import TextGenerationInstantiationModel, TextInferenceComponentConfig
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -20,9 +20,9 @@ def generate_text(config_path: FilePath, registry: Optional[Registry] = None):
         registry = Registry(COMPONENTS)
     registry.add_entity(
         component_key="inference_component",
-        variant_key="default",
+        variant_key="text",
         component_type=TextInferenceComponent,
-        component_config_type=TextInferenceComponent,
+        component_config_type=TextInferenceComponentConfig,
     )
     component_factory = ComponentFactory(registry=registry)
 

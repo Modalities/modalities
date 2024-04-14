@@ -252,14 +252,14 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpointing: PydanticCheckpointSavingIFType
+    checkpointing: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
-    checkpointing: PydanticCheckpointSavingIFType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
