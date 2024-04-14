@@ -3,7 +3,7 @@ settings:
     sample_key: input_ids
     prediction_key: logits
   model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-10__22-39-34/eid_2024-04-10__22-39-34-model-num_samples_819200.bin
-  device: 7
+  device: 0
   context_length: 512
 
 text_inference_component:
@@ -18,7 +18,6 @@ text_inference_component:
       pass_type: BY_REFERENCE
     context_length: ${settings.context_length}
     eod_token: <eod>
-    device: ${settings.device}
     prompt_template: "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
     temperature: 1.0
 
@@ -90,6 +89,6 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_sp_tokenizer
   config:
-    tokenizer_model_file: /workspaces/modalities/data/tokenizer/endefrites_bpe/bpe_tokenizer 1.model
+    tokenizer_model_file: /raid/s3/opengptx/max_lue/modalities/data/tokenizer/endefrites_bpe/bpe_tokenizer.model
     padding: false
     max_length: ${settings.context_length}
