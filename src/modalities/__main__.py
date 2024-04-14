@@ -24,6 +24,7 @@ from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedD
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
+from modalities.inference.inference import generate_text
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
@@ -55,18 +56,14 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("config_path", type=FilePath)
-@click.option("--chat", is_flag=True, show_default=True, default=False, help="Activate 'chat' mode")
-def entry_point_generate_text(config_path, chat, device_mode, gpu_id):
-    # Your existing code here
-
-    # Check if gpu-id is provided in a non-applicable context
-    if device_mode != "single-gpu" and "--gpu-id" in click.get_os_args():
-        click.echo("The --gpu-id option is only applicable when --device is set to 'single-gpu'.", err=True)
-        ctx = click.get_current_context()
-        ctx.exit(code=1)
-
-    pass
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+def entry_point_generate_text(config_file_path: FilePath):
+    generate_text(config_file_path)
 
 
 @main.group(name="data")
