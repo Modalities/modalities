@@ -31,14 +31,14 @@ class Gym:
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
     ):
-        self._run_evaluation(
-            model=model,
-            # here, fast_forward_sample_id points to the next sample_id that we would
-            # perform forward over. Therefore, -1 one for the current sample_id.
-            local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
-            local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
-            evaluation_data_loaders=evaluation_data_loaders,
-        )
+        # self._run_evaluation(
+        #     model=model,
+        #     # here, fast_forward_sample_id points to the next sample_id that we would
+        #     # perform forward over. Therefore, -1 one for the current sample_id.
+        #     local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
+        #     local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
+        #     evaluation_data_loaders=evaluation_data_loaders,
+        # )
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
             model=model,

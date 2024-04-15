@@ -68,7 +68,7 @@ class Evaluator:
                     )
 
                     cumulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cumulated_loss[1] += len(batch)
+                    cumulated_loss[1] += 1
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
@@ -113,12 +113,6 @@ class Evaluator:
                 evaluation_result=evaluation_result,
             )
             result_dict[data_loader.dataloader_tag] = evaluation_result
-        # Evaluator._publish_progress(
-        #     batch_progress_publisher=self.batch_progress_publisher,
-        #     train_batch_id=train_batch_id + 1,
-        #     dataset_batch_id=0,
-        #     dataloader_tag=data_loader.dataloader_tag,
-        # )
         return result_dict
 
     @staticmethod

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable
+from typing import Callable, Tuple
 
 import torch
 import torch.distributed as dist
@@ -29,7 +29,7 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
-        gradient_clipper: Callable[[nn.Module], None],
+        gradient_clipper: Callable[[nn.Module], torch.Tensor],
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
@@ -46,17 +46,17 @@ class Trainer:
         loss_fun: Loss,
         batch_id: int,
         data_loader: LLMDataLoader,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch) / self.gradient_acc_steps
         loss.backward()
-        self.gradient_clipper(model)
+        gradient_norm_score = self.gradient_clipper(model)
 
         if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-        return loss
+        return loss, gradient_norm_score
 
     def train(
         self,
@@ -71,7 +71,8 @@ class Trainer:
         local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
-        cumulated_loss = self._reset_loss()
+        cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
+
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
@@ -86,7 +87,7 @@ class Trainer:
             # Because we might resume training, we add the starting batch id of the data loader
             local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
-            batch_loss = self._train_batch(
+            batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
@@ -97,8 +98,10 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_loss[0] += batch_loss.item()
-            cumulated_loss[1] += len(batch)
+            cumulated_loss_and_gradient_norm[0] += batch_loss.item()
+            cumulated_loss_and_gradient_norm[1] += gradient_norm_score.item()
+            # This works, because we always drop the last batch in case it has less samples than the batch size
+            cumulated_loss_and_gradient_norm[-1] += 1  # number of local batches
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
@@ -109,7 +112,8 @@ class Trainer:
                 local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
 
-            if ((local_train_batch_id + 1) % local_training_log_interval_in_batches == 0) and local_train_batch_id > 0:
+            # Check, if model should be evaluated
+            if local_train_batch_id % local_training_log_interval_in_batches == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -122,10 +126,22 @@ class Trainer:
                 )
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
-                train_loss = Reducer.reduce(
-                    tensor=cumulated_loss,
+                cumulated_loss_and_gradient_norm[2] = batch_loss.item()
+                cumulated_loss_and_gradient_norm[3] = gradient_norm_score.item()
+                reduced_loss_and_gradient_norm = Reducer.reduce(
+                    tensor=cumulated_loss_and_gradient_norm,
                     operation=dist.ReduceOp.SUM,
-                    post_processing_fun=lambda t: t[0] / t[1],
+                    # divide the first two elements by the last one
+                    # i.e., summed batch loss / (num batches * world size)
+                    # and summed gradient norm/ (num batches * world size).
+                    # keep the other elements as is
+                    post_processing_fun=lambda t: torch.cat((t[:2] / t[-1], t[2:-1] / dist.get_world_size())),
+                )
+                train_loss_avg, train_gradient_norm_avg, train_loss_last_batch, train_gradient_norm_last_batch = (
+                    reduced_loss_and_gradient_norm[0],
+                    reduced_loss_and_gradient_norm[1],
+                    reduced_loss_and_gradient_norm[2],
+                    reduced_loss_and_gradient_norm[3],
                 )
                 local_train_sample_id = Trainer._get_local_sample_id(
                     batch_id=local_train_batch_id, batch_size=train_loader.batch_size
@@ -134,7 +150,14 @@ class Trainer:
                 global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
 
                 evaluation_result = EvaluationResultBatch(
-                    losses={loss_fun.tag: train_loss},
+                    losses={
+                        f"{loss_fun.tag} interval average": train_loss_avg,
+                        f"{loss_fun.tag} last batch": train_loss_last_batch,
+                    },
+                    metrics={
+                        "grad_norm_avg": train_gradient_norm_avg,
+                        "grad_norm_last_batch": train_gradient_norm_last_batch,
+                    },
                     # TODO: hardcoded metric key
                     throughput_metrics={
                         "training_synced_num_samples_per_second": synced_num_samples_per_second,
@@ -151,29 +174,24 @@ class Trainer:
                     evaluation_result=evaluation_result,
                 )
                 thoughput_aggregator.remove_keys()
-                # TODO early stopping
-                cumulated_loss = self._reset_loss()
 
-            local_train_sample_id = Trainer._get_local_sample_id(
-                batch_id=local_train_batch_id, batch_size=train_loader.batch_size
-            )
-            # Check, if model should be evaluated
-            evaluation_callback(local_train_sample_id=local_train_sample_id)
-            checkpointing_callback(local_train_sample_id=local_train_sample_id)
-            model.train()
+                evaluation_callback(local_train_sample_id=local_train_sample_id)
+                checkpointing_callback(local_train_sample_id=local_train_sample_id)
 
+                model.train()
+                cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
 
-    def _reset_loss(self):
+    def _reset_loss_and_gradient_norm(self):
         # TODO: we should handle the device assignment more centrally.
-        cumulated_loss = torch.zeros(2)
+        cumulated_loss_and_gradient_norm = torch.zeros(5)
         if torch.cuda.is_available():
-            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
         else:
-            cumulated_loss = cumulated_loss.to("cpu")
-        return cumulated_loss
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
+        return cumulated_loss_and_gradient_norm
 
     @staticmethod
     def _publish_progress(

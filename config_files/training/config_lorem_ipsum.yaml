@@ -26,7 +26,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: /workspaces/modalities/data/tokenizer/hf_gpt2
+    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
     max_length: ${settings.training.sequence_length}
 
 collate_fn:  
@@ -36,18 +36,13 @@ collate_fn:
     sample_key: ${settings.referencing_keys.sample_key}
     target_key: ${settings.referencing_keys.target_key}
 
-train_dataset:  
+train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /workspaces/modalities/data/lorem_ipsum.pbin
-    index_path: /workspaces/modalities/data/lorem_ipsum.idx
+    raw_data_path: ./data/lorem_ipsum.pbin
     block_size: ${settings.training.sequence_length}
-    jq_pattern: ".text"
     sample_key:  ${settings.referencing_keys.sample_key}
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
 
 train_dataloader:
   component_key: data_loader
@@ -247,7 +242,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 8
+    total_steps: 10
     pct_start: 0.01
     anneal_strategy: cos
 

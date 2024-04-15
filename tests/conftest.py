@@ -10,10 +10,9 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
-from transformers import GPT2TokenizerFast
 
 from modalities.checkpointing.checkpointing import CheckpointingIF
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import GradientClippingMode, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -24,6 +23,7 @@ from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
+from modalities.utils.gradient_clipping import build_gradient_clipper
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -45,13 +45,17 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 
 @pytest.fixture
-def dummy_config(monkeypatch) -> Dict:
+def dummy_config_path() -> Path:
+    return _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
+
+
+@pytest.fixture
+def dummy_config(monkeypatch, dummy_config_path) -> Dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
-    return config_dict, dummy_config_path
+    return config_dict
 
 
 @dataclasses.dataclass
@@ -76,12 +80,15 @@ def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
 
+
 @pytest.fixture
 def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
     gpt2_tokenizer_folder_path = Path(__file__).parents[1] / Path("data", "tokenizer", "hf_gpt2")
-    tokenizer = PreTrainedHFTokenizer(pretrained_model_name_or_path=gpt2_tokenizer_folder_path, 
-                          max_length=None, truncation=None, padding=False)
+    tokenizer = PreTrainedHFTokenizer(
+        pretrained_model_name_or_path=gpt2_tokenizer_folder_path, max_length=None, truncation=None, padding=False
+    )
     return tokenizer
+
 
 @pytest.fixture(scope="function")
 def checkpointing_mock():
@@ -153,7 +160,7 @@ def trainer(progress_publisher_mock):
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
-        gradient_clipper=lambda model: None,
+        gradient_clipper=build_gradient_clipper(GradientClippingMode.NONE),
     )
 
 
