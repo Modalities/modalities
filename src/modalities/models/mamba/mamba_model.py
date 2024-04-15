@@ -131,7 +131,7 @@ class Mamba(nn.Module):
                 out, _, _ = self.step(hidden_states, conv_state, ssm_state)
                 return out
 
-        # We do matmul and transpose BLH -> HBL at the same time
+        # We do matmul and transpose BLH -> HBL at the same time (Batch size, sequence length, hidden dim)
         xz = rearrange(
             self.in_proj.weight @ rearrange(hidden_states, "b l d -> d (b l)"),
             "d (b l) -> b d l",
@@ -209,6 +209,8 @@ class Mamba(nn.Module):
         dtype = hidden_states.dtype
         assert hidden_states.shape[1] == 1, "Only support decoding with 1 token at a time for now"
         xz = self.in_proj(hidden_states.squeeze(1))  # (B 2D)
+
+        # x goes to the left and z goes to the right in the mamba block
         x, z = xz.chunk(2, dim=-1)  # (B D)
 
         # Conv step

@@ -262,3 +262,18 @@ class MambaLMHeadModel(nn.Module, GenerationMixin):
         config_path = os.path.join(save_directory, 'config.json')
         with open(config_path, 'w') as f:
             json.dump(self.config.__dict__, f)
+
+
+if __name__ == '__main__':
+    batch, length, dim = 2, 64, 16
+    vocab_size = 1024
+    n_layers = 2
+    x = torch.randint(0, vocab_size, (batch, length)).to("cuda")
+    model = MixerModel(
+        # This module uses roughly 3 * expand * d_model^2 parameters
+        d_model=dim,  # Model dimension d_model
+        n_layer=n_layers,
+        vocab_size=vocab_size
+    ).to("cuda")
+    y = model(x)
+    print(y)
