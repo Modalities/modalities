@@ -71,6 +71,7 @@ class Trainer:
     ):
         model.train()
         cumulated_loss = self._reset_loss()
+        num_seen_batches = 0
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
@@ -93,11 +94,14 @@ class Trainer:
                 loss_fun=loss_fun,
                 batch_id=batch_id,
                 data_loader=train_loader,
-            )
+            ).item()
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_loss[0] += batch_loss.item()
-            cumulated_loss[1] += len(batch)
+            cumulated_loss[0] += batch_loss
+            num_seen_batches += 1
+    
+            # This works, because we always drop the last batch in case it has less samples than the batch size
+            cumulated_loss[1] += 1 
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(
@@ -107,7 +111,7 @@ class Trainer:
                 dataloader_tag=train_loader.dataloader_tag,
                 local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
-
+  
             # Check, if model should be evaluated
             if (local_train_batch_id + 1) % callback_interval_in_batches == 0:
                 if local_train_batch_id > 0:
@@ -128,7 +132,7 @@ class Trainer:
                     train_loss = Reducer.reduce(
                         tensor=cumulated_loss,
                         operation=dist.ReduceOp.SUM,
-                        # post_processing_fun=lambda t: t[0] / t[1],
+                        post_processing_fun=lambda t: t[0] / t[1],
                     )
                     local_train_sample_id = Trainer._get_local_sample_id(
                         batch_id=local_train_batch_id, batch_size=train_loader.batch_size

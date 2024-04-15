@@ -278,7 +278,7 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    project: modalities
-    mode: OFFLINE
+    project: modalities_lorem_ipsum
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
