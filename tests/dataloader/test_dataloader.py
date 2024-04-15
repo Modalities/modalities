@@ -27,8 +27,7 @@ def test_resumable_dataloader():
 
 def test_dataloader_from_config(dummy_config: Dict):
     start_index = 2
-    config_dict, _ = dummy_config
-    config_dict["train_dataloader"]["config"]["skip_num_batches"] = start_index
+    dummy_config["train_dataloader"]["config"]["skip_num_batches"] = start_index
 
     class DataloaderTestModel(BaseModel):
         train_dataloader: PydanticLLMDataLoaderIFType
@@ -36,7 +35,7 @@ def test_dataloader_from_config(dummy_config: Dict):
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     components: DataloaderTestModel = component_factory.build_components(
-        config_dict=config_dict, components_model_type=DataloaderTestModel
+        config_dict=dummy_config, components_model_type=DataloaderTestModel
     )
 
     dataloader_1: LLMDataLoader = components.train_dataloader
