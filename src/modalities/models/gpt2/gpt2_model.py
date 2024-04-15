@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
-from modalities.src.modalities.nn.moe import MoEFFN, MoEFFNConfig
+from modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -156,6 +156,7 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
+    moe_config: Optional[MoEFFNConfig] = None
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
