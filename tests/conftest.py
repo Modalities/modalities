@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
 from modalities.checkpointing.checkpointing import CheckpointingIF
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import GradientClippingMode, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -23,6 +23,7 @@ from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
+from modalities.utils.gradient_clipping import build_gradient_clipper
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -159,7 +160,7 @@ def trainer(progress_publisher_mock):
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
-        gradient_clipper=lambda model: None,
+        gradient_clipper=build_gradient_clipper(GradientClippingMode.NONE),
     )
 
 

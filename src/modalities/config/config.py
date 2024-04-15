@@ -308,7 +308,7 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
-    drop_last: Literal[True]
+    drop_last: Literal[True] = True
 
 
 class ResumableBatchSamplerConfig(BaseModel):

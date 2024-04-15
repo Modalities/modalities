@@ -8,7 +8,7 @@ from modalities.config.config import GradientClippingMode
 
 
 def build_gradient_clipper(
-    gradient_clipping_mode: GradientClippingMode, gradient_clipping_threshold: Optional[float]
+    gradient_clipping_mode: GradientClippingMode, gradient_clipping_threshold: Optional[float] = None
 ) -> Callable[[nn.Module], torch.Tensor]:
     """Returns a function that applies gradient clipping to a given model (in place).
 
