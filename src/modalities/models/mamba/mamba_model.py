@@ -311,18 +311,8 @@ if __name__ == '__main__':
         pad_vocab_size_multiple=8,
         tie_embeddings=True
     )
-
     batch, length = 2, 64
     x = torch.randint(0, config.vocab_size, (batch, length)).to(device)
-
-    # model = MixerModel(
-    #     # This module uses roughly 3 * expand * d_model^2 parameters
-    #     d_model=config.d_model,  # Model dimension d_model
-    #     n_layer=config.n_layer,
-    #     vocab_size=config.vocab_size
-    # ).to("cuda")
-    # y = model(x)
-
     lm_head = MambaLMHeadModel(
         config=config, device=device
     )
