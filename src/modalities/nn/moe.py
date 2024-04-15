@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -13,7 +13,7 @@ class MoEFFNConfig(BaseModel):
     uniform_expert_assignment: bool
     ffn_hidden_size: int
     act_fn: Callable[[], nn.Module] = nn.SiLU
-    moe_jitter_eps: float
+    moe_jitter_eps: Optional[float]
 
 
 class MoERouter(nn.Module):
@@ -49,7 +49,6 @@ class MoERouter(nn.Module):
                 top_experts = uniform_tensor.reshape(top_experts.shape)
                 # Note, weights and top_weights are not changed
 
-        weights = weights.to(x.dtype)
         top_weights = top_weights.to(x.dtype)
         return top_weights, top_experts
 
