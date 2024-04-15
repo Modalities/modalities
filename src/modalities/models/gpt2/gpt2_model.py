@@ -359,8 +359,10 @@ class GPT2LLM(NNModel):
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
+        seed: int = None
     ):
-        super().__init__()
+
+        super().__init__(seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
