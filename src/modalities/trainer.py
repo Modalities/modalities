@@ -71,6 +71,7 @@ class Trainer:
     ):
         model.train()
         cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
+
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
@@ -98,7 +99,8 @@ class Trainer:
             # Save the batch loss
             cumulated_loss_and_gradient_norm[0] += batch_loss.item()
             cumulated_loss_and_gradient_norm[1] += gradient_norm_score.item()
-            cumulated_loss_and_gradient_norm[-1] += len(batch)
+            # This works, because we always drop the last batch in case it has less samples than the batch size
+            cumulated_loss_and_gradient_norm[-1] += 1  # number of local batches
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
             self._publish_progress(

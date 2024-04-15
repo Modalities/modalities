@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Tuple
+from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple
 
 import torch.nn as nn
 from omegaconf import OmegaConf
@@ -308,7 +308,7 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
-    drop_last: bool
+    drop_last: Literal[True]
 
 
 class ResumableBatchSamplerConfig(BaseModel):
