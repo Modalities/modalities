@@ -10,7 +10,7 @@ settings:
     global_num_seen_samples: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 2
+    local_train_micro_batch_size: 3
     sequence_length: 256
     gradient_clipping:
       mode: p2_norm
