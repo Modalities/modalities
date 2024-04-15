@@ -28,7 +28,8 @@ class CLMCrossEntropyLoss(Loss):
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
-        self.loss_fun = CrossEntropyLoss()
+        # Mean over the tokens in the local-batch (batch per rank)
+        self.loss_fun = CrossEntropyLoss(reduction="mean")
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
@@ -38,7 +39,7 @@ class CLMCrossEntropyLoss(Loss):
         labels = labels.to(lm_logits.device)
         shift_logits = lm_logits.contiguous()
         shift_labels = labels.contiguous().long()
-        # Flatten the tokens
+        # Flatten the tokens. We compute here, the loss per token.
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
 
