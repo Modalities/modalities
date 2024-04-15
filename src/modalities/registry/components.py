@@ -180,4 +180,14 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
+
+    #block configs
+    ComponentEntity("block", "moe_block", MoEBlock, MoEBlockConfig),
+    ComponentEntity("block", "transformer_block", TransformerBlock, GPT2BlockConfig),
+    ComponentEntity("block", "swiglu_block", SwiGLUBlock, GPT2BlockConfig),
+
+    #moe activation_fn configs
+    ComponentEntity("moe_act_fn", "silu", nn.SiLU, ActivationConfig),
+    ComponentEntity("moe_act_fn", "relu", nn.ReLU, ActivationConfig),
+    ComponentEntity("moe_act_fn", "leaky_relu", nn.LeakyReLU, LeakyReLUConfig),
 ]
