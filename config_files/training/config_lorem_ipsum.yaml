@@ -20,13 +20,6 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
-    max_length: ${settings.training.sequence_length}
-
 collate_fn:  
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
