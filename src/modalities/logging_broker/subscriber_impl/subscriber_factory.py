@@ -25,18 +25,13 @@ class ProgressSubscriberFactory:
     ) -> RichProgressSubscriber:
         if local_rank == 0:
             skip_num_local_train_batches = global_num_seen_samples // world_size // train_dataloader.batch_size
-            train_split_num_samples = {
+            train_split_num_steps = {
                 train_dataloader.dataloader_tag: (len(train_dataloader) + skip_num_local_train_batches)
-                * world_size
-                * train_dataloader.batch_size
             }
 
-            eval_splits_num_samples = {
-                dataloader.dataloader_tag: len(dataloader) * world_size * dataloader.batch_size
-                for dataloader in eval_dataloaders
-            }
+            eval_splits_num_steps = {dataloader.dataloader_tag: len(dataloader) for dataloader in eval_dataloaders}
 
-            subscriber = RichProgressSubscriber(world_size, train_split_num_samples, eval_splits_num_samples)
+            subscriber = RichProgressSubscriber(train_split_num_steps, eval_splits_num_steps)
         else:
             subscriber = ProgressSubscriberFactory.get_dummy_progress_subscriber()
         return subscriber

@@ -391,9 +391,9 @@ class TrainingSettings(BaseModel):
                     raise ValueError("A threshold value is required when gradient clipping is used.")
                 return self
 
-        local_training_log_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
-        local_checkpointing_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
-        local_evaluation_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
+        global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+        global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+        global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
         global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]

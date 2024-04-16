@@ -51,21 +51,21 @@ class Checkpointing(CheckpointingIF):
 
     def save_checkpoint(
         self,
-        global_train_sample_id: int,
+        global_train_step: int,
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
         evaluation_result: Optional[Dict[str, EvaluationResultBatch]] = None,
     ):
         checkpointing_instruction = self.checkpointing_strategy.get_checkpoint_instruction(
-            global_train_sample_id=global_train_sample_id,
+            global_train_step=global_train_step,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
 
         self.checkpointing_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
-            global_train_sample_id=global_train_sample_id,
+            global_train_sample_id=global_train_step,
             model=model,
             optimizer=optimizer,
         )

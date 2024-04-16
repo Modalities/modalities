@@ -35,7 +35,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             for metric_key, metric_values in eval_result.metrics.items()
         }
 
-        num_samples = (eval_result.global_train_sample_id + 1) * self.num_ranks
+        num_samples = (eval_result.global_train_step + 1) * self.num_ranks
         group_content = [f"[yellow]Iteration #{num_samples}:"]
         if losses:
             group_content.append("\nLosses:")
@@ -81,13 +81,18 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         }
         # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
         wandb.log(
-            data=losses, step=eval_result.global_train_sample_id + 1
+            data=losses, step=eval_result.global_train_step + 1
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         wandb.log(
-            data=metrics, step=eval_result.global_train_sample_id + 1
+            data=metrics, step=eval_result.global_train_step + 1
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         throughput_metrics = {
             f"{eval_result.dataloader_tag} {metric_key}": metric_values
             for metric_key, metric_values in eval_result.throughput_metrics.items()
         }
-        wandb.log(data=throughput_metrics, step=eval_result.global_train_sample_id + 1)
+
+        wandb.log(data=throughput_metrics, step=eval_result.global_train_step + 1)
+
+        # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
+        # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
+        # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})

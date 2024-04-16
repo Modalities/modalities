@@ -24,9 +24,9 @@ class Gym:
         model: nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        local_training_log_interval_in_batches: int,
-        local_checkpointing_interval_in_samples: int,
-        local_evaluation_interval_in_samples: int,
+        global_training_log_interval_in_steps: int,
+        global_checkpointing_interval_in_steps: int,
+        global_evaluation_interval_in_steps: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpointing: Checkpointing,
@@ -43,7 +43,7 @@ class Gym:
             self._run_evaluation,
             model=model,
             evaluation_data_loaders=evaluation_data_loaders,
-            local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
+            global_evaluation_interval_in_steps=global_evaluation_interval_in_steps,
         )
 
         checkpointing_callback: Callable[[int], None] = partial(
@@ -51,7 +51,7 @@ class Gym:
             model=model,
             optimizer=optimizer,
             checkpointing=checkpointing,
-            local_checkpointing_interval_in_samples=local_checkpointing_interval_in_samples,
+            global_checkpointing_interval_in_steps=global_checkpointing_interval_in_steps,
         )
 
         self.trainer.train(
@@ -62,22 +62,20 @@ class Gym:
             scheduler=scheduler,
             evaluation_callback=evaluation_callback,
             checkpointing_callback=checkpointing_callback,
-            local_training_log_interval_in_batches=local_training_log_interval_in_batches,
-            local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
+            global_training_log_interval_in_steps=global_training_log_interval_in_steps,
         )
 
     def _run_checkpointing(
         self,
         model: nn.Module,
         optimizer: Optimizer,
-        local_train_sample_id: int,
+        global_train_step: int,
         checkpointing: Checkpointing,
-        local_checkpointing_interval_in_samples: int,
+        global_checkpointing_interval_in_steps: int,
     ):
-        if (local_train_sample_id + 1) % local_checkpointing_interval_in_samples == 0:
-            global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
+        if (global_train_step + 1) % global_checkpointing_interval_in_steps == 0:
             checkpointing.save_checkpoint(
-                global_train_sample_id=global_train_sample_id,
+                global_train_step=global_train_step,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 model=model,
                 optimizer=optimizer,
@@ -87,19 +85,16 @@ class Gym:
     def _run_evaluation(
         self,
         model: nn.Module,
-        local_train_sample_id: int,
+        global_train_step: int,
         evaluation_data_loaders: List[LLMDataLoader],
-        local_evaluation_interval_in_samples: int,
+        global_evaluation_interval_in_steps: int,
     ):
-        if (local_train_sample_id + 1) % local_evaluation_interval_in_samples == 0:
-            global_train_sample_id = self._local_sample_id_to_global_sample_id(local_sample_id=local_train_sample_id)
-
+        if (global_train_step) % global_evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
                 loss_fun=self.loss_fun,
-                global_train_sample_id=global_train_sample_id,
-                local_sample_id_to_global_sample_id=self._local_sample_id_to_global_sample_id,
+                global_train_step=global_train_step,
             )
 
     def _local_sample_id_to_global_sample_id(self, local_sample_id: int) -> int:

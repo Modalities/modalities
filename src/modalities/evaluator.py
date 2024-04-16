@@ -41,8 +41,7 @@ class Evaluator:
         model: nn.Module,
         data_loaders: List[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-        global_train_sample_id: int,
-        local_sample_id_to_global_sample_id: Callable[[int], int],
+        global_train_step: int,
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
@@ -54,8 +53,7 @@ class Evaluator:
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                global_train_sample_id=global_train_sample_id,
-                global_dataset_sample_id=-1,
+                global_train_step=global_train_step,
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -72,16 +70,9 @@ class Evaluator:
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
-                    local_dataset_sample_id = Evaluator._get_local_sample_id(
-                        batch_id=batch_id, batch_size=data_loader.batch_size
-                    )
-
-                    global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
-
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
-                        global_train_sample_id=global_train_sample_id,
-                        global_dataset_sample_id=global_dataset_sample_id,
+                        global_train_step=global_train_step,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
@@ -106,7 +97,7 @@ class Evaluator:
                 # TODO: hardcoded metric key
                 throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
-                global_train_sample_id=global_train_sample_id,
+                global_train_step=global_train_step,
             )
             Evaluator._publish_evaluation_result(
                 evaluation_result_publisher=self.evaluation_result_publisher,
@@ -118,13 +109,11 @@ class Evaluator:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        global_train_sample_id: int,
-        global_dataset_sample_id: int,
+        global_train_step: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            global_train_sample_id=global_train_sample_id,
-            global_dataset_sample_id=global_dataset_sample_id,
+            global_train_step=global_train_step,
             experiment_status=ExperimentStatus.EVALUATION,
             dataloader_tag=dataloader_tag,
         )

@@ -33,7 +33,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
+from modalities.util import compute_number_of_trainable_parameters
 from modalities.utils.generate_text import main as generate_text_main
 from modalities.utils.gradient_clipping import build_gradient_clipper
 
@@ -244,12 +244,6 @@ class Main:
             if components.settings.training.do_apply_activation_checkpointing:
                 apply_activation_checkpointing_inplace(wrapped_model)
 
-            local_training_log_interval_in_batches = get_callback_interval_in_batches_per_rank(
-                local_callback_interval_in_samples=components.settings.training.local_training_log_interval_in_samples,
-                local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
-                gradient_acc_steps=components.settings.training.gradient_acc_steps,
-            )
-
             gym.run(
                 train_data_loader=components.train_dataloader,
                 evaluation_data_loaders=components.eval_dataloaders,
@@ -257,9 +251,9 @@ class Main:
                 model=wrapped_model,
                 optimizer=components.optimizer,
                 scheduler=components.scheduler,
-                local_checkpointing_interval_in_samples=components.settings.training.local_checkpointing_interval_in_samples,
-                local_evaluation_interval_in_samples=components.settings.training.local_evaluation_interval_in_samples,
-                local_training_log_interval_in_batches=local_training_log_interval_in_batches,
+                global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
+                global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
+                global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
             )
             print("done")
 

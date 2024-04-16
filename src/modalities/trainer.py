@@ -65,10 +65,9 @@ class Trainer:
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
-        local_training_log_interval_in_batches: int,
+        global_training_log_interval_in_steps: int,
         evaluation_callback: Callable[[int], None],
         checkpointing_callback: Callable[[int], None],
-        local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
         model.train()
         cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
@@ -104,16 +103,15 @@ class Trainer:
             cumulated_loss_and_gradient_norm[-1] += 1  # number of local batches
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 local_batch_id=local_train_batch_id,
-                batch_size=train_loader.batch_size,
                 dataloader_tag=train_loader.dataloader_tag,
-                local_sample_id_to_global_sample_id=local_sample_id_to_global_sample_id,
             )
 
             # Check, if model should be evaluated
-            if local_train_batch_id % local_training_log_interval_in_batches == 0:
+            if local_train_batch_id % global_training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -143,11 +141,6 @@ class Trainer:
                     reduced_loss_and_gradient_norm[2],
                     reduced_loss_and_gradient_norm[3],
                 )
-                local_train_sample_id = Trainer._get_local_sample_id(
-                    batch_id=local_train_batch_id, batch_size=train_loader.batch_size
-                )
-
-                global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
 
                 evaluation_result = EvaluationResultBatch(
                     losses={
@@ -167,7 +160,7 @@ class Trainer:
                         "lr_first": torch.tensor(scheduler.get_last_lr())[0],
                     },
                     dataloader_tag=train_loader.dataloader_tag,
-                    global_train_sample_id=global_train_sample_id,
+                    global_train_step=local_train_batch_id,
                 )
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
@@ -175,11 +168,11 @@ class Trainer:
                 )
                 thoughput_aggregator.remove_keys()
 
-                evaluation_callback(local_train_sample_id=local_train_sample_id)
-                checkpointing_callback(local_train_sample_id=local_train_sample_id)
-
                 model.train()
                 cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
+
+            evaluation_callback(global_train_step=local_train_batch_id)
+            checkpointing_callback(global_train_step=local_train_batch_id)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
@@ -197,16 +190,10 @@ class Trainer:
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         local_batch_id: int,
-        batch_size: int,
         dataloader_tag: str,
-        local_sample_id_to_global_sample_id: Callable[[int], int],
     ):
-        local_train_sample_id = Trainer._get_local_sample_id(batch_id=local_batch_id, batch_size=batch_size)
-        global_train_sample_id = local_sample_id_to_global_sample_id(local_train_sample_id)
-
         payload = BatchProgressUpdate(
-            global_train_sample_id=global_train_sample_id,
-            global_dataset_sample_id=global_train_sample_id,
+            global_train_step=local_batch_id,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )
