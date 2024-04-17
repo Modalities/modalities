@@ -92,7 +92,7 @@ class Trainer:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 loss_fun=loss_fun,
-                batch_id=batch_id,
+                batch_id=local_train_batch_id,
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
@@ -142,7 +142,7 @@ class Trainer:
                     reduced_loss_and_gradient_norm[3],
                 )
 
-                evaluation_result = EvaluationResultBatch(
+                traning_metrics = EvaluationResultBatch(
                     losses={
                         f"{loss_fun.tag} interval average": train_loss_avg,
                         f"{loss_fun.tag} last batch": train_loss_last_batch,
@@ -164,7 +164,7 @@ class Trainer:
                 )
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
-                    evaluation_result=evaluation_result,
+                    evaluation_result=traning_metrics,
                 )
                 thoughput_aggregator.remove_keys()
 

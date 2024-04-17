@@ -62,7 +62,7 @@ class ResultsSubscriberFactory:
         directory: Path = None,
         experiment_config: Dict = None,
     ) -> WandBEvaluationResultSubscriber:
-        if local_rank == 0 and (mode == WandbMode.ONLINE or mode == WandbMode.OFFLINE):
+        if local_rank == 0 and (mode != WandbMode.DISABLED):
             result_subscriber = WandBEvaluationResultSubscriber(
                 project, experiment_id, mode, directory, experiment_config
             )

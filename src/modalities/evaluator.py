@@ -53,7 +53,7 @@ class Evaluator:
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                global_train_step=global_train_step,
+                global_train_step=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -72,7 +72,7 @@ class Evaluator:
 
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
-                        global_train_step=global_train_step,
+                        global_train_step=batch_id,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
