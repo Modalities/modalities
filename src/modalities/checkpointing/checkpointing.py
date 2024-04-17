@@ -27,7 +27,7 @@ class CheckpointingIF(ABC):
     @abstractmethod
     def save_checkpoint(
         self,
-        global_train_sample_id: int,
+        global_train_step: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
@@ -65,7 +65,7 @@ class Checkpointing(CheckpointingIF):
 
         self.checkpointing_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
-            global_train_sample_id=global_train_step,
+            global_train_step=global_train_step,
             model=model,
             optimizer=optimizer,
         )
