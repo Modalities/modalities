@@ -207,7 +207,3 @@ class Trainer:
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )
-
-    @staticmethod
-    def _get_local_sample_id(batch_id: int, batch_size: int) -> int:
-        return (batch_id + 1) * batch_size - 1
