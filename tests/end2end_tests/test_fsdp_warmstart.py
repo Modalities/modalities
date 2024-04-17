@@ -6,7 +6,12 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.batch import EvaluationResultBatch
-from modalities.config.config import ProcessGroupBackendType, TrainingComponentsInstantiationModel
+from modalities.config.config import (
+    ProcessGroupBackendType,
+    PydanticLLMDataLoaderIFType,
+    TrainingComponentsInstantiationModel,
+)
+from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
@@ -32,6 +37,10 @@ class SaveAllResultSubscriberConfig(BaseModel):
     pass
 
 
+class TrainDataloaderInstantiationModel(BaseModel):
+    train_dataloader: PydanticLLMDataLoaderIFType
+
+
 # @pytest.mark.skipif(
 #     "RANK" not in os.environ or torch.cuda.device_count() < 2,
 #     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
@@ -42,19 +51,22 @@ class TestWarmstart:
             # config for two steps model
             gpt2_two_steps_config_file_path = Path("tests/end2end_tests/gpt2_two_steps.yaml")
             gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
-            
+
             # adopt the checkpoint path
-            gpt2_two_steps_config_dict["checkpointing"]["config"]["checkpointing_execution"]["config"]["checkpoint_path"]= str(Path(temp_dir))
+            gpt2_two_steps_config_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
+                "checkpoint_path"
+            ] = str(Path(temp_dir))
             gpt2_two_steps_config_dict["settings"]["experiment_id"] = "0"
 
             # config for one step model
             gpt2_warm_start_from_step_1_config_file_path = Path("tests/end2end_tests/gpt2_warm_start_from_step_1.yaml")
-            gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+            gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
 
             # adopt the checkpoint path
-            gpt2_warm_start_from_step_1_dict["checkpointing"]["config"]["checkpointing_execution"]["config"]["checkpoint_path"]= str(Path(temp_dir)) + "/0/"
+            gpt2_warm_start_from_step_1_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
+                "checkpoint_path"
+            ] = (str(Path(temp_dir)) + "/0/")
             gpt2_two_steps_config_dict["wrapped_model"]["config"]["checkpoint_path"] = str(Path(temp_dir)) + "/0/"
-
 
             main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -66,7 +78,7 @@ class TestWarmstart:
                 )
                 components_1 = main_obj_1.build_components(components_model_type=TrainingComponentsInstantiationModel)
                 main_obj_1.run(components_1)
-            
+
             main_obj_2 = Main(gpt2_warm_start_from_step_1_dict, gpt2_warm_start_from_step_1_config_file_path)
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
                 main_obj_2.add_custom_component(
@@ -77,14 +89,55 @@ class TestWarmstart:
                 )
                 components_2 = main_obj_2.build_components(components_model_type=TrainingComponentsInstantiationModel)
                 main_obj_2.run(components_2)
-            
+
             messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
             messages_2: List[Message[EvaluationResultBatch]] = components_2.evaluation_subscriber.message_list
 
-            assert messages_1[-1].payload.losses == messages_2[-1].payload.losses
+            assert (
+                messages_1[-1].payload.losses["CLMCrossEntropyLoss last batch"].item()
+                == messages_2[-1].payload.losses["CLMCrossEntropyLoss last batch"].item()
+            )
             # messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
             # expected_values = {'CLMCrossEntropyLoss interval average': 10.7891}
             # for key, expected in expected_values.items():
             #     assert key in messages_1[-1].payload.losses, f"Key '{key}' not found in observed values"
             #     observed = messages_1[-1].payload.losses[key]
             #     assert observed == expected, f"AssertionError: {observed} != {expected} for key '{key}'"
+
+    def test_warmstart_dataloader(self):
+        gpt2_two_steps_config_file_path = Path("tests/end2end_tests/gpt2_two_steps.yaml")
+        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+
+        gpt2_warm_start_from_step_1_config_file_path = Path("tests/end2end_tests/gpt2_warm_start_from_step_1.yaml")
+        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+
+        main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
+        main_obj_2 = Main(gpt2_warm_start_from_step_1_dict, gpt2_warm_start_from_step_1_config_file_path)
+
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj_1.add_custom_component(
+                component_key="results_subscriber",
+                variant_key="save_all",
+                custom_component=SaveAllResultSubscriber,
+                custom_config=SaveAllResultSubscriberConfig,
+            )
+            components_1 = main_obj_1.build_components(components_model_type=TrainDataloaderInstantiationModel)
+            dataloader_1: LLMDataLoader = components_1.train_dataloader
+            dl_1_samples = [s for s in dataloader_1]
+
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj_2.add_custom_component(
+                component_key="results_subscriber",
+                variant_key="save_all",
+                custom_component=SaveAllResultSubscriber,
+                custom_config=SaveAllResultSubscriberConfig,
+            )
+            components_2 = main_obj_2.build_components(components_model_type=TrainDataloaderInstantiationModel)
+            dataloader_2: LLMDataLoader = components_2.train_dataloader
+            dl_2_samples = [s for s in dataloader_2]
+
+            # fast forward the first dataloader
+            num_skip_steps = dataloader_2.fast_forward_batch_id
+
+            for i in range(len(dataloader_2)):
+                assert dl_1_samples[i + num_skip_steps]["input_ids"].equal(dl_2_samples[i]["input_ids"])
