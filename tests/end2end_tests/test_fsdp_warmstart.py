@@ -81,8 +81,7 @@ class TestWarmstart:
             messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
             messages_2: List[Message[EvaluationResultBatch]] = components_2.evaluation_subscriber.message_list
 
-            key="CLMCrossEntropyLoss interval average"
-            assert messages_1[-1].payload.losses[key] == messages_2[-1].payload.losses[key] 
+            assert messages_1[-1].payload.losses == messages_2[-1].payload.losses
             # messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
             # expected_values = {'CLMCrossEntropyLoss interval average': 10.7891}
             # for key, expected in expected_values.items():
