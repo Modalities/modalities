@@ -8,7 +8,7 @@ from modalities.batch import DatasetBatch, InferenceResultBatch
 
 
 class NNModel(nn.Module):
-    def __init__(self, seed: int = 47):
+    def __init__(self, seed: int = None):
         if seed is not None:
             torch.manual_seed(seed)
         super(NNModel, self).__init__()
