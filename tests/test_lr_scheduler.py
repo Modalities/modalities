@@ -35,12 +35,12 @@ def test_run_scheduler(
         model=nn_model_mock,
         optimizer=optimizer_mock,
         scheduler=scheduler_mock,
-        local_checkpointing_interval_in_samples=1,
-        local_evaluation_interval_in_samples=1,
-        local_training_log_interval_in_batches=1,
         train_data_loader=llm_data_loader_mock,
         evaluation_data_loaders=[],
         checkpointing=checkpointing_mock,
+        global_training_log_interval_in_steps=1,
+        global_checkpointing_interval_in_steps=1,
+        global_evaluation_interval_in_steps=1,
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
     scheduler_mock.step.assert_called()
