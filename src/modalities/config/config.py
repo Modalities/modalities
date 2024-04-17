@@ -329,7 +329,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_batches: Optional[int] = 0
+    skip_num_steps: Optional[int] = 0
 
 
 class DummyProgressSubscriberConfig(BaseModel):
@@ -339,8 +339,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
-    world_size: int
-    global_num_seen_samples: int
+    global_num_seen_steps: int
     local_rank: int
 
 
@@ -394,7 +393,6 @@ class TrainingSettings(BaseModel):
         global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
         global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
         global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
         do_apply_activation_checkpointing: bool
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
@@ -411,7 +409,7 @@ class TrainingSettings(BaseModel):
     paths: Paths
 
 
-class TrainingComponentsModel(BaseModel):
+class TrainingComponentsInstantiationModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
