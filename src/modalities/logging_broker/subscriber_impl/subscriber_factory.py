@@ -23,7 +23,9 @@ class ProgressSubscriberFactory:
         local_rank: int,
     ) -> RichProgressSubscriber:
         if local_rank == 0:
-            train_split_num_steps = {train_dataloader.dataloader_tag: (len(train_dataloader) + global_num_seen_steps)}
+            train_split_num_steps = {
+                train_dataloader.dataloader_tag: (len(train_dataloader) + global_num_seen_steps, global_num_seen_steps)
+            }
 
             eval_splits_num_steps = {dataloader.dataloader_tag: len(dataloader) for dataloader in eval_dataloaders}
 
