@@ -4,10 +4,10 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 8
-    global_checkpointing_interval_in_steps: 3
-    global_evaluation_interval_in_steps: 2
-    global_num_seen_steps: 1
+    global_training_log_interval_in_steps: 1
+    global_checkpointing_interval_in_steps: 4
+    global_evaluation_interval_in_steps: 1
+    global_num_seen_steps: 4
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
@@ -19,6 +19,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpointing_path: data/checkpoints
 
 collate_fn:  
   component_key: collate_fn
@@ -43,7 +45,7 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_steps: 1
+    skip_num_steps: ${settings.training.global_num_seen_steps}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -82,7 +84,7 @@ checkpointing:
       component_key: checkpointing_execution
       variant_key: fsdp_to_disc_checkpointing
       config:
-        checkpoint_path: <replaced_in_test>
+        checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
@@ -107,7 +109,7 @@ wrapped_model:
     checkpointing:
       instance_key: checkpointing
       pass_type: BY_REFERENCE
-    checkpoint_path: <replaced_in_test>
+    checkpoint_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-17__19-48-27/eid_2024-04-17__19-48-27-model-num_steps_2.bin
 
 model:
   component_key: model
@@ -192,7 +194,17 @@ batch_progress_subscriber:
     eval_dataloaders: []
 
     
+# evaluation_subscriber:
+#   component_key: results_subscriber
+#   variant_key: save_all
+#   config: null
+
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: save_all
-  config: null
+  variant_key: wandb
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    project: modalities_lorem_ipsum
+    mode: ONLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
