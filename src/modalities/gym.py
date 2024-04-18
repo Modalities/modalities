@@ -89,7 +89,7 @@ class Gym:
         evaluation_data_loaders: List[LLMDataLoader],
         global_evaluation_interval_in_steps: int,
     ):
-        if (train_step_id) % global_evaluation_interval_in_steps == 0:
+        if (train_step_id + 1) % global_evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,

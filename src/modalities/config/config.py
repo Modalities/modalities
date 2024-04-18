@@ -361,7 +361,7 @@ class RichResultSubscriberConfig(BaseModel):
     local_rank: int
 
 
-class CudaEnv(BaseModel):
+class CudaEnvConfig(BaseModel):
     local_rank: Annotated[int, Field(strict=True, ge=0)]
     world_size: Annotated[int, Field(strict=True, ge=1)]
     global_rank: Annotated[int, Field(strict=True, ge=0)]
@@ -405,7 +405,7 @@ class TrainingSettings(BaseModel):
     experiment_id: str
     referencing_keys: Dict[str, str]
     training: Training
-    cuda_env: CudaEnv
+    cuda_env: CudaEnvConfig
     paths: Paths
 
 
@@ -429,7 +429,7 @@ class PackedDatasetComponentsModel(BaseModel):
 
 class ComponentsInferenceModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
-    cuda_env: CudaEnv
+    cuda_env: CudaEnvConfig
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:

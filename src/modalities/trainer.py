@@ -111,7 +111,7 @@ class Trainer:
             )
 
             # Check, if model should be evaluated
-            if train_step_id + 1 % global_training_log_interval_in_steps == 0:
+            if (train_step_id + 1) % global_training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -126,6 +126,7 @@ class Trainer:
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 cumulated_loss_and_gradient_norm[2] = batch_loss.item()
                 cumulated_loss_and_gradient_norm[3] = gradient_norm_score.item()
+
                 reduced_loss_and_gradient_norm = Reducer.reduce(
                     tensor=cumulated_loss_and_gradient_norm,
                     operation=dist.ReduceOp.SUM,
@@ -135,6 +136,7 @@ class Trainer:
                     # keep the other elements as is
                     post_processing_fun=lambda t: torch.cat((t[:2] / t[-1], t[2:-1] / dist.get_world_size())),
                 )
+
                 train_loss_avg, train_gradient_norm_avg, train_loss_last_batch, train_gradient_norm_last_batch = (
                     reduced_loss_and_gradient_norm[0],
                     reduced_loss_and_gradient_norm[1],
@@ -142,7 +144,7 @@ class Trainer:
                     reduced_loss_and_gradient_norm[3],
                 )
 
-                traning_metrics = EvaluationResultBatch(
+                training_metrics = EvaluationResultBatch(
                     losses={
                         f"{loss_fun.tag} interval average": train_loss_avg,
                         f"{loss_fun.tag} last batch": train_loss_last_batch,
@@ -164,7 +166,7 @@ class Trainer:
                 )
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
-                    evaluation_result=traning_metrics,
+                    evaluation_result=training_metrics,
                 )
                 thoughput_aggregator.remove_keys()
 
