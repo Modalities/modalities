@@ -47,10 +47,10 @@ def test_delete_checkpoint(tmpdir):
 
     (directory / experiment_id).mkdir(exist_ok=True)
 
-    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_samples_101.bin"
+    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_steps_101.bin"
     optimizer_path.write_text(CONTENT)
 
-    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_samples_101.bin"
+    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_steps_101.bin"
     model_path.write_text(CONTENT)
 
     checkpointing = FSDPToDiscCheckpointing(

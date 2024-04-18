@@ -7,7 +7,7 @@ settings:
     global_training_log_interval_in_steps: 8
     global_checkpointing_interval_in_steps: 3
     global_evaluation_interval_in_steps: 2
-    global_num_seen_samples: 0
+    global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
@@ -266,7 +266,7 @@ batch_progress_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_samples: ${settings.training.global_num_seen_samples}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
