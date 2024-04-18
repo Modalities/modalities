@@ -14,6 +14,7 @@ from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.nn.moe import MoEFFN, MoEFFNConfig
+from modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
