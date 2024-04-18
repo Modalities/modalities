@@ -69,13 +69,13 @@ class Gym:
         self,
         model: nn.Module,
         optimizer: Optimizer,
-        global_train_step: int,
+        train_step_id: int,
         checkpointing: Checkpointing,
         global_checkpointing_interval_in_steps: int,
     ):
-        if (global_train_step + 1) % global_checkpointing_interval_in_steps == 0:
+        if (train_step_id + 1) % global_checkpointing_interval_in_steps == 0:
             checkpointing.save_checkpoint(
-                global_train_step=global_train_step,
+                train_step_id=train_step_id,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 model=model,
                 optimizer=optimizer,
@@ -85,37 +85,14 @@ class Gym:
     def _run_evaluation(
         self,
         model: nn.Module,
-        global_train_step: int,
+        train_step_id: int,
         evaluation_data_loaders: List[LLMDataLoader],
         global_evaluation_interval_in_steps: int,
     ):
-        if (global_train_step) % global_evaluation_interval_in_steps == 0:
+        if (train_step_id) % global_evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
                 loss_fun=self.loss_fun,
-                global_train_step=global_train_step,
+                train_step_id=train_step_id,
             )
-
-    def _local_sample_id_to_global_sample_id(self, local_sample_id: int) -> int:
-        """Calculates the global sample id as an aggregation over all ranks
-
-        Args:
-            local_sample_id (int): sample id for a given rank
-
-        Returns:
-            int: global sample id
-        """
-        return (local_sample_id + 1) * self.num_ranks - 1
-
-    def _local_num_samples_to_global_num_samples(self, local_num_samples: int) -> int:
-        """Calculates the number of samples across all ranks.
-
-        Args:
-            local_num_samples (int): num samples per rank
-            num_ranks (int): number of ranks
-
-        Returns:
-            int: number of samples summed over all ranks
-        """
-        return local_num_samples * self.num_ranks

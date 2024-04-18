@@ -44,7 +44,7 @@ class Trainer:
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
-        batch_id: int,
+        train_step_id: int,
         data_loader: LLMDataLoader,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
@@ -52,7 +52,7 @@ class Trainer:
         loss.backward()
         gradient_norm_score = self.gradient_clipper(model)
 
-        if (batch_id + 1) % self.gradient_acc_steps == 0 or (batch_id + 1) == len(data_loader):
+        if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
@@ -84,7 +84,7 @@ class Trainer:
         forward_backward_time_recorder.start()
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
-            local_train_batch_id = batch_id + train_loader.fast_forward_batch_id
+            train_step_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
             batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
@@ -92,7 +92,7 @@ class Trainer:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 loss_fun=loss_fun,
-                batch_id=local_train_batch_id,
+                train_step_id=train_step_id,
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
@@ -106,12 +106,12 @@ class Trainer:
 
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                local_batch_id=local_train_batch_id,
+                train_step_id=train_step_id,
                 dataloader_tag=train_loader.dataloader_tag,
             )
 
             # Check, if model should be evaluated
-            if local_train_batch_id % global_training_log_interval_in_steps == 0:
+            if train_step_id + 1 % global_training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -160,7 +160,7 @@ class Trainer:
                         "lr_first": torch.tensor(scheduler.get_last_lr())[0],
                     },
                     dataloader_tag=train_loader.dataloader_tag,
-                    global_train_step=local_train_batch_id,
+                    train_step_id=train_step_id,
                 )
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
@@ -171,8 +171,8 @@ class Trainer:
                 model.train()
                 cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
 
-            evaluation_callback(global_train_step=local_train_batch_id)
-            checkpointing_callback(global_train_step=local_train_batch_id)
+            evaluation_callback(train_step_id=train_step_id)
+            checkpointing_callback(train_step_id=train_step_id)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
@@ -189,11 +189,11 @@ class Trainer:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        local_batch_id: int,
+        train_step_id: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            global_train_step=local_batch_id,
+            step_id=train_step_id,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )

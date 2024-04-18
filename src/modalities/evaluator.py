@@ -41,7 +41,7 @@ class Evaluator:
         model: nn.Module,
         data_loaders: List[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-        global_train_step: int,
+        train_step_id: int,
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
@@ -53,7 +53,7 @@ class Evaluator:
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                global_train_step=0,  # Reset progress bar
+                eval_step_id=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -72,7 +72,7 @@ class Evaluator:
 
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
-                        global_train_step=batch_id,
+                        eval_step_id=batch_id,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
@@ -97,7 +97,7 @@ class Evaluator:
                 # TODO: hardcoded metric key
                 throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
-                global_train_step=global_train_step,
+                train_step_id=train_step_id,
             )
             Evaluator._publish_evaluation_result(
                 evaluation_result_publisher=self.evaluation_result_publisher,
@@ -109,11 +109,11 @@ class Evaluator:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        global_train_step: int,
+        eval_step_id: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            global_train_step=global_train_step,
+            step_id=eval_step_id,
             experiment_status=ExperimentStatus.EVALUATION,
             dataloader_tag=dataloader_tag,
         )

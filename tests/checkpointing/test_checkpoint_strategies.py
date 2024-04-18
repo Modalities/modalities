@@ -21,10 +21,10 @@ from src.modalities.checkpointing.checkpointing_strategies import SaveKMostRecen
 def test_checkpoint_strategy_k(
     k: int, saved_batch_id_checkpoints: List[int], checkpoints_to_delete: List[int], save_current: bool
 ) -> None:
-    global_train_step = 100
+    train_step_id = 100
     checkpoint_strategy = SaveKMostRecentCheckpointsStrategy(k=k)
     checkpoint_strategy.saved_step_checkpoints = saved_batch_id_checkpoints
-    checkpoint_instruction = checkpoint_strategy.get_checkpoint_instruction(global_train_step=global_train_step)
+    checkpoint_instruction = checkpoint_strategy.get_checkpoint_instruction(train_step_id=train_step_id)
 
     assert checkpoint_instruction.checkpoints_to_delete == checkpoints_to_delete
     assert checkpoint_instruction.save_current == save_current
