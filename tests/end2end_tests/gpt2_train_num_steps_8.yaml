@@ -193,17 +193,17 @@ batch_progress_subscriber:
     eval_dataloaders: []
 
     
-# evaluation_subscriber:
-#   component_key: results_subscriber
-#   variant_key: save_all
-#   config: {}
-
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: wandb
-  config:
-    local_rank: ${settings.cuda_env.local_rank}
-    project: modalities_lorem_ipsum
-    mode: ONLINE
-    experiment_id: ${settings.experiment_id}
-    directory: "."
+  variant_key: save_all
+  config: {}
+
+# evaluation_subscriber:
+#   component_key: results_subscriber
+#   variant_key: wandb
+#   config:
+#     local_rank: ${settings.cuda_env.local_rank}
+#     project: modalities_lorem_ipsum
+#     mode: ONLINE
+#     experiment_id: ${settings.experiment_id}
+#     directory: "."

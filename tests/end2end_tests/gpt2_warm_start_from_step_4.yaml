@@ -109,7 +109,7 @@ wrapped_model:
     checkpointing:
       instance_key: checkpointing
       pass_type: BY_REFERENCE
-    checkpoint_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-17__19-48-27/eid_2024-04-17__19-48-27-model-num_steps_2.bin
+    checkpoint_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/0/eid_0-model-num_steps_4.bin
 
 model:
   component_key: model
@@ -194,17 +194,17 @@ batch_progress_subscriber:
     eval_dataloaders: []
 
     
-# evaluation_subscriber:
-#   component_key: results_subscriber
-#   variant_key: save_all
-#   config: null
-
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: wandb
-  config:
-    local_rank: ${settings.cuda_env.local_rank}
-    project: modalities_lorem_ipsum
-    mode: ONLINE
-    experiment_id: ${settings.experiment_id}
-    directory: "."
+  variant_key: save_all
+  config: {}
+
+# evaluation_subscriber:
+#   component_key: results_subscriber
+#   variant_key: wandb
+#   config:
+#     local_rank: ${settings.cuda_env.local_rank}
+#     project: modalities_lorem_ipsum
+#     mode: ONLINE
+#     experiment_id: ${settings.experiment_id}
+#     directory: "."
