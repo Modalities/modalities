@@ -99,6 +99,12 @@ class GradientClippingMode(LookupEnum):
     MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
+class PrecisionEnum(LookupEnum):
+    FP32 = torch.float32
+    FP16 = torch.float16
+    BF16 = torch.bfloat16
+
+
 class ReferenceConfig(BaseModel):
     instance_key: str
     pass_type: PassType
@@ -120,6 +126,7 @@ class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
 
 class TorchCheckpointLoadingConfig(BaseModel):
     device: PydanticPytorchDeviceType
+    precision: PrecisionEnum
 
     @field_validator("device", mode="before")
     def parse_device(cls, device) -> PydanticPytorchDeviceType:
@@ -343,7 +350,7 @@ class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
     drop_last: Literal[True]
-    
+
 
 class ResumableBatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
