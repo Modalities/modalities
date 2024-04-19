@@ -49,7 +49,7 @@ class DummyModel(NNModel):
             return gradient_vector.abs().sum()
 
 
-def _run_gradient_clipping_experiment(gradient_clipping_mode: GradientClippingMode, threshold: Optional[float] = 0.001):
+def _run_gradient_clipping_experiment(gradient_clipping_mode: GradientClippingMode, threshold: Optional[float] = None):
     model = DummyModel()
     inputs = {"input": torch.ones(2, 2)}
     output: torch.Tensor = model(inputs)["output"]
