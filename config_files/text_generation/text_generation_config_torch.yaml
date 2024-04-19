@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-10__22-39-34/eid_2024-04-10__22-39-34-model-num_samples_819200.bin
+  model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-10__22-39-34/eid_2024-04-10__22-39-34-model-num_samples_688128.bin
   device: 0
   context_length: 512
 
@@ -18,10 +18,9 @@ text_inference_component:
       pass_type: BY_REFERENCE
     context_length: ${settings.context_length}
     eod_token: <eod>
-    prompt_template: "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
-    temperature: 1.0
+    prompt_template: "{prompt_input}" # "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
+    temperature: 1
     chat: false
-
 
 checkpointed_model:
   component_key: model
@@ -32,6 +31,7 @@ checkpointed_model:
       variant_key: torch
       config:
         device: ${settings.device}
+        precision: FP16
     model:
       instance_key: raw_model
       pass_type: BY_REFERENCE
@@ -88,8 +88,8 @@ raw_model:
 
 tokenizer:
   component_key: tokenizer
-  variant_key: pretrained_sp_tokenizer
+  variant_key: pretrained_hf_tokenizer
   config:
-    tokenizer_model_file: /raid/s3/opengptx/max_lue/modalities/data/tokenizer/endefrites_bpe/bpe_tokenizer.model
+    pretrained_model_name_or_path: /raid/s3/opengptx/max_lue/modalities/data/tokenizer/hf_gpt2
     padding: false
     max_length: ${settings.context_length}
