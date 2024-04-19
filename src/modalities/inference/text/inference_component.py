@@ -14,7 +14,6 @@ class TextInferenceComponent:
         model: nn.Module,
         tokenizer: TokenizerWrapper,
         prompt_template: str,
-        chat: bool,
         context_length: int,
         temperature: float,
         eod_token: str,
@@ -23,7 +22,6 @@ class TextInferenceComponent:
         self.model.eval()
         self.tokenizer = tokenizer
         self.eod_token = eod_token
-        self.chat = chat  # TODO implement chat functionality
         self.prompt_template = prompt_template
         self.temperature = temperature
         self.context_length = context_length
@@ -32,11 +30,16 @@ class TextInferenceComponent:
         self,
         context: str,
     ):
-        in_batch = self.tokenizer.tokenize(context)
-        max_new_tokens = self.context_length - len(in_batch)
-        input_token_ids = torch.Tensor(in_batch).to(torch.int64).cuda().unsqueeze(0)
+        token_ids_list = self.tokenizer.tokenize(context)
+        max_new_tokens = self.context_length - len(token_ids_list)
+        input_token_ids = torch.IntTensor(token_ids_list).cuda().unsqueeze(0)
         input_dict = {"input_ids": input_token_ids}
 
+        print("--------------------PROMPT--------------------")
+        context_decoded = self.tokenizer.decode(token_ids_list)
+        print("Prompt: ", context_decoded, end="")
+
+        print("\n\n--------------------OUTPUT--------------------\n")
         for _ in range(max_new_tokens):
             logits = self.model.forward(input_dict)["logits"]
             logits = logits[:, -1, :] / self.temperature
@@ -52,18 +55,16 @@ class TextInferenceComponent:
             else:
                 print(idx_next_str, end=" ")
                 sys.stdout.flush()
-                in_batch = torch.cat((in_batch, idx_next), dim=1)
-        print("")
+                token_ids_list.append(token_id)
+                input_dict = {"input_ids": input_token_ids}
+        print("\n max tokens reached", end="")
 
     def run(self):
         prompt = TextInferenceComponent._get_prompt(self.prompt_template)
-        while True:
-            try:
-                print("-" * 50)
-                self.generate_tokens(context=prompt)
-            except KeyboardInterrupt:
-                print("closing app...")
-                break
+        try:
+            self.generate_tokens(context=prompt)
+        except KeyboardInterrupt:
+            print("closing app...")
 
     @staticmethod
     def _get_prompt(template: str) -> str:
