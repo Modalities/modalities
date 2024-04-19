@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Tuple
+from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple
 
 import torch.nn as nn
 from omegaconf import OmegaConf
@@ -92,6 +92,7 @@ class GradientClippingMode(LookupEnum):
     # For norm based clipping modes, the norm is computed over
     # all gradients together, as if they were concatenated
     # into a single vector.
+    P1_NORM = "p1_norm"  # manhattan norm based clipping.
     P2_NORM = "p2_norm"  # Euclidean norm based clipping.
     MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
@@ -308,7 +309,7 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
-    drop_last: bool
+    drop_last: Literal[True] = True
 
 
 class ResumableBatchSamplerConfig(BaseModel):

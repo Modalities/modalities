@@ -58,12 +58,6 @@ Or, if you are a VsCode user, add this to your `launch.json`:
 # Supported Features
 In the following, we list the already implemented, planned and in-progress features w.r.t. to improving downstream performance, throughput, multi-modality, and alignment. 
 
-The mechanism introduced to instantiate classes via `type_hint` in the `config_lorem_ipsum.yaml`, utilizes 
-1) Omegaconf to load the config yaml file
-2) Pydantic for the validation of the config
-3) ClassResolver to instantiate the correct, concrete class of a class hierarchy.
-
-
 ## Throughput Features
 
 | Name                                  | Status           | Description                                                                                                       |
@@ -91,7 +85,7 @@ The mechanism introduced to instantiate classes via `type_hint` in the `config_l
 | Grouped-query Attention (GQA)  | supported    | Enhances attention mechanisms by grouping queries to reduce computation and memory footprint while maintaining or improving performance. |
 | Learning Rate Scheduler        | supported     | Adjusts the learning rate during training according to a predefined schedule (e.g., step decay, exponential decay) to improve convergence and performance. |
 | Gradient Clipping              | supported         | Prevents exploding gradients by clipping the gradients of an optimization algorithm to a maximum value, thereby stabilizing training. |
-| Training Warmup                | planned          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
+| Training Warmup                | supported          | Gradually increases the learning rate from a low to a high value during the initial phase of training to stabilize optimization. |
 | Loss Masking                   | planned          | Ignores or gives less weight to certain data points in the loss function, often used in tasks with variable-length sequences to ignore padding tokens or in more specific usecases such as GAtt. |
 | Knowledge Distillation         | planned  | Transfers knowledge from a larger, complex model to a smaller, more efficient model, improving the smaller model's performance without the computational cost of the larger model.|
 | Hyperparameter Optimization    | planned          | Grid search for various hyperparameter such as LR, Optimizer arguments etc. Also the integration of µP might be interesting |
@@ -147,7 +141,10 @@ With
 [project.scripts]
 modalities = "modalities.__main__:main"
 ```
+
 in our `pyproject.toml`, we can start only main with `modalities` (which does nothing), or a specific sub-entrypoint e.g. `modalities do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.
 
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config_lorem_ipsum.yaml --my_cli_argument 3537`.
+
+
 
