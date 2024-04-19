@@ -242,7 +242,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 16
+    total_steps: 32
     pct_start: 0.01
     anneal_strategy: cos
 

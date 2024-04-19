@@ -31,11 +31,5 @@ def test_evaluate_cpu(
         evaluation_result_publisher=progress_publisher_mock,
     )
 
-    evaluator.evaluate(
-        model=nn_model_mock,
-        data_loaders=[llm_data_loader_mock],
-        loss_fun=loss_mock,
-        global_train_sample_id=0,
-        local_sample_id_to_global_sample_id=lambda i: i,
-    )
+    evaluator.evaluate(model=nn_model_mock, data_loaders=[llm_data_loader_mock], loss_fun=loss_mock, train_step_id=0)
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
