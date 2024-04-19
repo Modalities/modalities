@@ -95,6 +95,7 @@ class GradientClippingMode(LookupEnum):
     # For norm based clipping modes, the norm is computed over
     # all gradients together, as if they were concatenated
     # into a single vector.
+    P1_NORM = "p1_norm"  # manhattan norm based clipping.
     P2_NORM = "p2_norm"  # Euclidean norm based clipping.
     MAX_NORM = "max_norm"  # Maximum norm based clipping.
 

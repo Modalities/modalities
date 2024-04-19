@@ -30,15 +30,15 @@ class Gym:
         evaluation_data_loaders: List[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
     ):
-        self._run_evaluation_and_checkpointing(
-            model=model,
-            optimizer=optimizer,
-            # here, fast_forward_sample_id points to the next sample_id that we would
-            # perform forward over. Therefore, -1 one for the current sample_id.
-            local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
-            evaluation_data_loaders=evaluation_data_loaders,
-            checkpoint_saving=checkpoint_saving,
-        )
+        # self._run_evaluation_and_checkpointing(
+        #     model=model,
+        #     optimizer=optimizer,
+        #     # here, fast_forward_sample_id points to the next sample_id that we would
+        #     # perform forward over. Therefore, -1 one for the current sample_id.
+        #     local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
+        #     evaluation_data_loaders=evaluation_data_loaders,
+        #     checkpoint_saving=checkpoint_saving,
+        # )
 
         self.trainer.train(
             model=model,
