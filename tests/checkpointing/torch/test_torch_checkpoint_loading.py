@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
+from modalities.config.config import PrecisionEnum
 
 
 class DummyModel(nn.Module):
@@ -24,9 +25,9 @@ def test_load_model_checkpoint(tmp_path):
     model_state = model.state_dict()
     torch.save(model_state, tmp_file_path)
 
-    loaded_model: DummyModel = TorchCheckpointLoading(device=torch.device("cpu")).load_model_checkpoint(
-        model, tmp_file_path
-    )
+    loaded_model: DummyModel = TorchCheckpointLoading(
+        device=torch.device("cpu"), precision=PrecisionEnum.FP16
+    ).load_model_checkpoint(model, tmp_file_path)
 
     assert torch.equal(model._weights.weight, loaded_model._weights.weight)
     assert torch.equal(model._weights.bias, loaded_model._weights.bias)
