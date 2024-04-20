@@ -6,7 +6,7 @@ from torch.utils.data import BatchSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import PydanticLLMDataLoaderIFType
-from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -61,3 +61,92 @@ def test_dataloader_from_config(dummy_config: Dict):
     for batch_1, batch_2 in zip(samples_1, samples_2[start_index:]):
         assert (batch_1.samples["input_ids"] == batch_2.samples["input_ids"]).all()
         assert (batch_1.targets["target_ids"] == batch_2.targets["target_ids"]).all()
+
+
+def test_dataloader_batching():
+    batch_size = 2
+    skip_num_batches = 2
+    dataset = list(range(10))
+    seq_sampler = SequentialSampler(data_source=dataset)
+    batch_sampler = BatchSampler(sampler=seq_sampler, batch_size=batch_size, drop_last=False)
+    # the LLMDataLoader always requires a ResumableBatchSampler
+    resumable_batch_sampler = ResumableBatchSampler(
+        underlying_batch_sampler=batch_sampler, start_index=skip_num_batches
+    )
+    dataloader = LLMDataLoader(dataloader_tag="train", dataset=dataset, batch_sampler=resumable_batch_sampler)
+
+    batches_1 = torch.stack([i for i in dataloader])
+    batches_2 = torch.stack([i for i in dataloader])
+    assert batches_1.equal(batches_2)
+
+    assert batches_1.flatten().tolist() == dataset[skip_num_batches * batch_size :]
+
+
+def test_repeating_dataloader_without_shuffling():
+    batch_size = 2
+    skip_num_batches = 2
+    num_samples = 10
+    dataset = list(range(num_samples))
+    seq_sampler = SequentialSampler(data_source=dataset)
+    # the LLMDataLoader always requires a ResumableBatchSampler
+    # create the dataloader that skips the first skip_num_batches
+    batch_sampler_skipped = BatchSampler(sampler=seq_sampler, batch_size=batch_size, drop_last=True)
+    resumable_batch_sampler_skipped = ResumableBatchSampler(
+        underlying_batch_sampler=batch_sampler_skipped, start_index=skip_num_batches
+    )
+    dataloader_skipped = LLMDataLoader(
+        dataloader_tag="train", dataset=dataset, batch_sampler=resumable_batch_sampler_skipped
+    )
+
+    # create dataloader that skips no batches
+    batch_sampler = BatchSampler(sampler=seq_sampler, batch_size=batch_size, drop_last=True)
+    resumable_batch_sampler = ResumableBatchSampler(underlying_batch_sampler=batch_sampler, start_index=0)
+    dataloader = LLMDataLoader(dataloader_tag="train", dataset=dataset, batch_sampler=resumable_batch_sampler)
+
+    # create repeating dataloader that first skips the skip_num_batches
+    # in epoch 0 and then returns the batches from the beginning
+    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader_skipped, reshuffle_after_epoch=False)
+
+    num_batches_per_epoch = num_samples // batch_size
+    # get the batches for two epochs
+    batches_1 = torch.stack([i for i in dataloader_skipped] + [i for i in dataloader])
+    batches_2 = torch.stack(
+        [i for _, i in zip(range(num_batches_per_epoch * 2 - skip_num_batches), repeating_dataloader)]
+    )
+
+    assert batches_1.equal(batches_2)
+    assert batches_1.flatten().tolist() == dataset[skip_num_batches * batch_size :] + dataset
+
+
+def test_repeating_dataloader_with_shuffling():
+    batch_size = 2
+    skip_num_batches = 2
+    num_samples = 10
+    dataset = list(range(num_samples))
+    seq_sampler = SequentialSampler(data_source=dataset)
+    batch_sampler = BatchSampler(sampler=seq_sampler, batch_size=batch_size, drop_last=False)
+    # the LLMDataLoader always requires a ResumableBatchSampler
+    # create the dataloader that skips the first skip_num_batches
+    resumable_batch_sampler_skipped = ResumableBatchSampler(
+        underlying_batch_sampler=batch_sampler, start_index=skip_num_batches
+    )
+    dataloader_skipped = LLMDataLoader(
+        dataloader_tag="train", dataset=dataset, batch_sampler=resumable_batch_sampler_skipped
+    )
+
+    # create dataloader that skips not batches
+    resumable_batch_sampler = ResumableBatchSampler(underlying_batch_sampler=batch_sampler, start_index=0)
+    dataloader = LLMDataLoader(dataloader_tag="train", dataset=dataset, batch_sampler=resumable_batch_sampler)
+
+    # create repeating dataloader that first skips the skip_num_batches
+    # in epoch 0 and then returns the batches from the beginning
+    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader, reshuffle_after_epoch=True)
+
+    num_batches_per_epoch = num_samples // batch_size
+    # get the batches for two epochs
+    batches_1 = torch.stack([i for i in dataloader_skipped] + [i for i in dataloader])
+    batches_2 = torch.stack(
+        [i for _, i in zip(range(num_batches_per_epoch * 2 - skip_num_batches), repeating_dataloader)]
+    )
+
+    assert batches_1.equal(batches_2)
