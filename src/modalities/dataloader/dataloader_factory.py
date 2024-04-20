@@ -3,7 +3,7 @@ from typing import Callable, Optional
 from torch.utils.data import BatchSampler
 from torch.utils.data.dataset import Dataset
 
-from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.samplers import ResumableBatchSampler
 
 
@@ -31,4 +31,9 @@ class DataloaderFactory:
             shuffle=shuffle,
         )
 
+        return dataloader
+
+    @staticmethod
+    def get_repeating_dataloader(dataloader: LLMDataLoader, reshuffle_after_epoch: bool = False) -> RepeatingDataLoader:
+        dataloader = RepeatingDataLoader(dataloader, reshuffle_after_epoch)
         return dataloader
