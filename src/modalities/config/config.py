@@ -325,11 +325,16 @@ class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIFType
     batch_sampler: PydanticSamplerIFType
-    collate_fn: PydanticCollateFnIFType
+    collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
     skip_num_steps: Optional[int] = 0
+
+
+class RepeatingDataLoaderConfig(BaseModel):
+    dataloader: PydanticLLMDataLoaderIFType
+    reshuffle_after_epoch: bool
 
 
 class DummyProgressSubscriberConfig(BaseModel):
