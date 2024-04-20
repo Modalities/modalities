@@ -41,7 +41,6 @@ class TextInferenceComponentConfig(BaseModel):
     model: PydanticPytorchModuleType
     tokenizer: PydanticTokenizerIFType
     prompt_template: str
-    chat: bool
     context_length: int
     temperature: Optional[float] = 1.0
     eod_token: Optional[str] = "<eod>"

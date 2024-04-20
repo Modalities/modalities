@@ -20,7 +20,7 @@ text_inference_component:
     eod_token: <eod>
     prompt_template: "{prompt_input}" # "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
     temperature: 1
-    chat: false
+    # chat: false
 
 checkpointed_model:
   component_key: model
