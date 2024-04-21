@@ -40,6 +40,8 @@ class TextInferenceComponent:
         print("Prompt: ", context_decoded, end="")
 
         print("\n\n--------------------OUTPUT--------------------\n")
+        generated_token_ids = []
+        generated_text_old = ""
         for _ in range(max_new_tokens):
             logits = self.model.forward(input_dict)["logits"]
             logits = logits[:, -1, :] / self.temperature
@@ -47,15 +49,20 @@ class TextInferenceComponent:
             idx_next = torch.multinomial(probs, num_samples=1)
 
             token_id: int = idx_next[0, 0].item()
+            generated_token_ids.append(token_id)
             idx_next_str = self.tokenizer.decode([token_id])
+            generated_text_new = self.tokenizer.decode(generated_token_ids)
 
             if idx_next_str == self.eod_token:
                 print("\n<reached eos token>", end="")
                 break
             else:
-                print(idx_next_str, end=" ")
+                diff_text = generated_text_new[len(generated_text_old) :]
+                generated_text_old = generated_text_new
+                print(diff_text, end="")
                 sys.stdout.flush()
                 token_ids_list.append(token_id)
+                input_token_ids = torch.IntTensor(token_ids_list).cuda().unsqueeze(0)
                 input_dict = {"input_ids": input_token_ids}
         print("\n max tokens reached", end="")
 
