@@ -30,10 +30,11 @@ class DataloaderFactory:
             pin_memory=pin_memory,
             shuffle=shuffle,
         )
-
         return dataloader
 
     @staticmethod
-    def get_repeating_dataloader(dataloader: LLMDataLoader, reshuffle_after_epoch: bool = False) -> RepeatingDataLoader:
-        dataloader = RepeatingDataLoader(dataloader, reshuffle_after_epoch)
+    def get_repeating_dataloader(
+        dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False
+    ) -> RepeatingDataLoader:
+        dataloader = RepeatingDataLoader(dataloader, num_epochs, reshuffle_after_epoch)
         return dataloader

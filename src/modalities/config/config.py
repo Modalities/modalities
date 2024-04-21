@@ -336,6 +336,7 @@ class LLMDataLoaderConfig(BaseModel):
 class RepeatingDataLoaderConfig(BaseModel):
     dataloader: PydanticLLMDataLoaderIFType
     reshuffle_after_epoch: Optional[bool] = False
+    num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
 
 class DummyProgressSubscriberConfig(BaseModel):

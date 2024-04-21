@@ -79,7 +79,7 @@ class LLMDataLoader(DataLoader[T_co]):
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
-    def __init__(self, dataloader: LLMDataLoader[T_co], reshuffle_after_epoch: bool = False):
+    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
         """Wraps an iterator to allow for infinite iteration. This is especially useful
         for DataLoader types that we wish to automatically restart upon completion.
 
@@ -89,6 +89,7 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         self.data_iter = iter(self.dataloader)
         self.current_epoch = 0
         self.reshuffle_after_epoch = reshuffle_after_epoch
+        self.num_epochs = num_epochs
 
     def __iter__(self):
         return self
@@ -96,7 +97,7 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
     def __next__(self):
         try:
             batch = next(self.data_iter)
-        except StopIteration:
+        except StopIteration as e:
             if self.dataloader.sampler is not None:
                 self.current_epoch += 1
                 # After finishing an epoch, we set the start_index to 0 to start from the beginning
@@ -114,9 +115,11 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
                         raise NotImplementedError(
                             "Reshuffling after each epoch is only supported for DistributedSampler"
                         )
-
-            self.data_iter = iter(self.dataloader)
-            batch = next(self.data_iter)
+            if self.current_epoch <= self.num_epochs:
+                self.data_iter = iter(self.dataloader)
+                batch = next(self.data_iter)
+            else:
+                raise StopIteration(f"RepeatingDataLoader has completed after {self.current_epoch} epochs") from e
         return batch
 
     @property
@@ -135,3 +138,6 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
             int: fast forward batch id
         """
         return self.dataloader.fast_forward_batch_id
+
+    def __len__(self) -> int:
+        return self.num_epochs * len(self.dataloader)
