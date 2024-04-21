@@ -270,6 +270,7 @@ class DistributedSamplerConfig(BaseModel):
     num_replicas: Annotated[int, Field(strict=True, ge=0)]
     shuffle: bool
     dataset: PydanticDatasetIFType
+    seed: Optional[int] = 0
 
 
 class MemMapDatasetConfig(BaseModel):
@@ -334,7 +335,7 @@ class LLMDataLoaderConfig(BaseModel):
 
 class RepeatingDataLoaderConfig(BaseModel):
     dataloader: PydanticLLMDataLoaderIFType
-    reshuffle_after_epoch: bool
+    reshuffle_after_epoch: Optional[bool] = False
 
 
 class DummyProgressSubscriberConfig(BaseModel):

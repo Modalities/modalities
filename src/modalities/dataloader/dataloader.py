@@ -1,6 +1,6 @@
 from typing import Iterable, Optional, Union
 
-from torch.utils.data import Dataset, Sampler
+from torch.utils.data import Dataset, DistributedSampler, Sampler
 from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
 
 from modalities.dataloader.samplers import ResumableBatchSampler
@@ -108,7 +108,12 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
                     # the DataLoader iterator is necessary to make shuffling work properly across multiple epochs.
                     # Otherwise, the same ordering will be always used. See discussion:
                     # https://discuss.pytorch.org/t/why-is-sampler-set-epoch-epoch-needed-for-distributedsampler/149672
-                    self.dataloader.sampler.set_epoch(self.current_epoch)
+                    if isinstance(self.dataloader.sampler, DistributedSampler):
+                        self.dataloader.sampler.set_epoch(self.current_epoch)
+                    else:
+                        raise NotImplementedError(
+                            "Reshuffling after each epoch is only supported for DistributedSampler"
+                        )
 
             self.data_iter = iter(self.dataloader)
             batch = next(self.data_iter)
