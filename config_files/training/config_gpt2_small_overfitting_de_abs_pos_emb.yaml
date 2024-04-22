@@ -34,7 +34,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
+    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -42,7 +42,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
+    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
