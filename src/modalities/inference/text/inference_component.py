@@ -3,7 +3,6 @@ import sys
 
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
@@ -44,11 +43,12 @@ class TextInferenceComponent:
         generated_text_old = ""
         for _ in range(max_new_tokens):
             logits = self.model.forward(input_dict)["logits"]
-            logits = logits[:, -1, :] / self.temperature
-            probs = F.softmax(logits, dim=-1)
-            idx_next = torch.multinomial(probs, num_samples=1)
-
-            token_id: int = idx_next[0, 0].item()
+            logits = logits[:, -1, :]  # / self.temperature
+            # probs = F.softmax(logits, dim=-1)
+            # idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next = torch.argmax(logits, dim=-1)
+            # token_id: int = idx_next[0, 0].item()
+            token_id: int = idx_next.item()
             generated_token_ids.append(token_id)
             idx_next_str = self.tokenizer.decode([token_id])
             generated_text_new = self.tokenizer.decode(generated_token_ids)
