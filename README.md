@@ -145,3 +145,15 @@ in our `pyproject.toml`, we can start only main with `modalities` (which does no
 
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
+
+# Contributing
+
+Modalities welcomes your contributions! Please check out our
+[contributing](CONTRIBUTING.md) guidelines regarding the details on formatting, testing,
+etc.<br/><br/><br/>
+Thanks so much to all of our amazing contributors!
+
+<a href="https://github.com/modalities/modalities/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
+</a>
+

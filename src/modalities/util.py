@@ -21,12 +21,10 @@ def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
 
 
 def get_callback_interval_in_batches_per_rank(
-    callback_interval_in_samples: int, local_train_micro_batch_size: int, world_size: int, gradient_acc_steps: int
+    local_callback_interval_in_samples: int, local_train_micro_batch_size: int, gradient_acc_steps: int
 ):
-    num_local_train_micro_batches_exact = callback_interval_in_samples / local_train_micro_batch_size / world_size
-    num_local_train_micro_batches_ret = max(
-        callback_interval_in_samples // local_train_micro_batch_size // world_size, 1
-    )
+    num_local_train_micro_batches_exact = local_callback_interval_in_samples / local_train_micro_batch_size
+    num_local_train_micro_batches_ret = max(local_callback_interval_in_samples // local_train_micro_batch_size, 1)
     if num_local_train_micro_batches_exact != num_local_train_micro_batches_ret:
         warnings.warn(
             f"Calculated callback_interval_in_batches_per_rank is not an integer."
