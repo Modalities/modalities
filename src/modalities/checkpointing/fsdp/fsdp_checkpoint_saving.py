@@ -21,7 +21,7 @@ class CheckpointingEntityType(Enum):
 
 
 class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
-    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_samples_{num_samples}.bin"
+    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_steps_{num_train_steps}.bin"
 
     def __init__(
         self,

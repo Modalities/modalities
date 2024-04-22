@@ -53,7 +53,7 @@ def test_delete_checkpoint(tmpdir):
     model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_steps_101.bin"
     model_path.write_text(CONTENT)
 
-    checkpointing = FSDPCheckpointSaving(
+    checkpoint_saving = FSDPCheckpointSaving(
         checkpoint_path=directory,
         experiment_id=experiment_id,
         global_rank=0,
@@ -61,5 +61,5 @@ def test_delete_checkpoint(tmpdir):
         mixed_precision_settings=MixedPrecisionSettings.BF_16,
         sharding_strategy=ShardingStrategy.FULL_SHARD,
     )
-    checkpointing._delete_checkpoint(train_step_id=100)
+    checkpoint_saving._delete_checkpoint(train_step_id=100)
     assert is_empty_directory((directory / experiment_id).__str__())

@@ -51,7 +51,7 @@ class Gym:
             self._run_checkpointing,
             model=model,
             optimizer=optimizer,
-            checkpointing=checkpoint_saving,
+            checkpoint_saving=checkpoint_saving,
             global_checkpointing_interval_in_steps=global_checkpointing_interval_in_steps,
         )
 
