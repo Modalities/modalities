@@ -2,7 +2,7 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-from typing import Annotated, Dict, List, Optional, Tuple
+from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field, model_validator, validator
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
-from modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.util import parse_enum_by_name
 
@@ -106,10 +105,11 @@ class QueryKeyValueTransformType(Enum):
     RotaryTransform = RotaryTransform
 
 
-# class ActivationType(str, Enum):
-#     GELU = "gelu"
-#     FUSED_SWIGLU = "fused_swiglu"
-#     SILU = "silu"
+# FIXME Move or delete
+class ActivationType(str, Enum):
+    GELU = "gelu"
+    FUSED_SWIGLU = "fused_swiglu"
+    SILU = "silu"
 
 
 class AttentionConfig(BaseModel):
@@ -141,8 +141,8 @@ class GPT2BlockConfig(BaseModel):
     dropout: float
     block_size: int
     ffn_hidden: int
-    attention_norm: nn.Module
-    ffn_norm: nn.Module
+    attention_norm: PydanticPytorchModuleType
+    ffn_norm: PydanticPytorchModuleType
 
 
 class MoEBlockConfig(GPT2BlockConfig):
@@ -150,14 +150,13 @@ class MoEBlockConfig(GPT2BlockConfig):
     moe_top_k: int
     moe_normalize_expert_weights: float
     uniform_expert_assignment: bool
-    moe_act_fn: nn.Module
+    moe_act_fn: PydanticPytorchModuleType
     moe_jitter_eps: float
 
 
 class WeightInitializationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
     std: Annotated[float, Field(strict=True, ge=0.0)]
-
 
 
 class CausalSelfAttention(nn.Module):
@@ -419,7 +418,7 @@ class MoEBlock(GPT2Block):
             moe_jitter_eps=moe_jitter_eps,
         )
 
-        self.mlp = MoEFFN(hidden_router_size=ffn_hidden, config=moe_config) # change the ffn_hidden parameter's name
+        self.mlp = MoEFFN(hidden_router_size=ffn_hidden, config=moe_config)  # change the ffn_hidden parameter's name
 
 
 class GPT2LLM(NNModel):
@@ -520,6 +519,7 @@ class GPT2LLM(NNModel):
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
 
+
 class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
@@ -533,8 +533,7 @@ class GPT2LLMConfig(BaseModel):
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
-    gpt2block: GPT2Block
-    
+    gpt2block: PydanticPytorchModuleType
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
