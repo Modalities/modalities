@@ -144,6 +144,20 @@ class GPT2BlockConfig(BaseModel):
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
 
+    @model_validator(mode="after")
+    def check_divisibility(self) -> "GPT2BlockConfig":
+        if self.n_head_q % self.n_head_kv != 0:
+            raise ValueError("n_head_q must be divisible by n_head_kv")
+        return self
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "GPT2BlockConfig":
+        for param, param_name in zip([self.ffn_hidden, self.n_embd], ["ffn_hidden", "n_embd"]):
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
+        return self
+
 
 class MoEBlockConfig(GPT2BlockConfig):
     moe_num_experts: int
@@ -530,22 +544,15 @@ class GPT2LLMConfig(BaseModel):
     ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: Annotated[int, Field(strict=True, ge=1)]
     n_embd: Annotated[int, Field(strict=True, ge=1)]
+    n_head_q: Annotated[int, Field(strict=True, ge=1)]
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
     gpt2block: PydanticPytorchModuleType
 
     @model_validator(mode="after")
-    def check_divisibility(self) -> "GPT2LLMConfig":
-        if self.n_head_q % self.n_head_kv != 0:
-            raise ValueError("n_head_q must be divisible by n_head_kv")
-        return self
-
-    @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
-        for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
-        ):
+        for param, param_name in zip([self.vocab_size, self.n_embd], ["vocab_size", "n_embd"]):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
                 raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
