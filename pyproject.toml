@@ -45,6 +45,7 @@ line-length = 120
 [tool.isort]
 profile = "black"
 line_length = 120
+src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 120
