@@ -45,6 +45,7 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    SimpleProgressSubscriberConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
@@ -175,6 +176,12 @@ COMPONENTS = [
         "dummy",
         ProgressSubscriberFactory.get_dummy_progress_subscriber,
         DummyProgressSubscriberConfig,
+    ),
+    ComponentEntity(
+        "progress_subscriber",
+        "simple",
+        ProgressSubscriberFactory.get_simple_progress_subscriber,
+        SimpleProgressSubscriberConfig,
     ),
     ComponentEntity(
         "progress_subscriber",

@@ -314,6 +314,14 @@ class DummyProgressSubscriberConfig(BaseModel):
     pass
 
 
+class SimpleProgressSubscriberConfig(BaseModel):
+    train_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    world_size: int
+    global_num_seen_samples: int
+    local_rank: int
+
+
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)

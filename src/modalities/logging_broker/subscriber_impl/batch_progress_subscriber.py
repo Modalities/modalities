@@ -15,6 +15,42 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
         pass
 
 
+class SimpleProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
+    def __init__(
+        self,
+        train_split_num_samples: Dict[str, int],
+        eval_splits_num_samples: Dict[str, int],
+    ) -> None:
+        self.train_split_num_samples = train_split_num_samples
+        self.eval_splits_num_samples = eval_splits_num_samples
+
+    def consume_message(self, message: Message[BatchProgressUpdate]):
+        if not isinstance(message.payload, BatchProgressUpdate):
+            return
+
+        batch_progress = message.payload
+        completed_samples = 0
+        total_samples = 0
+
+        [batch_progress.dataloader_tag]
+
+        prefix = ""
+        if message.payload.experiment_status == ExperimentStatus.TRAIN:
+            prefix = "Train"
+            completed_samples = batch_progress.global_train_sample_id + 1
+            total_samples = self.train_split_num_samples[batch_progress.dataloader_tag]
+
+        elif message.payload.experiment_status == ExperimentStatus.EVALUATION:
+            prefix = "Evaluation"
+            completed_samples = batch_progress.global_dataset_sample_id + 1
+            total_samples = self.eval_splits_num_samples[batch_progress.dataloader_tag]
+
+        print(
+            f"{prefix}[{batch_progress.dataloader_tag}] "
+            f"[{completed_samples}/{total_samples} ({completed_samples/total_samples:.01f}%)]"
+        )
+
+
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     """A subscriber object for the RichProgress observable."""
 
