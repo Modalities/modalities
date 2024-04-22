@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, Tuple
+from typing import Callable, List, Tuple
 
 import torch
 import torch.distributed as dist
@@ -45,22 +45,38 @@ class Trainer:
         model: FSDP,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        loss_fun: Loss,
+        loss_fun: List[Loss],
         train_step_id: int,
         data_loader: LLMDataLoader,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
-        (loss / self.gradient_acc_steps).backward()
+
+        total_loss = None
+        losses = []
+        for lfn in loss_fun:
+            # Calculate loss
+            loss = lfn(result_batch)
+
+            # Add loss to total loss
+            weighted_loss = (loss * lfn.weight) / self.gradient_acc_steps
+            if total_loss is None:
+                total_loss = weighted_loss
+            else:
+                total_loss += weighted_loss
+
+            # Append individual losses (for logging)
+            losses.append(loss)
+
+        (total_loss / self.gradient_acc_steps).backward()
+        self.gradient_clipper(model)
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
             gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            return loss, gradient_norm_score
-        else:
-            return loss, None
+            return total_loss, *losses, gradient_norm_score
+        return total_loss, *losses, None
 
     def train(
         self,
@@ -80,6 +96,8 @@ class Trainer:
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
+        cumulated_loss = torch.zeros(len(loss_fun) + 1 + 1).to(device)
+
         # batch loop
         batch: DatasetBatch
         # TODO: why do we need a barrier here?
@@ -91,7 +109,7 @@ class Trainer:
             # Because we might resume training, we add the starting batch id of the data loader
             train_step_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
-            batch_loss, gradient_norm_score = self._train_batch(
+            *batch_losses, gradient_norm_score = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
@@ -102,7 +120,8 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_losses[0] += batch_loss.item()
+            for i, batch_loss in enumerate(batch_losses):
+                cumulated_loss[i] += batch_loss.item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
             cumulated_losses[-1] += 1  # number of local batches
 
@@ -141,17 +160,21 @@ class Trainer:
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
                     # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / dist.get_world_size()]),
+                    post_processing_fun=lambda t: torch.stack([t[:-1] / t[-1], t[-1] / dist.get_world_size()]),
                 )
 
                 train_loss_avg, train_loss_last_batch = (
                     reduced_losses[0],
-                    reduced_losses[1],
+                    reduced_losses[-1],
                 )
+
                 losses = {
-                    f"{loss_fun.tag} average": train_loss_avg,
-                    f"{loss_fun.tag} last step": train_loss_last_batch,
+                    f"total_loss average": train_loss_avg,
+                    f"total_loss last step": train_loss_last_batch,
                 }
+                for i, lfn in enumerate(loss_fun):
+                    losses[lfn.tag] = reduced_losses[i + 1]
+
                 if len(gradient_norm_scores) > 0:
                     metrics = {
                         "grad_norm_avg": torch.mean(torch.Tensor(gradient_norm_scores)),
@@ -186,19 +209,19 @@ class Trainer:
 
             evaluation_callback(train_step_id=train_step_id)
             checkpointing_callback(train_step_id=train_step_id)
+            cumulated_loss = torch.zeros(len(loss_fun) + 1 + 1).to(device)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
 
-    def _reset_tracked_losses(self):
+    def _reset_loss(self):
         # TODO: we should handle the device assignment more centrally.
-        # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
-        cumulated_loss_and_gradient_norm = torch.zeros(3)
+        cumulated_loss = torch.zeros(2)
         if torch.cuda.is_available():
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
+            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
         else:
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
-        return cumulated_loss_and_gradient_norm
+            cumulated_loss = cumulated_loss.to("cpu")
+        return cumulated_loss
 
     @staticmethod
     def _publish_progress(

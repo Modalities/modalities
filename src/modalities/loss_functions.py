@@ -8,8 +8,9 @@ from modalities.batch import InferenceResultBatch
 
 
 class Loss(ABC):
-    def __init__(self, tag: str):
+    def __init__(self, tag: str, weight: float = 1.0):
         self._tag = tag
+        self.weight = weight
 
     @property
     def tag(self) -> str:
