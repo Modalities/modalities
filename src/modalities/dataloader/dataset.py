@@ -16,6 +16,8 @@ from transformers import BatchEncoding
 
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
+from modalities.config.config import PydanticTokenizerIFType
+
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import EmbeddedStreamData
 
@@ -243,17 +245,54 @@ class ImageTransformConfig(BaseModel):
 
 class WebDatasetConfig(BaseModel):
     urls: Union[List[str], str]
-    key_mapping: Optional[Dict[str, str]] = None
-    image_preprocessing: ImageTransformConfig = ImageTransformConfig()
+    source_image_key: str
+    image_key: str
+    source_text_key: str
+    text_key: str
+    tokenizer: PydanticTokenizerIFType
+    block_size: int
+    num_samples: int
+    image_transform_config: Optional[ImageTransformConfig] = None
 
 
 class WebDataset(wds.WebDataset):
     def __init__(
-        self, urls: Union[List[str], str], key_mapping: Dict[str, str], image_transform_config: ImageTransformConfig
+        self,
+        urls: Union[List[str], str],
+        source_image_key: str,
+        image_key: str,
+        source_text_key: str,
+        text_key: str,
+        tokenizer: PreTrainedTokenizer,
+        block_size: int,
+        num_samples: int,
+        image_transform_config: ImageTransformConfig,
     ):
         super().__init__(urls=urls)
-        if key_mapping is not None:
-            self.append(wds.filters.map(lambda x: {key_mapping[k]: v for k, v in x.items() if k in key_mapping.keys()}))
-        if image_transform_config is not None:
-            transform = create_transform(**image_transform_config.model_dump())
-            self.append(wds.filters.map(lambda x: transform(x)))
+        self.num_samples = num_samples
+
+        self.append(wds.filters.shuffle(1000))
+        self.append(wds.filters.decode("pil"))
+
+        transform = create_transform(**image_transform_config.model_dump())
+
+        def make_sample(sample):
+            # print(sample["json"])
+            batch_encoding: BatchEncoding = tokenizer(
+                sample["json"]["text0"],  # [source_text_key],
+                max_length=block_size,
+                padding="max_length",
+                truncation=True,
+                return_attention_mask=True,
+            )
+
+            return {
+                image_key: transform(sample[source_image_key]),
+                text_key: batch_encoding.input_ids,
+                "attention_mask": batch_encoding.attention_mask,
+            }
+
+        self.append(wds.filters.map(make_sample))
+
+    def __len__(self):
+        return self.num_samples

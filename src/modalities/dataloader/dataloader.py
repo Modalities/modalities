@@ -1,12 +1,17 @@
 from typing import Iterable, Optional, Union
 
+import webdataset as wd
 from torch.utils.data import Dataset, DistributedSampler, Sampler
 from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
 
 from modalities.dataloader.samplers import ResumableBatchSampler
 
 
-class LLMDataLoader(DataLoader[T_co]):
+class DataLoaderIF:
+    pass
+
+
+class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
     def __init__(
         self,
         dataloader_tag: str,
@@ -141,3 +146,45 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
 
     def __len__(self) -> int:
         return self.num_epochs * len(self.dataloader)
+
+
+class WebLoader(DataLoaderIF):
+    def __init__(self, dataloader_tag: str, dataset: Dataset[T_co], batch_size: Optional[int] = 1, *args, **kwargs):
+        self.num_batches = len(dataset) // batch_size
+        self.webloader = wd.WebLoader(dataset=dataset, batch_size=None)
+        # self.webloader = self.webloader.unbatched().shuffle(1000).batched(batch_size)
+        self.webloader = self.webloader.with_epoch(1282 * 100 // batch_size)
+        self.dataloader_tag = dataloader_tag
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return self.num_batches
+
+    def __iter__(self):
+        return iter(self.webloader)
+
+    @property
+    def batch_size(self) -> int:
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, value: int):
+        self._batch_size = value
+
+    @property
+    def fast_forward_sample_id(self) -> int:
+        """The sample id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward sample id
+        """
+        return 0  # self.batch_size * self.batch_sampler.start_index
+
+    @property
+    def fast_forward_batch_id(self) -> int:
+        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward batch id
+        """
+        return 0  # self.batch_sampler.start_index

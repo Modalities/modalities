@@ -48,9 +48,10 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WebLoaderConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
-from modalities.dataloader.dataset import DummyDatasetConfig
+from modalities.dataloader.dataset import DummyDatasetConfig, WebDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -138,6 +139,7 @@ COMPONENTS = [
         "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
+    ComponentEntity("dataset", "web_dataset", DatasetFactory.get_web_dataset, WebDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
@@ -147,6 +149,7 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    ComponentEntity("data_loader", "web_loader", DataloaderFactory.get_web_loader, WebLoaderConfig),
     ComponentEntity(
         "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
