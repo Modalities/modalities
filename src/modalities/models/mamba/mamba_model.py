@@ -243,7 +243,7 @@ class MambaLLM(NNModel):
         if num_last_tokens > 0:
             hidden_states = hidden_states[:, -num_last_tokens:]
         lm_logits = self.lm_head(hidden_states)
-        return {self.prediction_key: lm_logits}
+        return {self.prediction_key: lm_logits}  # todo integrate state in inputs and return dict and remove **kwargs in signature
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name, device=None, dtype=None, **kwargs):

@@ -308,7 +308,7 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
-    drop_last: Literal[True] = True  # todo why is this even here if only true is allowed?
+    drop_last: Literal[True] = True
 
 
 class ResumableBatchSamplerConfig(BaseModel):
