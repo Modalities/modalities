@@ -59,11 +59,6 @@ class ReferenceConfig(BaseModel):
     pass_type: PassType
 
 
-class CLMCrossEntropyLossConfig(BaseModel):
-    target_key: str
-    prediction_key: str
-
-
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
 import torch
-from torch.nn import CrossEntropyLoss
+from pydantic import BaseModel
+from torch.nn import CrossEntropyLoss as TorchCrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
 
@@ -23,16 +24,27 @@ class Loss(ABC):
         raise NotImplementedError
 
 
-class CLMCrossEntropyLoss(Loss):
+class CrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+    tag: str = "CLMCrossEntropyLoss"
+
+
+class CrossEntropyLoss(Loss):
     def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
         # Mean over the tokens in the local-batch (batch per rank)
-        self.loss_fun = CrossEntropyLoss(reduction="mean")
+        self.loss_fun = TorchCrossEntropyLoss(reduction="mean")
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
+
+        if "attention_mask" in forward_batch.targets:
+            attention_mask = forward_batch.get_targets("attention_mask")
+            labels[attention_mask == 0] = -100
+
         lm_logits = forward_batch.get_predictions(self.prediction_key)
 
         # move labels to correct device to enable model parallelism
@@ -77,6 +89,14 @@ def nce_loss(
         numerator *= 2
         denominator = torch.logsumexp(sim_matrix, dim=1) + torch.logsumexp(sim_matrix.t(), dim=1)
     return torch.mean(denominator - numerator)  # calculated in log space
+
+
+class NCELossConfig(BaseModel):
+    prediction_key1: str
+    prediction_key2: str
+    is_asymmetric: bool = True
+    temperature: float = 1.0
+    tag: str = "NCELoss"
 
 
 class NCELoss(Loss):

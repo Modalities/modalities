@@ -34,11 +34,17 @@ class CoCaCollatorFn(CollateFnIF):
         samples = {
             sample_key: torch.stack([torch.tensor(d[sample_key]) for d in batch]) for sample_key in self.sample_keys
         }
-        targets = {
-            target_key: torch.stack([torch.tensor(d[target_key]) for d in batch]) for target_key in self.target_keys
-        }
+        if "attention_mask" in batch[0]:
+            samples["attention_mask"] = torch.stack([torch.tensor(d["attention_mask"]) for d in batch])
+
+        targets = {target_key: torch.stack([d[target_key] for d in batch]) for target_key in self.target_keys}
 
         # Create target for text input
         targets[self.text_target_key] = samples[self.text_sample_key][:, 1:].clone().detach()
-        samples[self.text_sample_key] = samples[self.text_sample_key][:, :-1].clone().detach()
+        samples[self.text_sample_key] = samples[self.text_sample_key][:, :-1]
+
+        if "attention_mask" in batch[0]:
+            targets["attention_mask"] = samples["attention_mask"][:, 1:].clone().detach()
+            samples["attention_mask"] = samples["attention_mask"][:, :-1]
+
         return DatasetBatch(targets=targets, samples=samples)
