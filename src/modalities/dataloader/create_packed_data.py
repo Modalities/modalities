@@ -30,6 +30,9 @@ class PackedDataGenerator:
         eod_token: str,
         number_of_processes: int,
         jq_pattern: str,
+        processing_batch_size: int,
+        raw_samples_queue_size: int,
+        processed_samples_queue_size: int,
         index_path: Optional[FilePath] = None,
     ):
         """
@@ -39,6 +42,8 @@ class PackedDataGenerator:
                            and length of samples given in `src_path`.
                            If not defined, an index file next to `src_path` is picked,
                            by replacing its suffix with ".idx".
+        :processing_batch_size: The size of the batches that the workers process
+                                (has nothing to do with batch size during training!).
         :param tokenizer: PretrainedTokenizer object, which is used to pre-tokenize the provided data in `src_path`.
                           Tokenization is necessary to work on final lengths of token sequences.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
@@ -53,9 +58,10 @@ class PackedDataGenerator:
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
-        self._raw_samples_queue = multiprocessing.Queue()
-        self._tokens_write_queue = multiprocessing.Queue()
+        self._raw_samples_queue = multiprocessing.Queue(maxsize=raw_samples_queue_size)
+        self.processed_samples_queue = multiprocessing.Queue(maxsize=processed_samples_queue_size)
         self._exception_buffer = []
+        self.processing_batch_size = processing_batch_size
 
     @staticmethod
     def _get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
@@ -110,16 +116,16 @@ class PackedDataGenerator:
         writer.join()
 
     def _stop_processing(self):
-        self._tokens_write_queue.put(None)
+        self.processed_samples_queue.put(None)
 
     def _generator_for_tokens_to_get_written(self):
         while True:
             if self._check_for_parallel_errors():
                 return
-            tokens = self._tokens_write_queue.get()
-            if tokens is None:
+            batch = self.processed_samples_queue.get()
+            if batch is None:
                 break
-            yield tokens
+            yield batch
 
     def _check_for_parallel_errors(self) -> bool:
         return bool(self._exception_buffer)
@@ -139,14 +145,15 @@ class PackedDataGenerator:
                 curr_offset = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
 
                 # write data section (tokens)
-                for tokens_as_bytes in tqdm(
-                    self._generator_for_tokens_to_get_written(), desc="Processed Samples", total=len(self._reader)
-                ):
-                    f.write(tokens_as_bytes)
-                    segment_length = len(tokens_as_bytes)
-                    index_list.append((curr_offset, segment_length))
-                    curr_offset += segment_length
-
+                pbar = tqdm(total=len(self._reader), desc="Processed batches")
+                for batch in self._generator_for_tokens_to_get_written():
+                    # write the tokens for each document
+                    for tokens_as_bytes in batch:
+                        f.write(tokens_as_bytes)
+                        segment_length = len(tokens_as_bytes)
+                        index_list.append((curr_offset, segment_length))
+                        curr_offset += segment_length
+                    pbar.update(len(batch))
                 # write index
                 f.write(pickle.dumps(index_list))
 
@@ -156,12 +163,20 @@ class PackedDataGenerator:
 
     def _reader_thread(self) -> Callable:
         def reader():
-            for line_id, line in enumerate(self._reader):
+            batch = []
+            for line_id, line in tqdm(enumerate(self._reader), desc="Reading jsonl", disable=True):
                 # line = self._reader[line_id]
-                self._raw_samples_queue.put((line_id, line))
+                batch.append((line_id, line))
+                if len(batch) % self.processing_batch_size == 0:
+                    self._raw_samples_queue.put(batch)
+                    batch = []
+
+            # add the remaining samples
+            if len(batch) > 0:
+                self._raw_samples_queue.put(batch)
 
             for _ in range(self._number_of_processes):
-                self._raw_samples_queue.put((None, None))
+                self._raw_samples_queue.put(None)
 
         return reader
 
@@ -172,13 +187,16 @@ class PackedDataGenerator:
         while True:
             if self._check_for_parallel_errors():
                 return
-            line_id, line = self._raw_samples_queue.get()
-            if line is None:
+            batch = self._raw_samples_queue.get()
+            if batch is None:
                 break
 
             try:
-                processed_line = self._process_line(line)
-                self._tokens_write_queue.put(processed_line)
+                batch_processed = []
+                for line_id, line in batch:
+                    processed_line = self._process_line(line, process_id)
+                    batch_processed.append(processed_line)
+                self.processed_samples_queue.put(batch_processed)
             except EmptySampleError:
                 warnings.warn(
                     f"Encountered empty sample in line {line_id} of file {self.src_path} within process {process_id}"
@@ -199,7 +217,7 @@ class PackedDataGenerator:
             fout.seek(0)
             fout.write(data_section_length_in_bytes)
 
-    def _process_line(self, line: str) -> bytes:
+    def _process_line(self, line: str, process_id: int) -> bytes:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
