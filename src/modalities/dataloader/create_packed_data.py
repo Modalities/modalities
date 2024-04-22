@@ -53,6 +53,7 @@ class PackedDataGenerator:
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
+        self._raw_samples_queue = multiprocessing.Queue()
         self._tokens_write_queue = multiprocessing.Queue()
         self._exception_buffer = []
 
@@ -93,6 +94,9 @@ class PackedDataGenerator:
             raise self._exception_buffer[0]
 
     def _launch_parallelized_workers(self, dst_path: Path):
+        reader = multiprocessing.Process(target=self._reader_thread())
+        reader.start()
+
         writer = multiprocessing.Process(target=self._writer_thread(dst_path))
         writer.start()
         processor_threads = [
@@ -150,17 +154,40 @@ class PackedDataGenerator:
 
         return writer
 
+    def _reader_thread(self) -> Callable:
+        def reader():
+            for line_id, line in enumerate(self._reader):
+                # line = self._reader[line_id]
+                self._raw_samples_queue.put((line_id, line))
+
+            for _ in range(self._number_of_processes):
+                self._raw_samples_queue.put((None, None))
+
+        return reader
+
     def _process_thread(self, process_id: int):
         if self._check_for_parallel_errors():
             return
-        for idx in range(process_id, len(self._reader), self._number_of_processes):
-            line = self._reader[idx]
+
+        while True:
+            if self._check_for_parallel_errors():
+                return
+            line_id, line = self._raw_samples_queue.get()
+            if line is None:
+                break
+
             try:
-                self._tokens_write_queue.put(self._process_line(line))
+                processed_line = self._process_line(line)
+                self._tokens_write_queue.put(processed_line)
             except EmptySampleError:
-                warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
+                warnings.warn(
+                    f"Encountered empty sample in line {line_id} of file {self.src_path} within process {process_id}"
+                )
             except Exception as exception:
-                warnings.warn(f"could not process line of number {idx}. Raised the following error: {exception=}")
+                warnings.warn(
+                    f"Could not process line of number {line_id} within process {process_id}. "
+                    f"Raised the following error: {exception=}"
+                )
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
         start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
