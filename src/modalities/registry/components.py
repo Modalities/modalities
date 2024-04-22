@@ -56,12 +56,21 @@ from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.gpt2.gpt2_model import (
+    GPT2LLM,
+    GPT2BlockConfig,
+    GPT2LLMConfig,
+    MoEBlock,
+    MoEBlockConfig,
+    SwiGLUBlock,
+    TransformerBlock,
+)
 from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.activations import ActivationConfig, LeakyReLUConfig
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -180,13 +189,11 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
-
-    #block configs
+    # block configs
     ComponentEntity("block", "moe_block", MoEBlock, MoEBlockConfig),
     ComponentEntity("block", "transformer_block", TransformerBlock, GPT2BlockConfig),
     ComponentEntity("block", "swiglu_block", SwiGLUBlock, GPT2BlockConfig),
-
-    #moe activation_fn configs
+    # moe activation_fn configs
     ComponentEntity("moe_act_fn", "silu", nn.SiLU, ActivationConfig),
     ComponentEntity("moe_act_fn", "relu", nn.ReLU, ActivationConfig),
     ComponentEntity("moe_act_fn", "leaky_relu", nn.LeakyReLU, LeakyReLUConfig),
