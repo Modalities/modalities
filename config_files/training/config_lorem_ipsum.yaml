@@ -24,7 +24,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: /workspaces/modalities/data/tokenizer/hf_gpt2
+    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
     max_length: ${settings.training.sequence_length}
 
 collate_fn:  
@@ -38,8 +38,8 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /workspaces/modalities/data/lorem_ipsum.pbin
-    index_path: /workspaces/modalities/data/lorem_ipsum.idx
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1048576/redpyjama_v2_default_DE_num_docs_1048576.pbin
+    index_path: data/lorem_ipsum.idx
     block_size: ${settings.training.sequence_length}
     jq_pattern: ".text"
     sample_key:  ${settings.referencing_keys.sample_key}
@@ -164,7 +164,7 @@ checkpointing:
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
+        block_names: [MoEBlock]
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -184,7 +184,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    block_names: [MoEBlock]
 
 model:
   component_key: model
@@ -198,6 +198,7 @@ model:
     n_layer: 2
     n_embd: 128
     dropout: 0.0
+    n_head_q: 8
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
@@ -216,10 +217,11 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-    block_config:
+    gpt2block:
       component_key: block
       variant_key: moe_block
       config:
+        block_size: ${settings.training.sequence_length}
         n_embd: ${model.config.n_embd}
         attention_norm:
           component_key: layer_norm
@@ -239,7 +241,7 @@ model:
         dropout: ${model.config.dropout}
         ffn_hidden: 128
         bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-        n_head_q: 8
+        n_head_q: ${model.config.n_head_q}
         n_head_kv: 8
         moe_num_experts: 4
         moe_top_k: 2
@@ -247,9 +249,10 @@ model:
         uniform_expert_assignment: true
         ffn_hidden_size: 128
         moe_jitter_eps: 0.1
-        moe_activation:
+        moe_act_fn:
           component_key: moe_act_fn
           variant_key: silu
+          config:
 
 scheduler:
   component_key: scheduler

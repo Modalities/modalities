@@ -125,7 +125,10 @@ class ComponentFactory:
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
-        comp_config = component_config_type(**config_dict, strict=True)
+        if config_dict:
+            comp_config = component_config_type(**config_dict, strict=True)
+        else:
+            comp_config = component_config_type()
         return comp_config
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:

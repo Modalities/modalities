@@ -5,7 +5,6 @@ import torch.nn as nn
 from pydantic import BaseModel
 
 
-
 # MoE implementation inspired from Dbrx https://github.com/databricks/dbrx/blob/main/model/modeling_dbrx.py
 class MoEFFNConfig(BaseModel):
     moe_num_experts: int
@@ -127,14 +126,7 @@ class MoEFFN(nn.Module):
         super().__init__()
         self.config = config
 
-        self.router = MoERouter(
-            hidden_router_size,
-            moe_num_experts=self.config.moe_num_experts,
-            moe_top_k=self.config.moe_top_k,
-            moe_normalize_expert_weights=self.config.moe_normalize_expert_weights,
-            uniform_expert_assignment=self.config.uniform_expert_assignment,
-            moe_jitter_eps=self.config.moe_jitter_eps,
-        )
+        self.router = MoERouter(hidden_router_size, config)
 
         self.experts = MoEExperts(
             hidden_size=hidden_router_size,
