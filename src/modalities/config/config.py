@@ -32,9 +32,9 @@ class PydanticThirdPartyTypeIF:
         self.third_party_type = third_party_type
 
     def __get_pydantic_core_schema__(
-        self,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
+            self,
+            _source_type: Any,
+            _handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
         # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
         return core_schema.json_or_python_schema(
@@ -129,8 +129,8 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
             name=name, enum_type=MixedPrecisionSettings
         )
         if not has_bfloat_support() and (
-            mixed_precision_settings == MixedPrecisionSettings.BF_16
-            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+                mixed_precision_settings == MixedPrecisionSettings.BF_16
+                or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
         ):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
@@ -243,8 +243,8 @@ class FSDPWrappedModelConfig(BaseModel):
             name=name, enum_type=MixedPrecisionSettings
         )
         if not has_bfloat_support() and (
-            mixed_precision_settings == MixedPrecisionSettings.BF_16
-            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+                mixed_precision_settings == MixedPrecisionSettings.BF_16
+                or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
         ):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
@@ -308,7 +308,7 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
-    drop_last: Literal[True] = True
+    drop_last: Literal[True] = True  # todo why is this even here if only true is allowed?
 
 
 class ResumableBatchSamplerConfig(BaseModel):

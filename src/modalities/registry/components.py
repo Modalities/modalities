@@ -66,6 +66,8 @@ from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 
+from modalities.models.mamba.mamba_model import MambaLLM, MambaLLMConfig
+
 
 @dataclass
 class ComponentEntity:
@@ -78,6 +80,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),

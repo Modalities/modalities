@@ -16,6 +16,8 @@ from modalities.exceptions import CheckpointingError
 from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
+
+
 class CheckpointingEntityType(Enum):
     MODEL = "model"
     OPTIMIZER = "optimizer"
@@ -133,6 +135,7 @@ class FSDPToDiscCheckpointing(CheckpointingExecution):
                 global_train_sample_id=global_train_sample_id,
                 entity_type=CheckpointingEntityType.MODEL,
             )
+
             model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model_state, model_checkpoint_path)
 
