@@ -1,0 +1,30 @@
+settings:  
+  referencing_keys:
+    sample_key: input_ids
+  training:
+    local_train_micro_batch_size: 8
+    sequence_length: 2048
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_sp_tokenizer
+  config:
+    tokenizer_model_file: /workspaces/modalities/notebooks/tokenizer/unigram_tokenizer.model
+    padding: false
+    max_length: 2048
+
+train_dataset:  
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /workspaces/modalities/notebooks/tokenizer/redpyjama_v2_default_DE_num_docs_65536.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+
+val_dataset:  
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /workspaces/modalities/notebooks/tokenizer/redpyjama_v2_default_DE_num_docs_65536.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}

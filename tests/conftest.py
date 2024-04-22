@@ -46,7 +46,7 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 @pytest.fixture
 def dummy_config_path() -> Path:
-    return _ROOT_DIR / Path("config_files/training/config_lorem_ipsum.yaml")
+    return _ROOT_DIR / Path("tests/test_yaml_configs/config_lorem_ipsum.yaml")
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
 
 
 @pytest.fixture(scope="function")
-def checkpointing_mock():
+def checkpoint_saving_mock():
     return MagicMock(spec=CheckpointSaving)
 
 

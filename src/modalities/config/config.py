@@ -260,7 +260,7 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpointing: PydanticCheckpointLoadingIFType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
@@ -371,7 +371,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_batches: Optional[int] = 0
+    skip_num_steps: Optional[int] = 0
 
 
 class DummyProgressSubscriberConfig(BaseModel):
@@ -381,8 +381,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
-    world_size: int
-    global_num_seen_samples: int
+    global_num_seen_steps: int
     local_rank: int
 
 
@@ -415,7 +414,7 @@ class PackedDatasetSettings(BaseModel):
     dst_path: Optional[Path] = None
     index_path: Optional[FilePath] = None
     jq_pattern: str
-    num_cpus: Optional[Annotated[int, Field(strict=True, ge=1)]] = os.cpu_count()
+    num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
     eod_token: str
 
 
@@ -433,8 +432,9 @@ class TrainingSettings(BaseModel):
                     raise ValueError("A threshold value is required when gradient clipping is used.")
                 return self
 
-        callback_interval_in_samples: Annotated[int, Field(strict=True, ge=1)]
-        global_num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
+        global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+        global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+        global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
         do_apply_activation_checkpointing: bool
         gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
         local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
@@ -451,7 +451,7 @@ class TrainingSettings(BaseModel):
     paths: Paths
 
 
-class TrainingComponentsModel(BaseModel):
+class TrainingComponentsInstantiationModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
@@ -467,6 +467,11 @@ class TrainingComponentsModel(BaseModel):
 class PackedDatasetComponentsModel(BaseModel):
     tokenizer: PydanticTokenizerIFType
     settings: PackedDatasetSettings
+
+
+class ComponentsInferenceModel(BaseModel):
+    wrapped_model: PydanticPytorchModuleType
+    cuda_env: CudaEnvSettings
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:

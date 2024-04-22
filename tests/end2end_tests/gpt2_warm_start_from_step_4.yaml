@@ -4,11 +4,11 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 8
-    global_checkpointing_interval_in_steps: 3
-    global_evaluation_interval_in_steps: 2
-    global_num_seen_steps: 0
-    do_apply_activation_checkpointing: true
+    global_training_log_interval_in_steps: 1
+    global_checkpointing_interval_in_steps: 4
+    global_evaluation_interval_in_steps: 1
+    global_num_seen_steps: 4
+    do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
@@ -45,6 +45,7 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
+    skip_num_steps: ${settings.training.global_num_seen_steps}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -68,88 +69,22 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-val_dataloader:
-  component_key: data_loader
+eval_dataloaders: []
+
+checkpointing:
+  component_key: checkpointing
   variant_key: default
   config:
-    num_workers: 2
-    pin_memory: true
-    shuffle: false
-    dataloader_tag: "val"
-    dataset:
-      instance_key: train_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
-      variant_key: default
-      config:
-        batch_size: 4
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
-          config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            dataset:
-              instance_key: train_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
-
-test_dataloader:
-  component_key: data_loader
-  variant_key: default
-  config:
-    num_workers: 2
-    pin_memory: true
-    shuffle: false
-    dataloader_tag: "test"
-    dataset:
-      instance_key: train_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
-      variant_key: default
-      config:
-        batch_size: 2
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
-          config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            dataset:
-              instance_key: train_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
-
-eval_dataloaders:
-  - instance_key: val_dataloader
-    pass_type: BY_REFERENCE
-  - instance_key: test_dataloader
-    pass_type: BY_REFERENCE 
-
-checkpoint_saving:
-  component_key: checkpoint_saving
-  variant_key: default
-  config:
-    checkpoint_saving_strategy:
-      component_key: checkpoint_saving_strategy
+    checkpointing_strategy:
+      component_key: checkpointing_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpoint_saving_execution:
-      component_key: checkpoint_saving_execution
-      variant_key: fsdp
+    checkpointing_execution:
+      component_key: checkpointing_execution
+      variant_key: fsdp_to_disc_checkpointing
       config:
-        checkpoint_path: ${settings.paths.checkpointing_path}
+        checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
@@ -166,15 +101,15 @@ loss_fn:
 
 wrapped_model:
   component_key: model
-  variant_key: fsdp_wrapped
+  variant_key: checkpointed
   config:
     model:
       instance_key: model
       pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    checkpointing:
+      instance_key: checkpointing
+      pass_type: BY_REFERENCE
+    checkpoint_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/0/eid_0-model-num_steps_4.bin
 
 model:
   component_key: model
@@ -227,17 +162,11 @@ model:
 
 scheduler:
   component_key: scheduler
-  variant_key: onecycle_lr
+  variant_key: dummy_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    max_lr: 6e-4
-    div_factor: 10
-    final_div_factor: 1
-    total_steps: 16
-    pct_start: 0.01
-    anneal_strategy: cos
 
 optimizer:  
   component_key: optimizer
@@ -258,22 +187,24 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
-    eval_dataloaders:
-        instance_key: eval_dataloaders
-        pass_type: BY_REFERENCE
+    eval_dataloaders: []
 
     
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: wandb
-  config:
-    local_rank: ${settings.cuda_env.local_rank}
-    project: modalities_lorem_ipsum
-    mode: ONLINE
-    experiment_id: ${settings.experiment_id}
-    directory: "."
+  variant_key: save_all
+  config: {}
+
+# evaluation_subscriber:
+#   component_key: results_subscriber
+#   variant_key: wandb
+#   config:
+#     local_rank: ${settings.cuda_env.local_rank}
+#     project: modalities_lorem_ipsum
+#     mode: ONLINE
+#     experiment_id: ${settings.experiment_id}
+#     directory: "."

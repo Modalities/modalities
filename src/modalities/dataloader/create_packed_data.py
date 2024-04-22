@@ -5,7 +5,7 @@ import os
 import pickle
 import warnings
 from pathlib import Path
-from typing import Callable, Iterator, List, Tuple
+from typing import Callable, Iterator, List, Optional, Tuple
 
 import jq
 import numpy as np
@@ -29,8 +29,8 @@ class PackedDataGenerator:
         tokenizer: TokenizerWrapper,
         eod_token: str,
         number_of_processes: int,
-        index_path: FilePath,
         jq_pattern: str,
+        index_path: Optional[FilePath] = None,
     ):
         """
         Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.
@@ -63,7 +63,7 @@ class PackedDataGenerator:
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
 
-    def _default_destination_path(self, destination_path: Path = None) -> Path:
+    def _default_destination_path(self, destination_path: Optional[Path] = None) -> Path:
         if destination_path is None:
             default_destination_path = Path(self.src_path.parent, f"{self.src_path.stem}.pbin")
             print(
@@ -73,7 +73,7 @@ class PackedDataGenerator:
             return default_destination_path
         return Path(destination_path)
 
-    def run(self, dst_path: Path = None):
+    def run(self, dst_path: Optional[Path] = None):
         assert self._total_num_of_tokens == 0, f"This {self.__name__} was already used and is exhausted. Use another!"
         dst_path = self._default_destination_path(destination_path=dst_path)
 

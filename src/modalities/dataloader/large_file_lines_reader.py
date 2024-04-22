@@ -1,7 +1,7 @@
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 class BaseReader(ABC):
@@ -15,7 +15,7 @@ class BaseReader(ABC):
 
 
 class LargeFileLinesReader(BaseReader):
-    def __init__(self, raw_data_path: Path, index_path: Path = None):
+    def __init__(self, raw_data_path: Path, index_path: Optional[Path] = None):
         """
         :param raw_data_path: Path to a jsonl file, which holds text data
         :param index_path: Path to an index file, which indicates the start character/byte position
@@ -35,7 +35,7 @@ class LargeFileLinesReader(BaseReader):
             self.index = pickle.load(f)
 
     @staticmethod
-    def default_index_path(raw_data_path: Path, index_path: Path = None) -> Path:
+    def default_index_path(raw_data_path: Path, index_path: Optional[Path] = None) -> Path:
         if index_path is None:
             default_index_path = Path(raw_data_path.parent, f"{raw_data_path.stem}.idx")
             print(f"No specific Index Path provided. Pointing to index next to input data at: {default_index_path}")

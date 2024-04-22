@@ -37,7 +37,7 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
         mixed_precision_settings=MixedPrecisionSettings.BF_16,
         sharding_strategy=ShardingStrategy.FULL_SHARD,
     )
-    files_paths_to_delete = checkpointing._get_paths_to_delete(global_train_sample_id=100)
+    files_paths_to_delete = checkpointing._get_paths_to_delete(train_step_id=100)
     assert len(files_paths_to_delete) != 0
 
 
@@ -47,10 +47,10 @@ def test_delete_checkpoint(tmpdir):
 
     (directory / experiment_id).mkdir(exist_ok=True)
 
-    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_samples_101.bin"
+    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_steps_101.bin"
     optimizer_path.write_text(CONTENT)
 
-    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_samples_101.bin"
+    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_steps_101.bin"
     model_path.write_text(CONTENT)
 
     checkpointing = FSDPCheckpointSaving(
@@ -61,5 +61,5 @@ def test_delete_checkpoint(tmpdir):
         mixed_precision_settings=MixedPrecisionSettings.BF_16,
         sharding_strategy=ShardingStrategy.FULL_SHARD,
     )
-    checkpointing._delete_checkpoint(global_train_sample_id=100)
+    checkpointing._delete_checkpoint(train_step_id=100)
     assert is_empty_directory((directory / experiment_id).__str__())

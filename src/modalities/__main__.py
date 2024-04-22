@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Type
 
 import click
 import click_pathlib
@@ -16,7 +16,7 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import (
     PackedDatasetComponentsModel,
     ProcessGroupBackendType,
-    TrainingComponentsModel,
+    TrainingComponentsInstantiationModel,
     load_app_config_dict,
 )
 from modalities.dataloader.create_index import IndexGenerator
@@ -33,7 +33,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
+from modalities.util import compute_number_of_trainable_parameters
 from modalities.utils.gradient_clipping import build_gradient_clipper
 
 
@@ -51,8 +51,10 @@ def main() -> None:
 )
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    main = Main(config_dict, config_file_path)
-    main.run()
+    main_obj = Main(config_dict, config_file_path)
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        main_obj.run(components)
 
 
 @main.command(name="generate_text")
@@ -173,80 +175,70 @@ class Main:
             component_config_type=custom_config,
         )
 
-    def build_components(self, components_model_type: BaseModel) -> BaseModel:
-        components: TrainingComponentsModel = self.component_factory.build_components(
+    def build_components(self, components_model_type: Type[BaseModel]) -> BaseModel:
+        components = self.component_factory.build_components(
             config_dict=self.config_dict, components_model_type=components_model_type
         )
         return components
 
-    def run(self):
-        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            components: TrainingComponentsModel = self.component_factory.build_components(
-                config_dict=self.config_dict, components_model_type=TrainingComponentsModel
-            )
+    def run(self, components: TrainingComponentsInstantiationModel):
+        # save the config file to the checkpointing path
+        if components.settings.cuda_env.global_rank == 0:
+            experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+            os.makedirs(experiment_path, exist_ok=True)
+            shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-            # save the config file to the checkpointing path
-            if components.settings.cuda_env.global_rank == 0:
-                experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
-                os.makedirs(experiment_path, exist_ok=True)
-                shutil.copy(self.config_path, experiment_path / self.config_path.name)
+        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+            progress_subscriber=components.batch_progress_subscriber,
+            results_subscriber=components.evaluation_subscriber,
+            global_rank=components.settings.cuda_env.global_rank,
+            local_rank=components.settings.cuda_env.local_rank,
+        )
 
-            evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-                progress_subscriber=components.batch_progress_subscriber,
-                results_subscriber=components.evaluation_subscriber,
-                global_rank=components.settings.cuda_env.global_rank,
-                local_rank=components.settings.cuda_env.local_rank,
-            )
+        # Trainer
+        trainer = Trainer(
+            local_rank=components.settings.cuda_env.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+            gradient_acc_steps=components.settings.training.gradient_acc_steps,
+            gradient_clipper=build_gradient_clipper(
+                gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
+                gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
+            ),
+        )
 
-            # Trainer
-            trainer = Trainer(
-                local_rank=components.settings.cuda_env.local_rank,
-                batch_progress_publisher=batch_processed_publisher,
-                evaluation_result_publisher=evaluation_result_publisher,
-                gradient_acc_steps=components.settings.training.gradient_acc_steps,
-                gradient_clipper=build_gradient_clipper(
-                    gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
-                    gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
-                ),
-            )
+        # Evaluator
+        evaluator = Evaluator(
+            local_rank=components.settings.cuda_env.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+        )
 
-            # Evaluator
-            evaluator = Evaluator(
-                local_rank=components.settings.cuda_env.local_rank,
-                batch_progress_publisher=batch_processed_publisher,
-                evaluation_result_publisher=evaluation_result_publisher,
-            )
+        # Gym
+        gym = Gym(
+            trainer=trainer,
+            evaluator=evaluator,
+            loss_fun=components.loss_fn,
+            num_ranks=components.settings.cuda_env.world_size,
+        )
+        wrapped_model = components.wrapped_model
+        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
-            # Gym
-            gym = Gym(
-                trainer=trainer,
-                evaluator=evaluator,
-                loss_fun=components.loss_fn,
-                num_ranks=components.settings.cuda_env.world_size,
-            )
-            wrapped_model = components.wrapped_model
-            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+        if components.settings.training.do_apply_activation_checkpointing:
+            apply_activation_checkpointing_inplace(wrapped_model)
 
-            if components.settings.training.do_apply_activation_checkpointing:
-                apply_activation_checkpointing_inplace(wrapped_model)
-
-            callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
-                callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
-                local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
-                gradient_acc_steps=components.settings.training.gradient_acc_steps,
-                world_size=components.settings.cuda_env.world_size,
-            )
-
-            gym.run(
-                callback_interval_in_batches=callback_interval_in_batches_per_rank,
-                train_data_loader=components.train_dataloader,
-                evaluation_data_loaders=components.eval_dataloaders,
-                checkpoint_saving=components.checkpoint_saving,
-                model=wrapped_model,
-                optimizer=components.optimizer,
-                scheduler=components.scheduler,
-            )
-            print("done")
+        gym.run(
+            train_data_loader=components.train_dataloader,
+            evaluation_data_loaders=components.eval_dataloaders,
+            checkpoint_saving=components.checkpoint_saving,
+            model=wrapped_model,
+            optimizer=components.optimizer,
+            scheduler=components.scheduler,
+            global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
+            global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
+            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
+        )
+        print("done")
 
     def get_logging_publishers(
         self,
