@@ -11,10 +11,9 @@ class TokenizerWrapper:
     @property
     def vocab_size(self) -> int:
         raise NotImplementedError("Tokenizer must be implemented by a subclass.")
-    
+
     def get_token_id(self, token: str) -> int:
         raise NotImplementedError
-
 
 
 class PreTrainedHFTokenizer(TokenizerWrapper):
@@ -38,7 +37,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             truncation=self.truncation,
         )["input_ids"]
         return tokens
-    
+
     def get_token_id(self, token: str) -> int:
         token_id = self.tokenizer.convert_tokens_to_ids(token)
         if isinstance(token_id, list):
@@ -53,16 +52,15 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         pass
 
     def tokenize(self, text: str) -> List[int]:
-        tokens =  self.tokenizer.encode(text)
+        tokens = self.tokenizer.encode(text)
         return tokens
 
     @property
     def vocab_size(self) -> int:
         return self.tokenizer.vocab_size()
-    
+
     def get_token_id(self, token: str) -> int:
         piece_id = self.tokenizer.PieceToId(token)
         if piece_id == self.tokenizer.unk_id():
             raise ValueError("Token is not represented by a single token id!")
         return piece_id
-

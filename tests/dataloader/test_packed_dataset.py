@@ -6,7 +6,6 @@ import pytest
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
@@ -43,8 +42,12 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
 def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
     block_size = 5
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_data_path.raw_data_path, tokenizer=wrapped_gpt2_tokenizer, number_of_processes=2, eod_token="<|endoftext|>",
-        index_path=indexed_dummy_data_path.index_path, jq_pattern=".text"
+        src_path=indexed_dummy_data_path.raw_data_path,
+        tokenizer=wrapped_gpt2_tokenizer,
+        number_of_processes=2,
+        eod_token="<|endoftext|>",
+        index_path=indexed_dummy_data_path.index_path,
+        jq_pattern=".text",
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
