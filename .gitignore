@@ -157,3 +157,5 @@ docs/source/api
 pyenv*
 .devcontainer/
 noteboks/*
+
+tests/tmp/*

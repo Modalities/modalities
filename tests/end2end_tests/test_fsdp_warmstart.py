@@ -28,7 +28,8 @@ from modalities.running_env.cuda_env import CudaEnv
 # NOTE that we can only run one test at time due to NCCL issues with multiple tests in parallel.
 # You can specify the test to run with the -k flag, e.g.: -k test_warm_start
 
-_ROOT_DIR = Path(__file__).parents[1]
+
+working_dir = Path(os.path.dirname(__file__))
 
 
 class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
@@ -60,7 +61,7 @@ class TestWarmstart:
     def test_warm_start(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
-            gpt2_two_steps_config_file_path = Path("tests/end2end_tests/gpt2_train_num_steps_8.yaml")
+            gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
             gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
 
             # adopt the checkpoint path
@@ -76,8 +77,11 @@ class TestWarmstart:
             gpt2_two_steps_config_dict["settings"]["experiment_id"] = experiment_id_1
             loss_values_1_path = checkpoint_path + "/0/loss_scores.txt"
 
+            # adopt dataset path
+            gpt2_two_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
+
             # config for one step model
-            gpt2_warm_start_from_step_1_config_file_path = Path("tests/end2end_tests/gpt2_warm_start_from_step_4.yaml")
+            gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
             gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
 
             # adopt the checkpoint path
@@ -94,6 +98,11 @@ class TestWarmstart:
             gpt2_warm_start_from_step_1_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
             gpt2_warm_start_from_step_1_dict["settings"]["experiment_id"] = experiment_id_2
             loss_values_2_path = checkpoint_path + "/1/loss_scores.txt"
+
+            # adopt dataset path
+            gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = (
+                working_dir / "lorem_ipsum.pbin"
+            )
 
             main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
 
@@ -152,11 +161,15 @@ class TestWarmstart:
                     assert loaded_loss_values_1[global_num_seen_steps:] == loaded_loss_values_2
 
     def test_warmstart_dataloader(self):
-        gpt2_two_steps_config_file_path = Path("tests/end2end_tests/gpt2_train_num_steps_8.yaml")
+        gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
         gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        # adopt dataset path
+        gpt2_two_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
-        gpt2_warm_start_from_step_1_config_file_path = Path("tests/end2end_tests/gpt2_warm_start_from_step_4.yaml")
+        gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
         gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        # adopt dataset path
+        gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
         main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
         main_obj_2 = Main(gpt2_warm_start_from_step_1_dict, gpt2_warm_start_from_step_1_config_file_path)

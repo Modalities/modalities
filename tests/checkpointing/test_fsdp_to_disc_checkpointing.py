@@ -32,6 +32,7 @@ from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
 _ROOT_DIR = Path(__file__).parents[1]
+working_dir = Path(os.path.dirname(__file__))
 
 
 @pytest.mark.skipif(
@@ -55,7 +56,7 @@ class TestFSDPToDiscCheckpointing:
 
     @pytest.fixture(scope="function")
     def gpt2_model_config_dict(self) -> Dict:
-        config_file_path = Path("tests/checkpointing/gpt2_config.yaml")
+        config_file_path = working_dir / "gpt2_config.yaml"
         config_dict = load_app_config_dict(config_file_path=config_file_path)
         return config_dict
 

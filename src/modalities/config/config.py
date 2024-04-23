@@ -270,6 +270,7 @@ class DistributedSamplerConfig(BaseModel):
     num_replicas: Annotated[int, Field(strict=True, ge=0)]
     shuffle: bool
     dataset: PydanticDatasetIFType
+    seed: Optional[int] = 0
 
 
 class MemMapDatasetConfig(BaseModel):
@@ -325,11 +326,17 @@ class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIFType
     batch_sampler: PydanticSamplerIFType
-    collate_fn: PydanticCollateFnIFType
+    collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
     skip_num_steps: Optional[int] = 0
+
+
+class RepeatingDataLoaderConfig(BaseModel):
+    dataloader: PydanticLLMDataLoaderIFType
+    reshuffle_after_epoch: Optional[bool] = False
+    num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
 
 class DummyProgressSubscriberConfig(BaseModel):
