@@ -48,6 +48,8 @@ def test_resumable_dataloader_without_shuffling():
         with open(f"tests/tmp/rank_{rank}_batches.json", "w") as f:
             json.dump(batches, f)
 
+        dist.barrier()
+
         with open("tests/tmp/rank_0_batches.json") as f:
             rank_0_batches = torch.tensor(json.load(f))
 
@@ -91,6 +93,8 @@ def test_resumable_dataloader_with_shuffling():
         rank = dist.get_rank()
         with open(f"tests/tmp/rank_{rank}_batches.json", "w") as f:
             json.dump(batches, f)
+
+        dist.barrier()
 
         with open("tests/tmp/rank_0_batches.json") as f:
             rank_0_batches = torch.tensor(json.load(f))
@@ -153,6 +157,8 @@ def test_resumable_dataloader_with_shuffling_and_skipped_batches():
             json.dump(batches_shuffled, f)
         with open(f"tests/tmp/rank_{rank}_batches_shuffled_and_skipped.json", "w") as f:
             json.dump(batches_shuffled_and_skipped, f)
+
+        dist.barrier()
 
         with open("tests/tmp/rank_0_batches_shuffled.json") as f:
             rank_0_batches_shuffled = torch.tensor(json.load(f))
