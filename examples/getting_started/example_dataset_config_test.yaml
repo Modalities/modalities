@@ -1,0 +1,15 @@
+settings:
+  src_path: data/raw/redpajama_v2_samples_512_test.jsonl
+  dst_path: data/mem_map/redpajama_v2_samples_512_test.pbin
+  index_path: data/mem_map/redpajama_v2_samples_512_test.idx
+  jq_pattern: .raw_content
+  num_cpus: ${node_env:num_cpus}
+  eod_token: <|endoftext|>
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: tokenizer/hf_gpt2
+    padding: false
+    max_length: 512
