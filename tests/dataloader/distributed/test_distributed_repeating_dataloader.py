@@ -58,6 +58,8 @@ def test_resumable_dataloader_without_shuffling():
         with open(f"tests/tmp/rank_{rank}_batches.json", "w") as f:
             json.dump(batches, f)
 
+        dist.barrier()
+
         with open("tests/tmp/rank_0_batches.json") as f:
             rank_0_batches = torch.tensor(json.load(f))
 
