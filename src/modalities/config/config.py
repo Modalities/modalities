@@ -374,6 +374,9 @@ class PackedDatasetSettings(BaseModel):
     jq_pattern: str
     num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
     eod_token: str
+    processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
+    raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
+    processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
 
 
 class TrainingSettings(BaseModel):
@@ -422,7 +425,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     settings: TrainingSettings
 
 
-class PackedDatasetComponentsModel(BaseModel):
+class PackedDatasetComponentsInstantiationModel(BaseModel):
     tokenizer: PydanticTokenizerIFType
     settings: PackedDatasetSettings
 
