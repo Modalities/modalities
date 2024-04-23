@@ -115,7 +115,7 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
                         raise NotImplementedError(
                             "Reshuffling after each epoch is only supported for DistributedSampler"
                         )
-            if self.current_epoch <= self.num_epochs:
+            if self.current_epoch < self.num_epochs:
                 self.data_iter = iter(self.dataloader)
                 batch = next(self.data_iter)
             else:
