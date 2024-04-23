@@ -20,7 +20,7 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: data/checkpoints
+    checkpointing_path: tmp/checkpoints
 
 collate_fn:  
   component_key: collate_fn
@@ -33,7 +33,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum.pbin
+    raw_data_path: lorem_ipsum.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -109,7 +109,7 @@ wrapped_model:
     checkpointing:
       instance_key: checkpointing
       pass_type: BY_REFERENCE
-    checkpoint_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/0/eid_0-model-num_steps_4.bin
+    checkpoint_path: tmp/checkpoints/0/eid_0-model-num_steps_4.bin
 
 model:
   component_key: model

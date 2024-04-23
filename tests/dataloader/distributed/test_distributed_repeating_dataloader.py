@@ -12,6 +12,9 @@ from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoa
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
+working_dir = Path(os.path.dirname(__file__))
+tmp_folder = working_dir / "../../tmp"
+
 
 class DataloaderInstantiationModel(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
@@ -30,9 +33,8 @@ def test_resumable_dataloader_without_shuffling():
     # to receive [[4, 6], [0, 2], [4, 6], [0, 2], [4, 6]] and
     #  [[5, 7], [1, 3], [5, 7], [1, 3], [5, 7]], respectively.
 
-    config_file_path = Path(
-        "tests/dataloader/distributed/dist_repeating_dataloader_config_without_shuffling_but_skipped_batch.yaml"
-    )
+    config_file_path = working_dir / "dist_repeating_dataloader_config_without_shuffling_but_skipped_batch.yaml"
+
     config_dict = load_app_config_dict(config_file_path)
 
     main = Main(config_dict, config_file_path)
@@ -50,20 +52,18 @@ def test_resumable_dataloader_without_shuffling():
 
         # each epoch has 2 batches of size 2, we want two skip the first batch in the
         # first epoch and have 3 epochs in total
-        num_batches = 5
-
-        batches = [batch.tolist() for _, batch in zip(range(num_batches), repeating_dataloader)]
+        batches = [batch.tolist() for batch in repeating_dataloader]
 
         rank = dist.get_rank()
-        with open(f"tests/tmp/rank_{rank}_batches.json", "w") as f:
+        with open(tmp_folder / f"rank_{rank}_batches.json", "w") as f:
             json.dump(batches, f)
 
         dist.barrier()
 
-        with open("tests/tmp/rank_0_batches.json") as f:
+        with open(tmp_folder / "rank_0_batches.json") as f:
             rank_0_batches = torch.tensor(json.load(f))
 
-        with open("tests/tmp/rank_1_batches.json") as f:
+        with open(tmp_folder / "rank_1_batches.json") as f:
             rank_1_batches = torch.tensor(json.load(f))
 
         samples = [i.item() for item in zip(rank_0_batches.flatten(), rank_1_batches.flatten()) for i in item]

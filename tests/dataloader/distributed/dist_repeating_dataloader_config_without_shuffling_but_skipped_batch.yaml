@@ -9,6 +9,7 @@ train_dataloader:
   variant_key: repeating_data_loader
   config:
     reshuffle_after_epoch: false
+    num_epochs: 3
     dataloader: 
       component_key: data_loader
       variant_key: default
