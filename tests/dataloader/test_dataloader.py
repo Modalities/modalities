@@ -105,14 +105,12 @@ def test_repeating_dataloader_without_shuffling():
 
     # create repeating dataloader that first skips the skip_num_batches
     # in epoch 0 and then returns the batches from the beginning
-    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader_skipped, reshuffle_after_epoch=False)
+    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader_skipped, reshuffle_after_epoch=False, num_epochs=2)
 
-    num_batches_per_epoch = num_samples // batch_size
+    num_samples // batch_size
     # get the batches for two epochs
     batches_1 = torch.stack([i for i in dataloader_skipped] + [i for i in dataloader])
-    batches_2 = torch.stack(
-        [i for _, i in zip(range(num_batches_per_epoch * 2 - skip_num_batches), repeating_dataloader)]
-    )
+    batches_2 = torch.stack([i for i in repeating_dataloader])
 
     assert batches_1.equal(batches_2)
     assert batches_1.flatten().tolist() == dataset[skip_num_batches * batch_size :] + dataset
@@ -136,13 +134,11 @@ def test_repeating_dataloader_with_shuffling():
 
     # create repeating dataloader that first skips the skip_num_batches
     # in epoch 0 and then returns the batches from the beginning
-    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader, reshuffle_after_epoch=False)
+    repeating_dataloader = RepeatingDataLoader(dataloader=dataloader, reshuffle_after_epoch=False, num_epochs=2)
 
     # get the batches for two epochs
     num_batches_per_epoch = num_samples // batch_size
-    batches = torch.stack(
-        [i for _, i in zip(range(num_batches_per_epoch * 2 - skip_num_batches), repeating_dataloader)]
-    )
+    batches = torch.stack([i for i in repeating_dataloader])
     batches_epoch_1 = batches[: num_batches_per_epoch - skip_num_batches]
     batches_epoch_2 = batches[num_batches_per_epoch - skip_num_batches :]
     # when we skip 2 batches only 3 batches are left, i.e., 6 samples
