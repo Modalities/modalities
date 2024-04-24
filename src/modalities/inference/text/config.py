@@ -8,17 +8,10 @@ from modalities.config.config import (
     PydanticThirdPartyTypeIF,
     PydanticTokenizerIFType,
 )
-from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import parse_torch_device
 from modalities.inference.text.inference_component import TextInferenceComponent
 
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
-
-
-class DeviceMode(LookupEnum):
-    CPU = "cpu"
-    SINGLE_GPU = "single-gpu"
-    MULTI_GPU = "multi-gpu"
 
 
 class TextGenerationSettings(BaseModel):
