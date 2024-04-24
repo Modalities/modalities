@@ -3,6 +3,7 @@ import sys
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
@@ -16,6 +17,7 @@ class TextInferenceComponent:
         context_length: int,
         temperature: float,
         eod_token: str,
+        device: torch.device,
     ) -> None:
         self.model = model
         self.model.eval()
@@ -24,6 +26,7 @@ class TextInferenceComponent:
         self.prompt_template = prompt_template
         self.temperature = temperature
         self.context_length = context_length
+        self.device = device
 
     def generate_tokens(
         self,
@@ -31,7 +34,7 @@ class TextInferenceComponent:
     ):
         token_ids_list = self.tokenizer.tokenize(context)
         max_new_tokens = self.context_length - len(token_ids_list)
-        input_token_ids = torch.IntTensor(token_ids_list).cuda().unsqueeze(0)
+        input_token_ids = torch.IntTensor(token_ids_list).to(self.device).unsqueeze(0)
         input_dict = {"input_ids": input_token_ids}
 
         print("--------------------PROMPT--------------------")
@@ -43,18 +46,21 @@ class TextInferenceComponent:
         generated_text_old = ""
         for _ in range(max_new_tokens):
             logits = self.model.forward(input_dict)["logits"]
-            logits = logits[:, -1, :]  # / self.temperature
-            # probs = F.softmax(logits, dim=-1)
-            # idx_next = torch.multinomial(probs, num_samples=1)
-            idx_next = torch.argmax(logits, dim=-1)
-            # token_id: int = idx_next[0, 0].item()
-            token_id: int = idx_next.item()
+            logits = logits[:, -1, :]
+            if self.temperature > 0:
+                logits = logits / self.temperature
+                probs = F.softmax(logits, dim=-1)
+                idx_next = torch.multinomial(probs, num_samples=1)
+                token_id: int = idx_next[0, 0].item()
+            else:
+                idx_next = torch.argmax(logits, dim=-1)
+                token_id: int = idx_next.item()
             generated_token_ids.append(token_id)
             idx_next_str = self.tokenizer.decode([token_id])
             generated_text_new = self.tokenizer.decode(generated_token_ids)
 
             if idx_next_str == self.eod_token:
-                print("\n<reached eos token>", end="")
+                print("\n<reached end of document token>", end="")
                 break
             else:
                 diff_text = generated_text_new[len(generated_text_old) :]
@@ -62,7 +68,7 @@ class TextInferenceComponent:
                 print(diff_text, end="")
                 sys.stdout.flush()
                 token_ids_list.append(token_id)
-                input_token_ids = torch.IntTensor(token_ids_list).cuda().unsqueeze(0)
+                input_token_ids = torch.IntTensor(token_ids_list).to(self.device).unsqueeze(0)
                 input_dict = {"input_ids": input_token_ids}
         print("\n max tokens reached", end="")
 
@@ -90,4 +96,6 @@ class TextInferenceComponent:
 
         # Use str.format() to replace placeholders with user values
         formatted_string = template.format(**user_inputs)
+        if len(formatted_string) == 0:
+            raise ValueError("Prompt is empty")
         return formatted_string

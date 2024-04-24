@@ -37,3 +37,8 @@ class TextInferenceComponentConfig(BaseModel):
     context_length: int
     temperature: Optional[float] = 1.0
     eod_token: Optional[str] = "<eod>"
+    device: PydanticPytorchDeviceType
+
+    @field_validator("device", mode="before")
+    def parse_device(cls, device) -> PydanticPytorchDeviceType:
+        return parse_torch_device(device)
