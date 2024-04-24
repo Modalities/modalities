@@ -14,7 +14,7 @@ class NNModel(nn.Module):
         super(NNModel, self).__init__()
 
     @abstractmethod
-    def forward(self, inputs: Dict[str, torch.Tensor], **kwargs) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
     def get_parameters(self) -> Dict[str, torch.Tensor]:

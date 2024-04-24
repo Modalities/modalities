@@ -6,11 +6,10 @@ from typing import Dict
 
 import torch
 import torch.nn as nn
-from mamba_ssm.models.config_mamba import MambaConfig
-from mamba_ssm.utils.hf import load_config_hf, load_state_dict_hf
+from pydantic import BaseModel
+
 from modalities.models.mamba.mamba_block import Block, MambaBlock
 from modalities.models.model import NNModel
-from pydantic import BaseModel
 
 try:
     from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
@@ -187,6 +186,8 @@ class MambaLLM(NNModel):
             seed: int = None,
             dtype: str = None,
             initializer_cfg=None,
+            num_last_tokens=0,
+            inference_params=None
     ):
         super().__init__(seed=seed)
         if initializer_cfg is None:
@@ -202,6 +203,11 @@ class MambaLLM(NNModel):
         self.pad_vocab_size_multiple = pad_vocab_size_multiple
         self.tie_embeddings = tie_embeddings
         self.prediction_key = prediction_key
+
+        # todo: How to pass these variables in the forward method?
+        self.inference_params = inference_params
+        self.num_last_tokens = num_last_tokens
+
         if self.vocab_size % self.pad_vocab_size_multiple != 0:
             self.vocab_size += self.pad_vocab_size_multiple - (self.vocab_size % self.pad_vocab_size_multiple)
         self.backbone = MixerModel(
@@ -234,24 +240,16 @@ class MambaLLM(NNModel):
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         return self.backbone.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
 
-    def forward(self, inputs: Dict[str, torch.Tensor], **kwargs) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
         num_last_tokens: if > 0, only return the logits for the last n tokens
         """
-        num_last_tokens = kwargs.pop("num_last_tokens", 0)
-        hidden_states = self.backbone(inputs["input_ids"], **kwargs)
-        if num_last_tokens > 0:
-            hidden_states = hidden_states[:, -num_last_tokens:]
-        lm_logits = self.lm_head(hidden_states)
-        return {self.prediction_key: lm_logits}  # todo integrate state in inputs and return dict and remove **kwargs in signature
 
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name, device=None, dtype=None, **kwargs):
-        config_data = load_config_hf(pretrained_model_name)
-        config = MambaConfig(**config_data)
-        model = cls(config, device=device, dtype=dtype, **kwargs)
-        model.load_state_dict(load_state_dict_hf(pretrained_model_name, device=device, dtype=dtype))
-        return model
+        hidden_states = self.backbone(inputs["input_ids"], inference_params=self.inference_params)
+        if self.num_last_tokens > 0:
+            hidden_states = hidden_states[:, -self.num_last_tokens:]
+        lm_logits = self.lm_head(hidden_states)
+        return {self.prediction_key: lm_logits}
 
 
 class MambaLLMConfig(BaseModel):
