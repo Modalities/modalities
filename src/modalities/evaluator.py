@@ -2,12 +2,13 @@ from typing import Callable, Dict, List
 
 import torch
 import torch.distributed as dist
+import torch.nn as nn
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.models.model import NNModel, model_predict_batch
+from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
 from modalities.util import Aggregator, TimeRecorder
@@ -27,7 +28,7 @@ class Evaluator:
     def evaluate_batch(
         self,
         batch: DatasetBatch,
-        model: NNModel,
+        model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
     ):
         with torch.no_grad():
@@ -37,11 +38,10 @@ class Evaluator:
 
     def evaluate(
         self,
-        model: NNModel,
+        model: nn.Module,
         data_loaders: List[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-        global_train_sample_id: int,
-        local_sample_id_to_global_sample_id: Callable[[int], int],
+        train_step_id: int,
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
@@ -53,8 +53,7 @@ class Evaluator:
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                global_train_sample_id=global_train_sample_id,
-                global_dataset_sample_id=-1,
+                eval_step_id=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -71,16 +70,9 @@ class Evaluator:
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
-                    local_dataset_sample_id = Evaluator._get_local_sample_id(
-                        batch_id=batch_id, batch_size=data_loader.batch_size
-                    )
-
-                    global_dataset_sample_id = local_sample_id_to_global_sample_id(local_dataset_sample_id)
-
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
-                        global_train_sample_id=global_train_sample_id,
-                        global_dataset_sample_id=global_dataset_sample_id,
+                        eval_step_id=batch_id,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
@@ -105,7 +97,7 @@ class Evaluator:
                 # TODO: hardcoded metric key
                 throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
-                global_train_sample_id=global_train_sample_id,
+                train_step_id=train_step_id,
             )
             Evaluator._publish_evaluation_result(
                 evaluation_result_publisher=self.evaluation_result_publisher,
@@ -117,13 +109,11 @@ class Evaluator:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        global_train_sample_id: int,
-        global_dataset_sample_id: int,
+        eval_step_id: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            global_train_sample_id=global_train_sample_id,
-            global_dataset_sample_id=global_dataset_sample_id,
+            step_id=eval_step_id,
             experiment_status=ExperimentStatus.EVALUATION,
             dataloader_tag=dataloader_tag,
         )
@@ -137,7 +127,3 @@ class Evaluator:
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )
-
-    @staticmethod
-    def _get_local_sample_id(batch_id: int, batch_size: int) -> int:
-        return (batch_id + 1) * batch_size - 1

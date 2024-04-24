@@ -4,11 +4,13 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    callback_interval_in_samples: 6
-    global_num_seen_samples: 0
+    global_training_log_interval_in_steps: 8
+    global_checkpointing_interval_in_steps: 3
+    global_evaluation_interval_in_steps: 2
+    global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 3
+    local_train_micro_batch_size: 1
     sequence_length: 256
     gradient_clipping:
       mode: p2_norm
@@ -88,7 +90,7 @@ val_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 3
+        batch_size: 4
         drop_last: true
         sampler:
           component_key: sampler
@@ -119,7 +121,7 @@ test_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 3
+        batch_size: 2
         drop_last: true
         sampler:
           component_key: sampler
@@ -240,7 +242,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 10
+    total_steps: 16
     pct_start: 0.01
     anneal_strategy: cos
 
@@ -264,7 +266,7 @@ batch_progress_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_samples: ${settings.training.global_num_seen_samples}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -278,7 +280,7 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    project: modalities
-    mode: OFFLINE
+    project: modalities_lorem_ipsum
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
