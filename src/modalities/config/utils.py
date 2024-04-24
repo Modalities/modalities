@@ -12,7 +12,9 @@ def convert_base_model_config_to_dict(config: BaseModel) -> Dict[Any, Any]:
 def parse_torch_device(device: str | int) -> torch.device:
     if isinstance(device, str) and device != "cpu":
         raise ValueError(f"Invalid device_id: {device}")
-    else:
+    elif isinstance(device, int):
         device_id = f"cuda:{device}"
+    else:
+        device_id = "cpu"
     device = torch.device(device_id)
     return device
