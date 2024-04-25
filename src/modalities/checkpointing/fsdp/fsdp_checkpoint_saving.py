@@ -6,13 +6,12 @@ import torch
 import torch.distributed as dist
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp import ShardingStrategy, StateDictType
+from torch.distributed.fsdp import StateDictType
 from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_saving import CheckpointEntityType
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.exceptions import CheckpointingError
-from modalities.running_env.env_utils import MixedPrecisionSettings
 
 
 class CheckpointingEntityType(Enum):
@@ -28,9 +27,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
-        block_names: List[str],
-        mixed_precision_settings: MixedPrecisionSettings,
-        sharding_strategy: ShardingStrategy,
     ):
         """
         Implementation of checkpointing to disc via FSDP
@@ -43,9 +39,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.experiment_id = experiment_id
-        self.block_names = block_names
-        self.mixed_precision_settings = mixed_precision_settings
-        self.sharding_strategy = sharding_strategy
 
     def _get_checkpointing_path(
         self,

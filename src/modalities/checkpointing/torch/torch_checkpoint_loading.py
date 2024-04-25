@@ -30,7 +30,7 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         else:
             model = model.to(self.device)
 
-        model_state = torch.load(file_path)
+        model_state = torch.load(file_path, map_location=self.device)
         model_state_dtype = list(model_state.values())[0].dtype
 
         if self.precision is not None and self.precision.value != model_state_dtype:

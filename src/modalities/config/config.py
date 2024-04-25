@@ -127,7 +127,7 @@ class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
 
 class TorchCheckpointLoadingConfig(BaseModel):
     device: PydanticPytorchDeviceType
-    precision: PrecisionEnum
+    precision: Optional[PrecisionEnum] = None
 
     @field_validator("device", mode="before")
     def parse_device(cls, device) -> PydanticPytorchDeviceType:
@@ -161,25 +161,6 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
-    block_names: List[str]
-    mixed_precision_settings: MixedPrecisionSettings
-    sharding_strategy: ShardingStrategy
-
-    @field_validator("mixed_precision_settings", mode="before")
-    def parse_mixed_precision_setting_by_name(cls, name):
-        mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
-            name=name, enum_type=MixedPrecisionSettings
-        )
-        if not has_bfloat_support() and (
-            mixed_precision_settings == MixedPrecisionSettings.BF_16
-            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
-        ):
-            raise ValueError("BF16 not supported in the current environment")
-        return mixed_precision_settings
-
-    @field_validator("sharding_strategy", mode="before")
-    def parse_sharding_strategy_by_name(cls, name):
-        return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
 class CheckpointSavingConfig(BaseModel):
