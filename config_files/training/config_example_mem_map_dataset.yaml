@@ -11,16 +11,16 @@ settings:
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 16
-    sequence_length: 4096
+    sequence_length: 2048
     gradient_clipping:
-      mode: none
+      mode: p2_norm
+      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
-
 
 collate_fn:  
   component_key: collate_fn
@@ -31,11 +31,11 @@ collate_fn:
 
 train_dataset:
   component_key: dataset
-  variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1048576/redpyjama_v2_default_DE_num_docs_1048576.pbin
     block_size: ${settings.training.sequence_length}
-    sample_key: ${settings.referencing_keys.sample_key}
+    sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -53,7 +53,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -70,11 +70,11 @@ train_dataloader:
 
 val_dataset:
   component_key: dataset
-  variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/LLMgym/data/redpyjama_v2_default_DE_num_docs_1024.pbin
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpyjama_v2_default_DE_num_docs_1024/redpyjama_v2_default_DE_num_docs_1024.pbin
     block_size: ${settings.training.sequence_length}
-    sample_key: ${settings.referencing_keys.sample_key}
+    sample_key:  ${settings.referencing_keys.sample_key}
 
 val_dataloader:
   component_key: data_loader
@@ -92,14 +92,14 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
           config:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
+            shuffle: false
             dataset:
               instance_key: val_dataset
               pass_type: BY_REFERENCE
@@ -131,14 +131,26 @@ checkpointing:
         sharding_strategy: FULL_SHARD
         block_names: [GPT2Block]
 
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
 model:
   component_key: model
   variant_key: gpt2
   config:
     sample_key: ${settings.referencing_keys.sample_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
-    block_size: ${settings.training.sequence_length}
     poe_type: NOPE
+    block_size: ${settings.training.sequence_length}
+    prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
     n_head_q: 12
@@ -152,7 +164,7 @@ model:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
     weight_init:
@@ -179,24 +191,6 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-
-wrapped_model:
-  component_key: model
-  variant_key: fsdp_wrapped
-  config:
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
-
-# scheduler:
-#   type_hint: StepLR
-#   config:
-#     step_size: 1
-#     gamma: 0.1
 
 loss_fn:
   component_key: loss

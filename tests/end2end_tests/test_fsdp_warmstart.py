@@ -67,10 +67,10 @@ class TestWarmstart:
             # adopt the checkpoint path
             checkpoint_path = temp_dir  # "/raid/s3/opengptx/max_lue/modalities/data/checkpoints"
             experiment_id_1 = "0"
-            gpt2_two_steps_config_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
+            gpt2_two_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_two_steps_config_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
+            gpt2_two_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "experiment_id"
             ] = experiment_id_1
             gpt2_two_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
@@ -86,12 +86,6 @@ class TestWarmstart:
 
             # adopt the checkpoint path
             experiment_id_2 = "1"
-            gpt2_warm_start_from_step_1_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
-                "checkpoint_path"
-            ] = checkpoint_path
-            gpt2_warm_start_from_step_1_dict["checkpointing"]["config"]["checkpointing_execution"]["config"][
-                "experiment_id"
-            ] = experiment_id_2
             gpt2_warm_start_from_step_1_dict["wrapped_model"]["config"]["checkpoint_path"] = (
                 checkpoint_path + "/0/eid_0-model-num_steps_4.bin"
             )
@@ -158,7 +152,9 @@ class TestWarmstart:
                     global_num_seen_steps = gpt2_warm_start_from_step_1_dict["settings"]["training"][
                         "global_num_seen_steps"
                     ]
-                    assert loaded_loss_values_1[global_num_seen_steps:] == loaded_loss_values_2
+                    assert loaded_loss_values_1[global_num_seen_steps:] == pytest.approx(
+                        loaded_loss_values_2, abs=1e-16
+                    )
 
     def test_warmstart_dataloader(self):
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"

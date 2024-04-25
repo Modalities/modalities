@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple
 
+import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
@@ -14,10 +15,11 @@ from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
-from modalities.checkpointing.checkpointing import Checkpointing
-from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
-from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
+from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
+from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
+from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -46,12 +48,13 @@ class PydanticThirdPartyTypeIF:
         )
 
 
-PydanticCheckpointingType = Annotated[Checkpointing, PydanticThirdPartyTypeIF(Checkpointing)]
-PydanticCheckpointingStrategyIFType = Annotated[
-    CheckpointingStrategyIF, PydanticThirdPartyTypeIF(CheckpointingStrategyIF)
+PydanticCheckpointSavingIFType = Annotated[CheckpointSaving, PydanticThirdPartyTypeIF(CheckpointSaving)]
+PydanticCheckpointLoadingIFType = Annotated[CheckpointLoadingIF, PydanticThirdPartyTypeIF(CheckpointLoadingIF)]
+PydanticCheckpointSavingStrategyIFType = Annotated[
+    CheckpointSavingStrategyIF, PydanticThirdPartyTypeIF(CheckpointSavingStrategyIF)
 ]
-PydanticCheckpointingExecutionIFType = Annotated[
-    CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
+PydanticCheckpointSavingExecutionIFType = Annotated[
+    CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
@@ -63,6 +66,7 @@ PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimize
 PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
+PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(torch.device)]
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -96,6 +100,12 @@ class GradientClippingMode(LookupEnum):
     MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
+class PrecisionEnum(LookupEnum):
+    FP32 = torch.float32
+    FP16 = torch.float16
+    BF16 = torch.bfloat16
+
+
 class ReferenceConfig(BaseModel):
     instance_key: str
     pass_type: PassType
@@ -115,10 +125,17 @@ class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
     k: Annotated[int, Field(strict=True, ge=-1)]
 
 
-class FSDPToDiscCheckpointingConfig(BaseModel):
-    checkpoint_path: Path
+class TorchCheckpointLoadingConfig(BaseModel):
+    device: PydanticPytorchDeviceType
+    precision: Optional[PrecisionEnum] = None
+
+    @field_validator("device", mode="before")
+    def parse_device(cls, device) -> PydanticPytorchDeviceType:
+        return parse_torch_device(device)
+
+
+class FSDPCheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
-    experiment_id: str
     block_names: List[str]
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
@@ -140,9 +157,15 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-class CheckpointingConfig(BaseModel):
-    checkpointing_strategy: PydanticCheckpointingStrategyIFType
-    checkpointing_execution: PydanticCheckpointingExecutionIFType
+class FSDPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+
+
+class CheckpointSavingConfig(BaseModel):
+    checkpoint_saving_strategy: PydanticCheckpointSavingStrategyIFType
+    checkpoint_saving_execution: PydanticCheckpointSavingExecutionIFType
 
 
 class AdamOptimizerConfig(BaseModel):
@@ -218,14 +241,14 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpointing: PydanticCheckpointingType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
-    checkpointing: PydanticCheckpointingType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
@@ -368,7 +391,7 @@ class RichResultSubscriberConfig(BaseModel):
     local_rank: int
 
 
-class CudaEnvConfig(BaseModel):
+class CudaEnvSettings(BaseModel):
     local_rank: Annotated[int, Field(strict=True, ge=0)]
     world_size: Annotated[int, Field(strict=True, ge=1)]
     global_rank: Annotated[int, Field(strict=True, ge=0)]
@@ -415,7 +438,7 @@ class TrainingSettings(BaseModel):
     experiment_id: str
     referencing_keys: Dict[str, str]
     training: Training
-    cuda_env: CudaEnvConfig
+    cuda_env: CudaEnvSettings
     paths: Paths
 
 
@@ -428,7 +451,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
-    checkpointing: PydanticCheckpointingType
+    checkpoint_saving: PydanticCheckpointSavingIFType
     settings: TrainingSettings
 
 
@@ -439,7 +462,7 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
 
 class ComponentsInferenceModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
-    cuda_env: CudaEnvConfig
+    cuda_env: CudaEnvSettings
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:

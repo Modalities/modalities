@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from modalities.checkpointing.checkpointing import Checkpointing
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
@@ -29,7 +29,7 @@ class Gym:
         global_evaluation_interval_in_steps: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
-        checkpointing: Checkpointing,
+        checkpoint_saving: CheckpointSaving,
     ):
         # self._run_evaluation(
         #     model=model,
@@ -38,6 +38,7 @@ class Gym:
         #     local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
         #     local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
         #     evaluation_data_loaders=evaluation_data_loaders,
+        #     checkpoint_saving=checkpoint_saving,
         # )
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
@@ -50,7 +51,7 @@ class Gym:
             self._run_checkpointing,
             model=model,
             optimizer=optimizer,
-            checkpointing=checkpointing,
+            checkpoint_saving=checkpoint_saving,
             global_checkpointing_interval_in_steps=global_checkpointing_interval_in_steps,
         )
 
@@ -70,11 +71,11 @@ class Gym:
         model: nn.Module,
         optimizer: Optimizer,
         train_step_id: int,
-        checkpointing: Checkpointing,
+        checkpoint_saving: CheckpointSaving,
         global_checkpointing_interval_in_steps: int,
     ):
         if (train_step_id + 1) % global_checkpointing_interval_in_steps == 0:
-            checkpointing.save_checkpoint(
+            checkpoint_saving.save_checkpoint(
                 train_step_id=train_step_id,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 model=model,
