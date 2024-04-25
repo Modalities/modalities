@@ -293,6 +293,7 @@ class DistributedSamplerConfig(BaseModel):
     num_replicas: Annotated[int, Field(strict=True, ge=0)]
     shuffle: bool
     dataset: PydanticDatasetIFType
+    seed: Optional[int] = 0
 
 
 class MemMapDatasetConfig(BaseModel):
@@ -348,11 +349,17 @@ class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIFType
     batch_sampler: PydanticSamplerIFType
-    collate_fn: PydanticCollateFnIFType
+    collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
     skip_num_steps: Optional[int] = 0
+
+
+class RepeatingDataLoaderConfig(BaseModel):
+    dataloader: PydanticLLMDataLoaderIFType
+    reshuffle_after_epoch: Optional[bool] = False
+    num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
 
 class DummyProgressSubscriberConfig(BaseModel):
@@ -397,6 +404,9 @@ class PackedDatasetSettings(BaseModel):
     jq_pattern: str
     num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
     eod_token: str
+    processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
+    raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
+    processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
 
 
 class TrainingSettings(BaseModel):
@@ -445,7 +455,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     settings: TrainingSettings
 
 
-class PackedDatasetComponentsModel(BaseModel):
+class PackedDatasetComponentsInstantiationModel(BaseModel):
     tokenizer: PydanticTokenizerIFType
     settings: PackedDatasetSettings
 

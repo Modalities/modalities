@@ -1,0 +1,35 @@
+train_dataset:
+  component_key: dataset
+  variant_key: test
+  config:
+    num_samples: 8
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "train"
+    skip_num_steps: 0
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 2
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${cuda_env:RANK}
+            num_replicas: ${cuda_env:WORLD_SIZE}
+            shuffle: true
+            seed: 0
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE

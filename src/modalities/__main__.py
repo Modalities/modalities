@@ -14,7 +14,7 @@ from modalities.activation_checkpointing import apply_activation_checkpointing_i
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import (
-    PackedDatasetComponentsModel,
+    PackedDatasetComponentsInstantiationModel,
     ProcessGroupBackendType,
     TrainingComponentsInstantiationModel,
     load_app_config_dict,
@@ -120,18 +120,20 @@ def entry_point_pack_encoded_data(config_path: FilePath):
     config = load_app_config_dict(config_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsModel = component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsModel
+    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
+        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
     )
 
-    tokenizer = components.tokenizer
     generator = PackedDataGenerator(
         components.settings.src_path,
         index_path=components.settings.index_path,
-        tokenizer=tokenizer,
+        tokenizer=components.tokenizer,
         eod_token=components.settings.eod_token,
         jq_pattern=components.settings.jq_pattern,
         number_of_processes=components.settings.num_cpus,
+        processing_batch_size=components.settings.processing_batch_size,
+        raw_samples_queue_size=components.settings.raw_samples_queue_size,
+        processed_samples_queue_size=components.settings.processed_samples_queue_size,
     )
     generator.run(components.settings.dst_path)
 
