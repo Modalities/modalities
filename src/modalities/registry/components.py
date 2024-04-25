@@ -1,24 +1,26 @@
 from dataclasses import dataclass
-from typing import Type
+from typing import Callable, Type
 
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 
-from modalities.checkpointing.checkpointing import Checkpointing
-from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from modalities.checkpointing.checkpointing_strategies import (
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
-    CheckpointingConfig,
+    CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
@@ -26,7 +28,8 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
-    FSDPToDiscCheckpointingConfig,
+    FSDPCheckpointLoadingConfig,
+    FSDPCheckpointSavingConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
@@ -37,11 +40,13 @@ from modalities.config.config import (
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
+    RepeatingDataLoaderConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
     StepLRSchedulerConfig,
+    TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
@@ -71,7 +76,7 @@ from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, Pre
 class ComponentEntity:
     component_key: str
     variant_key: str
-    component_type: Type
+    component_type: Type | Callable
     component_config_type: Type[BaseModel]
 
 
@@ -131,26 +136,29 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
-    # ComponentEntity("data_loader", "repeating_data_loader",(RepeatingDataLoader, None), # TODO
+    ComponentEntity(
+        "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
+    ),
     # checkpointing
-    ComponentEntity("checkpointing", "default", Checkpointing, CheckpointingConfig),
+    ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
     ComponentEntity(
-        "checkpointing_strategy",
+        "checkpoint_saving_strategy",
         "save_every_k_steps_checkpointing_strategy",
         SaveEveryKStepsCheckpointingStrategy,
         SaveEveryKStepsCheckpointingStrategyConfig,
     ),
     ComponentEntity(
-        "checkpointing_strategy",
+        "checkpoint_saving_strategy",
         "save_k_most_recent_checkpoints_strategy",
         SaveKMostRecentCheckpointsStrategy,
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
-    # checkpointing execution
-    ComponentEntity(
-        "checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointing, FSDPToDiscCheckpointingConfig
-    ),
+    # checkpoint saving execution
+    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    # checkpoint loading
+    ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(
         "progress_subscriber",

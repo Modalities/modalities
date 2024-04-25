@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
@@ -5,6 +7,11 @@ from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
 
 from modalities.config.lookup_enum import LookupEnum
+
+
+def is_running_with_torchrun():
+    # Check for one of the environment variables set by torchrun
+    return "LOCAL_RANK" in os.environ
 
 
 def has_bfloat_support():
@@ -52,4 +59,4 @@ class MixedPrecisionSettings(LookupEnum):
     FP_16 = fpSixteen
     BF_16 = bfSixteen
     BF_16_WORKING = bfSixteen_working
-    BF_32 = fpThirtytwo
+    FP_32 = fpThirtytwo
