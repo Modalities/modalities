@@ -15,6 +15,7 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDPCheckpointSaving
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
@@ -179,9 +180,11 @@ class TestFSDPToDiscCheckpointing:
         experiment_id = "0"
         train_step_id = 1
 
-        checkpointing = FSDPCheckpointSaving(
-            checkpoint_path=temporary_checkpoint_folder_path,
-            experiment_id=experiment_id,
+        checkpoint_saving = FSDPCheckpointSaving(
+            checkpoint_path=temporary_checkpoint_folder_path, experiment_id=experiment_id, global_rank=dist.get_rank()
+        )
+
+        checkpoint_loading = FSDPCheckpointLoading(
             global_rank=dist.get_rank(),
             block_names=["GPT2Block"],
             mixed_precision_settings=MixedPrecisionSettings.FP_16,
@@ -204,26 +207,26 @@ class TestFSDPToDiscCheckpointing:
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
-        checkpointing._save_checkpoint(model=fsdp_wrapped_model, optimizer=optimizer, train_step_id=train_step_id)
+        checkpoint_saving._save_checkpoint(model=fsdp_wrapped_model, optimizer=optimizer, train_step_id=train_step_id)
 
         # load the model checkpoint
-        model_checkpointing_path = checkpointing._get_checkpointing_path(
+        model_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
             train_step_id=train_step_id,
             entity_type=CheckpointingEntityType.MODEL,
         )
-        fsdp_wrapped_model_2 = checkpointing.load_model_checkpoint(
+        fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint(
             model=gpt2_model_2, file_path=model_checkpointing_path
         )
 
         optimizer_2 = AdamW(fsdp_wrapped_model_2.parameters(), lr=0.001)
 
-        optimizer_checkpointing_path = checkpointing._get_checkpointing_path(
+        optimizer_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
             train_step_id=train_step_id,
             entity_type=CheckpointingEntityType.OPTIMIZER,
         )
-        checkpointing.load_optimizer_checkpoint(
+        checkpoint_loading.load_optimizer_checkpoint(
             optimizer=optimizer_2, wrapped_model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
