@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
+import wandb
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
@@ -33,6 +34,9 @@ class ModelFactory:
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
+        # Sum all parameters
+        total_params = sum(p.numel() for p in model.parameters())
+        print("Total parameters:", total_params)
 
         # model is on CPU before input to FSDP
         fsdp_model = FSDP(

@@ -6,8 +6,8 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import xformers.ops as xops
-from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.config import PydanticPytorchModuleType
@@ -107,7 +107,7 @@ class QueryKeyValueTransformType(Enum):
 class ActivationType(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
-
+    PYTORCH_SWIGLU = "pytorch_swiglu"
 
 class AttentionConfig(BaseModel):
     class QueryKeyValueTransformConfig(BaseModel):
@@ -257,8 +257,9 @@ class CausalSelfAttention(nn.Module):
         v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
 
         # TODO: make parameters configurable
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
-
+        #return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        #print(torch.backends.cuda.flash_sdp_enabled())
+        return F.scaled_dot_product_attention(q,k,v, dropout_p=dropout, is_causal=True, scale=None)
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
         q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
@@ -270,6 +271,32 @@ class CausalSelfAttention(nn.Module):
 
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
+class SwiGLU_Pytorch(nn.Module):
+    
+    def __init__(self, n_embd, ffn_hidden, bias) -> None:
+        super().__init__()        
+        self.c_f1 = nn.Linear(
+            in_features=n_embd,
+            out_features=ffn_hidden,  # best practice: 4 * n_embd,
+            bias=bias,
+        )
+        self.c_f2 = nn.Linear(
+            in_features=n_embd,
+            out_features=ffn_hidden,
+            bias=bias,
+        )
+        self.silu = nn.SiLU()
+        self.c_f3 = nn.Linear(
+            in_features=ffn_hidden,
+            out_features=n_embd,
+            bias=bias,
+        )
+    
+    def forward(self, x):
+        x1 = self.c_f1(x)
+        x2 = self.c_f2(x)
+        hidden = F.silu(x1) * x2
+        return self.c_f3(hidden)
 
 class TransformerMLP(nn.Module):
     def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, dropout: float):
@@ -327,6 +354,10 @@ class GPT2Block(nn.Module):
         elif activation_type == ActivationType.FUSED_SWIGLU:
             hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
             self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        elif activation_type == ActivationType.PYTORCH_SWIGLU:
+            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+            self.mlp = SwiGLU_Pytorch(n_embd, hidden_dim, bias=False)
+
         else:
             raise NotImplementedError("unimplemented activation")
 
