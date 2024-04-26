@@ -191,14 +191,29 @@ Already during the training, the checkpoints can be found locally in `checkpoint
 
 ### Evaluation
 
-Given a checkpoint and tokenizer, we can load the model for text generation as follows
+In order to let the model generate text, we need to specify the last training checkpoint under `model_path` in the config file `example_text_generation_config.yaml`:
+
+```
+# example_text_generation_config.yaml
+
+settings:
+  referencing_keys:
+    sample_key: input_ids
+    prediction_key: logits
+  model_path: ./checkpoints/<checkpoint_name>.bin
+  device: 0
+  context_length: 512
+
+[..]
+````
+
+Subsequently, given the checkpoint and tokenizer, we can load the model for text generation as follows:
 
 ```sh
-modalities generate_text --tokenizer_file tokenizer/tokenizer.json \
-                        checkpoints/2024-01-15__14-02-37/eid_2024-01-15__14-02-37-model-num_samples_768.bin \
-                         example_config.yaml 
+modalities generate_text --config_file_path example_text_generation_config.yaml 
 ```
-which opens an interactive chatting CMD interface.
+
+This opens an interactive chatting CMD interface.
 
 ```
 enter prompt> Once upon a time, 
