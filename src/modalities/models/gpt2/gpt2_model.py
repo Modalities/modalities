@@ -225,7 +225,9 @@ class CausalSelfAttention(nn.Module):
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
-            transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
+            transform_config.type_hint.value(
+                **convert_base_model_config_to_dict(transform_config.config)
+            )  # TODO refactor, still uses the legacy type_hint
             for transform_config in attention_config.qkv_transforms
         )
 
@@ -237,13 +239,12 @@ class CausalSelfAttention(nn.Module):
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size = q.shape[0]
-        block_size = q.shape[1]
-        n_head_dim = q.shape[2] // n_head_q
+        batch_size, block_size, embedding_dim = q.size()
+        n_head_dim = embedding_dim // n_head_q
 
-        q = q.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_q, T, hd)
-        k = k.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
+        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -252,11 +253,10 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
-        q = q.transpose(1, 2)  # (B, T, nh_q, hd)
-        k = k.transpose(1, 2)  # (B, T, nh_kv, hd)
-        v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
-
-        # TODO: make parameters configurable
+        # the next three lines are only needed for flash-attn from Daio Lab
+        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
         return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -267,7 +267,6 @@ class CausalSelfAttention(nn.Module):
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
         y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
-
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
