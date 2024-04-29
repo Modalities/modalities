@@ -17,9 +17,8 @@ As a reference, this example has the following folder structure. Folders in <> w
     │       └── redpajama_v2_samples_512_train.jsonl
     ├── getting_started_example.md
     ├── tokenizer
-    │   └── hf_gpt2
-    │       ├── tokenizer.json
-    │       └── tokenizer_config.json
+    │   ├── tokenizer.json
+    │   └── tokenizer_config.json
     └── wandb
         └── <wandb_logs>
 ```

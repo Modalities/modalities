@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: ./checkpoints/2024-04-26__10-01-56/eid_2024-04-26__10-01-56-model-num_steps_32.bin
+  model_path: ./checkpoints/2024-04-29__10-21-05/eid_2024-04-29__10-21-05-model-num_steps_32.bin
   device: 0
   context_length: 512
 
@@ -91,6 +91,6 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: tokenizer/hf_gpt2
+    pretrained_model_name_or_path: tokenizer
     padding: false
     max_length: ${settings.context_length}
