@@ -17,12 +17,15 @@ As a reference, this example has the following folder structure. Folders in <> w
     │       └── redpajama_v2_samples_512_train.jsonl
     ├── getting_started_example.md
     ├── tokenizer
-    │   └── tokenizer.json
+    │   ├── tokenizer.json
+    │   └── tokenizer_config.json
     └── wandb
         └── <wandb_logs>
 ```
 
 ## 1. Preprocessing
+
+### Raw Data Format
 A single line of the Redpajama V2 JSONL file has the structure denoted below. Since we are not interested in the meta data and quality signals for this minimal example, we consider the `raw_content` from each line without any filtering for model training. 
 ```json
 {
@@ -35,11 +38,38 @@ A single line of the Redpajama V2 JSONL file has the structure denoted below. Si
 The two raw dataset splits for training and evaluation can be found in 
 `data/raw/redpajama_v2_samples_512_train.jsonl` and `data/raw/redpajama_v2_samples_512_test.jsonl`
 and need to be preprocessed into the [MemMap dataset format](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/dataset.py). 
-Firstly, we create the dataset index via
 
+### Config File
+To do so, we employ the `example_dataset_config_train.yaml` and `example_dataset_config_test.yaml` configuration files, which contain the paths of the input and output files, the path of the tokenizer as well as some configurable parameters:
+```yaml
+# example_dataset_config_train.yaml
+
+settings:
+  src_path: data/raw/redpajama_v2_samples_512_train.jsonl
+  dst_path: data/mem_map/redpajama_v2_samples_512_train.pbin
+  index_path: data/mem_map/redpajama_v2_samples_512_train.idx
+  jq_pattern: .raw_content
+  num_cpus: ${node_env:num_cpus}
+  eod_token: <|endoftext|>
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: tokenizer
+    padding: false
+    max_length: 512
+```
+
+### Step 1: Create Index
+
+Firstly, after
 ```sh
 cd modalities/examples/getting_started/
+```
+we create the dataset index via
 
+```sh
 # train split
 modalities data create_raw_index --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
                                data/raw/redpajama_v2_samples_512_train.jsonl
@@ -52,22 +82,16 @@ In this step, we read the JSON file as a binary file, iterate over all character
 as determined by the `\n` character positions. The sample index is stored in the specified `index_path`. Internally, the `create_raw_index` command 
 instantiates and calls the [IndexGenerator](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/create_index.py#L14).
 
-After having determined the index, we create the packed dataset as described below by leveraging the tokenizer, jsonl file and the created index.
+### Step 2: Pack Dataset
+
+After having determined the index, we create the packed dataset as described below by leveraging the tokenizer, jsonl file and the created index like so:
 
 ```sh
 # train split
-modalities data pack_encoded_data --jq_pattern .raw_content \
-                              --index_path data/mem_map/redpajama_v2_samples_512_train.idx \
-                              --dst_path data/mem_map/redpajama_v2_samples_512_train.pbin \
-                              --tokenizer_file tokenizer/tokenizer.json \
-                              data/raw/redpajama_v2_samples_512_train.jsonl
+modalities data pack_encoded_data example_dataset_config_train.yaml
 
 # test split
-modalities data pack_encoded_data --jq_pattern .raw_content \
-                              --index_path data/mem_map/redpajama_v2_samples_512_test.idx \
-                              --dst_path data/mem_map/redpajama_v2_samples_512_test.pbin \
-                              --tokenizer_file tokenizer/tokenizer.json \
-                              data/raw/redpajama_v2_samples_512_test.jsonl
+modalities data pack_encoded_data example_dataset_config_test.yaml
 ```
 This will create the following file structure which can we can directly load into the [PackedMemMapdataset](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/dataset.py#L65).
 ```
@@ -118,12 +142,14 @@ first and then divides it into chunks of size context-length.
 
 
 
-In modalities, we describe the entire training and evaluation setup (i.e., components such das model, trainer, evaluator, dataloder etc.) within a single config file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. 
+## 2. Training & Evaluation
+
+### Config File
+In modalities, we describe the entire training and evaluation setup (i.e., components such as model, trainer, evaluator, dataloder etc.) within a single config file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. 
 
 The example config file for this experiment can be found in `examples/getting_started/example_config.yaml`. 
 
-## 2. Training
-
+### Training
 Having created the dataset and defined the experiment in the configuration file, we can already start the training by running the following command.
 
 ```sh
@@ -162,16 +188,31 @@ The command can be broken down into the following parts:
 
 Already during the training, the checkpoints can be found locally in `checkpoints/` and the loss and metric developments can be inspected online in [Weights&Biases](https://wandb.ai/). 
 
-## Evaluation
+### Evaluation
 
-Given a checkpoint and tokenizer, we can load the model for text generation as follows
+In order to let the model generate text, we need to specify the last training checkpoint under `model_path` in the config file `example_text_generation_config.yaml`:
+
+```
+# example_text_generation_config.yaml
+
+settings:
+  referencing_keys:
+    sample_key: input_ids
+    prediction_key: logits
+  model_path: ./checkpoints/<checkpoint_name>.bin
+  device: 0
+  context_length: 512
+
+[..]
+````
+
+Subsequently, given the checkpoint and tokenizer, we can load the model for text generation as follows:
 
 ```sh
-modalities generate_text --tokenizer_file tokenizer/tokenizer.json \
-                        checkpoints/2024-01-15__14-02-37/eid_2024-01-15__14-02-37-model-num_samples_768.bin \
-                         example_config.yaml 
+modalities generate_text --config_file_path example_text_generation_config.yaml 
 ```
-which opens an interactive chatting CMD interface.
+
+This opens an interactive chatting CMD interface.
 
 ```
 enter prompt> Once upon a time, 
