@@ -241,7 +241,6 @@ model:
         moe_top_k: 2
         moe_normalize_expert_weights: 0.1
         uniform_expert_assignment: true
-        ffn_hidden_size: 128
         moe_jitter_eps: 0.1
         moe_act_fn:
           component_key: moe_act_fn
