@@ -41,7 +41,7 @@ and need to be preprocessed into the [MemMap dataset format](https://github.com/
 
 ### Config File
 To do so, we employ the `example_dataset_config_train.yaml` and `example_dataset_config_test.yaml` configuration files, which contain the paths of the input and output files, the path of the tokenizer as well as some configurable parameters:
-```
+```yaml
 # example_dataset_config_train.yaml
 
 settings:
@@ -59,7 +59,7 @@ tokenizer:
     pretrained_model_name_or_path: tokenizer
     padding: false
     max_length: 1024
-````
+```
 
 ### Step 1: Create Index
 
