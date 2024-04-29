@@ -70,6 +70,14 @@ from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
+from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
+    FSDPGradientClipper,
+    FSDPLoggingOnlyGradientClipper,
+)
+from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
+    FSDPDummyGradientClipperConfig,
+    FSDPGradientClipperConfig,
+)
 
 
 @dataclass
@@ -188,4 +196,9 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
+    # gradient clippers
+    ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity(
+        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+    ),
 ]

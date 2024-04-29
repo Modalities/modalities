@@ -13,11 +13,10 @@ from pydantic import BaseModel, FilePath
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import (
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
-    ProcessGroupBackendType,
     TrainingComponentsInstantiationModel,
-    load_app_config_dict,
 )
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
@@ -34,7 +33,6 @@ from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters
-from modalities.utils.gradient_clipping import build_gradient_clipper
 
 
 @click.group()
@@ -203,10 +201,7 @@ class Main:
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
-            gradient_clipper=build_gradient_clipper(
-                gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
-                gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
-            ),
+            gradient_clipper=components.gradient_clipper,
         )
 
         # Evaluator
