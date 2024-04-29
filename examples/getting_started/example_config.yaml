@@ -11,7 +11,7 @@ settings:
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
     local_train_micro_batch_size: 8
-    sequence_length: 1024
+    sequence_length: 512
     gradient_clipping:
       mode: p2_norm
       threshold: 1.0
