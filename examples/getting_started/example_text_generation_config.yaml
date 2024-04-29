@@ -2,9 +2,9 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: ./checkpoints/2024-04-29__10-21-05/eid_2024-04-29__10-21-05-model-num_steps_32.bin
+  model_path: ./checkpoints/2024-04-29__13-04-54/eid_2024-04-29__13-04-54-model-num_steps_48.bin
   device: 0
-  context_length: 512
+  context_length: 1024
 
 text_inference_component:
   component_key: inference_component
@@ -18,9 +18,9 @@ text_inference_component:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
     context_length: ${settings.context_length}
-    eod_token: <eod>
+    eod_token: <|endoftext|>
     prompt_template: "{prompt_input}" # "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
-    temperature: 0
+    temperature: 1
     # chat: false
 
 checkpointed_model:
