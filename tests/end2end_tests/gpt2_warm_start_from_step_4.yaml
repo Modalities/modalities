@@ -174,6 +174,21 @@ scheduler:
       instance_key: optimizer
       pass_type: BY_REFERENCE
 
+# optimizer:
+#   component_key: optimizer
+#   variant_key: checkpointed
+#   config:
+#     optimizer:
+#       instance_key: raw_optimizer
+#       pass_type: BY_REFERENCE
+#     checkpoint_loading:
+#       instance_key: checkpoint_loading
+#       pass_type: BY_REFERENCE
+#     wrapped_model:
+#       instance_key: wrapped_model
+#       pass_type: BY_REFERENCE
+#     checkpoint_path: tmp/checkpoints/0/eid_0-optimizer-num_steps_4.bin
+
 optimizer:  
   component_key: optimizer
   variant_key: adam_w
