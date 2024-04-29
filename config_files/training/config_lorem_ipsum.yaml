@@ -171,7 +171,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    block_names: [TransformerBlock]
 
 model:
   component_key: model
@@ -240,7 +240,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 16
+    total_steps: 32
     pct_start: 0.01
     anneal_strategy: cos
 
@@ -279,6 +279,6 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."

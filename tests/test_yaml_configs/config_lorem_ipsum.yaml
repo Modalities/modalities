@@ -161,7 +161,7 @@ checkpoint_saving:
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
+        block_names: [TransformerBlock]
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -181,7 +181,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    block_names: [TransformerBlock]
 
 model:
   component_key: model
@@ -290,6 +290,6 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
