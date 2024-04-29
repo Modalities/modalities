@@ -3,7 +3,7 @@ from typing import Tuple
 import torch.nn as nn
 from torch.optim import Adam, AdamW, Optimizer
 
-from modalities.checkpointing.checkpointing import Checkpointing
+from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 
 
 class OptimizerFactory:
@@ -25,9 +25,9 @@ class OptimizerFactory:
 
     @staticmethod
     def get_checkpointed_optimizer(
-        checkpointing: Checkpointing, checkpoint_path, wrapped_model: nn.Module, optimizer: Optimizer
+        checkpoint_loading: CheckpointLoadingIF, checkpoint_path, wrapped_model: nn.Module, optimizer: Optimizer
     ) -> Optimizer:
-        wrapped_optimizer = checkpointing.load_optimizer_checkpoint(
-            file_path=checkpoint_path, optimizer=optimizer, wrapped_model=wrapped_model
+        wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint(
+            file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
         )
         return wrapped_optimizer

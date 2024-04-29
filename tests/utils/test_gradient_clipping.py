@@ -25,7 +25,7 @@ def test_gradient_clipping_mode_none_does_not_change_gradients():
     assert grad_sum1 == grad_sum_clipper
 
 
-class TestModel(NNModel):
+class DummyModel(NNModel):
     def __init__(self):
         super().__init__()
         self._weights = nn.Linear(2, 3)
@@ -50,7 +50,7 @@ class TestModel(NNModel):
 
 
 def _run_gradient_clipping_experiment(gradient_clipping_mode: GradientClippingMode, threshold: Optional[float] = None):
-    model = TestModel()
+    model = DummyModel()
     inputs = {"input": torch.ones(2, 2)}
     output: torch.Tensor = model(inputs)["output"]
     loss = output.sum()

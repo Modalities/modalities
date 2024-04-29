@@ -1,0 +1,18 @@
+settings:
+  src_path: /workspaces/modalities/data/cc_en/raw/train.jsonl
+  dst_path: /workspaces/modalities/data/cc_en/processed/train.pbin
+  index_path: /workspaces/modalities/data/cc_en/processed/train.idx
+  jq_pattern: .text
+  num_cpus:  ${node_env:num_cpus}
+  eod_token: <eod>
+  processing_batch_size: 1000
+  raw_samples_queue_size: 300
+  processed_samples_queue_size: 300
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_sp_tokenizer
+  config:
+    tokenizer_model_file: /workspaces/modalities/data/tokenizer/sp_bpe_en/bpe_tokenizer.model
+    padding: false
+    max_length: 2048

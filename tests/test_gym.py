@@ -6,7 +6,7 @@ from tests.test_utils import configure_dataloader_mock
 
 def test_run_cpu_only(
     monkeypatch,
-    checkpointing_mock,
+    checkpoint_saving_mock,
     evaluator_mock,
     nn_model_mock,
     optimizer_mock,
@@ -38,7 +38,7 @@ def test_run_cpu_only(
         global_evaluation_interval_in_steps=1,
         train_data_loader=llm_data_loader_mock,
         evaluation_data_loaders=[],
-        checkpointing=checkpointing_mock,
+        checkpoint_saving=checkpoint_saving_mock,
     )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
     optimizer_mock.step.assert_called()

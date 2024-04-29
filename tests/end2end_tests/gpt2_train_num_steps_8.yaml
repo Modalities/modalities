@@ -20,7 +20,7 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: data/checkpoints
+    checkpointing_path: tmp/checkpoints
 
 collate_fn:  
   component_key: collate_fn
@@ -33,7 +33,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum.pbin
+    raw_data_path: lorem_ipsum.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -70,25 +70,23 @@ train_dataloader:
 
 eval_dataloaders: []
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
+
 
 # resolving class types via different enums sucks...
 loss_fn:

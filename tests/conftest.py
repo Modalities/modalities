@@ -11,7 +11,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
-from modalities.checkpointing.checkpointing import CheckpointingIF
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import GradientClippingMode, load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -91,8 +91,8 @@ def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
 
 
 @pytest.fixture(scope="function")
-def checkpointing_mock():
-    return MagicMock(spec=CheckpointingIF)
+def checkpoint_saving_mock():
+    return MagicMock(spec=CheckpointSaving)
 
 
 @pytest.fixture(scope="function")
