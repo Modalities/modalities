@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from modalities.nn.moe import MoEExpertGLU, MoEExperts, MoEFFNConfig, MoERouter
+from modalities.nn.moe import MoEExpertGLU, MoEExperts, MoEFFN, MoEFFNConfig, MoERouter
 
 
 def test_moe_router_produces_expected_shapes(
@@ -44,18 +44,28 @@ def test_moe_expert_errors_with_invalid_idx(model_input: torch.Tensor, hidden_si
         model.forward(model_input, invalid_expert_idx)
 
 
-def test_moe_experts_produce_expected_shape(batch_size: int, seq_length: int, hidden_size: int, moe_num_experts: int):
+def test_moe_experts_produce_expected_shape(
+    batch_size: int, seq_length: int, hidden_size: int, moe_num_experts: int, moe_top_k: int
+):
     ffn_hidden_size = 64
     act_fn = nn.ReLU
 
     model = MoEExperts(hidden_size, ffn_hidden_size, moe_num_experts, act_fn)
     x = torch.rand(batch_size, seq_length, hidden_size)
-    top_weights = torch.rand(batch_size, seq_length, moe_num_experts)
-    top_experts = torch.randint(0, moe_num_experts, (batch_size, seq_length))
+    top_weights = torch.rand(batch_size * seq_length, moe_top_k)
+    top_experts = torch.randint(0, moe_top_k, (batch_size * seq_length, moe_top_k))
 
     output = model(x, top_weights, top_experts)
 
     assert output.shape == (batch_size, seq_length, hidden_size)
+
+
+def test_moeffn_output_shape(batch_size: int, seq_length: int, moe_config: MoEFFNConfig):
+    hidden_router_size = 128
+    model = MoEFFN(hidden_router_size, moe_config)
+    input_tensor = torch.randn(batch_size, seq_length, hidden_router_size)
+    output = model(input_tensor)
+    assert output.shape == (batch_size, seq_length, hidden_router_size)
 
 
 @pytest.fixture
