@@ -71,10 +71,12 @@ from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
+    DummyGradientClipper,
     FSDPGradientClipper,
     FSDPLoggingOnlyGradientClipper,
 )
 from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
+    DummyGradientClipperConfig,
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
@@ -201,4 +203,5 @@ COMPONENTS = [
     ComponentEntity(
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
+    ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
 ]

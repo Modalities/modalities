@@ -31,3 +31,12 @@ class FSDPLoggingOnlyGradientClipper(GradientClipperIF):
         # we only return the gradient norm score without actually clipping the gradients
         gradient_norm_score = self.wrapped_model.clip_grad_norm_(max_norm=torch.inf, norm_type=self.norm_type.value)
         return gradient_norm_score
+
+
+class DummyGradientClipper(GradientClipperIF):
+    def __init__(self) -> None:
+        pass
+
+    def clip_gradients(self) -> torch.Tensor:
+        gradient_norm_score = torch.Tensor([-1.0])
+        return gradient_norm_score

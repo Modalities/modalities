@@ -15,3 +15,7 @@ class FSDPGradientClipperConfig(BaseModel):
 class FSDPDummyGradientClipperConfig(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     norm_type: GradientClippingMode
+
+
+class DummyGradientClipperConfig(BaseModel):
+    pass
