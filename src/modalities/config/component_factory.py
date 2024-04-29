@@ -61,7 +61,7 @@ class ComponentFactory:
                 current_component_config = self._instantiate_component_config(
                     component_key=component_key,
                     variant_key=variant_key,
-                    config_dict=materialized_component_config["config"],
+                    config_dict=materialized_component_config.get("config", dict()),
                 )
                 # instantiate component
                 component = self._instantiate_component(
@@ -125,10 +125,7 @@ class ComponentFactory:
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
-        if config_dict:
-            comp_config = component_config_type(**config_dict, strict=True)
-        else:
-            comp_config = component_config_type()
+        comp_config = component_config_type(**config_dict, strict=True)
         return comp_config
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
