@@ -6,8 +6,8 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import xformers.ops as xops
+from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
@@ -239,13 +239,12 @@ class CausalSelfAttention(nn.Module):
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size = q.shape[0]
-        block_size = q.shape[1]
-        n_head_dim = q.shape[2] // n_head_q
+        batch_size, block_size, embedding_dim = q.size()
+        n_head_dim = embedding_dim // n_head_q
 
-        q = q.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_q, T, hd)
-        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
+        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -254,9 +253,11 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
-        # TODO: make parameters configurable
-        attention_output = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout, is_causal=True, scale=None)
-        return attention_output
+        # the next three lines are only needed for flash-attn from Daio Lab
+        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
@@ -264,10 +265,8 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, nh_q, T, hd)
-        y = y.transpose(1, 2)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
-
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 

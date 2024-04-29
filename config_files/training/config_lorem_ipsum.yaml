@@ -181,7 +181,7 @@ model:
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head_q: 8
-    n_head_kv: 8
+    n_head_kv: 4
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
