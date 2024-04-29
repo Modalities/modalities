@@ -6,7 +6,8 @@ from pydantic import FilePath
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.inference.text.config import TextGenerationInstantiationModel, TextInferenceComponentConfig
+from modalities.config.instantiation_models import TextGenerationInstantiationModel
+from modalities.inference.text.config import TextInferenceComponentConfig
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry

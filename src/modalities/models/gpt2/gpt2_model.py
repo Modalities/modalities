@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import xformers.ops as xops
 from pydantic import BaseModel, Field, model_validator, validator
 
-from modalities.config.config import PydanticPytorchModuleType
+from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name

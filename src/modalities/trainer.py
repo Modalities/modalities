@@ -15,6 +15,7 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.util import Aggregator, TimeRecorder
 
 
@@ -30,7 +31,7 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
-        gradient_clipper: Callable[[nn.Module], torch.Tensor],
+        gradient_clipper: GradientClipperIF,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
@@ -53,8 +54,7 @@ class Trainer:
         (loss / self.gradient_acc_steps).backward()
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
-            # gradient_norm_score = self.gradient_clipper(model)
-            gradient_norm_score = model.clip_grad_norm_(max_norm=1, norm_type=2).sum()
+            gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
