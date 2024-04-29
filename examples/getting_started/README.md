@@ -58,7 +58,7 @@ tokenizer:
   config:
     pretrained_model_name_or_path: tokenizer
     padding: false
-    max_length: 512
+    max_length: 1024
 ````
 
 ### Step 1: Create Index
@@ -201,7 +201,7 @@ settings:
     prediction_key: logits
   model_path: ./checkpoints/<checkpoint_name>.bin
   device: 0
-  context_length: 512
+  context_length: 1024
 
 [..]
 ````
