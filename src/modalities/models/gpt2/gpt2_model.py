@@ -6,8 +6,8 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import xformers.ops as xops
-from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.config import PydanticPytorchModuleType
@@ -225,7 +225,9 @@ class CausalSelfAttention(nn.Module):
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
-            transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
+            transform_config.type_hint.value(
+                **convert_base_model_config_to_dict(transform_config.config)
+            )  # TODO refactor, still uses the legacy type_hint
             for transform_config in attention_config.qkv_transforms
         )
 
@@ -241,9 +243,9 @@ class CausalSelfAttention(nn.Module):
         block_size = q.shape[1]
         n_head_dim = q.shape[2] // n_head_q
 
-        q = q.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_q, T, hd)
-        k = k.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_q, T, hd)
+        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2)  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -252,12 +254,9 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
-        q = q.transpose(1, 2)  # (B, T, nh_q, hd)
-        k = k.transpose(1, 2)  # (B, T, nh_kv, hd)
-        v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
-
         # TODO: make parameters configurable
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        attention_output = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout, is_causal=True, scale=None)
+        return attention_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
@@ -265,7 +264,8 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, nh_q, T, hd)
+        y = y.transpose(1, 2)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
 
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
