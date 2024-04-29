@@ -91,7 +91,7 @@ val_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 4
+        batch_size: ${settings.training.local_train_micro_batch_size}
         drop_last: true
         sampler:
           component_key: sampler
