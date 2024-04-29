@@ -56,7 +56,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: tokenizer/hf_gpt2
+    pretrained_model_name_or_path: tokenizer
     padding: false
     max_length: 512
 ````
