@@ -2,11 +2,14 @@
 
 import math
 from functools import partial
-from typing import Dict
+import sys
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pydantic import BaseModel
+from transformers import PreTrainedTokenizer
 
 from modalities.models.mamba.mamba_block import Block, MambaBlock
 from modalities.models.model import NNModel
@@ -248,8 +251,36 @@ class MambaLLM(NNModel):
         hidden_states = self.backbone(inputs["input_ids"], inference_params=self.inference_params)
         if self.num_last_tokens > 0:
             hidden_states = hidden_states[:, -self.num_last_tokens:]
-        lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(hidden_states.to(self.lm_head.weight.dtype))
         return {self.prediction_key: lm_logits}
+    
+    def generate(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        context: str,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+    ):
+        if not context:
+            raise ValueError("Context must be not empty")
+            
+        in_batch = tokenizer([context])
+        in_batch["input_ids"] = torch.Tensor(in_batch["input_ids"]).to(torch.int32).to(next(self.parameters()).device)
+
+        for _ in range(max_new_tokens):
+            logits = self.forward(in_batch)["logits"]
+            logits = logits[:, -1, :] / temperature
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next_str = tokenizer.decode(idx_next[0])
+            if idx_next_str == tokenizer.eos_token:
+                print("\n<reached eos token>", end="")
+                break
+            else:
+                print(idx_next_str, end="")
+                sys.stdout.flush()
+                in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
+        print("")
 
 
 class MambaLLMConfig(BaseModel):
@@ -263,3 +294,4 @@ class MambaLLMConfig(BaseModel):
     pad_vocab_size_multiple: int
     tie_embeddings: bool
     prediction_key: str
+    #dtype: Optional[str]

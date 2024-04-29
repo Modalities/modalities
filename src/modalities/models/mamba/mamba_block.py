@@ -133,7 +133,7 @@ class MambaBlock(nn.Module):
 
         # We do matmul and transpose BLH -> HBL at the same time (Batch size, sequence length, hidden dim)
         xz = rearrange(
-            self.in_proj.weight @ rearrange(hidden_states, "b l d -> d (b l)"),
+            self.in_proj.weight @ rearrange(hidden_states.to(self.in_proj.weight.dtype), "b l d -> d (b l)"),
             "d (b l) -> b d l",
             l=seqlen,
         )

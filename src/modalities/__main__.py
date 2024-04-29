@@ -79,7 +79,8 @@ def entry_point_run_modalities(config_file_path: Path):
 @click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
 def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
     tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
 
 
 @main.group(name="data")

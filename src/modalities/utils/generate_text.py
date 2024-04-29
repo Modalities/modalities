@@ -4,6 +4,7 @@
 # 2) How do we make the inference script robust against (architecture) changes? Maybe save the commit hash in the model state dict? # noqa: E501
 # 3) Register script in the pyproject toml?
 
+from functools import partial
 import os
 import readline  # noqa: F401
 import sys
@@ -15,6 +16,7 @@ from transformers import PreTrainedTokenizer
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsInferenceModel, load_app_config_dict
+from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -107,6 +109,11 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
 
     model.load_state_dict(state_dict)
     model.eval()
+    if type(model.module) == MambaLLM:
+        generate_fn = model.module.generate
+    else:
+        seq_len = model.config.block_size
+        generate_fn = partial(generate, model=model, seq_len=seq_len)
 
     while True:
         try:
@@ -114,11 +121,22 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
+                generate_fn(
+                    tokenizer=tokenizer,
+                    context=prompt,
+                    max_new_tokens=max_new_tokens
+                )
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate(model, tokenizer, prompt, model.config.block_size, max_new_tokens)
+                generate_fn(
+                    tokenizer=tokenizer,
+                    context=prompt,
+                    max_new_tokens=max_new_tokens
+                )
+        except ValueError as e:
+            print(e)
+            continue
         except KeyboardInterrupt:
             print("closing app...")
             break
