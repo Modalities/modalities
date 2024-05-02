@@ -12,9 +12,6 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -248,7 +245,15 @@ optimizer:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
-# message subscriber
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
 
 batch_progress_subscriber:
   component_key: progress_subscriber

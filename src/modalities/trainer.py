@@ -15,6 +15,7 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.util import Aggregator, TimeRecorder
 
 
@@ -30,7 +31,7 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
-        gradient_clipper: Callable[[nn.Module], torch.Tensor],
+        gradient_clipper: GradientClipperIF,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
@@ -53,8 +54,7 @@ class Trainer:
         (loss / self.gradient_acc_steps).backward()
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
-            # gradient_norm_score = self.gradient_clipper(model)
-            gradient_norm_score = model.clip_grad_norm_(max_norm=1, norm_type=2).sum()
+            gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
@@ -74,7 +74,7 @@ class Trainer:
         checkpointing_callback: Callable[[int], None],
     ):
         model.train()
-        cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
+        cumulated_losses = self._reset_tracked_losses()
 
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
@@ -102,9 +102,9 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_loss_and_gradient_norm[0] += batch_loss.item()
+            cumulated_losses[0] += batch_loss.item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
-            cumulated_loss_and_gradient_norm[-1] += 1  # number of local batches
+            cumulated_losses[-1] += 1  # number of local batches
 
             # gradient norm is already synced across all ranks
             if gradient_norm_score is not None:
@@ -134,10 +134,10 @@ class Trainer:
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
-                cumulated_loss_and_gradient_norm[1] = batch_loss.item()
+                cumulated_losses[1] = batch_loss.item()
 
-                reduced_loss_and_gradient_norm = Reducer.reduce(
-                    tensor=cumulated_loss_and_gradient_norm,
+                reduced_losses = Reducer.reduce(
+                    tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
                     # 2.) last batch loss / world size
@@ -145,8 +145,8 @@ class Trainer:
                 )
 
                 train_loss_avg, train_loss_last_batch = (
-                    reduced_loss_and_gradient_norm[0],
-                    reduced_loss_and_gradient_norm[1],
+                    reduced_losses[0],
+                    reduced_losses[1],
                 )
                 losses = {
                     f"{loss_fun.tag} average": train_loss_avg,
@@ -182,7 +182,7 @@ class Trainer:
                 thoughput_aggregator.remove_keys()
 
                 model.train()
-                cumulated_loss_and_gradient_norm = self._reset_loss_and_gradient_norm()
+                cumulated_losses = self._reset_tracked_losses()
 
             evaluation_callback(train_step_id=train_step_id)
             checkpointing_callback(train_step_id=train_step_id)
@@ -190,7 +190,7 @@ class Trainer:
             # via the dataloader.
             forward_backward_time_recorder.start()
 
-    def _reset_loss_and_gradient_norm(self):
+    def _reset_tracked_losses(self):
         # TODO: we should handle the device assignment more centrally.
         # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
         cumulated_loss_and_gradient_norm = torch.zeros(3)

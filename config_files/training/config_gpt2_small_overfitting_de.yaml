@@ -13,9 +13,6 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 16
     sequence_length: 2048
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -34,7 +31,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -42,7 +39,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -119,25 +116,22 @@ eval_dataloaders:
     pass_type: BY_REFERENCE
 
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
 
 wrapped_model:
   component_key: model
@@ -218,6 +212,16 @@ optimizer:
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
 
 scheduler:
   component_key: scheduler

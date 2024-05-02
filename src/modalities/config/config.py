@@ -1,72 +1,31 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
 import torch
-import torch.nn as nn
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
-from pydantic_core import core_schema
+from pydantic import BaseModel, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data import Sampler
-from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
-from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
-from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
+from modalities.config.pydanctic_if_types import (
+    PydanticCheckpointLoadingIFType,
+    PydanticCheckpointSavingExecutionIFType,
+    PydanticCheckpointSavingStrategyIFType,
+    PydanticCollateFnIFType,
+    PydanticDatasetIFType,
+    PydanticLLMDataLoaderIFType,
+    PydanticOptimizerIFType,
+    PydanticPytorchDeviceType,
+    PydanticPytorchModuleType,
+    PydanticSamplerIFType,
+    PydanticTokenizerIFType,
+)
 from modalities.config.utils import parse_torch_device
-from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.loss_functions import Loss
-from modalities.models.gpt2.collator import CollateFnIF
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.util import get_date_of_run, parse_enum_by_name
-
-
-class PydanticThirdPartyTypeIF:
-    def __init__(self, third_party_type):
-        self.third_party_type = third_party_type
-
-    def __get_pydantic_core_schema__(
-        self,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(self.third_party_type),
-            python_schema=core_schema.is_instance_schema(self.third_party_type),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-PydanticCheckpointSavingIFType = Annotated[CheckpointSaving, PydanticThirdPartyTypeIF(CheckpointSaving)]
-PydanticCheckpointLoadingIFType = Annotated[CheckpointLoadingIF, PydanticThirdPartyTypeIF(CheckpointLoadingIF)]
-PydanticCheckpointSavingStrategyIFType = Annotated[
-    CheckpointSavingStrategyIF, PydanticThirdPartyTypeIF(CheckpointSavingStrategyIF)
-]
-PydanticCheckpointSavingExecutionIFType = Annotated[
-    CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
-]
-PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
-PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
-PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
-PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
-PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
-PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
-PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
-PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
-PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
-PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
-PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(torch.device)]
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -87,17 +46,6 @@ class WandbMode(LookupEnum):
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"
     DISABLED = "DISABLED"
-
-
-class GradientClippingMode(LookupEnum):
-    NONE = "NONE"  # Do not apply gradient clipping.
-    VALUE = "value"  # Clip all gradient values independently.
-    # For norm based clipping modes, the norm is computed over
-    # all gradients together, as if they were concatenated
-    # into a single vector.
-    P1_NORM = "p1_norm"  # manhattan norm based clipping.
-    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
-    MAX_NORM = "max_norm"  # Maximum norm based clipping.
 
 
 class PrecisionEnum(LookupEnum):
@@ -389,80 +337,6 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
     local_rank: int
-
-
-class CudaEnvSettings(BaseModel):
-    local_rank: Annotated[int, Field(strict=True, ge=0)]
-    world_size: Annotated[int, Field(strict=True, ge=1)]
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
-
-
-class PackedDatasetSettings(BaseModel):
-    src_path: FilePath
-    dst_path: Optional[Path] = None
-    index_path: Optional[FilePath] = None
-    jq_pattern: str
-    num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
-    eod_token: str
-    processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
-    raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-    processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-
-
-class TrainingSettings(BaseModel):
-    class Training(BaseModel):
-        class GradientClipping(BaseModel):
-            mode: GradientClippingMode
-            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
-
-            @model_validator(mode="after")
-            def check_mode_none_iff_threshold_none(self) -> BaseModel:
-                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
-                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
-                if self.mode != GradientClippingMode.NONE and self.threshold is None:
-                    raise ValueError("A threshold value is required when gradient clipping is used.")
-                return self
-
-        global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        do_apply_activation_checkpointing: bool
-        gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
-        local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
-        sequence_length: Annotated[int, Field(strict=True, ge=1)]
-        gradient_clipping: GradientClipping
-
-    class Paths(BaseModel):
-        checkpointing_path: Path
-
-    experiment_id: str
-    referencing_keys: Dict[str, str]
-    training: Training
-    cuda_env: CudaEnvSettings
-    paths: Paths
-
-
-class TrainingComponentsInstantiationModel(BaseModel):
-    wrapped_model: PydanticPytorchModuleType
-    optimizer: PydanticOptimizerIFType
-    scheduler: PydanticLRSchedulerIFType
-    loss_fn: PydanticLossIFType
-    train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
-    batch_progress_subscriber: PydanticMessageSubscriberIFType
-    evaluation_subscriber: PydanticMessageSubscriberIFType
-    checkpoint_saving: PydanticCheckpointSavingIFType
-    settings: TrainingSettings
-
-
-class PackedDatasetComponentsInstantiationModel(BaseModel):
-    tokenizer: PydanticTokenizerIFType
-    settings: PackedDatasetSettings
-
-
-class ComponentsInferenceModel(BaseModel):
-    wrapped_model: PydanticPytorchModuleType
-    cuda_env: CudaEnvSettings
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
