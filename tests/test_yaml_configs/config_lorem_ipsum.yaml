@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -286,5 +287,6 @@ evaluation_subscriber:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities_lorem_ipsum
     mode: ONLINE
-    experiment_id: ${settings.experiment_id}
     directory: "."
+    experiment_id: ${settings.experiment_id}
+    config_file_path: ${settings.config_file_path}
