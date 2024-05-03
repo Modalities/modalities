@@ -331,7 +331,7 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
     experiment_id: str
     mode: WandbMode
     directory: Path
-    experiment_config: Optional[Dict] = None
+    config_file_path: Path
 
 
 class RichResultSubscriberConfig(BaseModel):
@@ -347,6 +347,8 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
     def modalities_env_resolver_fun(var_name: str) -> int:
         if var_name == "experiment_id":
             return get_date_of_run()
+        if var_name == "config_file_path":
+            return config_file_path
 
     def node_env_resolver_fun(var_name: str) -> int:
         if var_name == "num_cpus":

@@ -1,5 +1,6 @@
 settings:
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -274,3 +275,4 @@ evaluation_subscriber:
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}
