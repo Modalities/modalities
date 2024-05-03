@@ -1,6 +1,6 @@
 # Modalities
 
-[![Coverage Status](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT')
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT')
 [![Coverage Status](https://coveralls.io/repos/github/Modalities/modalities/badge.svg)](https://coveralls.io/github/Modalities/modalities)
 
 
