@@ -9,8 +9,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
-from modalities.running_env.fsdp.reducer import Reducer
-from modalities.trainer import ThroughputAggregationKeys
+from modalities.trainer import AggregationKeys
 from modalities.util import Aggregator, TimeRecorder
 
 
@@ -46,17 +45,13 @@ class Evaluator:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
-
         for data_loader in data_loaders:
-            cumulated_loss = torch.zeros(3).to(device)
-
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 eval_step_id=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
-            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+            score_aggregator = Aggregator[AggregationKeys]()
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
                     batch_loss = self.evaluate_batch(
@@ -65,35 +60,43 @@ class Evaluator:
                         loss_fun=loss_fun,
                     )
 
-                    cumulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cumulated_loss[1] += 1
-                    batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+                    score_aggregator.add_value(key=AggregationKeys.CUMM_LOSS, value=batch_loss.item())
+                    # This works, because we always drop the last batch in case it has less samples than the batch size
+                    score_aggregator.add_value(key=AggregationKeys.NUM_STEPS, value=1)
+
+                    score_aggregator.add_value(key=AggregationKeys.NUM_SAMPLES, value=len(batch))
 
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
                         eval_step_id=batch_id,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
-            # TODO: insert reducer from outside so Evaluator is independent of FSDP
-            total_loss = Reducer.reduce(
-                tensor=cumulated_loss,
-                operation=dist.ReduceOp.SUM,
-                post_processing_fun=lambda t: t[0] / t[1],
+
+            score_aggregator.add_value(
+                key=AggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_timer_recorder.delta_t
             )
 
-            forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
-            thoughput_aggregator.add_value(
-                key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
+            # reduce the scores with the respective reduction operation
+            sum_reduced_scores = score_aggregator.get_all_reduced_values(
+                keys=[AggregationKeys.NUM_SAMPLES, AggregationKeys.NUM_STEPS, AggregationKeys.CUMM_LOSS],
+                reduce_operation=dist.ReduceOp.SUM,
             )
-            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-            synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
-                ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
+
+            max_reduced_scores = score_aggregator.get_all_reduced_values(
+                keys=[AggregationKeys.FORWARD_BACKWARD_TIME], reduce_operation=dist.ReduceOp.MAX
             )
-            num_samples_per_second = synced_num_samples / synced_forward_backward_time
+
+            # calculate the metric scores for logging
+            num_samples_per_second = (
+                sum_reduced_scores[AggregationKeys.NUM_SAMPLES]
+                / max_reduced_scores[AggregationKeys.FORWARD_BACKWARD_TIME]
+            )
+            eval_loss_avg = (
+                sum_reduced_scores[AggregationKeys.CUMM_LOSS] / sum_reduced_scores[AggregationKeys.NUM_STEPS]
+            )
 
             evaluation_result = EvaluationResultBatch(
-                losses={loss_fun.tag: total_loss},
+                losses={loss_fun.tag: eval_loss_avg},
                 # TODO: hardcoded metric key
                 throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,

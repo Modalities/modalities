@@ -14,14 +14,17 @@ from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentSt
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
-from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.util import Aggregator, TimeRecorder
 
 
-class ThroughputAggregationKeys(Enum):
+class AggregationKeys(Enum):
     NUM_SAMPLES = "NUM_SAMPLES"
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
+
+    NUM_STEPS = "NUM_STEPS"
+    CUMM_LOSS = "CUMM_LOSS"
+    LAST_BATCH_LOSS = "LAST_BATCH_LOSS"
 
 
 class Trainer:
@@ -74,11 +77,11 @@ class Trainer:
         checkpointing_callback: Callable[[int], None],
     ):
         model.train()
-        cumulated_losses = self._reset_tracked_losses()
+        # cumulated_losses = self._reset_tracked_losses()
 
-        thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+        score_aggregator = Aggregator[AggregationKeys]()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch
@@ -102,16 +105,15 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
             # Save the batch loss
-            cumulated_losses[0] += batch_loss.item()
+            score_aggregator.add_value(key=AggregationKeys.CUMM_LOSS, value=batch_loss.item())
             # This works, because we always drop the last batch in case it has less samples than the batch size
-            cumulated_losses[-1] += 1  # number of local batches
+            score_aggregator.add_value(key=AggregationKeys.NUM_STEPS, value=1)
 
             # gradient norm is already synced across all ranks
             if gradient_norm_score is not None:
                 gradient_norm_scores.append(gradient_norm_score.item())
 
-            batch_length_tensor = torch.tensor(len(batch)).to(device)
-            thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+            score_aggregator.add_value(key=AggregationKeys.NUM_SAMPLES, value=len(batch))
 
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -121,33 +123,39 @@ class Trainer:
 
             # Check, if model should be evaluated
             if (train_step_id + 1) % global_training_log_interval_in_steps == 0:
-                forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
+                # add the loss for the LAST batch
+                score_aggregator.add_value(key=AggregationKeys.LAST_BATCH_LOSS, value=batch_loss.item())
+                score_aggregator.add_value(
+                    key=AggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time_recorder.delta_t
+                )
+
                 forward_backward_time_recorder.reset()
 
-                thoughput_aggregator.add_value(
-                    key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
-                )
-                synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-                synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
-                    ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
-                )
-                synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
-                # TODO: insert reducer from outside so Trainer is independent of FSDP
-                # add the loss and gradient norm for the LAST batch
-                cumulated_losses[1] = batch_loss.item()
-
-                reduced_losses = Reducer.reduce(
-                    tensor=cumulated_losses,
-                    operation=dist.ReduceOp.SUM,
-                    # 1.) summed batch loss / (num batches * world size)
-                    # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / dist.get_world_size()]),
+                # reduce the scores with the respective reduction operation
+                sum_reduced_scores = score_aggregator.get_all_reduced_values(
+                    keys=[
+                        AggregationKeys.NUM_SAMPLES,
+                        AggregationKeys.NUM_STEPS,
+                        AggregationKeys.CUMM_LOSS,
+                        AggregationKeys.LAST_BATCH_LOSS,
+                    ],
+                    reduce_operation=dist.ReduceOp.SUM,
                 )
 
-                train_loss_avg, train_loss_last_batch = (
-                    reduced_losses[0],
-                    reduced_losses[1],
+                max_reduced_scores = score_aggregator.get_all_reduced_values(
+                    keys=[AggregationKeys.FORWARD_BACKWARD_TIME], reduce_operation=dist.ReduceOp.MAX
                 )
+
+                # calculate the metric scores for logging
+                synced_num_samples_per_second = (
+                    sum_reduced_scores[AggregationKeys.NUM_SAMPLES]
+                    / max_reduced_scores[AggregationKeys.FORWARD_BACKWARD_TIME]
+                )
+                train_loss_avg = (
+                    sum_reduced_scores[AggregationKeys.CUMM_LOSS] / sum_reduced_scores[AggregationKeys.NUM_STEPS]
+                )
+                train_loss_last_batch = sum_reduced_scores[AggregationKeys.LAST_BATCH_LOSS] / dist.get_world_size()
+
                 losses = {
                     f"{loss_fun.tag} average": train_loss_avg,
                     f"{loss_fun.tag} last step": train_loss_last_batch,
@@ -179,26 +187,15 @@ class Trainer:
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,
                 )
-                thoughput_aggregator.remove_keys()
+                score_aggregator.remove_keys()
 
                 model.train()
-                cumulated_losses = self._reset_tracked_losses()
 
             evaluation_callback(train_step_id=train_step_id)
             checkpointing_callback(train_step_id=train_step_id)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
-
-    def _reset_tracked_losses(self):
-        # TODO: we should handle the device assignment more centrally.
-        # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
-        cumulated_loss_and_gradient_norm = torch.zeros(3)
-        if torch.cuda.is_available():
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
-        else:
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
-        return cumulated_loss_and_gradient_norm
 
     @staticmethod
     def _publish_progress(
