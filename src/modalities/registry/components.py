@@ -61,7 +61,7 @@ from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
@@ -92,7 +92,7 @@ class ComponentEntity:
 
 COMPONENTS = [
     # models
-    ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
