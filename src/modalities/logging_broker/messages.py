@@ -8,6 +8,7 @@ class MessageTypes(Enum):
     BATCH_PROGRESS_UPDATE = "PROGRESS_UPDATE"
     ERROR_MESSAGE = "ERROR_MESSAGE"
     EVALUATION_RESULT = "EVALUATION_RESULT"
+    MODEL_STATE = "MODEL_STATE"
 
 
 T = TypeVar("T")
@@ -36,3 +37,13 @@ class BatchProgressUpdate:
     # Note: in case of ExperimentState.TRAIN, dataset_batch_id=global_train_batch_id
     experiment_status: ExperimentStatus
     dataloader_tag: str
+
+
+@dataclass
+class ModelState:
+    class KeyEnum(Enum):
+        ACTIVATION_ENTROPY = "ACTIVATION_ENTROPY"
+        SELF_ATTENTION_ENTROPY = "SELF_ATTENTION_ENTROPY"
+
+    key: KeyEnum
+    value: float
