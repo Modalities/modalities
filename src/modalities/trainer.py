@@ -68,7 +68,6 @@ class Trainer:
             losses.append(loss)
 
         (total_loss / self.gradient_acc_steps).backward()
-        self.gradient_clipper(model)
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
             gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
@@ -90,13 +89,12 @@ class Trainer:
         checkpointing_callback: Callable[[int], None],
     ):
         model.train()
-        cumulated_losses = self._reset_tracked_losses()
 
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
-        cumulated_loss = torch.zeros(len(loss_fun) + 1 + 1).to(device)
+        cumulated_losses = torch.zeros(len(loss_fun) + 1 + 1).to(device)
 
         # batch loop
         batch: DatasetBatch
@@ -121,7 +119,7 @@ class Trainer:
             forward_backward_time_recorder.stop()
             # Save the batch loss
             for i, batch_loss in enumerate(batch_losses):
-                cumulated_loss[i] += batch_loss.item()
+                cumulated_losses[i] += batch_loss.item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
             cumulated_losses[-1] += 1  # number of local batches
 
@@ -160,7 +158,7 @@ class Trainer:
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
                     # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack([t[:-1] / t[-1], t[-1] / dist.get_world_size()]),
+                    post_processing_fun=lambda t: torch.cat([t[:-1] / t[-1], t[-1:] / dist.get_world_size()]),
                 )
 
                 train_loss_avg, train_loss_last_batch = (
@@ -169,8 +167,8 @@ class Trainer:
                 )
 
                 losses = {
-                    f"total_loss average": train_loss_avg,
-                    f"total_loss last step": train_loss_last_batch,
+                    "total_loss average": train_loss_avg,
+                    "total_loss last step": train_loss_last_batch,
                 }
                 for i, lfn in enumerate(loss_fun):
                     losses[lfn.tag] = reduced_losses[i + 1]
@@ -205,23 +203,13 @@ class Trainer:
                 thoughput_aggregator.remove_keys()
 
                 model.train()
-                cumulated_losses = self._reset_tracked_losses()
+                cumulated_losses = torch.zeros(len(loss_fun) + 1 + 1).to(device)
 
             evaluation_callback(train_step_id=train_step_id)
             checkpointing_callback(train_step_id=train_step_id)
-            cumulated_loss = torch.zeros(len(loss_fun) + 1 + 1).to(device)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
-
-    def _reset_loss(self):
-        # TODO: we should handle the device assignment more centrally.
-        cumulated_loss = torch.zeros(2)
-        if torch.cuda.is_available():
-            cumulated_loss = cumulated_loss.to(torch.device(self.local_rank))
-        else:
-            cumulated_loss = cumulated_loss.to("cpu")
-        return cumulated_loss
 
     @staticmethod
     def _publish_progress(

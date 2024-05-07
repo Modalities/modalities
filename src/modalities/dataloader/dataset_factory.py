@@ -105,10 +105,6 @@ class DatasetFactory:
         num_samples: int,
         image_transform_config: Optional[ImageTransformConfig] = None,
     ) -> WebDataset:
-        # TODO this was part of the old Dataloader implementation.
-        # we need to check if this is actually wanted generally.
-        tokenizer.pad_token = tokenizer.eos_token
-
         dataset = WebDataset(
             urls=urls,
             source_image_key=source_image_key,

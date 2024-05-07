@@ -5,7 +5,7 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 64
+    global_training_log_interval_in_steps: 4
     global_checkpointing_interval_in_steps: 5_000
     global_evaluation_interval_in_steps: 5_000
     global_num_training_samples: 10_000
@@ -148,12 +148,27 @@ checkpoint_saving:
         sharding_strategy: FULL_SHARD
         block_names: [TransformerBlock, VisionTransformerBlock]
 
-loss_fn:
+captioning_loss:
   component_key: loss
-  variant_key: clm_cross_entropy_loss
+  variant_key: cross_entropy_loss
   config:
     target_key: ${settings.referencing_keys.target_key}
-    prediction_key: logits
+    prediction_key: ${model.config.prediction_key}
+    tag: captioning_loss
+
+contrastive_loss:
+  component_key: loss
+  variant_key: nce_loss
+  config:
+    prediction_key1: ${model.config.vision_cls_prediction_key}
+    prediction_key2: ${model.config.text_cls_prediction_key}
+    tag: contrastive_loss
+
+loss_fn:
+  - instance_key: captioning_loss
+    pass_type: BY_REFERENCE
+  - instance_key: contrastive_loss
+    pass_type: BY_REFERENCE
 
 wrapped_model:
   component_key: model
@@ -181,7 +196,7 @@ model:
       prediction_key: vision_embeddings
       img_size: 224
       n_classes: Null # Disable vision transformer head
-      n_layer: 12
+      n_layer: 4
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
@@ -194,11 +209,11 @@ model:
       bias: True
     text_decoder_config:
       sample_key: ${settings.referencing_keys.sample_key}
-      prediction_key: ${loss_fn.config.prediction_key}
+      prediction_key: ${model.config.prediction_key}
       block_size: 1024
       vocab_size: 50304
-      n_layer_text: 12
-      n_layer_multimodal_text: 12
+      n_layer_text: 4
+      n_layer_multimodal_text: 4
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
@@ -226,7 +241,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4
+    total_steps: 625
     pct_start: 0.01
     anneal_strategy: cos
 

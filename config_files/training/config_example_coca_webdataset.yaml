@@ -1,19 +1,19 @@
 settings:
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
   training:
-    callback_interval_in_samples: 32
-    global_num_training_samples: 1281990
-    global_num_seen_samples: 0
+    global_training_log_interval_in_steps: 4
+    global_checkpointing_interval_in_steps: 5_000
+    global_evaluation_interval_in_steps: 5_000
+    global_num_training_samples: 10_000
+    global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 4 # This is the batch size per rank?
+    local_train_micro_batch_size: 16
     sequence_length: 256
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -23,9 +23,11 @@ settings:
 
 tokenizer:
   component_key: tokenizer
-  variant_key: gpt2_tokenizer_fast
+  variant_key: pretrained_hf_tokenizer
   config:
-    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
+    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    padding: false
+    max_length: 256
 
 collate_fn:
   component_key: collate_fn
@@ -48,7 +50,7 @@ train_dataset:
     source_text_key: txt
     text_key: input_ids
     block_size: ${settings.training.sequence_length}
-    num_samples: 1_281_000
+    num_samples: 100_000
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -59,13 +61,13 @@ val_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 4
+    num_samples: 1_000
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
         sample_type: float
       - sample_key: input_ids
-        sample_shape: [1024]
+        sample_shape: [256]
         sample_type: int
 
 train_dataloader:
@@ -100,7 +102,6 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -109,7 +110,7 @@ val_dataloader:
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
             dataset:
-              instance_key: val_dataset
+              instance_key: train_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
@@ -119,18 +120,18 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1 # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -232,7 +233,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4000000
+    total_steps: 625
     pct_start: 0.01
     anneal_strategy: cos
 
@@ -248,13 +249,22 @@ optimizer:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp_logging_only
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+
 batch_progress_subscriber:
   component_key: progress_subscriber
-  variant_key: dummy
+  variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_samples: ${settings.training.global_num_seen_samples}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -268,6 +278,7 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}

@@ -12,7 +12,7 @@ from torch.utils.data.dataset import Dataset
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
-from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.dataloader import DataLoaderIF
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -53,7 +53,7 @@ PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(T
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
-PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
+PydanticLLMDataLoaderIFType = Annotated[DataLoaderIF, PydanticThirdPartyTypeIF(DataLoaderIF)]
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
 PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]

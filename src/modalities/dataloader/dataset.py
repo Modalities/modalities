@@ -14,9 +14,8 @@ from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding
 
-from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
-
 from modalities.config.config import PydanticTokenizerIFType
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
 from .create_packed_data import EmbeddedStreamData
@@ -263,7 +262,7 @@ class WebDataset(wds.WebDataset):
         image_key: str,
         source_text_key: str,
         text_key: str,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: TokenizerWrapper,
         block_size: int,
         num_samples: int,
         image_transform_config: ImageTransformConfig,
@@ -274,11 +273,13 @@ class WebDataset(wds.WebDataset):
         self.append(wds.filters.shuffle(1000))
         self.append(wds.filters.decode("pil"))
 
+        tokenizer.tokenizer.pad_token = tokenizer.tokenizer.eos_token
+
         transform = create_transform(**image_transform_config.model_dump())
 
         def make_sample(sample):
             # print(sample["json"])
-            batch_encoding: BatchEncoding = tokenizer(
+            batch_encoding: BatchEncoding = tokenizer.tokenizer(
                 sample["json"]["text0"],  # [source_text_key],
                 max_length=block_size,
                 padding="max_length",
