@@ -1,13 +1,15 @@
 from pathlib import Path
 
 import rich
+import torch
 from rich.console import Group
 from rich.panel import Panel
 
 import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
-from modalities.logging_broker.messages import Message
+from modalities.logging_broker.message_broker import MessageBroker
+from modalities.logging_broker.messages import BatchProgressUpdate, Message, MessageTypes, ModelState
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 
 
@@ -60,11 +62,27 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         super().__init__()
 
         run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory)
+        self.last_batch_progress_update: BatchProgressUpdate = None
 
         run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def consume_message(self, message: Message[EvaluationResultBatch]):
+    def consume_message(self, message: Message):
         """Consumes a message from a message broker."""
+        if message.message_type == MessageTypes.EVALUATION_RESULT:
+            self._consum_evaluation_results_batch(message)
+        elif message.message_type == MessageTypes.BATCH_PROGRESS_UPDATE:
+            self.last_batch_progress_update = message.payload
+        elif message.message_type == MessageTypes.MODEL_STATE:
+            self._consum_model_state(message)
+
+        # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
+        # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
+        # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
+
+    def _consum_model_state(self, message: Message[ModelState]):
+        wandb.log(data={message.payload.key: message.payload.value}, step=self.last_batch_progress_update.step_id + 1)
+
+    def _consum_evaluation_results_batch(self, message: Message[EvaluationResultBatch]):
         eval_result = message.payload
 
         losses = {
@@ -89,6 +107,17 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         wandb.log(data=throughput_metrics, step=eval_result.train_step_id + 1)
 
-        # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
-        # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
-        # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
+
+class ModelStatePublisher:
+    def __init__(self, message_broker: MessageBroker):
+        self.message_broker = message_broker
+
+    def log_activations(self, module, input, output):
+        entropy = torch.distributions.Categorical(probs=output).entropy()
+        payload = ModelState(key=ModelState.KeyEnum.ACTIVATION_ENTROPY, value=entropy.item())
+        message = Message(payload=payload, message_type=MessageTypes.MODEL_STATE)
+        self.message_broker.distribute_message(message)
+
+    def log_attention_scores(self, module, input, output):
+        # TODO: Implement logging of attention scores using WandBEvaluationResultSubscriber
+        pass
