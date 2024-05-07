@@ -2,7 +2,7 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-from typing import Annotated, Dict, List, Tuple
+from typing import Annotated, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -155,6 +155,8 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
     weight_init: WeightInitializationConfig
+    log_activation: Optional[bool] = False
+    log_attention_scores: Optional[bool] = False
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
