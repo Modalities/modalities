@@ -163,27 +163,34 @@ model:
     d_model: 768
     n_layer: 24
     vocab_size: 50257
-    rms_norm: True
-    ssm_cfg: 
-      d_state: 16
-      d_conv: 4
-      expand: 2
-      dt_rank: "auto"
-      dt_min: 0.001
-      dt_max: 0.1
-      dt_init: "random"
-      dt_scale: 1.0
-      dt_init_floor: 1e-4
-      conv_bias: True
-      bias: False
-      use_fast_path: True
-    residual_in_fp32: True
-    fused_add_norm: True
+    rms_norm: true
+    residual_in_fp32: true
+    fused_add_norm: true
     pad_vocab_size_multiple: 8
-    tie_embeddings: True
-    prediction_key: logits
-    sample_key: input_ids
-    # dtype: null # TODO make this an optional parameter
+    tie_embeddings: true
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    sample_key: ${settings.referencing_keys.sample_key}
+    seed: null
+    dtype: null
+    initializer_cfg: {}
+    num_last_tokens: 0
+    inference_params: {}
+    mixer_model_config:
+      norm_epsilon: 1e-5
+      device: null
+      mamba_block_config:
+        d_state: 16
+        d_conv: 4
+        expand: 2
+        dt_rank: auto
+        dt_min: 0.001
+        dt_max: 0.1
+        dt_init: random
+        dt_scale: 1.0
+        dt_init_floor: 1e-4
+        conv_bias: true
+        bias: false
+        use_fast_path: true
 
 
 loss_fn:

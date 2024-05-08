@@ -62,12 +62,13 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
 )
+from modalities.models.mamba.mamba_config import MambaLLMConfig
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 
-from modalities.models.mamba.mamba_model import MambaLLM, MambaLLMConfig
+from modalities.models.mamba.mamba_model import MambaLLM
 
 
 @dataclass

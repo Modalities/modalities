@@ -76,6 +76,26 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
     model.load_state_dict(state_dict)
     model.eval()
 
+    # todo change back
+    # enter_interactive(chat, model, tokenizer, max_new_tokens)
+    enter_manual("My", model, tokenizer, max_new_tokens)
+
+
+def enter_manual(prompt: str, model, tokenizer, max_new_tokens):
+    while True:
+        try:
+            prompt = prompt
+            print(prompt, end="")
+            model.module.generate(
+                tokenizer=tokenizer,
+                context=prompt,
+                max_new_tokens=max_new_tokens
+            )
+        except ValueError as e:
+            print(e)
+
+
+def enter_interactive(chat, model, tokenizer, max_new_tokens):
     while True:
         try:
             print("-" * 50)

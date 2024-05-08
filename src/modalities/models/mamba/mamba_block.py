@@ -6,6 +6,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pydantic import BaseModel
 from torch import Tensor
 
 from einops import rearrange, repeat
@@ -30,23 +31,23 @@ except ImportError:
 
 class MambaBlock(nn.Module):
     def __init__(
-        self,
-        d_model,
-        d_state=16,
-        d_conv=4,
-        expand=2,
-        dt_rank="auto",
-        dt_min=0.001,
-        dt_max=0.1,
-        dt_init="random",
-        dt_scale=1.0,
-        dt_init_floor=1e-4,
-        conv_bias=True,
-        bias=False,
-        use_fast_path=True,  # Fused kernel options
-        layer_idx=None,
-        device=None,
-        dtype=None,
+            self,
+            d_model,
+            d_state=16,
+            d_conv=4,
+            expand=2,
+            dt_rank="auto",
+            dt_min=0.001,
+            dt_max=0.1,
+            dt_init="random",
+            dt_scale=1.0,
+            dt_init_floor=1e-4,
+            conv_bias=True,
+            bias=False,
+            use_fast_path=True,
+            layer_idx=None,
+            device=None,
+            dtype=None,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -80,7 +81,7 @@ class MambaBlock(nn.Module):
         self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
-        dt_init_std = self.dt_rank**-0.5 * dt_scale
+        dt_init_std = self.dt_rank ** -0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -124,7 +125,7 @@ class MambaBlock(nn.Module):
         batch, seqlen, dim = hidden_states.shape
 
         conv_state, ssm_state = None, None
-        if inference_params is not None:
+        if inference_params:
             conv_state, ssm_state = self._get_states_from_cache(inference_params, batch)
             if inference_params.seqlen_offset > 0:
                 # The states are updated inplace
@@ -298,7 +299,12 @@ class MambaBlock(nn.Module):
 
 class Block(nn.Module):
     def __init__(
-        self, dim, mixer_cls, norm_cls=nn.LayerNorm, fused_add_norm=False, residual_in_fp32=False
+            self,
+            d_model: int,
+            mixer_cls: MambaBlock,
+            norm_cls: nn.LayerNorm,
+            fused_add_norm: bool,
+            residual_in_fp32: bool,
     ):
         """
         Simple block wrapping a mixer class with LayerNorm/RMSNorm and residual connection"
@@ -315,8 +321,8 @@ class Block(nn.Module):
         super().__init__()
         self.residual_in_fp32 = residual_in_fp32
         self.fused_add_norm = fused_add_norm
-        self.mixer = mixer_cls(dim)
-        self.norm = norm_cls(dim)
+        self.mixer = mixer_cls(d_model)
+        self.norm = norm_cls(d_model)
         if self.fused_add_norm:
             assert RMSNorm is not None, "RMSNorm import fails"
             assert isinstance(
@@ -324,7 +330,7 @@ class Block(nn.Module):
             ), "Only LayerNorm and RMSNorm are supported for fused_add_norm"
 
     def forward(
-        self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
+            self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
     ):
         r"""Pass the input through the encoder layer.
 
@@ -353,18 +359,3 @@ class Block(nn.Module):
 
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         return self.mixer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
-
-
-if __name__ == '__main__':
-    batch, length, dim = 2, 64, 16
-    x = torch.randn(batch, length, dim).to("cuda")
-    model = MambaBlock(
-        # This module uses roughly 3 * expand * d_model^2 parameters
-        d_model=dim,  # Model dimension d_model
-        d_state=16,  # SSM state expansion factor
-        d_conv=4,  # Local convolution width
-        expand=2,  # Block expansion factor
-    ).to("cuda")
-    y = model(x)
-    assert y.shape == x.shape
-    print(y)

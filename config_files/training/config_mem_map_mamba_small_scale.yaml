@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   referencing_keys:
     sample_key: input_ids
@@ -6,7 +6,7 @@ settings:
     prediction_key: logits
   training:
     global_training_log_interval_in_steps: 10
-    global_checkpointing_interval_in_steps: 1000 
+    global_checkpointing_interval_in_steps: 1000
     global_evaluation_interval_in_steps: 64
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: false
@@ -23,7 +23,7 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
-collate_fn:  
+collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
@@ -36,7 +36,7 @@ train_dataset:
   config:
     raw_data_path: /raid/fhgiais/opengptx/michaelf/git_repos/modalities/data-temp/en/modalities/2048/train_2048.pbin
     block_size: ${settings.training.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
+    sample_key: ${settings.referencing_keys.sample_key}
 
 val_dataset:
   component_key: dataset
@@ -44,7 +44,7 @@ val_dataset:
   config:
     raw_data_path: /raid/fhgiais/opengptx/michaelf/git_repos/modalities/data-temp/en/modalities/2048/valid_2048.pbin
     block_size: ${settings.training.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
+    sample_key: ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -52,7 +52,7 @@ train_dataloader:
   config:
     reshuffle_after_epoch: false
     num_epochs: 1 # 100 epochs
-    dataloader:   
+    dataloader:
       component_key: data_loader
       variant_key: default
       config:
@@ -134,7 +134,7 @@ checkpointing:
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
-        experiment_id: ${settings.experiment_id} 
+        experiment_id: ${settings.experiment_id}
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
         block_names: [ MambaBlock ]
@@ -149,7 +149,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [MambaBlock]
+    block_names: [ MambaBlock ]
 
 model:
   component_key: model
@@ -158,28 +158,34 @@ model:
     d_model: 768
     n_layer: 24
     vocab_size: 50257
-    rms_norm: True
-    ssm_cfg: 
-      d_state: 16
-      d_conv: 4
-      expand: 2
-      dt_rank: "auto"
-      dt_min: 0.001
-      dt_max: 0.1
-      dt_init: "random"
-      dt_scale: 1.0
-      dt_init_floor: 1e-4
-      conv_bias: True
-      bias: False
-      use_fast_path: True
-    residual_in_fp32: True
-    fused_add_norm: True
+    rms_norm: true
+    residual_in_fp32: true
+    fused_add_norm: true
     pad_vocab_size_multiple: 8
-    tie_embeddings: True
-    prediction_key: logits
-    sample_key: input_ids
-    # dtype: null # TODO make this an optional parameter
-
+    tie_embeddings: true
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    sample_key: ${settings.referencing_keys.sample_key}
+    seed: null
+    dtype: null
+    initializer_cfg: {}
+    num_last_tokens: 0
+    inference_params: {}
+    mixer_model_config:
+      norm_epsilon: 1e-5
+      device: null
+      mamba_block_config:
+        d_state: 16
+        d_conv: 4
+        expand: 2
+        dt_rank: auto
+        dt_min: 0.001
+        dt_max: 0.1
+        dt_init: random
+        dt_scale: 1.0
+        dt_init_floor: 1e-4
+        conv_bias: true
+        bias: false
+        use_fast_path: true
 
 loss_fn:
   component_key: loss
@@ -188,15 +194,15 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
-optimizer:  
+optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
-    betas: [0.9, 0.95]
+    betas: [ 0.9, 0.95 ]
     eps: 1e-8
     weight_decay: 1e-1
-    wrapped_model: 
+    wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
@@ -223,7 +229,7 @@ batch_progress_subscriber:
       - instance_key: val_dataloader
         pass_type: BY_REFERENCE
 
-    
+
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb

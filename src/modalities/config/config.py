@@ -439,7 +439,6 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
 
 class ComponentsInferenceModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
-    cuda_env: CudaEnvConfig
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
