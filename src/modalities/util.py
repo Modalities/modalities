@@ -3,7 +3,7 @@ import warnings
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Callable, Dict, Generic, Type, TypeVar
+from typing import Dict, Generic, List, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -108,31 +108,27 @@ T = TypeVar("T")
 
 class Aggregator(Generic[T]):
     def __init__(self):
-        self.key_to_value: Dict[T, torch.Tensor] = {}
+        self.key_to_value: Dict[T, float] = {}
 
-    def add_value(self, key: T, value: torch.Tensor):
+    def add_value(self, key: T, value: float | int):
         if key not in self.key_to_value:
-            self.key_to_value[key] = value
-        else:
-            self.key_to_value[key] += value
+            self.key_to_value[key] = 0
 
-    def remove_key(self, key: T):
-        self.key_to_value.pop(key)
+        self.key_to_value[key] += value
 
     def remove_keys(self):
         self.key_to_value = {}
 
-    def get_all_reduced_value(
+    def get_all_reduced_values(
         self,
-        key: T,
+        keys: List[T],
         reduce_operation: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM,
-        postprocessing_fun: None | Callable[[torch.Tensor], torch.Tensor] = None,
     ) -> torch.Tensor:
         # we clone the value so that we can always resync the value without side-effects
-        cloned_value = self.key_to_value[key].clone()
+        cloned_value = torch.FloatTensor([self.key_to_value[key] for key in keys]).cuda()
         value = Reducer.reduce(
             tensor=cloned_value,
             operation=reduce_operation,
-            post_processing_fun=postprocessing_fun,  # lambda t: t[0] / t[1],
         )
-        return value
+        reduced_dict = {key: value[i] for i, key in enumerate(keys)}
+        return reduced_dict
