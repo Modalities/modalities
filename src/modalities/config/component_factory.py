@@ -61,7 +61,7 @@ class ComponentFactory:
                 current_component_config = self._instantiate_component_config(
                     component_key=component_key,
                     variant_key=variant_key,
-                    config_dict=materialized_component_config.get("config", dict()),
+                    config_dict=materialized_component_config.get("config") or dict(),
                 )
                 # instantiate component
                 component = self._instantiate_component(

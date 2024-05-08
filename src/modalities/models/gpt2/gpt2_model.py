@@ -432,7 +432,7 @@ class MoEBlock(GPT2Block):
             moe_jitter_eps=moe_jitter_eps,
         )
 
-        self.mlp = MoEFFN(hidden_router_size=ffn_hidden, config=moe_config)  # change the ffn_hidden parameter's name
+        self.mlp = MoEFFN(hidden_router_size=n_embd, config=moe_config)  # change the ffn_hidden parameter's name
 
 
 class GPT2LLM(NNModel):
@@ -471,10 +471,10 @@ class GPT2LLM(NNModel):
         else:
             raise TypeError(f"{poe_type} not supported")
 
-        # if poe_type is not PositionTypes.NOPE and RotaryTransform in [
-        #     config.type_hint.value for config in attention_config.qkv_transforms
-        # ]:
-        #     raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
+        if poe_type is not PositionTypes.NOPE and RotaryTransform in [
+            config.type_hint.value for config in gpt2block.attention_config.qkv_transforms
+        ]:
+            raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
 
         self.transformer = nn.ModuleDict(
             dict(
