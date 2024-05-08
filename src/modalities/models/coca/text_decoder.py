@@ -7,24 +7,25 @@ from modalities.models.coca.multi_modal_decoder import TransformerBlock
 from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel
 from modalities.nn.attention import AttentionConfig, AttentionType
+from transformers import PreTrainedTokenizer
 
 
 class TextDecoder(NNModel):
     def __init__(
-        self,
-        sample_key: str,
-        prediction_key: str,
-        block_size: int,
-        vocab_size: int,
-        n_layer: int,
-        n_head: int,
-        n_embd: int,
-        ffn_hidden: int,
-        dropout: float,
-        bias: bool,
-        activation: ActivationType,
-        epsilon: float,
-        attention_config: AttentionConfig = None,
+            self,
+            sample_key: str,
+            prediction_key: str,
+            block_size: int,
+            vocab_size: int,
+            n_layer: int,
+            n_head: int,
+            n_embd: int,
+            ffn_hidden: int,
+            dropout: float,
+            bias: bool,
+            activation: ActivationType,
+            epsilon: float,
+            attention_config: AttentionConfig = None,
     ):
         super().__init__()
         self.sample_key = sample_key
@@ -71,3 +72,12 @@ class TextDecoder(NNModel):
         for block in self.transformer.h:
             x = block(x)
         return {self.prediction_key: x}
+
+    def generate(
+            self,
+            tokenizer: PreTrainedTokenizer,
+            context: str,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ):
+        raise NotImplementedError

@@ -1,4 +1,5 @@
 import math
+import sys
 from copy import deepcopy
 from enum import Enum
 from functools import partial
@@ -9,11 +10,14 @@ import torch.nn as nn
 import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
+from torch.nn import functional as F
+from transformers import PreTrainedTokenizer
 
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name
+
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -25,20 +29,20 @@ class PositionTypes(str, Enum):
 
 class QueryKeyValueTransform(nn.Module):
     def forward(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pass
 
 
 class IdentityTransform(QueryKeyValueTransform):
     def forward(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return q, k, v
 
@@ -90,7 +94,7 @@ class RotaryTransform(QueryKeyValueTransform):
         return (x * cos) + (self.rotate_half(x) * sin)
 
     def forward(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+            self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
@@ -165,7 +169,7 @@ class GPT2LLMConfig(BaseModel):
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+                [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
@@ -175,14 +179,14 @@ class GPT2LLMConfig(BaseModel):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self,
-        n_head_q: int,
-        n_head_kv: int,
-        n_embd: int,
-        attention_config: AttentionConfig,
-        bias: bool,
-        dropout: float,
-        block_size: int,
+            self,
+            n_head_q: int,
+            n_head_kv: int,
+            n_embd: int,
+            attention_config: AttentionConfig,
+            bias: bool,
+            dropout: float,
+            block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
@@ -235,7 +239,7 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+            q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size = q.shape[0]
         block_size = q.shape[1]
@@ -297,18 +301,18 @@ class TransformerMLP(nn.Module):
 
 class GPT2Block(nn.Module):
     def __init__(
-        self,
-        n_embd: int,
-        bias: bool,
-        n_head_q: int,
-        n_head_kv: int,
-        activation_type: ActivationType,
-        attention_config: AttentionConfig,
-        dropout: float,
-        block_size: int,
-        ffn_hidden: int,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
+            self,
+            n_embd: int,
+            bias: bool,
+            n_head_q: int,
+            n_head_kv: int,
+            activation_type: ActivationType,
+            attention_config: AttentionConfig,
+            dropout: float,
+            block_size: int,
+            ffn_hidden: int,
+            attention_norm: nn.Module,
+            ffn_norm: nn.Module,
     ):
         super().__init__()
         self.attention_norm = attention_norm
@@ -340,26 +344,26 @@ class GPT2Block(nn.Module):
 
 class GPT2LLM(NNModel):
     def __init__(
-        self,
-        sample_key: str,
-        prediction_key: str,
-        poe_type: PositionTypes,
-        block_size: int,
-        vocab_size: int,
-        n_layer: int,
-        n_head_q: int,
-        n_head_kv: int,
-        n_embd: int,
-        ffn_hidden: int,
-        dropout: float,
-        bias: bool,
-        activation_type: ActivationType,
-        weight_init: WeightInitializationConfig,
-        attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
-        seed: int = None
+            self,
+            sample_key: str,
+            prediction_key: str,
+            poe_type: PositionTypes,
+            block_size: int,
+            vocab_size: int,
+            n_layer: int,
+            n_head_q: int,
+            n_head_kv: int,
+            n_embd: int,
+            ffn_hidden: int,
+            dropout: float,
+            bias: bool,
+            activation_type: ActivationType,
+            weight_init: WeightInitializationConfig,
+            attention_config: AttentionConfig,
+            attention_norm: nn.Module,
+            ffn_norm: nn.Module,
+            lm_head_norm: nn.Module,
+            seed: int = None
     ):
 
         super().__init__(seed=seed)
@@ -460,3 +464,34 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+    def generate(
+            self,
+            tokenizer: PreTrainedTokenizer,
+            context: str,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ):
+        in_batch = tokenizer([context])
+        in_batch[self.sample_key] = torch.Tensor(in_batch[self.sample_key]).to(torch.int64)
+
+        for _ in range(max_new_tokens):
+            in_batch[self.sample_key] = (
+                in_batch[self.sample_key] if in_batch[self.sample_key].size(1) <= self.block_size else in_batch[
+                                                                                                           self.sample_key][
+                                                                                                       :,
+                                                                                                       -self.block_size:]
+            )
+            logits = self.forward(in_batch)[self.prediction_key]
+            logits = logits[:, -1, :] / temperature
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next_str = tokenizer.decode(idx_next[0])
+            if idx_next_str == tokenizer.eos_token:
+                print("\n<reached eos token>", end="")
+                break
+            else:
+                print(idx_next_str, end="")
+                sys.stdout.flush()
+                in_batch[self.sample_key] = torch.cat((in_batch[self.sample_key], idx_next), dim=1)
+        print("")

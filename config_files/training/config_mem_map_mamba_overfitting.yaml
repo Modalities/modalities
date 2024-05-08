@@ -23,6 +23,11 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
+cuda_env:
+  local_rank: ${cuda_env:LOCAL_RANK}
+  global_rank: ${cuda_env:RANK}
+  world_size: ${cuda_env:WORLD_SIZE}
+
 collate_fn:  
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
@@ -177,6 +182,7 @@ model:
     pad_vocab_size_multiple: 8
     tie_embeddings: True
     prediction_key: logits
+    sample_key: input_ids
     # dtype: null # TODO make this an optional parameter
 
 

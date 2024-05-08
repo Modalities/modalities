@@ -177,6 +177,7 @@ model:
     pad_vocab_size_multiple: 8
     tie_embeddings: True
     prediction_key: logits
+    sample_key: input_ids
     # dtype: null # TODO make this an optional parameter
 
 

@@ -8,6 +8,7 @@ from torch import linalg as LA
 from modalities.config.config import GradientClippingMode
 from modalities.models.model import NNModel
 from modalities.utils.gradient_clipping import build_gradient_clipper
+from transformers import PreTrainedTokenizer
 
 
 @pytest.mark.parametrize(
@@ -47,6 +48,15 @@ class TestModel(NNModel):
             return gradient_vector.abs().sum()
         if gradient_clipping_mode == GradientClippingMode.VALUE:
             return gradient_vector.abs().sum()
+
+    def generate(
+            self,
+            tokenizer: PreTrainedTokenizer,
+            context: str,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ):
+        raise NotImplementedError
 
 
 def _run_gradient_clipping_experiment(gradient_clipping_mode: GradientClippingMode, threshold: Optional[float] = None):

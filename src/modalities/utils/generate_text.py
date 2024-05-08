@@ -4,19 +4,15 @@
 # 2) How do we make the inference script robust against (architecture) changes? Maybe save the commit hash in the model state dict? # noqa: E501
 # 3) Register script in the pyproject toml?
 
-from functools import partial
 import os
 import readline  # noqa: F401
-import sys
 from pathlib import Path
 
 import torch
-from torch.nn import functional as F
 from transformers import PreTrainedTokenizer
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ComponentsInferenceModel, load_app_config_dict
-from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -59,36 +55,6 @@ chat_prompt_template = """user: {prompt}
 bot: """
 
 
-def generate(
-    model: torch.nn.Module,
-    tokenizer: PreTrainedTokenizer,
-    context: str,
-    seq_len: int,
-    max_new_tokens: int,
-    temperature: float = 1.0,
-):
-    in_batch = tokenizer([context])
-    in_batch["input_ids"] = torch.Tensor(in_batch["input_ids"]).to(torch.int64)
-
-    for _ in range(max_new_tokens):
-        in_batch["input_ids"] = (
-            in_batch["input_ids"] if in_batch["input_ids"].size(1) <= seq_len else in_batch["input_ids"][:, -seq_len:]
-        )
-        logits = model.forward(in_batch)["logits"]
-        logits = logits[:, -1, :] / temperature
-        probs = F.softmax(logits, dim=-1)
-        idx_next = torch.multinomial(probs, num_samples=1)
-        idx_next_str = tokenizer.decode(idx_next[0])
-        if idx_next_str == tokenizer.eos_token:
-            print("\n<reached eos token>", end="")
-            break
-        else:
-            print(idx_next_str, end="")
-            sys.stdout.flush()
-            in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
-    print("")
-
-
 def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, max_new_tokens: int, chat: bool):
     os.environ["LOCAL_RANK"] = "1"
     os.environ["RANK"] = "1"
@@ -109,11 +75,6 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
 
     model.load_state_dict(state_dict)
     model.eval()
-    if type(model.module) == MambaLLM:
-        generate_fn = model.module.generate
-    else:
-        seq_len = model.config.block_size
-        generate_fn = partial(generate, model=model, seq_len=seq_len)
 
     while True:
         try:
@@ -121,7 +82,7 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                generate_fn(
+                model.module.generate(
                     tokenizer=tokenizer,
                     context=prompt,
                     max_new_tokens=max_new_tokens
@@ -129,7 +90,7 @@ def main(model_path: Path, config_path: Path, tokenizer: PreTrainedTokenizer, ma
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                generate_fn(
+                model.module.generate(
                     tokenizer=tokenizer,
                     context=prompt,
                     max_new_tokens=max_new_tokens

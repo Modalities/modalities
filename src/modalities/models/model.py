@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
+from transformers import PreTrainedTokenizer
 
 
 class NNModel(nn.Module):
@@ -19,6 +20,16 @@ class NNModel(nn.Module):
 
     def get_parameters(self) -> Dict[str, torch.Tensor]:
         return {name: param for name, param in self.named_parameters()}
+
+    @abstractmethod
+    def generate(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        context: str,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+    ):
+        ...
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:

@@ -46,10 +46,15 @@ def prediction_key():
 
 
 @pytest.fixture()
-def mamba_llm(d_model, n_layer, vocab_size, prediction_key):
+def sample_key():
+    return "input_ids"
+
+
+@pytest.fixture()
+def mamba_llm(d_model, n_layer, vocab_size, prediction_key, sample_key):
     return MambaLLM(d_model=d_model, n_layer=n_layer, vocab_size=vocab_size, ssm_cfg={}, rms_norm=True,
                     residual_in_fp32=False, fused_add_norm=False, pad_vocab_size_multiple=1, tie_embeddings=False,
-                    prediction_key=prediction_key)
+                    prediction_key=prediction_key, sample_key=sample_key)
 
 
 @pytest.fixture()
@@ -108,3 +113,7 @@ def test_tie_weights(mamba_llm):
     mamba_llm.tie_embeddings = True
     mamba_llm.tie_weights()
     assert (mamba_llm.lm_head.weight == mamba_llm.backbone.embedding.weight).all()
+
+
+def test_generate(mamba_llm):
+    raise NotImplementedError

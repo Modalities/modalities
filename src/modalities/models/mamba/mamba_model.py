@@ -1,18 +1,17 @@
 # Copyright (c) 2023, Albert Gu, Tri Dao.
 
 import math
-from functools import partial
 import sys
-from typing import Dict, Optional
+from functools import partial
+from typing import Dict
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pydantic import BaseModel
-from transformers import PreTrainedTokenizer
-
 from modalities.models.mamba.mamba_block import Block, MambaBlock
 from modalities.models.model import NNModel
+from pydantic import BaseModel
+from transformers import PreTrainedTokenizer
 
 try:
     from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
@@ -186,11 +185,12 @@ class MambaLLM(NNModel):
             pad_vocab_size_multiple: int,
             tie_embeddings: bool,
             prediction_key: str,
+            sample_key: str,
             seed: int = None,
             dtype: str = None,
             initializer_cfg=None,
             num_last_tokens=0,
-            inference_params=None
+            inference_params=None,
     ):
         super().__init__(seed=seed)
         if initializer_cfg is None:
@@ -206,6 +206,8 @@ class MambaLLM(NNModel):
         self.pad_vocab_size_multiple = pad_vocab_size_multiple
         self.tie_embeddings = tie_embeddings
         self.prediction_key = prediction_key
+        self.sample_key = sample_key
+        self.dtype = dtype
 
         # todo: How to pass these variables in the forward method?
         self.inference_params = inference_params
@@ -222,9 +224,9 @@ class MambaLLM(NNModel):
             initializer_cfg=initializer_cfg,
             fused_add_norm=self.fused_add_norm,
             residual_in_fp32=self.residual_in_fp32,
-            dtype=dtype,
+            dtype=self.dtype,
         )
-        self.lm_head = nn.Linear(self.d_model, self.vocab_size, bias=False, dtype=dtype)
+        self.lm_head = nn.Linear(self.d_model, self.vocab_size, bias=False, dtype=self.dtype)
 
         # Initialize weights and apply final processing
         self.apply(
@@ -248,24 +250,25 @@ class MambaLLM(NNModel):
         num_last_tokens: if > 0, only return the logits for the last n tokens
         """
 
-        hidden_states = self.backbone(inputs["input_ids"], inference_params=self.inference_params)
+        hidden_states = self.backbone(inputs[self.sample_key], inference_params=self.inference_params)
         if self.num_last_tokens > 0:
             hidden_states = hidden_states[:, -self.num_last_tokens:]
         lm_logits = self.lm_head(hidden_states.to(self.lm_head.weight.dtype))
         return {self.prediction_key: lm_logits}
-    
+
     def generate(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        context: str,
-        max_new_tokens: int,
-        temperature: float = 1.0,
+            self,
+            tokenizer: PreTrainedTokenizer,
+            context: str,
+            max_new_tokens: int,
+            temperature: float = 1.0,
     ):
         if not context:
             raise ValueError("Context must be not empty")
-            
+
         in_batch = tokenizer([context])
-        in_batch["input_ids"] = torch.Tensor(in_batch["input_ids"]).to(torch.int32).to(next(self.parameters()).device)
+        in_batch[self.sample_key] = torch.Tensor(in_batch[self.sample_key]).to(torch.int32).to(
+            next(self.parameters()).device)
 
         for _ in range(max_new_tokens):
             logits = self.forward(in_batch)["logits"]
@@ -279,7 +282,7 @@ class MambaLLM(NNModel):
             else:
                 print(idx_next_str, end="")
                 sys.stdout.flush()
-                in_batch["input_ids"] = torch.cat((in_batch["input_ids"], idx_next), dim=1)
+                in_batch[self.sample_key] = torch.cat((in_batch[self.sample_key], idx_next), dim=1)
         print("")
 
 
@@ -294,4 +297,9 @@ class MambaLLMConfig(BaseModel):
     pad_vocab_size_multiple: int
     tie_embeddings: bool
     prediction_key: str
-    #dtype: Optional[str]
+    sample_key: str
+    # dtype: Optional[str]
+
+
+if __name__ == '__main__':
+    print("hello")

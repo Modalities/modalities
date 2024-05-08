@@ -14,6 +14,7 @@ from modalities.models.gpt2.gpt2_model import ActivationType, WeightInitializati
 from modalities.models.model import NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
+from transformers import PreTrainedTokenizer
 
 
 class TextDecoderConfig(BaseModel):
@@ -176,3 +177,12 @@ class CoCa(NNModel):
         decoder_outputs = self.multimodal_decoder(decoder_inputs)
         logits = decoder_outputs[self.multimodal_decoder.prediction_key]
         return logits
+
+    def generate(
+            self,
+            tokenizer: PreTrainedTokenizer,
+            context: str,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ):
+        raise NotImplementedError
