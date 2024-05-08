@@ -113,7 +113,7 @@ class ModelStatePublisher:
         self.message_broker = message_broker
 
     def log_activations(self, module, input, output):
-        entropy = torch.distributions.Categorical(probs=output).entropy()
+        entropy = torch.distributions.Categorical(logits=output).entropy()
         payload = ModelState(key=ModelState.KeyEnum.ACTIVATION_ENTROPY, value=entropy.item())
         message = Message(payload=payload, message_type=MessageTypes.MODEL_STATE)
         self.message_broker.distribute_message(message)
