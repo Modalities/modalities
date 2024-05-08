@@ -281,3 +281,27 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    project: modalities_lorem_ipsum
+    mode: ONLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
+    config_file_path: ${settings.config_file_path}
+
+
+broker:
+  subscriptions: 
+    BATCH_PROGRESS_UPDATE: 
+      - instance_key: batch_progress_subscriber
+        pass_type: BY_REFERENCE
+    EVALUATION_RESULT: 
+      - instance_key: evaluation_subscriber
+        pass_type: BY_REFERENCE
+    MODEL_STATE:
+      - instance_key: evaluation_subscriber
+        pass_type: BY_REFERENCE
