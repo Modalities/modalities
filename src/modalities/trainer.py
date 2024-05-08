@@ -10,9 +10,10 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
-from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
+from modalities.messaging.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
+from modalities.messaging.messages.payloads import ForwardPassState
+from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
@@ -87,9 +88,17 @@ class Trainer:
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         gradient_norm_scores = []
+
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
             train_step_id = batch_id + train_loader.fast_forward_batch_id
+
+            self._publish_progress(
+                batch_progress_publisher=self.batch_progress_publisher,
+                train_step_id=train_step_id,
+                dataloader_tag=train_loader.dataloader_tag,
+            )
+
             # Train single batch
             batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
@@ -110,14 +119,23 @@ class Trainer:
             if gradient_norm_score is not None:
                 gradient_norm_scores.append(gradient_norm_score.item())
 
+            ForwardPassState(
+                metrics=ForwardPassState.Metrics(
+                    loss=batch_loss.item(),
+                    gradient_norm_score=gradient_norm_score.item() if gradient_norm_score is not None else None,
+                    num_samples=len(batch),
+                    forward_backward_time=forward_backward_time_recorder.delta_t,
+                ),
+                inference_result_batch=batch,
+                meta_information=ForwardPassState.MetaInformation(
+                    step_id=train_step_id,
+                    dataloader_tag=train_loader.dataloader_tag,
+                    experiment_status=ForwardPassState.MetaInformation.ExperimentStatus.TRAIN,
+                ),
+            )
+
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
-
-            self._publish_progress(
-                batch_progress_publisher=self.batch_progress_publisher,
-                train_step_id=train_step_id,
-                dataloader_tag=train_loader.dataloader_tag,
-            )
 
             # Check, if model should be evaluated
             if (train_step_id + 1) % global_training_log_interval_in_steps == 0:

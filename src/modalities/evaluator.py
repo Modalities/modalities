@@ -6,8 +6,8 @@ import torch.nn as nn
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
-from modalities.logging_broker.publisher import MessagePublisher
+from modalities.messaging.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
+from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
