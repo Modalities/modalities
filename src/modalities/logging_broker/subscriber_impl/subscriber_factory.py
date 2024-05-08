@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -57,12 +57,12 @@ class ResultsSubscriberFactory:
         project: str,
         experiment_id: str,
         mode: WandbMode,
+        config_file_path: Path,
         directory: Path = None,
-        experiment_config: Dict = None,
     ) -> WandBEvaluationResultSubscriber:
         if local_rank == 0 and (mode != WandbMode.DISABLED):
             result_subscriber = WandBEvaluationResultSubscriber(
-                project, experiment_id, mode, directory, experiment_config
+                project, experiment_id, mode, directory, config_file_path
             )
         else:
             result_subscriber = ResultsSubscriberFactory.get_dummy_result_subscriber()

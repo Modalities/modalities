@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import PydanticLLMDataLoaderIFType
+from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.registry.components import COMPONENTS
