@@ -267,7 +267,8 @@ class WebDataset(wds.WebDataset):
         num_samples: int,
         image_transform_config: ImageTransformConfig,
     ):
-        super().__init__(urls=urls)
+        # TODO auto node splitter
+        super().__init__(urls=urls, nodesplitter=wds.shardlists.split_by_node, repeat=True)
         self.num_samples = num_samples
 
         self.append(wds.filters.shuffle(1000))
@@ -280,7 +281,7 @@ class WebDataset(wds.WebDataset):
         def make_sample(sample):
             # print(sample["json"])
             batch_encoding: BatchEncoding = tokenizer.tokenizer(
-                sample["json"]["text0"],  # [source_text_key],
+                sample[source_text_key],
                 max_length=block_size,
                 padding="max_length",
                 truncation=True,
