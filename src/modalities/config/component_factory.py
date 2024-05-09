@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Type, TypeVar, Union
 
 from pydantic import BaseModel
@@ -14,7 +15,6 @@ class ComponentFactory:
     def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
         component_names = list(components_model_type.model_fields.keys())
         component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
-        print(component_dict)
         components = components_model_type(**component_dict)
         return components
 
@@ -67,7 +67,9 @@ class ComponentFactory:
                 component = self._instantiate_component(
                     component_key=component_key, variant_key=variant_key, component_config=current_component_config
                 )
-                print(" -> ".join(traversal_path) + ":", component)
+
+                if os.environ["RANK"] == 0:
+                    print(" -> ".join(traversal_path) + ":", component)
 
                 # if the component is a top level component, then we add it to the top level components dictionary
                 # to make sure that we don't build it again. Building it again would mean that we work by-value
@@ -91,7 +93,8 @@ class ComponentFactory:
                     # so that we don't instantiate it again when we reach the respective component config
                     # in the subsequent config traversal
                     top_level_components[referenced_entity_key] = materialized_referenced_component
-                print(" -> ".join(traversal_path) + ": ", f"--ref--> {top_level_components[referenced_entity_key]}")
+                if os.environ["RANK"]:
+                    print(" -> ".join(traversal_path) + ": ", f"--ref--> {top_level_components[referenced_entity_key]}")
                 return top_level_components[referenced_entity_key], top_level_components
 
             return materialized_component_config, top_level_components
