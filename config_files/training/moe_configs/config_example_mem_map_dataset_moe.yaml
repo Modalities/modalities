@@ -5,10 +5,9 @@ settings:
     target_key: target_ids
     prediction_key: logits
   training:
-    global_training_log_interval_in_steps: 1
-    global_checkpointing_interval_in_steps: 128 
-    global_evaluation_interval_in_steps: 64
-    global_num_seen_steps: 0
+    callback_interval_in_samples: 32768
+    global_num_training_samples: 2048
+    global_num_seen_samples: 0
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 16
@@ -31,54 +30,48 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
-    block_size: ${settings.training.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
-
-val_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_continuous
-  config:
-    raw_data_path: /workspaces/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1048576/redpyjama_v2_default_DE_num_docs_1048576.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
-  variant_key: repeating_data_loader
+  variant_key: default
   config:
-    reshuffle_after_epoch: false
-    num_epochs: 100
-    dataloader:   
-      component_key: data_loader
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
       variant_key: default
       config:
-        num_workers: 2
-        pin_memory: true
-        shuffle: false
-        dataloader_tag: train
-        dataset:
-          instance_key: train_dataset
-          pass_type: BY_REFERENCE
-        batch_sampler:
-          component_key: batch_sampler
-          variant_key: default
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
           config:
-            batch_size: ${settings.training.local_train_micro_batch_size}
-            drop_last: true
-            sampler:
-              component_key: sampler
-              variant_key: distributed_sampler
-              config:
-                rank: ${settings.cuda_env.global_rank}
-                num_replicas: ${settings.cuda_env.world_size}
-                shuffle: true
-                dataset:
-                  instance_key: train_dataset
-                  pass_type: BY_REFERENCE
-        collate_fn:
-          instance_key: collate_fn
-          pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpyjama_v2_default_DE_num_docs_1024/redpyjama_v2_default_DE_num_docs_1024.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
 
 val_dataloader:
   component_key: data_loader
@@ -87,7 +80,7 @@ val_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: val
+    dataloader_tag: "val"
     dataset:
       instance_key: val_dataset
       pass_type: BY_REFERENCE
@@ -115,7 +108,6 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
 
-
 checkpointing:
   component_key: checkpointing
   variant_key: default
@@ -134,7 +126,7 @@ checkpointing:
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
-        block_names: [TransformerBlockock]
+        block_names: [MoEBlock]
 
 wrapped_model:
   component_key: model
@@ -146,14 +138,14 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [TransformerBlockock]
+    block_names: [MoEBlock]
 
 model:
   component_key: model
   variant_key: gpt2
   config:
     sample_key: ${settings.referencing_keys.sample_key}
-    poe_type: ABSOLUTE
+    poe_type: NOPE
     block_size: ${settings.training.sequence_length}
     prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
@@ -163,8 +155,11 @@ model:
     dropout: 0.0
     attention_config:
       qkv_transforms:
-        - type_hint: IdentityTransform
-          config: {}
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model.config.n_embd}
+            n_head: ${model.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
     activation_type: gelu
     weight_init:
       mean: 0.0
@@ -192,7 +187,7 @@ model:
         epsilon: 1e-5
     gpt2block:
       component_key: block
-      variant_key: transformer_block
+      variant_key: moe_block
       config:
         block_size: ${settings.training.sequence_length}
         n_embd: ${model.config.n_embd}
@@ -212,10 +207,19 @@ model:
             epsilon: 1e-5
         attention_config: ${model.config.attention_config}
         dropout: ${model.config.dropout}    
-        bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
+        bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster   
         n_head_q: ${model.config.n_head_q}
         n_head_kv: 12
-        ffn_hidden: 2048
+        ffn_hidden: 2048 
+        moe_num_experts: 4
+        moe_top_k: 2
+        moe_normalize_expert_weights: 0.1
+        uniform_expert_assignment: true
+        moe_jitter_eps: 0.1
+        moe_act_fn:
+          component_key: moe_act_fn
+          variant_key: silu
+          config:
 
 loss_fn:
   component_key: loss
@@ -229,9 +233,6 @@ optimizer:
   variant_key: adam_w
   config:
     lr: 0.0001
-    betas: [0.9, 0.95]
-    eps: 1e-8
-    weight_decay: 1e-1
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -246,22 +247,13 @@ gradient_clipper:
     norm_type: P2_NORM
     max_norm: 1.0
 
-scheduler:
-  component_key: scheduler
-  variant_key: dummy_lr
-  config:
-    optimizer:
-      instance_key: optimizer
-      pass_type: BY_REFERENCE
-
-
 batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    global_num_seen_samples: ${settings.training.global_num_seen_samples}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
