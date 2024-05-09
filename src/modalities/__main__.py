@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import logging
 import os
 import shutil
 from pathlib import Path
@@ -221,7 +220,12 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+
+        if os.environ["RANK"] == 0:
+            # TODO calculate parameters for full model
+            print(
+                f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters (per process)."
+            )
 
         if components.settings.training.do_apply_activation_checkpointing:
             apply_activation_checkpointing_inplace(wrapped_model)
@@ -237,7 +241,10 @@ class Main:
             global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
             global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
         )
-        print("done")
+
+        dist.barrier()
+        if os.environ["RANK"] == 0:
+            print("done")
 
     def get_logging_publishers(
         self,
