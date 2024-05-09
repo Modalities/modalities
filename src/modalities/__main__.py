@@ -8,6 +8,7 @@ from typing import Dict, Tuple, Type
 
 import click
 import click_pathlib
+import torch.distributed as dist
 from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
@@ -48,11 +49,12 @@ def main() -> None:
     help="Path to a file with the YAML config file.",
 )
 def entry_point_run_modalities(config_file_path: Path):
-    config_dict = load_app_config_dict(config_file_path)
-    main_obj = Main(config_dict, config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        config_dict = load_app_config_dict(config_file_path)
+        main_obj = Main(config_dict, config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
+        dist.barrier()
 
 
 @main.command(name="generate_text")

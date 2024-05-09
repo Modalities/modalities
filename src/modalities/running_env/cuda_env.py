@@ -13,7 +13,7 @@ class CudaEnv:
     ) -> None:
         self.process_group_backend = process_group_backend
         # TODO we might want to set this from outside via the config
-        self.local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        self.local_rank = int(os.environ["LOCAL_RANK"])
 
     def __enter__(self) -> "CudaEnv":
         dist.init_process_group(self.process_group_backend.value)
@@ -21,5 +21,4 @@ class CudaEnv:
         return self
 
     def __exit__(self, type, value, traceback):
-        dist.barrier()
         dist.destroy_process_group()
