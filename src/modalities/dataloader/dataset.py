@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
+import torch
 import webdataset as wds
 from pydantic import BaseModel
 from timm.data import create_transform
@@ -252,6 +253,27 @@ class WebDatasetConfig(BaseModel):
     block_size: int
     num_samples: int
     image_transform_config: Optional[ImageTransformConfig] = None
+    shardshuffle: Optional[int] = None
+    repeat: bool = False
+    resample: bool = False
+    shuffle: int = 0
+
+
+def nodesplitter(src, group=None):
+    if torch.distributed.is_initialized():
+        if group is None:
+            group = torch.distributed.group.WORLD
+        rank = torch.distributed.get_rank(group=group)
+        size = torch.distributed.get_world_size(group=group)
+        print(f"nodesplitter: rank={rank} size={size}")
+        count = 0
+        for i, item in enumerate(src):
+            if i % size == rank:
+                yield item
+                count += 1
+        print(f"nodesplitter: rank={rank} size={size} count={count} DONE")
+    else:
+        yield from src
 
 
 class WebDataset(wds.WebDataset):
@@ -266,12 +288,23 @@ class WebDataset(wds.WebDataset):
         block_size: int,
         num_samples: int,
         image_transform_config: ImageTransformConfig,
+        shardshuffle: int,
+        repeat: bool,
+        resample: bool,
+        shuffle: int,
     ):
-        # TODO auto node splitter
-        super().__init__(urls=urls, nodesplitter=wds.shardlists.split_by_node, repeat=True)
+        super().__init__(
+            urls=urls,
+            nodesplitter=nodesplitter if not resample else None,
+            workersplitter=wds.shardlists.split_by_worker,
+            shardshuffle=shardshuffle,
+            repeat=repeat,
+            handler=wds.ignore_and_continue,
+            resampled=resample,
+        )
         self.num_samples = num_samples
 
-        self.append(wds.filters.shuffle(1000))
+        self.append(wds.filters.shuffle(shuffle))
         self.append(wds.filters.decode("pil"))
 
         tokenizer.tokenizer.pad_token = tokenizer.tokenizer.eos_token
