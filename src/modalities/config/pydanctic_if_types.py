@@ -14,8 +14,9 @@ from modalities.checkpointing.checkpoint_saving import CheckpointSaving, Checkpo
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
-from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
+from modalities.messaging.publishers.publisher import MessagePublisherIF
+from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
@@ -58,6 +59,7 @@ PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimize
 PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
 PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
 PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
+PydanticMessagePublisherIFType = Annotated[MessagePublisherIF, PydanticThirdPartyTypeIF(MessagePublisherIF)]
 PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(torch.device)]
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]

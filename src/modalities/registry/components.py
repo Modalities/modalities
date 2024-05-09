@@ -34,6 +34,8 @@ from modalities.config.config import (
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MessageBrokerConfig,
+    MessagePublisherConfig,
     OneCycleLRSchedulerConfig,
     OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
@@ -52,11 +54,10 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
-from modalities.logging_broker.subscriber_impl.subscriber_factory import (
-    ProgressSubscriberFactory,
-    ResultsSubscriberFactory,
-)
 from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.messaging.broker.message_broker import MessageBroker
+from modalities.messaging.publishers.publisher_factory import PublisherFactory
+from modalities.messaging.subscribers.subscriber_factory import ProgressSubscriberFactory, ResultsSubscriberFactory
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -169,6 +170,32 @@ COMPONENTS = [
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
+    # Message Broker
+    ComponentEntity(
+        "message_broker",
+        "default",
+        MessageBroker,
+        MessageBrokerConfig,
+    ),
+    # Message Publishers
+    ComponentEntity(
+        "message_publisher",
+        "progress_publisher",
+        PublisherFactory.get_batch_progress_publisher,
+        MessagePublisherConfig,
+    ),
+    ComponentEntity(
+        "message_publisher",
+        "evaluation_result_publisher",
+        PublisherFactory.get_evaluation_result_publisher,
+        MessagePublisherConfig,
+    ),
+    ComponentEntity(
+        "message_publisher",
+        "evaluation_result_publisher",
+        PublisherFactory.get_evaluation_result_publisher,
+        MessagePublisherConfig,
+    ),
     # Progress subscriber
     ComponentEntity(
         "progress_subscriber",

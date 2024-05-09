@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticMessagePublisherIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -318,11 +319,21 @@ class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
-    local_rank: int
+    local_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):
     pass
+
+
+class MessageBrokerConfig(BaseModel):
+    pass
+
+
+class MessagePublisherConfig(BaseModel):
+    message_broker: PydanticMessagePublisherIFType
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    local_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):
