@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Union
 
 import torch
 import torch.distributed as dist
@@ -29,11 +29,11 @@ class Evaluator:
         batch: DatasetBatch,
         model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-    ):
+    ) -> Union[torch.Tensor, InferenceResultBatch]:
         with torch.no_grad():
             result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
-        return loss
+        return loss, result_batch
 
     def evaluate(
         self,
@@ -54,7 +54,7 @@ class Evaluator:
             score_aggregator = Aggregator[AggregationKeys]()
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
-                    batch_loss = self.evaluate_batch(
+                    batch_loss, result_batch = self.evaluate_batch(
                         batch=batch,
                         model=model,
                         loss_fun=loss_fun,
@@ -98,7 +98,7 @@ class Evaluator:
             evaluation_result = EvaluationResultBatch(
                 losses={loss_fun.tag: eval_loss_avg},
                 # TODO: hardcoded metric key
-                throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
+                meta_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
                 train_step_id=train_step_id,
             )
