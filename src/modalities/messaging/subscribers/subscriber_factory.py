@@ -3,11 +3,8 @@ from typing import List
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
-    DummyProgressSubscriber,
-    RichProgressSubscriber,
-)
-from modalities.logging_broker.subscriber_impl.results_subscriber import (
+from modalities.messaging.subscribers.batch_progress_subscriber import DummyProgressSubscriber, RichProgressSubscriber
+from modalities.messaging.subscribers.results_subscriber import (
     DummyResultSubscriber,
     RichResultSubscriber,
     WandBEvaluationResultSubscriber,

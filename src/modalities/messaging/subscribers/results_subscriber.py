@@ -8,9 +8,9 @@ from rich.panel import Panel
 import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
-from modalities.logging_broker.message_broker import MessageBroker
-from modalities.logging_broker.messages import BatchProgressUpdate, Message, MessageTypes, ModelState
-from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.messaging.broker.message_broker import MessageBrokerIF
+from modalities.messaging.messages import BatchProgressUpdate, Message, MessageTypes, ModelState
+from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 
 class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
@@ -73,13 +73,15 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         elif message.message_type == MessageTypes.BATCH_PROGRESS_UPDATE:
             self.last_batch_progress_update = message.payload
         elif message.message_type == MessageTypes.MODEL_STATE:
-            self._consum_model_state(message)
+            self._consume_model_state(message)
 
         # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
         # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
         # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
 
-    def _consum_model_state(self, message: Message[ModelState]):
+    def _consume_model_state(self, message: Message[ModelState]):
+        if self.last_batch_progress_update is None:
+            raise ValueError("Received a model state message before a batch progress update message.")
         wandb.log(data={message.payload.key: message.payload.value}, step=self.last_batch_progress_update.step_id + 1)
 
     def _consum_evaluation_results_batch(self, message: Message[EvaluationResultBatch]):
@@ -109,12 +111,12 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
 
 class ModelStatePublisher:
-    def __init__(self, message_broker: MessageBroker):
+    def __init__(self, message_broker: MessageBrokerIF):
         self.message_broker = message_broker
 
     def log_activations(self, module, input, output):
         entropy = torch.distributions.Categorical(logits=output).entropy()
-        payload = ModelState(key=ModelState.KeyEnum.ACTIVATION_ENTROPY, value=entropy.item())
+        payload = ModelState(key=ModelState.ModelStateKeys.ACTIVATION_ENTROPY, value=entropy.item())
         message = Message(payload=payload, message_type=MessageTypes.MODEL_STATE)
         self.message_broker.distribute_message(message)
 

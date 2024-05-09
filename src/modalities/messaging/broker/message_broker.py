@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Dict, List
 
-from modalities.logging_broker.messages import Message, MessageTypes
-from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.messaging.messages.message import Message, MessageTypes
+from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 
 class MessageBrokerIF(ABC):

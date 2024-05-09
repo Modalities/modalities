@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from modalities.logging_broker.message_broker import Message, MessageBroker
-from modalities.logging_broker.messages import MessageTypes
+from modalities.messaging.broker.message_broker import Message, MessageBrokerIF
+from modalities.messaging.messages.message import MessageTypes
 
 T = TypeVar("T")
 
@@ -18,7 +18,7 @@ class MessagePublisher(MessagePublisherIF[T]):
 
     def __init__(
         self,
-        message_broker: MessageBroker,
+        message_broker: MessageBrokerIF,
         global_rank: int,
         local_rank: int,
     ):
