@@ -167,7 +167,7 @@ class Trainer:
                 )
 
                 losses = {
-                    "total_loss average": train_loss_avg,
+                    "total_loss average": train_loss_avg / train_loss_last_batch,
                     "total_loss last step": train_loss_last_batch,
                 }
                 for i, lfn in enumerate(loss_fun):
