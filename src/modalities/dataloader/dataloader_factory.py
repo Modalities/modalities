@@ -41,14 +41,14 @@ class DataloaderFactory:
 
     @staticmethod
     def get_web_loader(
-        dataloader_tag: str,
-        dataset: Dataset,
-        batch_size: int,
-        collate_fn: Callable,
-        num_workers: int,
+        dataloader_tag: str, dataset: Dataset, batch_size: int, collate_fn: Callable, num_workers: int, pin_memory: bool
     ) -> WebLoader:
-        dataset = dataset.batched(batch_size, collation_fn=collate_fn)
         dataloader = WebLoader(
-            dataloader_tag=dataloader_tag, dataset=dataset, batch_size=batch_size, num_workers=num_workers
+            dataloader_tag=dataloader_tag,
+            dataset=dataset,
+            batch_size=batch_size,
+            collate_fn=collate_fn,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
         )
         return dataloader

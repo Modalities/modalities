@@ -161,7 +161,6 @@ class WebLoader(DataLoaderIF):
         self.num_batches = len(dataset) // batch_size
         dataset = dataset.batched(batch_size, collation_fn=collate_fn)
         self.webloader = wd.WebLoader(dataset=dataset, batch_size=None, num_workers=num_workers, pin_memory=pin_memory)
-        # self.webloader = self.webloader.unbatched().shuffle(1000).batched(batch_size)
         self.webloader = self.webloader.with_epoch(self.num_batches)
         self.dataloader_tag = dataloader_tag
         self.batch_size = batch_size

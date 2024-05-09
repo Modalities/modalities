@@ -305,6 +305,7 @@ class WebLoaderConfig(BaseModel):
     batch_size: int
     collate_fn: PydanticCollateFnIFType
     num_workers: Annotated[int, Field(strict=True, ge=0)]
+    pin_memory: bool
 
 
 class RepeatingDataLoaderConfig(BaseModel):
