@@ -104,6 +104,10 @@ class DatasetFactory:
         block_size: int,
         num_samples: int,
         image_transform_config: Optional[ImageTransformConfig] = None,
+        shardshuffle: Optional[int] = None,
+        repeat: bool = False,
+        resample: bool = False,
+        shuffle: int = 0,
     ) -> WebDataset:
         dataset = WebDataset(
             urls=urls,
@@ -115,5 +119,9 @@ class DatasetFactory:
             block_size=block_size,
             num_samples=num_samples,
             image_transform_config=image_transform_config,
+            shardshuffle=shardshuffle,
+            repeat=repeat,
+            resample=resample,
+            shuffle=shuffle,
         )
         return dataset
