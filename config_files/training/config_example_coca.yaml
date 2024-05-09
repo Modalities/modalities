@@ -8,11 +8,11 @@ settings:
     global_training_log_interval_in_steps: 4
     global_checkpointing_interval_in_steps: 5_000
     global_evaluation_interval_in_steps: 5_000
-    global_num_training_samples: 10_000
+    global_num_training_samples: 102_400
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 16
+    local_train_micro_batch_size: 144
     sequence_length: 256
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
@@ -45,7 +45,7 @@ train_dataset:
     num_samples: 10_000
     sample_definition:
       - sample_key: images
-        sample_shape: [3, 224, 224]
+        sample_shape: [3, 256, 256]
         sample_type: float
       - sample_key: input_ids
         sample_shape: [256]
@@ -58,7 +58,7 @@ val_dataset:
     num_samples: 1_000
     sample_definition:
       - sample_key: images
-        sample_shape: [3, 224, 224]
+        sample_shape: [3, 256, 256]
         sample_type: float
       - sample_key: input_ids
         sample_shape: [256]
@@ -145,7 +145,7 @@ checkpoint_saving:
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
         mixed_precision_settings: FP_16
-        sharding_strategy: FULL_SHARD
+        sharding_strategy: HYBRID_SHARD
         block_names: [TransformerBlock, VisionTransformerBlock]
 
 captioning_loss:
@@ -179,7 +179,7 @@ wrapped_model:
       pass_type: BY_REFERENCE
     sync_module_states: true
     mixed_precision_settings: FP_16
-    sharding_strategy: FULL_SHARD
+    sharding_strategy: HYBRID_SHARD
     block_names: [TransformerBlock, VisionTransformerBlock]
 
 model:
@@ -194,16 +194,16 @@ model:
     vision_encoder_config:
       sample_key: images
       prediction_key: vision_embeddings
-      img_size: 224
+      img_size: 256 # 288 in the original coca
       n_classes: Null # Disable vision transformer head
-      n_layer: 4
+      n_layer: 12
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
       n_embd: 768
       dropout: 0.0
-      patch_size: 16
-      patch_stride: 16
+      patch_size: 16 # 18 in the original coca
+      patch_stride: 16 # 18 in the original coca
       n_img_channels: 3
       add_cls_token: False
       bias: True
@@ -211,9 +211,9 @@ model:
       sample_key: ${settings.referencing_keys.sample_key}
       prediction_key: ${model.config.prediction_key}
       block_size: 1024
-      vocab_size: 50304
-      n_layer_text: 4
-      n_layer_multimodal_text: 4
+      vocab_size: 50304 # 64k in the original coca
+      n_layer_text: 12
+      n_layer_multimodal_text: 12
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
@@ -223,7 +223,7 @@ model:
       bias: true
       activation: fused_swiglu
       epsilon: 1e-5
-    n_pool_head: 8
+    n_pool_head: 12
     n_vision_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
@@ -233,26 +233,26 @@ model:
 
 scheduler:
   component_key: scheduler
-  variant_key: onecycle_lr
+  variant_key: onecycle_lr # COCA uses linear decay
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    max_lr: 6e-4
+    max_lr: 8e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 625
-    pct_start: 0.01
+    total_steps: 500_000 # depends on 500.000 iterations on 65,536 image-text pairs -> 5 epochs on JFT -> 32.7B image-text pairs
+    pct_start: 0.02
     anneal_strategy: cos
 
 optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
-    lr: 0.0001
-    betas: [0.9, 0.95]
+    lr: 8e-4
+    betas: [0.9, 0.999]
     eps: 1e-8
-    weight_decay: 1e-1
+    weight_decay: 0.01
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -270,7 +270,7 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    local_rank: ${settings.cuda_env.global_rank}
     world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
@@ -284,9 +284,9 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    local_rank: ${settings.cuda_env.global_rank}
     project: modalities
-    mode: OFFLINE
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
