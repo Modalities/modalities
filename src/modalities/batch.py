@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict
 
 import torch
@@ -91,25 +91,3 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
     def __len__(self) -> int:
         key = list(self.predictions.keys())[0]
         return self.predictions[key].shape[self.batch_dim]
-
-
-@dataclass
-class EvaluationResultBatch(Batch):
-    """Data class for storing the results of a single or multiple batches.
-    Also entire epoch results are stored in here."""
-
-    dataloader_tag: str
-    train_step_id: int
-    losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    throughput_metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-
-    def __str__(self) -> str:
-        eval_str = f"Evaluation result on dataset tag {self.dataloader_tag} after {self.train_step_id + 1} steps:"
-        eval_str += "\n\nlosses: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()])
-        eval_str += "\n\nmetrics: " + "\n\t".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()])
-        eval_str += "\n\nthroughput metrics: " + "\n\t".join(
-            [f"{k}: {v.mean().item()}" for k, v in self.throughput_metrics.items()]
-        )
-        eval_str += "\n==============================================="
-        return eval_str
