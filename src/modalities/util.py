@@ -3,14 +3,12 @@ import warnings
 from datetime import datetime
 from enum import Enum
 from types import TracebackType
-from typing import Dict, Generic, List, Type, TypeVar
+from typing import Type
 
 import torch
-import torch.distributed as dist
 from pydantic import ValidationError
 
 from modalities.exceptions import TimeRecorderStateError
-from modalities.running_env.fsdp.reducer import Reducer
 
 
 def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
@@ -101,34 +99,3 @@ class TimeRecorder:
 
     def __repr__(self) -> str:
         return f"{self.delta_t}s"
-
-
-T = TypeVar("T")
-
-
-class Aggregator(Generic[T]):
-    def __init__(self):
-        self.key_to_value: Dict[T, float] = {}
-
-    def add_value(self, key: T, value: float | int):
-        if key not in self.key_to_value:
-            self.key_to_value[key] = 0
-
-        self.key_to_value[key] += value
-
-    def remove_keys(self):
-        self.key_to_value = {}
-
-    def get_all_reduced_values(
-        self,
-        keys: List[T],
-        reduce_operation: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM,
-    ) -> torch.Tensor:
-        # we clone the value so that we can always resync the value without side-effects
-        cloned_value = torch.FloatTensor([self.key_to_value[key] for key in keys]).cuda()
-        value = Reducer.reduce(
-            tensor=cloned_value,
-            operation=reduce_operation,
-        )
-        reduced_dict = {key: value[i] for i, key in enumerate(keys)}
-        return reduced_dict
