@@ -151,7 +151,7 @@ class Trainer:
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
-                cumulated_losses[1] = batch_loss.item()
+                # cumulated_losses[1] = batch_loss.item()
 
                 reduced_losses = Reducer.reduce(
                     tensor=cumulated_losses,
