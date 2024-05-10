@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 import torch
+import torch.distributed as dist
+import torch.nn.functional as F
 from pydantic import BaseModel
 from torch.nn import CrossEntropyLoss as TorchCrossEntropyLoss
 
@@ -143,3 +145,77 @@ class NCELoss(Loss):
             contiguous_embedding1, contiguous_embedding2, embedding1.device, self.is_asymmetric, self.temperature
         )
         return loss
+
+
+class ClipLossConfig(BaseModel):
+    logit_scale_key: str
+    prediction_key1: str
+    prediction_key2: str
+    tag: str = "ClipLoss"
+
+
+class ClipLoss(Loss):
+    def __init__(
+        self,
+        logit_scale_key: str,
+        prediction_key1: str,
+        prediction_key2: str,
+        tag: str = "ClipLoss",
+    ):
+        """
+        CLIP Loss (Source: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/loss.py)
+
+        Args:
+            logit_scale_key (str): Value of a learnable logit scale parameter.
+            prediction_key1 (str): Key to access embedding 1.
+            prediction_key2 (str): Key to access embedding 2.
+            tag (str, optional): Defaults to "ClipLoss".
+        """
+        super().__init__(tag)
+        self.logit_scale_key = logit_scale_key
+        self.prediction_key1 = prediction_key1
+        self.prediction_key2 = prediction_key2
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        """
+        Args:
+            forward_batch (InferenceResultBatch): data batch.
+
+        Returns:
+            torch.Tensor: loss tensor.
+        """
+        logit_scale = forward_batch.get_predictions(self.logit_scale_key)
+        embedding1 = forward_batch.get_predictions(self.prediction_key1).contiguous()
+        embedding2 = forward_batch.get_predictions(self.prediction_key2).contiguous()
+        device = embedding1.device
+
+        # Gather all embeddings from each rank
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+        gathered_embedding1 = [torch.zeros_like(embedding1) for _ in range(world_size)]
+        gathered_embedding2 = [torch.zeros_like(embedding2) for _ in range(world_size)]
+        dist.all_gather(gathered_embedding1, embedding1)
+        dist.all_gather(gathered_embedding2, embedding2)
+
+        # Make sure we have gradients for the "local" embeddings
+        gathered_embedding1[rank] = embedding1
+        gathered_embedding2[rank] = embedding2
+
+        # Combine embeddings
+        gathered_embedding1 = torch.cat(gathered_embedding1, dim=0)
+        gathered_embedding2 = torch.cat(gathered_embedding2, dim=0)
+
+        # Calculate logits
+        logits_per_embedding1 = logit_scale * gathered_embedding1 @ gathered_embedding2.T
+        logits_per_embedding2 = logits_per_embedding1.T
+
+        # Build gt labels for diagonal
+        num_logits = logits_per_embedding1.shape[0]
+        labels = torch.arange(num_logits, device=device, dtype=torch.long)
+
+        # Calculate loss
+        clip_loss = (
+            F.cross_entropy(logits_per_embedding1, labels) + F.cross_entropy(logits_per_embedding2, labels)
+        ) / 2
+
+        return clip_loss

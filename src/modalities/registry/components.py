@@ -57,7 +57,14 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CrossEntropyLoss, CrossEntropyLossConfig, NCELoss, NCELossConfig
+from modalities.loss_functions import (
+    ClipLoss,
+    ClipLossConfig,
+    CrossEntropyLoss,
+    CrossEntropyLossConfig,
+    NCELoss,
+    NCELossConfig,
+)
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -103,6 +110,7 @@ COMPONENTS = [
     # losses
     ComponentEntity("loss", "cross_entropy_loss", CrossEntropyLoss, CrossEntropyLossConfig),
     ComponentEntity("loss", "nce_loss", NCELoss, NCELossConfig),
+    ComponentEntity("loss", "clip_loss", ClipLoss, ClipLossConfig),
     # optmizers
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
