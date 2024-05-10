@@ -178,6 +178,7 @@ model:
     text_embd_prediction_key: text_embeddings
     vision_cls_prediction_key: vision_cls
     text_cls_prediction_key: text_cls
+    logit_scale_prediction_key: logit_scale
     vision_encoder_config:
       sample_key: images
       prediction_key: vision_embeddings
