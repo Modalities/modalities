@@ -121,7 +121,7 @@ class Evaluator:
             )
 
             losses = {
-                "total_loss average": loss_avg / loss_last_batch,
+                "total_loss average": loss_avg,
                 "total_loss last step": loss_last_batch,
             }
             for i, lfn in enumerate(loss_fun):
