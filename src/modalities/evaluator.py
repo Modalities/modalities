@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List
+from typing import Dict, List
 
 import torch
 import torch.distributed as dist
@@ -9,7 +9,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
-from modalities.models.model import NNModel, model_predict_batch
+from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
 from modalities.util import Aggregator, TimeRecorder
@@ -42,7 +42,7 @@ class Evaluator:
                 loss = lfn(result_batch)
 
                 # Add loss to total loss
-                weighted_loss = loss * lfn.weight  # / self.gradient_acc_steps
+                weighted_loss = loss * lfn.weight
                 if total_loss is None:
                     total_loss = weighted_loss
                 else:
@@ -108,16 +108,24 @@ class Evaluator:
             num_samples_per_second = synced_num_samples / synced_forward_backward_time
 
             # Agreggate loss from all ranks
-            total_losses = Reducer.reduce(
+            reduced_losses = Reducer.reduce(
                 tensor=cumulated_loss,
                 operation=dist.ReduceOp.SUM,
-                post_processing_fun=lambda t: t[:-1] / t[-1],
+                post_processing_fun=lambda t: torch.cat([t[:-1] / t[-1], t[-1:] / dist.get_world_size()]),
             )
 
             # Fill logging dict with total loss and the individual losses
-            losses = {"total_loss": total_losses[0]}
+            loss_avg, loss_last_batch = (
+                reduced_losses[0],
+                reduced_losses[-1],
+            )
+
+            losses = {
+                "total_loss average": loss_avg / loss_last_batch,
+                "total_loss last step": loss_last_batch,
+            }
             for i, lfn in enumerate(loss_fun):
-                losses[lfn.tag] = total_losses[i + 1]
+                losses[lfn.tag] = reduced_losses[i + 1]
 
             evaluation_result = EvaluationResultBatch(
                 losses=losses,
