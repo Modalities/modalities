@@ -140,10 +140,11 @@ captioning_loss:
 
 contrastive_loss:
   component_key: loss
-  variant_key: nce_loss
+  variant_key: clip_loss
   config:
     prediction_key1: ${model.config.vision_cls_prediction_key}
     prediction_key2: ${model.config.text_cls_prediction_key}
+    logit_scale_key: ${model.config.logit_scale_prediction_key}
     tag: contrastive_loss
 
 loss_fn:

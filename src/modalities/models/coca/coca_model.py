@@ -2,6 +2,7 @@ import math
 from functools import partial
 from typing import Annotated, Dict, Tuple
 
+import numpy as np
 import torch
 from einops import repeat
 from pydantic import BaseModel, Field
@@ -39,6 +40,7 @@ class CoCaConfig(BaseModel):
     text_embd_prediction_key: str
     vision_cls_prediction_key: str
     text_cls_prediction_key: str
+    logit_scale_prediction_key: str
     vision_encoder_config: VisionTransformerConfig
     text_decoder_config: TextDecoderConfig
     n_pool_head: Annotated[int, Field(ge=1)]
@@ -65,6 +67,7 @@ class CoCa(NNModel):
         text_cls_prediction_key: str,
         vision_embd_prediction_key: str,
         text_embd_prediction_key: str,
+        logit_scale_prediction_key: str,
         n_vision_queries: int,
         n_pool_head: int,
         bias_attn_pool: bool,
@@ -79,6 +82,7 @@ class CoCa(NNModel):
         self.text_cls_prediction_key = text_cls_prediction_key
         self.vision_embd_prediction_key = vision_embd_prediction_key
         self.text_embd_prediction_key = text_embd_prediction_key
+        self.logit_scale_prediction_key = logit_scale_prediction_key
 
         self.vision_encoder = VisionTransformer(**dict(vision_encoder_config))
         self.text_decoder = TextDecoder(
@@ -126,6 +130,9 @@ class CoCa(NNModel):
             attention_config=text_decoder_config.attention_config,
         )
 
+        # Logit scale for contrastive loss
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+
         # init all weights
         self.apply(partial(self._init_weights, weight_init=weight_init))
         # apply special scaled init to the residual projections, per GPT-2 paper
@@ -154,6 +161,7 @@ class CoCa(NNModel):
             self.prediction_key: logits,
             self.vision_cls_prediction_key: vision_cls_token,
             self.text_cls_prediction_key: text_cls_token,
+            self.logit_scale_prediction_key: self.logit_scale.exp(),
         }
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
