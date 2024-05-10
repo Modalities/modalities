@@ -51,11 +51,16 @@ train_dataset:
     text_key: input_ids
     block_size: ${settings.training.sequence_length}
     num_samples: 566_747
+    shardshuffle: 1000
+    repeat: true
+    resample: true
+    shuffle: true
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
     image_transform_config:
       is_training: True
+      input_size: 256
 
 val_dataset:
   component_key: dataset
@@ -73,14 +78,14 @@ val_dataset:
       pass_type: BY_REFERENCE
     image_transform_config:
       is_training: False
+      input_size: 256
 
 train_dataloader:
   component_key: data_loader
   variant_key: web_loader
   config:
-    num_workers: 16
+    num_workers: 8
     pin_memory: true
-    shuffle: true
     dataloader_tag: "train"
     dataset:
       instance_key: train_dataset
@@ -94,9 +99,8 @@ val_dataloader:
   component_key: data_loader
   variant_key: web_loader
   config:
-    num_workers: 16
+    num_workers: 8
     pin_memory: true
-    shuffle: false
     dataloader_tag: "val"
     dataset:
       instance_key: val_dataset
@@ -224,7 +228,7 @@ scheduler:
     max_lr: 8e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 491 # 500_000 # depends on 500.000 iterations on 65,536 image-text pairs -> 5 epochs on JFT -> 32.7B image-text pairs
+    total_steps: 500_000 # depends on 500.000 iterations on 65,536 image-text pairs -> 5 epochs on JFT -> 32.7B image-text pairs
     pct_start: 0.02
     anneal_strategy: cos
 
