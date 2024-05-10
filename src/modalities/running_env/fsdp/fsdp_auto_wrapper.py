@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, List
 
 import torch.nn as nn
-from accelerate.utils.dataclasses import FullyShardedDataParallelPlugin
+from accelerate.utils.dataclasses import get_module_class_from_name
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 from modalities.config.lookup_enum import LookupEnum
@@ -28,7 +28,7 @@ class FSDPTransformerAutoWrapPolicyFactory(FSDPAutoWrapFactoryIF):
         for cls_block_name in block_names:
             # TODO FullyShardedDataParallelPlugin from Accelerate uses string matching to find the correct
             # block class. In the long-term we should implmement this ourselves in a robuster fashion.
-            block_type = FullyShardedDataParallelPlugin.get_module_class_from_name(model, cls_block_name)
+            block_type = get_module_class_from_name(model, cls_block_name)
             if block_type is None:
                 raise ValueError(f"Could not find block with name {cls_block_name} in model")
             fsdp_block_types.append(block_type)
