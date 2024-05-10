@@ -18,8 +18,8 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.evaluator import Evaluator
-from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
+from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer

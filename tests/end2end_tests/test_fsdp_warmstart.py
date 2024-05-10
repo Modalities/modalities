@@ -14,8 +14,8 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.messages import Message
-from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.messaging.messages import Message
+from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
