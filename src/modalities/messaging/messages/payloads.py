@@ -61,6 +61,7 @@ class EvaluationResult:
 
     dataloader_tag: str
     train_step_id: int
+    experiment_status: ExperimentStatus
     losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
     metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
     trackables: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
