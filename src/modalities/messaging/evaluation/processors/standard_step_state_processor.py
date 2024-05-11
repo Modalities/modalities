@@ -1,4 +1,7 @@
 from enum import Enum
+from typing import Annotated
+
+from pydantic import BaseModel, Field
 
 from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
 from modalities.messaging.evaluation.states import IntervalState, LocalReduceOperations, RankReduceOperations, Trackable
@@ -78,3 +81,11 @@ class StandardGlobalStepStateProcessor(GlobalProcessorIF):
             )
 
         return eval_result
+
+
+class StandardGlobalStepStateProcessorConfig(BaseModel):
+    world_size: Annotated[int, Field(strict=True, ge=1)]
+
+
+class StandardLocalStepStateProcessorConfig(BaseModel):
+    pass

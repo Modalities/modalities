@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List
 
 import torch
+from pydantic import BaseModel
 
 from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
 from modalities.messaging.evaluation.processors.standard_step_state_processor import (
@@ -51,3 +52,11 @@ class GlobalModelStateProcessor(GlobalProcessorIF):
                 StandardTrackablesKeys.NUM_SAMPLES
             )
             eval_result.trackables[f"{ce_trackable.tag} avg cross entropy"] = avg_cross_entropy
+
+
+class LocalModelStateProcessorConfig(BaseModel):
+    trackable_keys: List[TrackablesKeys]
+
+
+class GlobalModelStateProcessorConfig(BaseModel):
+    pass
