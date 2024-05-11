@@ -13,11 +13,10 @@ from modalities.messaging.evaluation.processors.standard_step_state_processor im
 from modalities.messaging.evaluation.states import IntervalState
 from modalities.messaging.messages.message import Message, MessageTypes
 from modalities.messaging.messages.payloads import EvaluationResult, ExperimentStatus, StepState
-from modalities.messaging.publishers.publisher import MessagePublisherIF
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 
-class DistributedEvaluator(MessageSubscriberIF, MessagePublisherIF[EvaluationResult]):
+class DistributedEvaluator(MessageSubscriberIF):
     def __init__(
         self,
         message_broker: MessageBrokerIF,
@@ -50,8 +49,8 @@ class DistributedEvaluator(MessageSubscriberIF, MessagePublisherIF[EvaluationRes
             StandardGlobalStepStateProcessor(world_size=world_size)
         ] + global_processors
 
-    def publish_message(self, payload: EvaluationResult, message_type: MessageTypes):
-        message = Message(message_type=message_type, payload=payload)
+    def _publish_eval_result_message(self, payload: EvaluationResult):
+        message = Message(message_type=MessageTypes.EVALUATION_RESULT, payload=payload)
         self.message_broker.distribute_message(message)
 
     def consume_message(self, message: Message):
@@ -68,7 +67,7 @@ class DistributedEvaluator(MessageSubscriberIF, MessagePublisherIF[EvaluationRes
             if is_log_step or is_last_step:
                 self.interval_state.reduce_values_across_ranks()
                 eval_result = self._process_global()
-                self.publish_message(payload=eval_result, message_type=MessageTypes.EVALUATION_RESULT)
+                self._publish_eval_result_message(payload=eval_result)
                 self._reset_train_step_state()
 
     def _process_local(self, message: Message):
@@ -79,6 +78,7 @@ class DistributedEvaluator(MessageSubscriberIF, MessagePublisherIF[EvaluationRes
         eval_result = EvaluationResult(
             dataloader_tag=self.interval_state.meta_information.dataloader_tag,
             train_step_id=self.interval_state.meta_information.step_id,
+            experiment_status=self.interval_state.meta_information.experiment_status,
         )
         for global_processor in self.global_processors:
             global_processor.process(current_step_state=self.interval_state, eval_result=eval_result)
