@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Generic, TypeVar
 
+from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
 from modalities.messaging.evaluation.states import IntervalState, LocalReduceOperations, RankReduceOperations, Trackable
-from modalities.messaging.messages.payloads import BatchProgressUpdate, EvaluationResult, StepState
+from modalities.messaging.messages.payloads import EvaluationResult, StepState
 
 
 class TrackablesKeys(Enum):
@@ -11,22 +11,11 @@ class TrackablesKeys(Enum):
     NUM_STEPS = "NUM_STEPS"
     CUMM_BATCH_LOSS = "CUMM_BATCH_LOSS"
     LAST_BATCH_LOSS = "LAST_BATCH_LOSS"
+
     # only in train
     CUMM_GRADIENT_NORM = "CUMM_GRADIENT_NORM"
     LAST_BATCH_GRADIENT_NORM = "LAST_BATCH_GRADIENT_NORM"
-
-
-T = TypeVar("T")
-
-
-class LocalProcessorIF(Generic[T]):
-    def process(self, payload: T, current_local_step_state: IntervalState):
-        raise NotImplementedError
-
-
-class GlobalProcessorIF:
-    def process(self, current_step_state: IntervalState, eval_result: EvaluationResult):
-        raise NotImplementedError
+    LAST_SCHEDULER_LR = "LAST_SCHEDULER_LR"
 
 
 class StandardLocalStepStateProcessor(LocalProcessorIF[StepState]):
@@ -39,6 +28,7 @@ class StandardLocalStepStateProcessor(LocalProcessorIF[StepState]):
             TrackablesKeys.LAST_BATCH_LOSS: (LocalReduceOperations.REPLACE, RankReduceOperations.SUM),
             TrackablesKeys.CUMM_GRADIENT_NORM: (LocalReduceOperations.SUM, RankReduceOperations.NONE),
             TrackablesKeys.LAST_BATCH_GRADIENT_NORM: (LocalReduceOperations.REPLACE, RankReduceOperations.NONE),
+            TrackablesKeys.LAST_SCHEDULER_LR: (LocalReduceOperations.REPLACE, RankReduceOperations.NONE),
         }
 
     def process(self, payload: StepState, current_local_step_state: IntervalState):
@@ -59,53 +49,32 @@ class StandardGlobalStepStateProcessor(GlobalProcessorIF):
     def __init__(self, world_size: int):
         self.world_size = world_size
 
-    def process(self, current_step_state: IntervalState, eval_result: EvaluationResult):
-        trackables = current_step_state.trackables
+    def process(self, interval_state: IntervalState, eval_result: EvaluationResult):
+        trackables = interval_state.trackables
         # throughput
         num_samples = trackables.get_trackable[TrackablesKeys.NUM_SAMPLES]
         forward_backward_time = trackables.get_trackable[TrackablesKeys.FORWARD_BACKWARD_TIME]
-        num_samples / forward_backward_time
+        throughput = num_samples / forward_backward_time
+        eval_result.trackables[
+            f"{interval_state.meta_information.experiment_status} throughput [samples/s]"
+        ] = throughput
 
         # losses
-        trackables.get_trackable(TrackablesKeys.CUMM_BATCH_LOSS) / trackables.get_trackable(TrackablesKeys.NUM_STEPS)
-
-        trackables.get_trackable(TrackablesKeys.LAST_BATCH_LOSS) / self.world_size
+        avg_loss = trackables.get_trackable(TrackablesKeys.CUMM_BATCH_LOSS) / num_samples
+        last_batch_loss = trackables.get_trackable(TrackablesKeys.LAST_BATCH_LOSS) / self.world_size
+        eval_result.trackables["avg loss"] = avg_loss
+        eval_result.trackables["last batch loss"] = last_batch_loss
 
         # gradient norm
         if TrackablesKeys.CUMM_GRADIENT_NORM in trackables.state:
-            trackables.get_keys(TrackablesKeys.CUMM_GRADIENT_NORM)
+            avg_gradient_norm = trackables.get_keys(TrackablesKeys.CUMM_GRADIENT_NORM) / trackables.get_trackable(
+                TrackablesKeys.NUM_STEPS
+            )
+            eval_result.trackables["avg gradient norm"] = avg_gradient_norm
 
-        [
-            payload.trackables.gradient_norm_score
-            for payload in self.train_step_state_history
-            if payload.trackables.gradient_norm_score is not None
-        ]
+        if TrackablesKeys.LAST_BATCH_GRADIENT_NORM in trackables.state:
+            eval_result.trackables["last batch gradient norm"] = trackables.get_keys(
+                TrackablesKeys.LAST_BATCH_GRADIENT_NORM
+            )
 
-        # if len(gradient_norm_scores) > 0:
-        #     metrics = {
-        #         "grad_norm_avg": np.mean(gradient_norm_scores),
-        #         "grad_norm_last_batch": gradient_norm_scores[-1],
-        #     }
-        # else:
-        #     metrics = {}
-
-        # result_batch = EvaluationResult(
-        #     losses=losses,
-        #     metrics=metrics,
-        #     # TODO: hardcoded metric key
-        #     meta_metrics={
-        #         "training_synced_num_samples_per_second": synced_num_samples_per_second,
-        #         "scheduler_lr_first": last_train_step_state.trackables.scheduler_lr_first,
-        #     },
-        #     dataloader_tag=last_train_step_state.meta_information.dataloader_tag,
-        #     train_step_id=last_train_step_state.meta_information.step_id,
-        # )
-        # return result_batch
-
-
-class BatchProgressUpdateProcessor(LocalProcessorIF[BatchProgressUpdate]):
-    def __init__(self):
-        pass
-
-    def process(self, payload: BatchProgressUpdate, current_local_step_state: IntervalState):
-        current_local_step_state.meta_information = payload
+        return eval_result
