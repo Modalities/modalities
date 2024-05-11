@@ -4,10 +4,9 @@ from typing import Dict, List, Optional
 import torch.distributed as dist
 
 from modalities.messaging.broker.message_broker import MessageBrokerIF
-from modalities.messaging.evaluation.processors import (
-    BatchProgressUpdateProcessor,
-    GlobalProcessorIF,
-    LocalProcessorIF,
+from modalities.messaging.evaluation.processors.batch_progress_update_processors import BatchProgressUpdateProcessor
+from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
+from modalities.messaging.evaluation.processors.standard_step_state_processor import (
     StandardGlobalStepStateProcessor,
     StandardLocalStepStateProcessor,
 )
