@@ -85,6 +85,7 @@ class Trainer:
             self._publish_batch_progress_update(
                 batch_progress_publisher=self.batch_progress_publisher,
                 train_step_id=train_step_id,
+                num_steps=len(train_loader),
                 dataloader_tag=train_loader.dataloader_tag,
             )
 
@@ -134,10 +135,12 @@ class Trainer:
     def _publish_batch_progress_update(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         train_step_id: int,
+        num_steps: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
             step_id=train_step_id,
+            num_steps=num_steps,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )
