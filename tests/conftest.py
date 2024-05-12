@@ -17,13 +17,13 @@ from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.evaluator import Evaluator
+from modalities.loops.evaluation.evaluator import Evaluator
+from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.loops.training.trainer import Trainer
 from modalities.loss_functions import Loss
 from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
-from modalities.trainer import Trainer
-from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 _ROOT_DIR = Path(__file__).parents[1]
 

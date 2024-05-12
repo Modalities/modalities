@@ -4,7 +4,7 @@ from unittest.mock import call
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.evaluator import Evaluator
+from modalities.loops.evaluation.evaluator import Evaluator
 
 
 def test_evaluate_cpu(

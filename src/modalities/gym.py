@@ -7,9 +7,9 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.evaluator import Evaluator
+from modalities.loops.evaluation.evaluator import Evaluator
+from modalities.loops.training.trainer import Trainer
 from modalities.loss_functions import Loss
-from modalities.trainer import Trainer
 
 
 class Gym:

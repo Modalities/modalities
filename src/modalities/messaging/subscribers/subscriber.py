@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from modalities.messaging.messages import Message
+from modalities.messaging.messages.message import Message
 
 T = TypeVar("T")
 
