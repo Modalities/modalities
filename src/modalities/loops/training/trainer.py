@@ -1,20 +1,27 @@
-from typing import Callable, Tuple
+from typing import Annotated, Callable, Tuple
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from pydantic import BaseModel, Field
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
+from modalities.config.pydanctic_if_types import (
+    PydanticBatchProgressUpdatePublisherIFType,
+    PydanticGradientClipperIFType,
+    PydanticStepStatePublisherIFType,
+)
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.loss_functions import Loss
+from modalities.messaging.evaluation.processors.standard_step_state_processor import TrackablesKeys
 from modalities.messaging.messages.message import MessageTypes
-from modalities.messaging.messages.payloads import BatchProgressUpdate, ExperimentStatus, TrainStepState
+from modalities.messaging.messages.payloads import BatchProgressUpdate, ExperimentStatus, StepState
 from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
-from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.util import TimeRecorder
 
 
@@ -23,13 +30,13 @@ class Trainer:
         self,
         local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        forward_backward_pass_publisher: MessagePublisher[TrainStepState],
+        step_state_publisher: MessagePublisher[StepState],
         gradient_acc_steps: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
-        self.forward_backward_pass_publisher = forward_backward_pass_publisher
+        self.step_state_publisher = step_state_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.gradient_clipper = gradient_clipper
 
@@ -101,16 +108,23 @@ class Trainer:
             )
             forward_backward_time_recorder.stop()
 
-            train_step_state = TrainStepState(
-                trackables=TrainStepState.Trackables(
-                    loss=batch_loss.item(),
-                    gradient_norm_score=gradient_norm_score.item() if gradient_norm_score is not None else None,
-                    num_samples=len(batch),
-                    forward_backward_time=forward_backward_time_recorder.delta_t,
-                ),
+            trackable_values = {
+                TrackablesKeys.NUM_SAMPLES: len(batch),
+                TrackablesKeys.FORWARD_BACKWARD_TIME: forward_backward_time_recorder.delta_t,
+                TrackablesKeys.NUM_STEPS: 1,
+                TrackablesKeys.CUMM_BATCH_LOSS: batch_loss.item(),
+                TrackablesKeys.LAST_BATCH_LOSS: batch_loss.item(),
+                TrackablesKeys.LAST_SCHEDULER_LR: scheduler.get_last_lr()[0],
+            }
+            if gradient_norm_score is not None:
+                trackable_values[TrackablesKeys.LAST_BATCH_GRADIENT_NORM] = gradient_norm_score.item()
+
+            train_step_state = StepState(
+                trackable_values=trackable_values,
                 inference_result_batch=result_batch,
-                meta_information=TrainStepState.MetaInformation(
+                meta_information=StepState.MetaInformation(
                     step_id=train_step_id,
+                    num_steps=len(train_loader),
                     dataloader_tag=train_loader.dataloader_tag,
                     loss_fun_tag=loss_fun.tag,
                     experiment_status=ExperimentStatus.TRAIN,
@@ -118,9 +132,7 @@ class Trainer:
             )
 
             # send the train step state to the broker
-            self.forward_backward_pass_publisher.publish_message(
-                payload=train_step_state, message_type=MessageTypes.FORWARD_BACKWARD_PASS_STATE
-            )
+            self.step_state_publisher.publish_message(payload=train_step_state, message_type=MessageTypes.STEP_STATE)
 
             evaluation_callback(train_step_id=train_step_id)
             checkpointing_callback(train_step_id=train_step_id)
@@ -145,3 +157,10 @@ class Trainer:
             dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
+
+
+class TrainerConfig(BaseModel):
+    batch_progress_publisher: PydanticBatchProgressUpdatePublisherIFType
+    step_state_publisher: PydanticStepStatePublisherIFType
+    gradient_acc_steps: Annotated[float, Field(strict=True, ge=1)]
+    gradient_clipper: PydanticGradientClipperIFType

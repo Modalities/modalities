@@ -54,6 +54,18 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.loops.evaluation.evaluator import Evaluator, EvaluatorConfig
+from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper import (
+    DummyGradientClipper,
+    FSDPGradientClipper,
+    FSDPLoggingOnlyGradientClipper,
+)
+from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper_config import (
+    DummyGradientClipperConfig,
+    FSDPDummyGradientClipperConfig,
+    FSDPGradientClipperConfig,
+)
+from modalities.loops.training.trainer import Trainer, TrainerConfig
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.messaging.broker.message_broker import MessageBroker
 from modalities.messaging.publishers.publisher_factory import PublisherFactory
@@ -71,16 +83,6 @@ from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
-from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
-    DummyGradientClipper,
-    FSDPGradientClipper,
-    FSDPLoggingOnlyGradientClipper,
-)
-from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
-    DummyGradientClipperConfig,
-    FSDPDummyGradientClipperConfig,
-    FSDPGradientClipperConfig,
-)
 
 
 @dataclass
@@ -92,6 +94,10 @@ class ComponentEntity:
 
 
 COMPONENTS = [
+    # Trainer
+    ComponentEntity("trainer", "default", Trainer, TrainerConfig),
+    # Evaluator
+    ComponentEntity("evaluator", "default", Evaluator, EvaluatorConfig),
     # models
     ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity(
