@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -39,6 +39,7 @@ class Trackable:
     value: float | int | torch.Tensor
     rank_reduce_op: RankReduceOperations
     local_reduce_op: LocalReduceOperations
+    tag: Optional[str] = ""
 
 
 @dataclass
