@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 
 import torch.distributed as dist
+from pydantic import BaseModel
 
 from modalities.messaging.broker.message_broker import MessageBrokerIF
 from modalities.messaging.evaluation.processors.batch_progress_update_processors import BatchProgressUpdateProcessor
@@ -16,11 +17,12 @@ from modalities.messaging.messages.payloads import EvaluationResult, ExperimentS
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 
-class DistributedEvaluator(MessageSubscriberIF):
+class DistributedEvaluation(MessageSubscriberIF):
     def __init__(
         self,
         message_broker: MessageBrokerIF,
         training_log_interval_in_steps: int,
+        message_type_subscriptions: List[MessageTypes],
         local_processors: Optional[Dict[Enum, List[LocalProcessorIF]]] = None,
         global_processors: Optional[List[GlobalProcessorIF]] = None,
     ) -> None:
@@ -29,25 +31,25 @@ class DistributedEvaluator(MessageSubscriberIF):
         self.interval_state: IntervalState = None
 
         # subscribe to the relevant messages
-        self.message_broker.add_subscriber(subscription=MessageTypes.FORWARD_BACKWARD_PASS_STATE, subscriber=self)
-        self.message_broker.add_subscriber(subscription=MessageTypes.BATCH_PROGRESS_UPDATE, subscriber=self)
-        self.message_broker.add_subscriber(subscription=MessageTypes.MODEL_STATE, subscriber=self)
+        for message_type in message_type_subscriptions:
+            self.message_broker.add_subscriber(subscription=message_type, subscriber=self)
 
         # specify the local message processors
         self.local_processors: Dict[Enum, List[LocalProcessorIF]] = {
-            MessageTypes.FORWARD_BACKWARD_PASS_STATE: [StandardLocalStepStateProcessor()],
+            MessageTypes.STEP_STATE: [StandardLocalStepStateProcessor()],
             MessageTypes.MODEL_STATE: [],
             MessageTypes.BATCH_PROGRESS_UPDATE: [BatchProgressUpdateProcessor()],
         }
-        for message_type, processors in local_processors.items():
-            self.local_processors[message_type] += processors
+        if local_processors is not None:
+            for message_type, processors in local_processors.items():
+                self.local_processors[message_type] += processors
 
         # specify the global processor that work on the aggregated global state,
         # after reducing the local states across the ranks
         world_size = dist.get_world_size()
-        self.global_processors: List[GlobalProcessorIF] = [
-            StandardGlobalStepStateProcessor(world_size=world_size)
-        ] + global_processors
+        self.global_processors: List[GlobalProcessorIF] = [StandardGlobalStepStateProcessor(world_size=world_size)]
+        if global_processors is not None:
+            self.global_processors += global_processors
 
     def _publish_eval_result_message(self, payload: EvaluationResult):
         message = Message(message_type=MessageTypes.EVALUATION_RESULT, payload=payload)
@@ -56,7 +58,7 @@ class DistributedEvaluator(MessageSubscriberIF):
     def consume_message(self, message: Message):
         self._process_local(message)
 
-        if message.message_type == MessageTypes.FORWARD_BACKWARD_PASS_STATE:
+        if message.message_type == MessageTypes.STEP_STATE:
             step_state: StepState = message.payload
             step_id = step_state.meta_information.step_id
             is_log_step = (
@@ -81,8 +83,16 @@ class DistributedEvaluator(MessageSubscriberIF):
             experiment_status=self.interval_state.meta_information.experiment_status,
         )
         for global_processor in self.global_processors:
-            global_processor.process(current_step_state=self.interval_state, eval_result=eval_result)
+            global_processor.process(interval_state=self.interval_state, eval_result=eval_result)
         return eval_result
 
     def _reset_train_step_state(self):
         self.interval_state = None
+
+
+class DistributedEvaluationConfig(BaseModel):
+    message_broker: MessageBrokerIF
+    training_log_interval_in_steps: int
+    message_type_subscriptions: List[MessageTypes]
+    local_processors: Optional[Dict[Enum, List[LocalProcessorIF]]] = None
+    global_processors: Optional[List[GlobalProcessorIF]] = None
