@@ -286,7 +286,7 @@ class WebDataset(wds.WebDataset):
     ):
         super().__init__(
             urls=urls,
-            nodesplitter=wds.dummy_nodesplitter if not resample else None,
+            nodesplitter=dummy_nodesplitter if not resample else None,
             shardshuffle=shardshuffle,
             repeat=repeat,
             handler=wds.ignore_and_continue,
