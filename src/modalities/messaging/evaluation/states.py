@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
@@ -46,17 +46,24 @@ class Trackable:
 class IntervalState:
     class TrackableCollection:
         def __init__(self):
-            self.state: Dict[Enum, Trackable] = {}
+            # maps TrackableEnum -> Tag -> Trackable
+            self.state: Dict[Enum, Dict[str, Trackable]] = defaultdict(dict)
 
         def set_trackable(self, trackable: Trackable):
-            if trackable.key in self.state:
+            if trackable.key in self.state and trackable.tag in self.state[trackable.key]:
                 local_reduce_op_fun = trackable.local_reduce_op.value
-                self.state[trackable.key] = local_reduce_op_fun([self.state[trackable.key], trackable.value])
+                old_trackable = self.state[trackable.key][trackable.tag]
+                self.state[trackable.key][trackable.tag].value = local_reduce_op_fun(
+                    [old_trackable.value, trackable.value]
+                )
             else:
-                self.state[trackable.key] = trackable
+                self.state[trackable.key][trackable.tag] = trackable
 
-        def get_trackable(self, key: Enum) -> Trackable:
-            return self.state[key]
+        def get_trackable(self, key: Enum, tag: str) -> Trackable:
+            return self.state[key][tag]
+
+        def get_tags(self, key: Enum) -> List[str]:
+            return list(self.state[key].keys())
 
         def get_keys(self) -> List[Enum]:
             return list(self.state.keys())
@@ -68,15 +75,19 @@ class IntervalState:
         dataloader_tag: str
         experiment_status: ExperimentStatus
 
-    trackables: TrackableCollection = TrackableCollection()
     meta_information: MetaInformation
+    trackables: TrackableCollection = TrackableCollection()
 
     def reduce_values_across_ranks(self) -> Dict[Enum, torch.Tensor]:
-        reduce_op_to_trackables: Dict[RankReduceOperations, List[Tuple[Enum, torch.Tensor]]] = defaultdict(list)
+        reduce_op_to_trackables: Dict[RankReduceOperations, List[Trackable]] = defaultdict(list)
+        # get the trackables and group them by the rank reduce operation
         for key in self.trackables.get_keys():
-            trackable = self.trackables.get_trackable(key)
-            reduce_op_to_trackables[trackable.rank_reduce_op].append(trackable)
+            tags = self.trackables.get_tags(key=key)
+            for tag in tags:
+                trackable = self.trackables.get_trackable(key=key, tag=tag)
+                reduce_op_to_trackables[trackable.rank_reduce_op].append(trackable)
 
+        # reduce the trackables for each reduce operation
         for reduce_op, trackables in reduce_op_to_trackables.items():
             if reduce_op == RankReduceOperations.NONE:
                 continue
