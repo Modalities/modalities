@@ -74,6 +74,10 @@ class Evaluator:
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+
+            dist.barrier()
+            print("All ranks reached the eval step")
+
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
                     batch_losses = self.evaluate_batch(
@@ -95,6 +99,10 @@ class Evaluator:
                         eval_step_id=batch_id,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
+
+                print(f"Rank {dist.get_rank()} is done with eval step")
+                dist.barrier()
+                print("All ranks are done with the eval step")
 
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
             forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
