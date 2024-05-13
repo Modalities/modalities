@@ -58,7 +58,7 @@ class Trainer:
             loss = lfn(result_batch)
 
             # Add loss to total loss
-            weighted_loss = (loss * lfn.weight) / self.gradient_acc_steps
+            weighted_loss = loss * lfn.weight
             if total_loss is None:
                 total_loss = weighted_loss
             else:
