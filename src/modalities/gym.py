@@ -7,15 +7,17 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.loops.evaluation.evaluator import Evaluator
-from modalities.loops.training.trainer import Trainer
+from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
+from modalities.loops.training.training_loop import TrainingLoop
 from modalities.loss_functions import Loss
 
 
 class Gym:
-    def __init__(self, trainer: Trainer, evaluator: Evaluator, loss_fun: Loss, num_ranks: int) -> None:
-        self.trainer = trainer
-        self.evaluator = evaluator
+    def __init__(
+        self, training_loop: TrainingLoop, evaluation_loop: EvaluationLoop, loss_fun: Loss, num_ranks: int
+    ) -> None:
+        self.training_loop = training_loop
+        self.evaluation_loop = evaluation_loop
         self.loss_fun = loss_fun
         self.num_ranks = num_ranks
 
@@ -24,7 +26,6 @@ class Gym:
         model: nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        global_training_log_interval_in_steps: int,
         global_checkpointing_interval_in_steps: int,
         global_evaluation_interval_in_steps: int,
         train_data_loader: LLMDataLoader,
@@ -55,7 +56,7 @@ class Gym:
             global_checkpointing_interval_in_steps=global_checkpointing_interval_in_steps,
         )
 
-        self.trainer.train(
+        self.training_loop.train(
             model=model,
             train_loader=train_data_loader,
             loss_fun=self.loss_fun,
@@ -63,7 +64,6 @@ class Gym:
             scheduler=scheduler,
             evaluation_callback=evaluation_callback,
             checkpointing_callback=checkpointing_callback,
-            global_training_log_interval_in_steps=global_training_log_interval_in_steps,
         )
 
     def _run_checkpointing(
@@ -91,7 +91,7 @@ class Gym:
         global_evaluation_interval_in_steps: int,
     ):
         if (train_step_id + 1) % global_evaluation_interval_in_steps == 0:
-            self.evaluator.evaluate(
+            self.evaluation_loop.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
                 loss_fun=self.loss_fun,

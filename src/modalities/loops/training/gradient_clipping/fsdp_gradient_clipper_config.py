@@ -3,7 +3,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.training.gradient_clipping.fsdp_gradient_clipper import GradientClippingMode
+from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper import GradientClippingMode
 
 
 class FSDPGradientClipperConfig(BaseModel):

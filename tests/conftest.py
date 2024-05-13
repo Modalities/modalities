@@ -17,9 +17,9 @@ from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.loops.evaluation.evaluator import Evaluator
+from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
 from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
-from modalities.loops.training.trainer import Trainer
+from modalities.loops.training.training_loop import TrainingLoop
 from modalities.loss_functions import Loss
 from modalities.messaging.publishers.publisher import MessagePublisher
 from modalities.models.model import NNModel
@@ -97,7 +97,7 @@ def checkpoint_saving_mock():
 
 @pytest.fixture(scope="function")
 def evaluator_mock():
-    return MagicMock(spec=Evaluator)
+    return MagicMock(spec=EvaluationLoop)
 
 
 @pytest.fixture(scope="function")
@@ -162,7 +162,7 @@ def progress_publisher_mock():
 
 @pytest.fixture(scope="function")
 def trainer(progress_publisher_mock, gradient_clipper_mock):
-    return Trainer(
+    return TrainingLoop(
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,

@@ -28,7 +28,7 @@ def test_run_cpu_only(
         llm_data_loader_mock=llm_data_loader_mock,
     )
 
-    gym = Gym(trainer=trainer, evaluator=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
+    gym = Gym(training_loop=trainer, evaluation_loop=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
     gym.run(
         model=nn_model_mock,
         optimizer=optimizer_mock,

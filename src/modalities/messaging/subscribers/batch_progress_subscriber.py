@@ -6,7 +6,8 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, T
 from rich.rule import Rule
 from rich.text import Text
 
-from modalities.messaging.messages import BatchProgressUpdate, ExperimentStatus, Message
+from modalities.messaging.messages.message import Message
+from modalities.messaging.messages.payloads import BatchProgressUpdate, ExperimentStatus
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 

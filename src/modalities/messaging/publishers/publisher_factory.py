@@ -1,6 +1,5 @@
-from modalities.batch import EvaluationResultBatch
 from modalities.messaging.broker.message_broker import MessageBrokerIF
-from modalities.messaging.messages.message import BatchProgressUpdate
+from modalities.messaging.messages.payloads import BatchProgressUpdate, EvaluationResult, StepState
 from modalities.messaging.publishers.publisher import MessagePublisher
 
 
@@ -19,8 +18,8 @@ class PublisherFactory:
     @staticmethod
     def get_evaluation_result_publisher(
         message_broker: MessageBrokerIF, global_rank: int, local_rank: int
-    ) -> MessagePublisher[EvaluationResultBatch]:
-        publisher = MessagePublisher[EvaluationResultBatch](
+    ) -> MessagePublisher[EvaluationResult]:
+        publisher = MessagePublisher[EvaluationResult](
             message_broker=message_broker,
             global_rank=global_rank,
             local_rank=local_rank,
@@ -30,8 +29,8 @@ class PublisherFactory:
     @staticmethod
     def get_model_state_publisher(
         message_broker: MessageBrokerIF, global_rank: int, local_rank: int
-    ) -> MessagePublisher[EvaluationResultBatch]:
-        publisher = MessagePublisher[EvaluationResultBatch](
+    ) -> MessagePublisher[StepState]:
+        publisher = MessagePublisher[StepState](
             message_broker=message_broker,
             global_rank=global_rank,
             local_rank=local_rank,

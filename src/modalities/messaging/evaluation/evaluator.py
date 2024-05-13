@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 import torch.distributed as dist
 from pydantic import BaseModel
 
+from modalities.config.pydanctic_if_types import PydanticMessageBrokerIFType
 from modalities.messaging.broker.message_broker import MessageBrokerIF
 from modalities.messaging.evaluation.processors.batch_progress_update_processors import BatchProgressUpdateProcessor
 from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
@@ -91,7 +92,7 @@ class DistributedEvaluation(MessageSubscriberIF):
 
 
 class DistributedEvaluationConfig(BaseModel):
-    message_broker: MessageBrokerIF
+    message_broker: PydanticMessageBrokerIFType
     training_log_interval_in_steps: int
     message_type_subscriptions: List[MessageTypes]
     local_processors: Optional[Dict[Enum, List[LocalProcessorIF]]] = None

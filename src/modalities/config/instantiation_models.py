@@ -6,14 +6,14 @@ from pydantic import BaseModel, Field, FilePath, field_validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
-    PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
     PydanticLRSchedulerIFType,
-    PydanticMessageSubscriberIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
+    PydanticPytorchEvaluationLoopType,
     PydanticPytorchModuleType,
+    PydanticPytorchTrainingLoopType,
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
 )
@@ -52,10 +52,9 @@ class TrainingComponentsInstantiationModel(BaseModel):
     loss_fn: PydanticLossIFType
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
-    batch_progress_subscriber: PydanticMessageSubscriberIFType
-    evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
-    gradient_clipper: PydanticGradientClipperIFType
+    training_loop: PydanticPytorchTrainingLoopType
+    evaluation_loop: PydanticPytorchEvaluationLoopType
     settings: TrainingSettings
 
 

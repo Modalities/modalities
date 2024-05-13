@@ -41,6 +41,7 @@ class StandardLocalStepStateProcessor(LocalProcessorIF[StepState]):
             if key in payload.trackable_values:
                 trackable = Trackable(
                     key=key,
+                    tag="",
                     value=payload.trackable_values[key],
                     local_reduce_op=self.trackable_key_to_reduce_op[key][0],
                     rank_reduce_op=self.trackable_key_to_reduce_op[key][1],

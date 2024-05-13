@@ -4,7 +4,7 @@ from unittest.mock import call
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.loops.evaluation.evaluator import Evaluator
+from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
 
 
 def test_evaluate_cpu(
@@ -25,7 +25,7 @@ def test_evaluate_cpu(
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
     llm_data_loader_mock.batch_size = batch_size
 
-    evaluator = Evaluator(
+    evaluator = EvaluationLoop(
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,

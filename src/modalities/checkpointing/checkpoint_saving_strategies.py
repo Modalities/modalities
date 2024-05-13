@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
-from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
+from modalities.messaging.messages.payloads import EvaluationResult
 
 
 class CheckpointSavingStrategyIF(ABC):
@@ -14,7 +14,7 @@ class CheckpointSavingStrategyIF(ABC):
     def get_checkpoint_instruction(
         self,
         train_step_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: Dict[str, EvaluationResult] | None = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         raise NotImplementedError
@@ -33,7 +33,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
     def get_checkpoint_instruction(
         self,
         train_step_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: Dict[str, EvaluationResult] | None = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         checkpoints_to_delete = []
@@ -60,7 +60,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
     def get_checkpoint_instruction(
         self,
         train_step_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: Dict[str, EvaluationResult] | None = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         save_current = (train_step_id + 1) % self.k == 0

@@ -4,9 +4,9 @@ from typing import Dict
 import torch.nn as nn
 from torch.optim import Optimizer
 
-from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
+from modalities.messaging.messages.payloads import EvaluationResult
 
 
 class CheckpointEntityType(Enum):
@@ -30,7 +30,7 @@ class CheckpointSaving:
     def save_checkpoint(
         self,
         train_step_id: int,
-        evaluation_result: Dict[str, EvaluationResultBatch],
+        evaluation_result: Dict[str, EvaluationResult],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,

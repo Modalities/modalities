@@ -2,7 +2,7 @@ import torch
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 
 class GradientClippingMode(LookupEnum):

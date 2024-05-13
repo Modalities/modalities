@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Generic, TypeVar
 
+from modalities.config.lookup_enum import LookupEnum
 
-class MessageTypes(Enum):
+
+class MessageTypes(LookupEnum):
     STEP_STATE = "STEP_STATE"
     BATCH_PROGRESS_UPDATE = "PROGRESS_UPDATE"
     MODEL_STATE = "MODEL_STATE"

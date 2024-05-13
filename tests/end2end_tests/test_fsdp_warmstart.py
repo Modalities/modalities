@@ -10,11 +10,11 @@ import torch.distributed as dist
 from pydantic import BaseModel
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.messaging.messages import Message
+from modalities.messaging.messages.message import Message
+from modalities.messaging.messages.payloads import EvaluationResult
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
 
@@ -29,11 +29,11 @@ from modalities.running_env.cuda_env import CudaEnv
 working_dir = Path(os.path.dirname(__file__))
 
 
-class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
+class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResult]):
     def __init__(self):
-        self.message_list: List[Message[EvaluationResultBatch]] = []
+        self.message_list: List[Message[EvaluationResult]] = []
 
-    def consume_message(self, message: Message[EvaluationResultBatch]):
+    def consume_message(self, message: Message[EvaluationResult]):
         """Consumes a message from a message broker."""
         self.message_list.append(message)
 
@@ -52,7 +52,7 @@ class TrainDataloaderInstantiationModel(BaseModel):
 )
 class TestWarmstart:
     @staticmethod
-    def get_loss_scores(messages: List[Message[EvaluationResultBatch]], loss_key: str) -> List[float]:
+    def get_loss_scores(messages: List[Message[EvaluationResult]], loss_key: str) -> List[float]:
         return [message.payload.losses[loss_key].item() for message in messages]
 
     def test_warm_start(self):
@@ -110,7 +110,7 @@ class TestWarmstart:
                 # we collect the loss values from rank 0 and store them in the temporary experiment folder
                 rank_1 = dist.get_rank()
                 if rank_1 == 0:
-                    messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
+                    messages_1: List[Message[EvaluationResult]] = components_1.evaluation_subscriber.message_list
                     loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "CLMCrossEntropyLoss interval average")
                     with open(loss_values_1_path, "w") as f:
                         json.dump(loss_scores_1, f)
@@ -130,7 +130,7 @@ class TestWarmstart:
                 # and store them in the temporary experiment folder
                 rank_2 = dist.get_rank()
                 if rank_2 == 0:
-                    messages_2: List[Message[EvaluationResultBatch]] = components_2.evaluation_subscriber.message_list
+                    messages_2: List[Message[EvaluationResult]] = components_2.evaluation_subscriber.message_list
                     loss_scores_2 = TestWarmstart.get_loss_scores(messages_2, "CLMCrossEntropyLoss interval average")
                     with open(loss_values_2_path, "w") as f:
                         json.dump(loss_scores_2, f)
