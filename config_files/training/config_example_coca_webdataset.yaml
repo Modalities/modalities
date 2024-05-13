@@ -5,7 +5,7 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 129_600 # Needs to be a multiple of gradient_acc_steps
+    global_training_log_interval_in_steps: 30 # Needs to be a multiple of gradient_acc_steps
     global_checkpointing_interval_in_steps: 9_990
     global_evaluation_interval_in_steps: 4_980
     global_num_training_samples: ${train_dataset.config.num_samples} # 491 steps with 8 gpus and global bs of 1152
