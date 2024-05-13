@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Iterator
+from typing import Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -26,21 +26,14 @@ class BatchProgressUpdate:
 
 @dataclass
 class ModelState:
-    tensor_key: str
-    value: Iterator[nn.Parameter]
+    module_alias: str
+    module_input: Tuple[torch.Tensor]
+    module_output: torch.Tensor
+    module: nn.Module
 
 
 @dataclass
 class StepState:
-    # @dataclass
-    # class TrackableValues:
-    # loss: float
-    # num_samples: int
-    # forward_backward_time: float
-    # gradient_norm_score: Optional[float] = None
-    # # learning rate of the first parameter according to the lr scheduler
-    # scheduler_lr_first: Optional[float] = None
-
     @dataclass
     class MetaInformation:
         step_id: int

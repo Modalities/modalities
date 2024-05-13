@@ -67,8 +67,6 @@ class ModelFactory:
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
-        log_activation: bool = False,
-        log_attention_scores: bool = False,
     ):
         model = GPT2LLM(
             sample_key=sample_key,
@@ -90,22 +88,4 @@ class ModelFactory:
             ffn_norm=ffn_norm,
             lm_head_norm=lm_head_norm,
         )
-
-        for flag, hook, layer in zip(
-            [log_activation, log_attention_scores],
-            [ModelFactory.activation_logger, ModelFactory.attention_score_logger],
-            [model.transformer["h"][-1].mlp, model.transformer["h"][-1].attn],
-        ):
-            if flag:
-                # Log activation/attention of last of transformer's last mlp layer (not ouput's mlp layer)
-                layer.register_forward_hook(hook)
-
-    @staticmethod
-    def activation_logger(module, input, output):
-        # Here you can log the activations
-        pass
-
-    @staticmethod
-    def attention_score_logger(module, input, output):
-        # Here you can log the attention scores
-        pass
+        return model

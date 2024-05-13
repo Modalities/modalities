@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List
 
 import torch
 from pydantic import BaseModel
@@ -17,20 +16,17 @@ class TrackablesKeys(Enum):
 
 
 class LocalModelStateProcessor(LocalProcessorIF[ModelState]):
-    def __init__(self, trackable_keys: List[TrackablesKeys]):
-        self.trackable_keys = trackable_keys
-        self.trackable_key_to_process_fun = {TrackablesKeys.CROSS_ENTROPY: self._process_cross_entropy}
+    def __init__(self):
+        pass
 
     def process(self, payload: ModelState, current_local_step_state: IntervalState):
-        for key in self.trackable_keys:
-            self.trackable_key_to_process_fun[key](payload, current_local_step_state)
+        self._process_cross_entropy(payload, current_local_step_state)
 
     def _process_cross_entropy(self, payload: ModelState, current_local_step_state: IntervalState):
-        entropy_score = torch.distributions.Categorical(logits=payload.value).entropy()
-        layer_name = payload.key
+        entropy_score = torch.distributions.Categorical(logits=payload.module_output).entropy()
         trackable = Trackable(
             key=TrackablesKeys.CROSS_ENTROPY,
-            tag=layer_name,
+            tag=payload.module_alias,
             value=entropy_score,
             local_reduce_op=LocalReduceOperations.SUM,
             rank_reduce_op=RankReduceOperations.SUM,
@@ -55,7 +51,7 @@ class GlobalModelStateProcessor(GlobalProcessorIF):
 
 
 class LocalModelStateProcessorConfig(BaseModel):
-    trackable_keys: List[TrackablesKeys]
+    pass
 
 
 class GlobalModelStateProcessorConfig(BaseModel):

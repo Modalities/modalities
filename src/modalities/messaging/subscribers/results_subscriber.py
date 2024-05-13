@@ -1,30 +1,28 @@
 from pathlib import Path
 
 import rich
-import torch
 from rich.console import Group
 from rich.panel import Panel
 
 import wandb
-from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
-from modalities.messaging.broker.message_broker import MessageBrokerIF
-from modalities.messaging.messages import BatchProgressUpdate, Message, MessageTypes, ModelState
+from modalities.messaging.messages.message import Message, MessageTypes
+from modalities.messaging.messages.payloads import BatchProgressUpdate, EvaluationResult, ModelState
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 
 
-class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
-    def consume_message(self, message: Message[EvaluationResultBatch]):
+class DummyResultSubscriber(MessageSubscriberIF[EvaluationResult]):
+    def consume_message(self, message: Message[EvaluationResult]):
         """Consumes a message from a message broker."""
         pass
 
 
-class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
+class RichResultSubscriber(MessageSubscriberIF[EvaluationResult]):
     def __init__(self, num_ranks: int) -> None:
         super().__init__()
         self.num_ranks = num_ranks
 
-    def consume_message(self, message: Message[EvaluationResultBatch]):
+    def consume_message(self, message: Message[EvaluationResult]):
         """Consumes a message from a message broker."""
         eval_result = message.payload
         losses = {
@@ -48,7 +46,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             rich.print(Panel(Group(*group_content)))
 
 
-class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
+class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResult]):
     """A subscriber object for the WandBEvaluationResult observable."""
 
     def __init__(
@@ -84,7 +82,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             raise ValueError("Received a model state message before a batch progress update message.")
         wandb.log(data={message.payload.key: message.payload.value}, step=self.last_batch_progress_update.step_id + 1)
 
-    def _consum_evaluation_results_batch(self, message: Message[EvaluationResultBatch]):
+    def _consum_evaluation_results_batch(self, message: Message[EvaluationResult]):
         eval_result = message.payload
 
         losses = {
@@ -108,18 +106,3 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         }
 
         wandb.log(data=throughput_metrics, step=eval_result.train_step_id + 1)
-
-
-class ModelStatePublisher:
-    def __init__(self, message_broker: MessageBrokerIF):
-        self.message_broker = message_broker
-
-    def log_activations(self, module, input, output):
-        entropy = torch.distributions.Categorical(logits=output).entropy()
-        payload = ModelState(key=ModelState.ModelStateKeys.ACTIVATION_ENTROPY, value=entropy.item())
-        message = Message(payload=payload, message_type=MessageTypes.MODEL_STATE)
-        self.message_broker.distribute_message(message)
-
-    def log_attention_scores(self, module, input, output):
-        # TODO: Implement logging of attention scores using WandBEvaluationResultSubscriber
-        pass
