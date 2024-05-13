@@ -65,7 +65,7 @@ class Trainer:
                 total_loss += weighted_loss
 
             # Append individual losses (for logging)
-            losses.append(loss)
+            losses.append(weighted_loss)
 
         (total_loss / self.gradient_acc_steps).backward()
 
