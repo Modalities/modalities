@@ -155,6 +155,7 @@ class ClipLossConfig(BaseModel):
     prediction_key1: str
     prediction_key2: str
     weight: float = 1
+    local_loss: bool = True
     tag: str = "ClipLoss"
 
 
@@ -165,6 +166,7 @@ class ClipLoss(Loss):
         prediction_key1: str,
         prediction_key2: str,
         weight: float,
+        local_loss: bool,
         tag: str = "ClipLoss",
     ):
         """
@@ -180,6 +182,7 @@ class ClipLoss(Loss):
         self.logit_scale_key = logit_scale_key
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
+        self.local_loss = local_loss
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         """
@@ -203,20 +206,27 @@ class ClipLoss(Loss):
         dist.all_gather(gathered_embedding2, embedding2)
 
         # Make sure we have gradients for the "local" embeddings
-        gathered_embedding1[rank] = embedding1
-        gathered_embedding2[rank] = embedding2
+        if not self.local_loss:
+            gathered_embedding1[rank] = embedding1
+            gathered_embedding2[rank] = embedding2
 
         # Combine embeddings
         gathered_embedding1 = torch.cat(gathered_embedding1, dim=0)
         gathered_embedding2 = torch.cat(gathered_embedding2, dim=0)
 
         # Calculate logits
-        logits_per_embedding1 = logit_scale * gathered_embedding1 @ gathered_embedding2.T
-        logits_per_embedding2 = logits_per_embedding1.T
+        if self.local_loss:
+            logits_per_embedding1 = logit_scale * embedding1 @ gathered_embedding2.T
+            logits_per_embedding2 = logit_scale * embedding2 @ gathered_embedding1.T
+        else:
+            logits_per_embedding1 = logit_scale * gathered_embedding1 @ gathered_embedding2.T
+            logits_per_embedding2 = logits_per_embedding1.T
 
         # Build gt labels for diagonal
         num_logits = logits_per_embedding1.shape[0]
         labels = torch.arange(num_logits, device=device, dtype=torch.long)
+        if world_size > 1 and self.local_loss:
+            labels = labels + num_logits * self.rank
 
         # Calculate loss
         clip_loss = (
