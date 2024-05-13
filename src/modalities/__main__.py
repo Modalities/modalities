@@ -221,7 +221,7 @@ class Main:
         )
         wrapped_model = components.wrapped_model
 
-        if os.environ["RANK"] == 0:
+        if int(os.environ["RANK"]) == 0:
             # TODO calculate parameters for full model
             print(
                 f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters (per process)."
