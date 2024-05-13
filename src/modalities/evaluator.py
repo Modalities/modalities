@@ -32,27 +32,26 @@ class Evaluator:
         model: nn.Module,
         loss_fun: List[Loss],
     ):
-        with torch.no_grad():
-            result_batch = model_predict_batch(model=model, batch=batch)
+        result_batch = model_predict_batch(model=model, batch=batch)
 
-            total_loss = None
-            losses = []
-            for lfn in loss_fun:
-                # Calculate loss
-                loss = lfn(result_batch)
+        total_loss = None
+        losses = []
+        for lfn in loss_fun:
+            # Calculate loss
+            weighted_loss = lfn(result_batch) * lfn.weight
 
-                # Add loss to total loss
-                weighted_loss = loss * lfn.weight
-                if total_loss is None:
-                    total_loss = weighted_loss
-                else:
-                    total_loss += weighted_loss
+            # Add loss to total loss
+            if total_loss is None:
+                total_loss = weighted_loss
+            else:
+                total_loss += weighted_loss
 
-                # Append individual losses (for logging)
-                losses.append(loss)
+            # Append individual losses (for logging)
+            losses.append(weighted_loss.clone().detach())
 
         return total_loss, *losses
 
+    @torch.no_grad()
     def evaluate(
         self,
         model: nn.Module,
@@ -75,37 +74,39 @@ class Evaluator:
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
+            # Make sure that all ranks reach this point at the same time
             dist.barrier()
-            print("All ranks reached the eval step")
 
-            with TimeRecorder() as forward_backward_timer_recorder:
-                for batch_id, batch in enumerate(data_loader):
-                    batch_losses = self.evaluate_batch(
-                        batch=batch,
-                        model=model,
-                        loss_fun=loss_fun,
-                    )
+            forward_backward_time_recorder = TimeRecorder()
+            forward_backward_time_recorder.start()
+            for batch_id, batch in enumerate(data_loader):
+                batch_losses = self.evaluate_batch(
+                    batch=batch,
+                    model=model,
+                    loss_fun=loss_fun,
+                )
+                forward_backward_time_recorder.stop()
 
-                    # Accumulate losses
-                    for i, batch_loss in enumerate(batch_losses):
-                        cumulated_loss[i] += batch_loss.item()
-                    cumulated_loss[-1] += 1
+                # Accumulate losses
+                for i, batch_loss in enumerate(batch_losses):
+                    cumulated_loss[i] += batch_loss.item()
+                cumulated_loss[-1] += 1
 
-                    batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+                batch_length_tensor = torch.tensor(len(batch)).to(device)
+                thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
-                    Evaluator._publish_progress(
-                        batch_progress_publisher=self.batch_progress_publisher,
-                        eval_step_id=batch_id,
-                        dataloader_tag=data_loader.dataloader_tag,
-                    )
+                Evaluator._publish_progress(
+                    batch_progress_publisher=self.batch_progress_publisher,
+                    eval_step_id=batch_id,
+                    dataloader_tag=data_loader.dataloader_tag,
+                )
 
-                print(f"Rank {dist.get_rank()} is done with eval step")
-                dist.barrier()
-                print("All ranks are done with the eval step")
+                # we start the time recoder here again to also capture the time spend loading
+                # via the dataloader.
+                forward_backward_time_recorder.start()
 
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
-            forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
+            forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
             thoughput_aggregator.add_value(
                 key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
             )
