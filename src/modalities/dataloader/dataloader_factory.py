@@ -41,7 +41,13 @@ class DataloaderFactory:
 
     @staticmethod
     def get_web_loader(
-        dataloader_tag: str, dataset: Dataset, batch_size: int, collate_fn: Callable, num_workers: int, pin_memory: bool
+        dataloader_tag: str,
+        dataset: Dataset,
+        batch_size: int,
+        collate_fn: Callable,
+        num_workers: int,
+        pin_memory: bool,
+        drop_last: bool,
     ) -> WebLoader:
         dataloader = WebLoader(
             dataloader_tag=dataloader_tag,

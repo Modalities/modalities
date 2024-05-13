@@ -313,6 +313,7 @@ class WebLoaderConfig(BaseModel):
     collate_fn: PydanticCollateFnIFType
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
+    drop_last: bool
 
 
 class RepeatingDataLoaderConfig(BaseModel):

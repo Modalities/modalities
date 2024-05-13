@@ -54,7 +54,7 @@ train_dataset:
     shardshuffle: 1000
     repeat: true
     resample: true
-    shuffle: true
+    shuffle: 1_000
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -73,6 +73,8 @@ val_dataset:
     text_key: input_ids
     block_size: ${settings.training.sequence_length}
     num_samples: 25_010
+    resample: false
+    shuffle: 0 # Disable shuffling
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -86,6 +88,7 @@ train_dataloader:
   config:
     num_workers: 8
     pin_memory: true
+    drop_last: true
     dataloader_tag: "train"
     dataset:
       instance_key: train_dataset
@@ -101,6 +104,7 @@ val_dataloader:
   config:
     num_workers: 8
     pin_memory: true
+    drop_last: false
     dataloader_tag: "val"
     dataset:
       instance_key: val_dataset
