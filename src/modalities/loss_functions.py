@@ -226,7 +226,7 @@ class ClipLoss(Loss):
         num_logits = logits_per_embedding1.shape[0]
         labels = torch.arange(num_logits, device=device, dtype=torch.long)
         if world_size > 1 and self.local_loss:
-            labels = labels + num_logits * self.rank
+            labels = labels + num_logits * rank
 
         # Calculate loss
         clip_loss = (
