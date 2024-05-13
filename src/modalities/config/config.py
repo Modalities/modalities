@@ -17,7 +17,8 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
-    PydanticMessagePublisherIFType,
+    PydanticMessageBrokerIFType,
+    PydanticMessageSubscriberIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -25,6 +26,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
+from modalities.messaging.messages.message import MessageTypes
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
 from modalities.util import get_date_of_run, parse_enum_by_name
 
@@ -327,11 +329,11 @@ class DummyResultSubscriberConfig(BaseModel):
 
 
 class MessageBrokerConfig(BaseModel):
-    pass
+    subscriptions: Dict[MessageTypes, List[PydanticMessageSubscriberIFType]]
 
 
 class MessagePublisherConfig(BaseModel):
-    message_broker: PydanticMessagePublisherIFType
+    message_broker: PydanticMessageBrokerIFType
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     local_rank: Annotated[int, Field(strict=True, ge=0)]
 
