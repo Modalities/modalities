@@ -55,17 +55,16 @@ class Trainer:
         losses = []
         for lfn in loss_fun:
             # Calculate loss
-            loss = lfn(result_batch)
+            weighted_loss = lfn(result_batch) * lfn.weight
 
             # Add loss to total loss
-            weighted_loss = loss * lfn.weight
             if total_loss is None:
                 total_loss = weighted_loss
             else:
                 total_loss += weighted_loss
 
             # Append individual losses (for logging)
-            losses.append(weighted_loss)
+            losses.append(weighted_loss.clone().detach())
 
         (total_loss / self.gradient_acc_steps).backward()
 
