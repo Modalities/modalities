@@ -68,11 +68,11 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         eval_result = message.payload
 
         losses = {
-            f"{eval_result.dataloader_tag} {loss_key}": loss_values
+            f"{eval_result.dataloader_tag}/{loss_key}": loss_values
             for loss_key, loss_values in eval_result.losses.items()
         }
         metrics = {
-            f"{eval_result.dataloader_tag} {metric_key}": metric_values
+            f"{eval_result.dataloader_tag}/{metric_key}": metric_values
             for metric_key, metric_values in eval_result.metrics.items()
         }
         # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
@@ -83,7 +83,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             data=metrics, step=eval_result.train_step_id + 1
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         throughput_metrics = {
-            f"{eval_result.dataloader_tag} {metric_key}": metric_values
+            f"{eval_result.dataloader_tag}/{metric_key}": metric_values
             for metric_key, metric_values in eval_result.throughput_metrics.items()
         }
 
