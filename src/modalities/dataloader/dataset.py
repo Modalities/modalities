@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
-import torch
 import webdataset as wds
 from pydantic import BaseModel
 from timm.data import create_transform
@@ -259,21 +258,13 @@ class WebDatasetConfig(BaseModel):
     shuffle: int = 0
 
 
-def nodesplitter(src, group=None):
-    if torch.distributed.is_initialized():
-        if group is None:
-            group = torch.distributed.group.WORLD
-        rank = torch.distributed.get_rank(group=group)
-        size = torch.distributed.get_world_size(group=group)
-        print(f"nodesplitter: rank={rank} size={size}")
-        count = 0
-        for i, item in enumerate(src):
-            if i % size == rank:
-                yield item
-                count += 1
-        print(f"nodesplitter: rank={rank} size={size} count={count} DONE")
-    else:
-        yield from src
+def dummy_nodesplitter(src, group=None):
+    # This node splitter is not actually splitting the data over the nodes
+    # but keeps the complete dataset on each node.
+    # This is required so that each node has the same amount of data.
+    # In the case of 25 shards and 16 ranks for example 7 ranks are
+    # without data in the second iteration. This will cause a crash once all_gather is called.
+    yield from src
 
 
 class WebDataset(wds.WebDataset):
@@ -293,30 +284,25 @@ class WebDataset(wds.WebDataset):
         resample: bool,
         shuffle: int,
     ):
-        # Dont apply nodesplitting
-        # This is not required for training due to resample
-        # For validation the datasets are small and we dont get an even split between all nodes
         super().__init__(
             urls=urls,
-            nodesplitter=wds.single_node_only if not resample else None,
+            nodesplitter=wds.dummy_nodesplitter if not resample else None,
             shardshuffle=shardshuffle,
             repeat=repeat,
             handler=wds.ignore_and_continue,
             resampled=resample,
         )
         self.num_samples = num_samples
+        tokenizer.tokenizer.pad_token = tokenizer.tokenizer.eos_token
 
         if shuffle > 0:
             self.append(wds.filters.shuffle(shuffle))
 
         self.append(wds.filters.decode("pil"))
 
-        tokenizer.tokenizer.pad_token = tokenizer.tokenizer.eos_token
-
         transform = create_transform(**image_transform_config.model_dump())
 
         def make_sample(sample):
-            # print(sample["json"])
             batch_encoding: BatchEncoding = tokenizer.tokenizer(
                 sample[source_text_key],
                 max_length=block_size,
