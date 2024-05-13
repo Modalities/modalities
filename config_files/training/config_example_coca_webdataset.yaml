@@ -5,13 +5,13 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 4
-    global_checkpointing_interval_in_steps: 100
-    global_evaluation_interval_in_steps: 100
+    global_training_log_interval_in_steps: 30 # Needs to be a multiple of gradient_acc_steps
+    global_checkpointing_interval_in_steps: 30
+    global_evaluation_interval_in_steps: 30
     global_num_training_samples: ${train_dataset.config.num_samples} # 491 steps with 8 gpus and global bs of 1152
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
-    gradient_acc_steps: 1
+    gradient_acc_steps: 30
     local_train_micro_batch_size: 144
     sequence_length: 256
   cuda_env:
@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
-    urls: "coco/train/{000000..000566}.tar"
+    urls: "/hpcwork/rwth1597/coco/train/{000000..000566}.tar"
     source_image_key: jpg
     image_key: images
     source_text_key: txt
@@ -66,7 +66,7 @@ val_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
-    urls: "coco/val/{000000..000025}.tar"
+    urls: "/hpcwork/rwth1597/coco/val/{000000..000025}.tar"
     source_image_key: jpg
     image_key: images
     source_text_key: txt
@@ -141,6 +141,7 @@ captioning_loss:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${model.config.prediction_key}
     tag: captioning_loss
+    weight: 2.0
 
 contrastive_loss:
   component_key: loss
@@ -150,6 +151,7 @@ contrastive_loss:
     prediction_key2: ${model.config.text_cls_prediction_key}
     logit_scale_key: ${model.config.logit_scale_prediction_key}
     tag: contrastive_loss
+    weight: 1.0
 
 loss_fn:
   - instance_key: captioning_loss
@@ -221,17 +223,13 @@ model:
 
 scheduler:
   component_key: scheduler
-  variant_key: onecycle_lr # COCA uses linear decay
+  variant_key: cosine_annealing_with_warmup_lr # COCA uses linear decay
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    max_lr: 8e-4
-    div_factor: 10
-    final_div_factor: 1
-    total_steps: 500_000 # depends on 500.000 iterations on 65,536 image-text pairs -> 5 epochs on JFT -> 32.7B image-text pairs
-    pct_start: 0.02
-    anneal_strategy: cos
+    num_warmup_steps: 2_000
+    num_training_steps: 500_000
 
 optimizer:
   component_key: optimizer
@@ -247,12 +245,13 @@ optimizer:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp_logging_only
+  variant_key: fsdp
   config:
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
+    max_norm: 1.0
 
 batch_progress_subscriber:
   component_key: progress_subscriber

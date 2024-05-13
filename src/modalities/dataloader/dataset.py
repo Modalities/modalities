@@ -293,9 +293,12 @@ class WebDataset(wds.WebDataset):
         resample: bool,
         shuffle: int,
     ):
+        # Dont apply nodesplitting
+        # This is not required for training due to resample
+        # For validation the datasets are small and we dont get an even split between all nodes
         super().__init__(
             urls=urls,
-            nodesplitter=nodesplitter if not resample else None,
+            nodesplitter=None,
             shardshuffle=shardshuffle,
             repeat=repeat,
             handler=wds.ignore_and_continue,
@@ -303,7 +306,9 @@ class WebDataset(wds.WebDataset):
         )
         self.num_samples = num_samples
 
-        self.append(wds.filters.shuffle(shuffle))
+        if shuffle > 0:
+            self.append(wds.filters.shuffle(shuffle))
+
         self.append(wds.filters.decode("pil"))
 
         tokenizer.tokenizer.pad_token = tokenizer.tokenizer.eos_token
