@@ -4,14 +4,12 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, Type
+from typing import Dict, Type
 
 import click
 import click_pathlib
 from pydantic import BaseModel, FilePath
 
-from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
-from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
@@ -21,17 +19,14 @@ from modalities.config.instantiation_models import (
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
-from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.inference.inference import generate_text
-from modalities.logging_broker.message_broker import MessageBroker
-from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
-from modalities.logging_broker.publisher import MessagePublisher
-from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.loops.evaluation.evaluator import Evaluator
+from modalities.loops.training.activation_checkpointing import apply_activation_checkpointing_inplace
+from modalities.loops.training.trainer import Trainer
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
-from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters
 
 
@@ -218,17 +213,19 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        wrapped_model = components.wrapped_model
-        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+
+        logging.info(
+            f"Training model with {compute_number_of_trainable_parameters(components.wrapped_model)} parameters."
+        )
 
         if components.settings.training.do_apply_activation_checkpointing:
-            apply_activation_checkpointing_inplace(wrapped_model)
+            apply_activation_checkpointing_inplace(components.wrapped_model)
 
         gym.run(
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
             checkpoint_saving=components.checkpoint_saving,
-            model=wrapped_model,
+            model=components.wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,
             global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
@@ -236,33 +233,6 @@ class Main:
             global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
         )
         print("done")
-
-    def get_logging_publishers(
-        self,
-        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
-        results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
-        global_rank: int,
-        local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
-        message_broker = MessageBroker()
-        batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
-            message_broker=message_broker,
-            global_rank=global_rank,
-            local_rank=local_rank,
-        )
-        evaluation_result_publisher = MessagePublisher[EvaluationResultBatch](
-            message_broker=message_broker,
-            global_rank=global_rank,
-            local_rank=local_rank,
-        )
-
-        message_broker.add_subscriber(subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber)
-        message_broker.add_subscriber(
-            subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
-            subscriber=progress_subscriber,
-        )
-
-        return evaluation_result_publisher, batch_processed_publisher
 
 
 if __name__ == "__main__":
