@@ -30,12 +30,13 @@ class Loss(ABC):
 class CrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
+    weight: float = 1
     tag: str = "CLMCrossEntropyLoss"
 
 
 class CrossEntropyLoss(Loss):
-    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
-        super().__init__(tag)
+    def __init__(self, target_key: str, prediction_key: str, weight: float, tag: str = "CLMCrossEntropyLoss"):
+        super().__init__(tag, weight)
         self.target_key = target_key
         self.prediction_key = prediction_key
         # Mean over the tokens in the local-batch (batch per rank)
@@ -99,6 +100,7 @@ class NCELossConfig(BaseModel):
     prediction_key2: str
     is_asymmetric: bool = True
     temperature: float = 1.0
+    weight: float = 1
     tag: str = "NCELoss"
 
 
@@ -107,8 +109,9 @@ class NCELoss(Loss):
         self,
         prediction_key1: str,
         prediction_key2: str,
-        is_asymmetric: bool = True,
-        temperature: float = 1.0,
+        is_asymmetric: bool,
+        temperature: float,
+        weight: float,
         tag: str = "NCELoss",
     ):
         """
@@ -121,7 +124,7 @@ class NCELoss(Loss):
             temperature (float, optional): temperature. Defaults to 1.0.
             tag (str, optional): Defaults to "NCELoss".
         """
-        super().__init__(tag)
+        super().__init__(tag, weight)
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
         self.is_asymmetric = is_asymmetric
@@ -151,6 +154,7 @@ class ClipLossConfig(BaseModel):
     logit_scale_key: str
     prediction_key1: str
     prediction_key2: str
+    weight: float = 1
     tag: str = "ClipLoss"
 
 
@@ -160,6 +164,7 @@ class ClipLoss(Loss):
         logit_scale_key: str,
         prediction_key1: str,
         prediction_key2: str,
+        weight: float,
         tag: str = "ClipLoss",
     ):
         """
@@ -171,7 +176,7 @@ class ClipLoss(Loss):
             prediction_key2 (str): Key to access embedding 2.
             tag (str, optional): Defaults to "ClipLoss".
         """
-        super().__init__(tag)
+        super().__init__(tag, weight)
         self.logit_scale_key = logit_scale_key
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
