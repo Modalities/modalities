@@ -1,14 +1,9 @@
-from typing import Annotated, Callable, Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 import torch
 import torch.nn as nn
-from pydantic import BaseModel, Field
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
-from modalities.config.pydanctic_if_types import (
-    PydanticBatchProgressUpdatePublisherIFType,
-    PydanticStepStatePublisherIFType,
-)
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.messaging.evaluation.processors.standard_step_state_processor import TrackablesKeys
 from modalities.messaging.messages.message import MessageTypes
@@ -18,14 +13,12 @@ from modalities.models.model import model_predict_batch
 from modalities.util import TimeRecorder
 
 
-class Evaluator:
+class EvaluationLoop:
     def __init__(
         self,
-        local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         step_state_publisher: MessagePublisher[StepState],
     ) -> None:
-        self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.step_state_publisher = step_state_publisher
 
@@ -49,7 +42,7 @@ class Evaluator:
     ) -> Dict[str, EvaluationResult]:
         model.eval()
         for data_loader in data_loaders:
-            Evaluator._publish_progress(
+            EvaluationLoop._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 eval_step_id=0,  # Reset progress bar
                 num_steps=len(data_loader),
@@ -58,7 +51,7 @@ class Evaluator:
             forward_backward_time_recorder = TimeRecorder()
             forward_backward_time_recorder.start()
             for batch_id, batch in enumerate(data_loader):
-                Evaluator._publish_progress(
+                EvaluationLoop._publish_progress(
                     batch_progress_publisher=self.batch_progress_publisher,
                     eval_step_id=batch_id,
                     num_steps=len(data_loader),
@@ -112,9 +105,3 @@ class Evaluator:
             dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
-
-
-class EvaluatorConfig(BaseModel):
-    local_rank: Annotated[int, Field(strict=True, ge=1)]
-    batch_progress_publisher: PydanticBatchProgressUpdatePublisherIFType
-    step_state_publisher: PydanticStepStatePublisherIFType

@@ -14,9 +14,11 @@ from modalities.checkpointing.checkpoint_saving import CheckpointSaving, Checkpo
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
+from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
 from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.loops.training.training_loop import TrainingLoop
 from modalities.loss_functions import Loss
-from modalities.messaging.messages.payloads import BatchProgressUpdate, StepState
+from modalities.messaging.broker.message_broker import MessageBrokerIF
 from modalities.messaging.publishers.publisher import MessagePublisherIF
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 from modalities.models.gpt2.collator import CollateFnIF
@@ -42,6 +44,8 @@ class PydanticThirdPartyTypeIF:
         )
 
 
+PydanticPytorchTrainingLoopType = Annotated[TrainingLoop, PydanticThirdPartyTypeIF(TrainingLoop)]
+PydanticPytorchEvaluationLoopType = Annotated[EvaluationLoop, PydanticThirdPartyTypeIF(EvaluationLoop)]
 PydanticCheckpointSavingIFType = Annotated[CheckpointSaving, PydanticThirdPartyTypeIF(CheckpointSaving)]
 PydanticCheckpointLoadingIFType = Annotated[CheckpointLoadingIF, PydanticThirdPartyTypeIF(CheckpointLoadingIF)]
 PydanticCheckpointSavingStrategyIFType = Annotated[
@@ -64,9 +68,4 @@ PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(tor
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
 PydanticMessagePublisherIFType = Annotated[MessagePublisherIF, PydanticThirdPartyTypeIF(MessagePublisherIF)]
-PydanticBatchProgressUpdatePublisherIFType = Annotated[
-    MessagePublisherIF[BatchProgressUpdate], PydanticThirdPartyTypeIF(MessagePublisherIF[BatchProgressUpdate])
-]
-PydanticStepStatePublisherIFType = Annotated[
-    MessagePublisherIF[StepState], PydanticThirdPartyTypeIF(MessagePublisherIF[StepState])
-]
+PydanticMessageBrokerIFType = Annotated[MessageBrokerIF, PydanticThirdPartyTypeIF(MessageBrokerIF)]

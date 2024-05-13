@@ -54,7 +54,8 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
-from modalities.loops.evaluation.evaluator import Evaluator, EvaluatorConfig
+from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
+from modalities.loops.evaluation.evaluation_loop_config import EvaluatorConfig
 from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
     FSDPGradientClipper,
@@ -65,9 +66,16 @@ from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper_config im
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
-from modalities.loops.training.trainer import Trainer, TrainerConfig
+from modalities.loops.training.training_loop import TrainingLoop
+from modalities.loops.training.training_loop_config import TrainingLoopConfig
 from modalities.loss_functions import CLMCrossEntropyLoss
-from modalities.messaging.broker.message_broker import MessageBroker
+from modalities.messaging.broker.message_broker_factory import MessageBrokerFactory
+from modalities.messaging.evaluation.processors.model_state_processors import (
+    GlobalModelStateProcessor,
+    GlobalModelStateProcessorConfig,
+    LocalModelStateProcessor,
+    LocalModelStateProcessorConfig,
+)
 from modalities.messaging.publishers.publisher_factory import PublisherFactory
 from modalities.messaging.subscribers.subscriber_factory import ProgressSubscriberFactory, ResultsSubscriberFactory
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
@@ -95,9 +103,9 @@ class ComponentEntity:
 
 COMPONENTS = [
     # Trainer
-    ComponentEntity("trainer", "default", Trainer, TrainerConfig),
+    ComponentEntity("training_loop", "default", TrainingLoop, TrainingLoopConfig),
     # Evaluator
-    ComponentEntity("evaluator", "default", Evaluator, EvaluatorConfig),
+    ComponentEntity("evaluation_loop", "default", EvaluationLoop, EvaluatorConfig),
     # models
     ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity(
@@ -180,13 +188,13 @@ COMPONENTS = [
     ComponentEntity(
         "message_broker",
         "default",
-        MessageBroker,
+        MessageBrokerFactory.get_message_broker,
         MessageBrokerConfig,
     ),
     # Message Publishers
     ComponentEntity(
         "message_publisher",
-        "progress_publisher",
+        "batch_progress_publisher",
         PublisherFactory.get_batch_progress_publisher,
         MessagePublisherConfig,
     ),
@@ -198,8 +206,8 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "message_publisher",
-        "evaluation_result_publisher",
-        PublisherFactory.get_evaluation_result_publisher,
+        "step_state_publisher",
+        PublisherFactory.get_model_state_publisher,
         MessagePublisherConfig,
     ),
     # Progress subscriber
@@ -227,6 +235,11 @@ COMPONENTS = [
         "wandb",
         ResultsSubscriberFactory.get_wandb_result_subscriber,
         WandBEvaluationResultSubscriberConfig,
+    ),
+    # ModelStateProcessor
+    ComponentEntity("local_message_processor", "model_state", LocalModelStateProcessor, LocalModelStateProcessorConfig),
+    ComponentEntity(
+        "global_message_processor", "model_state", GlobalModelStateProcessor, GlobalModelStateProcessorConfig
     ),
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),

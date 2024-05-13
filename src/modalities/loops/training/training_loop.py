@@ -1,19 +1,13 @@
-from typing import Annotated, Callable, Tuple
+from typing import Callable, Tuple
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from pydantic import BaseModel, Field
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
-from modalities.config.pydanctic_if_types import (
-    PydanticBatchProgressUpdatePublisherIFType,
-    PydanticGradientClipperIFType,
-    PydanticStepStatePublisherIFType,
-)
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.loops.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.loss_functions import Loss
@@ -25,7 +19,7 @@ from modalities.models.model import model_predict_batch
 from modalities.util import TimeRecorder
 
 
-class Trainer:
+class TrainingLoop:
     def __init__(
         self,
         local_rank: int,
@@ -157,10 +151,3 @@ class Trainer:
             dataloader_tag=dataloader_tag,
         )
         batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
-
-
-class TrainerConfig(BaseModel):
-    batch_progress_publisher: PydanticBatchProgressUpdatePublisherIFType
-    step_state_publisher: PydanticStepStatePublisherIFType
-    gradient_acc_steps: Annotated[float, Field(strict=True, ge=1)]
-    gradient_clipper: PydanticGradientClipperIFType
