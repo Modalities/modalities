@@ -4,6 +4,7 @@ from typing import Annotated, Dict, Tuple
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from einops import repeat
 from pydantic import BaseModel, Field
 from torch import nn
@@ -168,12 +169,12 @@ class CoCa(NNModel):
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(queries, context=vision_embd)
-        vision_embd, vision_cls_token = vision_embd[:, :-1, :], vision_embd[:, -1, :]
+        vision_embd, vision_cls_token = vision_embd[:, :-1, :], F.normalize(vision_embd[:, -1, :], dim=-1)
         return vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]
-        text_embd, text_cls_token = text_embd[:, :-1, :], text_embd[:, -1, :]
+        text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
 
     def _forward_decode(self, text_embd: torch.Tensor, vision_embd: torch.Tensor) -> torch.Tensor:
