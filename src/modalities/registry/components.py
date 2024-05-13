@@ -3,6 +3,7 @@ from typing import Callable, Type
 
 import torch
 import torch.nn as nn
+import transformers
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 
@@ -23,6 +24,7 @@ from modalities.config.config import (
     CheckpointSavingConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    CosineAnnealingWithWarmupLRSchedulerConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -124,6 +126,12 @@ COMPONENTS = [
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler",
+        "cosine_annealing_with_warmup_lr",
+        transformers.get_linear_schedule_with_warmup,
+        CosineAnnealingWithWarmupLRSchedulerConfig,
     ),
     # tokenizers
     ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
