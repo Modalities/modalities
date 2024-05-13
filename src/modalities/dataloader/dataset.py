@@ -298,7 +298,7 @@ class WebDataset(wds.WebDataset):
         # For validation the datasets are small and we dont get an even split between all nodes
         super().__init__(
             urls=urls,
-            nodesplitter=None,
+            nodesplitter=wds.single_node_only if not resample else None,
             shardshuffle=shardshuffle,
             repeat=repeat,
             handler=wds.ignore_and_continue,
