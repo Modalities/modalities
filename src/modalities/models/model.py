@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -22,13 +22,23 @@ class NNModel(nn.Module):
         return {name: param for name, param in self.named_parameters()}
 
     @abstractmethod
-    def generate(
+    def generate_text(
         self,
         tokenizer: PreTrainedTokenizer,
         context: str,
         max_new_tokens: int,
         temperature: float = 1.0,
-    ):
+    ) -> str:
+        ...
+
+    @abstractmethod
+    def generate(
+            self,
+            stop_token_ids: List[int],
+            input_ids: torch.Tensor,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ) -> torch.Tensor:
         ...
 
 

@@ -1,70 +1,7 @@
 import pytest
 import torch
-from torch import nn
-
-from modalities.models.mamba.mamba_model import MixerModel, _init_weights, MambaLLM, create_block
-
-
-@pytest.fixture()
-def batch_size():
-    return 2
-
-
-@pytest.fixture()
-def vocab_size():
-    return 1024
-
-
-@pytest.fixture()
-def sequence_length():
-    return 64
-
-
-@pytest.fixture()
-def n_layer():
-    return 2
-
-
-@pytest.fixture()
-def d_model():
-    return 12
-
-
-@pytest.fixture()
-def ssm_config():
-    return {}
-
-
-@pytest.fixture()
-def mixer_model(d_model, n_layer, vocab_size):
-    return MixerModel(d_model, n_layer, vocab_size)
-
-
-@pytest.fixture()
-def prediction_key():
-    return "logits"
-
-
-@pytest.fixture()
-def sample_key():
-    return "input_ids"
-
-
-@pytest.fixture()
-def mamba_llm(d_model, n_layer, vocab_size, prediction_key, sample_key):
-    return MambaLLM(d_model=d_model, n_layer=n_layer, vocab_size=vocab_size, ssm_cfg={}, rms_norm=True,
-                    residual_in_fp32=False, fused_add_norm=False, pad_vocab_size_multiple=1, tie_embeddings=False,
-                    prediction_key=prediction_key, sample_key=sample_key)
-
-
-@pytest.fixture()
-def linear_layer():
-    return nn.Linear(in_features=16, out_features=24)
-
-
-@pytest.fixture()
-def embedding_layer(vocab_size, d_model):
-    return nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
+from transformers import AutoTokenizer
+from modalities.models.mamba.mamba_model import _init_weights, create_block
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
@@ -102,8 +39,11 @@ def test_mamba_llm_forward(mamba_llm, batch_size, sequence_length, vocab_size, p
     assert y[prediction_key].shape == (batch_size, sequence_length, vocab_size)
 
 
-def test__create_block(d_model):
-    test_block = create_block(d_model=d_model)
+def test__create_block(d_model, ssm_cfg, norm_epsilon, rms_norm, residual_in_fp32, fused_add_norm, layer_idx, device,
+                       dtype):
+    test_block = create_block(d_model=d_model, ssm_cfg=ssm_cfg, norm_epsilon=norm_epsilon, rms_norm=rms_norm,
+                              residual_in_fp32=residual_in_fp32, fused_add_norm=fused_add_norm, layer_idx=layer_idx,
+                              device=device, dtype=dtype)
     assert test_block.norm.normalized_shape[0] == d_model
     assert test_block.mixer.d_model == d_model
 
@@ -115,5 +55,22 @@ def test_tie_weights(mamba_llm):
     assert (mamba_llm.lm_head.weight == mamba_llm.backbone.embedding.weight).all()
 
 
-def test_generate(mamba_llm):
-    raise NotImplementedError
+def test_generate_text(mamba_llm):
+    tokenizer = AutoTokenizer.from_pretrained("../../../data/tokenizer/hf_gpt2")
+    context = "My name is"
+    output = mamba_llm.to("cuda").generate_text(tokenizer=tokenizer, context=context, max_new_tokens=5,
+                                                temperature=1)
+    assert type(output) == str
+    assert context in output
+    assert len(output) > len(context)
+
+def test_generate(mamba_llm, vocab_size):
+    num_input_tokens = 3
+    max_new_tokens = 5
+    input_ids = torch.randint(0, vocab_size, (1, num_input_tokens)).to("cuda")
+    output = mamba_llm.to("cuda").generate(stop_token_ids=[],input_ids=input_ids, max_new_tokens=max_new_tokens,temperature=1)
+
+    assert type(output) == torch.Tensor
+    assert output.shape[1] == num_input_tokens + max_new_tokens
+
+

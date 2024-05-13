@@ -46,8 +46,8 @@ class MambaBlock(nn.Module):
             bias: bool,
             use_fast_path: bool,
             layer_idx: int,
-            device: str,
-            dtype: str,
+            device: Optional[str],
+            dtype: Optional[str],
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()

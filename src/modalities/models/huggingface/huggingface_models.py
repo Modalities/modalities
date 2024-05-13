@@ -38,6 +38,7 @@ class HuggingFacePretrainedModelConfig(BaseModel):
 
 
 class HuggingFacePretrainedModel(NNModel):
+
     def __init__(
             self,
             model_type: HuggingFaceModelTypes,
@@ -72,13 +73,17 @@ class HuggingFacePretrainedModel(NNModel):
     def fsdp_block_names(self) -> List[str]:
         return self.huggingface_model._no_split_modules
 
-    def generate(
+    def generate_text(
             self,
             tokenizer: PreTrainedTokenizer,
             context: str,
             max_new_tokens: int,
             temperature: float = 1.0,
     ):
+        raise NotImplementedError
+
+    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
+                 temperature: float = 1.0) -> torch.Tensor:
         raise NotImplementedError
 
 

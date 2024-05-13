@@ -24,10 +24,6 @@ class MixerModelConfig(BaseModel):
     mamba_block_config: MambaBlockConfig
 
 
-class BlockConfig(BaseModel):
-    ...
-
-
 class MambaLLMConfig(BaseModel):
     d_model: int
     n_layer: int

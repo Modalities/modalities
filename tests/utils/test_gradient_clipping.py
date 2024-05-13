@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import pytest
 import torch
@@ -49,13 +49,17 @@ class TestModel(NNModel):
         if gradient_clipping_mode == GradientClippingMode.VALUE:
             return gradient_vector.abs().sum()
 
-    def generate(
+    def generate_text(
             self,
             tokenizer: PreTrainedTokenizer,
             context: str,
             max_new_tokens: int,
             temperature: float = 1.0,
     ):
+        raise NotImplementedError
+
+    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
+                 temperature: float = 1.0) -> torch.Tensor:
         raise NotImplementedError
 
 

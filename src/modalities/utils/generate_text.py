@@ -83,11 +83,9 @@ def enter_manual(prompt: str, model, tokenizer, max_new_tokens):
     try:
         prompt = prompt
         print(prompt, end="")
-        model.module.generate(
-            tokenizer=tokenizer,
-            context=prompt,
-            max_new_tokens=max_new_tokens
-        )
+        model.module.generate_text(tokenizer=tokenizer,
+                                   context=prompt,
+                                   max_new_tokens=max_new_tokens)
     except ValueError as e:
         print(e)
 
@@ -99,19 +97,15 @@ def enter_interactive(chat, model, tokenizer, max_new_tokens):
             if chat is True:
                 prompt = input("enter question> ").strip()
                 prompt = chat_prefix + chat_prompt_template.format(prompt=prompt)
-                model.module.generate(
-                    tokenizer=tokenizer,
-                    context=prompt,
-                    max_new_tokens=max_new_tokens
-                )
+                model.module.generate_text(tokenizer=tokenizer,
+                                           context=prompt,
+                                           max_new_tokens=max_new_tokens)
             else:
                 prompt = input("enter prompt> ")
                 print(prompt, end="")
-                model.module.generate(
-                    tokenizer=tokenizer,
-                    context=prompt,
-                    max_new_tokens=max_new_tokens
-                )
+                model.module.generate_text(tokenizer=tokenizer,
+                                           context=prompt,
+                                           max_new_tokens=max_new_tokens)
         except ValueError as e:
             print(e)
             continue

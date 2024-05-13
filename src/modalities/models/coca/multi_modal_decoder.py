@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict
+from typing import Dict, List
 
 import torch
 import xformers.ops as xops
@@ -124,11 +124,15 @@ class MultiModalTextDecoder(NNModel):
         logits = self.lm_head(x)
         return {self.prediction_key: logits}
 
-    def generate(
+    def generate_text(
             self,
             tokenizer: PreTrainedTokenizer,
             context: str,
             max_new_tokens: int,
             temperature: float = 1.0,
     ):
+        raise NotImplementedError
+
+    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
+                 temperature: float = 1.0) -> torch.Tensor:
         raise NotImplementedError

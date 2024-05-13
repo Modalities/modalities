@@ -3,7 +3,7 @@
 import math
 import sys
 from functools import partial
-from typing import Dict
+from typing import Dict, Optional, List
 
 import torch
 import torch.nn as nn
@@ -85,8 +85,8 @@ class MixerModel(nn.Module):
             initializer_cfg: dict,
             fused_add_norm: bool,
             residual_in_fp32: bool,
-            device: str,
-            dtype: str,
+            device: Optional[str],
+            dtype: Optional[str],
             mamba_block_config: MambaBlockConfig,
     ) -> None:
         super().__init__()
@@ -106,7 +106,7 @@ class MixerModel(nn.Module):
                     residual_in_fp32=residual_in_fp32,
                     fused_add_norm=fused_add_norm,
                     layer_idx=i,
-                    ssm_cfg=mamba_block_config.dict(),
+                    ssm_cfg=mamba_block_config.model_dump(),
                     **factory_kwargs,
                 )
                 for i in range(n_layer)
@@ -168,8 +168,8 @@ class MambaLLM(NNModel):
             tie_embeddings: bool,
             prediction_key: str,
             sample_key: str,
-            seed: int,
-            dtype: str,
+            seed: Optional[int],
+            dtype: Optional[str],
             initializer_cfg: dict,
             num_last_tokens: int,
             inference_params: dict,
@@ -238,13 +238,14 @@ class MambaLLM(NNModel):
         lm_logits = self.lm_head(hidden_states.to(self.lm_head.weight.dtype))
         return {self.prediction_key: lm_logits}
 
-    def generate(
+    def generate_text(
             self,
             tokenizer: PreTrainedTokenizer,
             context: str,
             max_new_tokens: int,
             temperature: float = 1.0,
     ):
+        assert temperature > 0
         if not context:
             raise ValueError("Context must be not empty")
 
@@ -252,17 +253,30 @@ class MambaLLM(NNModel):
         in_batch[self.sample_key] = torch.Tensor(in_batch[self.sample_key]).to(torch.int32).to(
             next(self.parameters()).device)
 
+        generated_ids = self.generate(stop_token_ids=[tokenizer.eos_token_id],
+                                      input_ids=in_batch[self.sample_key],
+                                      max_new_tokens=max_new_tokens, temperature=temperature)
+
+        generated_string = tokenizer.decode(generated_ids.tolist()[0])
+        return generated_string
+
+    def generate(
+            self,
+            stop_token_ids: List[int],
+            input_ids: torch.Tensor,
+            max_new_tokens: int,
+            temperature: float = 1.0,
+    ) -> torch.Tensor:
+
         for _ in range(max_new_tokens):
-            logits = self.forward(in_batch)[self.prediction_key]
+            logits = self.forward({self.sample_key: input_ids})[
+                self.prediction_key]
             logits = logits[:, -1, :] / temperature
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
-            idx_next_str = tokenizer.decode(idx_next[0])
-            if idx_next_str == tokenizer.eos_token:
-                print("\n<reached eos token>", end="")
+
+            if idx_next.item() in stop_token_ids:
                 break
             else:
-                print(idx_next_str, end="")
-                sys.stdout.flush()
-                in_batch[self.sample_key] = torch.cat((in_batch[self.sample_key], idx_next), dim=1)
-        print("")
+                input_ids = torch.cat([input_ids, idx_next], dim=1)
+        return input_ids

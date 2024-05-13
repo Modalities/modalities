@@ -343,6 +343,8 @@ class GPT2Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
+
+
     def __init__(
             self,
             sample_key: str,
@@ -465,7 +467,7 @@ class GPT2LLM(NNModel):
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
 
-    def generate(
+    def generate_text(
             self,
             tokenizer: PreTrainedTokenizer,
             context: str,
@@ -495,3 +497,7 @@ class GPT2LLM(NNModel):
                 sys.stdout.flush()
                 in_batch[self.sample_key] = torch.cat((in_batch[self.sample_key], idx_next), dim=1)
         print("")
+
+    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
+                 temperature: float = 1.0) -> torch.Tensor:
+        raise NotImplementedError
