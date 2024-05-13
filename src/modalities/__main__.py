@@ -227,6 +227,12 @@ class Main:
                 f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters (per process)."
             )
 
+            # Print global batch size
+            world_size = dist.get_world_size()
+            acc_steps = components.settings.training.gradient_acc_steps
+            local_batch_size = components.settings.training.local_train_micro_batch_size
+            print(f"Training model with a global batch size of {world_size * acc_steps* local_batch_size} samples.")
+
         if components.settings.training.do_apply_activation_checkpointing:
             apply_activation_checkpointing_inplace(wrapped_model)
 
