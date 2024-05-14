@@ -11,6 +11,7 @@ from modalities.dataloader.dataset import (
     MemMapDataset,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
+    SimpleDataset,
 )
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 
@@ -36,6 +37,28 @@ class DatasetFactory:
     def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:
         dataset = DummyDataset(num_samples=num_samples, sample_definition=sample_definition)
         return dataset
+
+    @staticmethod
+    def get_simple_dataset(
+        type_: str,
+        audio_dataset_arrows: str,
+        vision_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        num_feats: int,
+        freq_domain_mask_length: int,
+        time_domain_mask_length: int,
+    ) -> SimpleDataset:
+        return SimpleDataset(
+            type_=type_,
+            audio_dataset_arrows=audio_dataset_arrows,
+            vision_dataset_arrows=vision_dataset_arrows,
+            bpe_to_ind=bpe_to_ind,
+            bpecodes=bpecodes,
+            num_feats=num_feats,
+            freq_domain_mask_length=freq_domain_mask_length,
+            time_domain_mask_length=time_domain_mask_length,
+        )
 
     @staticmethod
     def get_mem_map_dataset(
