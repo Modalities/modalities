@@ -56,30 +56,31 @@ class StandardGlobalStepStateProcessor(GlobalProcessorIF):
     def process(self, interval_state: IntervalState, eval_result: EvaluationResult):
         trackables = interval_state.trackables
         # throughput
-        num_samples = trackables.get_trackable[TrackablesKeys.NUM_SAMPLES]
-        forward_backward_time = trackables.get_trackable[TrackablesKeys.FORWARD_BACKWARD_TIME]
+        num_samples = trackables.get_trackable(key=TrackablesKeys.NUM_SAMPLES).value
+        forward_backward_time = trackables.get_trackable(key=TrackablesKeys.FORWARD_BACKWARD_TIME).value
         throughput = num_samples / forward_backward_time
         eval_result.trackables[
             f"{interval_state.meta_information.experiment_status} throughput [samples/s]"
         ] = throughput
 
         # losses
-        avg_loss = trackables.get_trackable(TrackablesKeys.CUMM_BATCH_LOSS) / num_samples
-        last_batch_loss = trackables.get_trackable(TrackablesKeys.LAST_BATCH_LOSS) / self.world_size
+        avg_loss = trackables.get_trackable(TrackablesKeys.CUMM_BATCH_LOSS).value / num_samples
+        last_batch_loss = trackables.get_trackable(TrackablesKeys.LAST_BATCH_LOSS).value / self.world_size
         eval_result.trackables["avg loss"] = avg_loss
         eval_result.trackables["last batch loss"] = last_batch_loss
 
         # gradient norm
         if TrackablesKeys.CUMM_GRADIENT_NORM in trackables.state:
-            avg_gradient_norm = trackables.get_keys(TrackablesKeys.CUMM_GRADIENT_NORM) / trackables.get_trackable(
-                TrackablesKeys.NUM_STEPS
+            avg_gradient_norm = (
+                trackables.get_trackable(TrackablesKeys.CUMM_GRADIENT_NORM).value
+                / trackables.get_trackable(TrackablesKeys.NUM_STEPS).value
             )
             eval_result.trackables["avg gradient norm"] = avg_gradient_norm
 
         if TrackablesKeys.LAST_BATCH_GRADIENT_NORM in trackables.state:
-            eval_result.trackables["last batch gradient norm"] = trackables.get_keys(
+            eval_result.trackables["last batch gradient norm"] = trackables.get_trackable(
                 TrackablesKeys.LAST_BATCH_GRADIENT_NORM
-            )
+            ).value
 
         return eval_result
 

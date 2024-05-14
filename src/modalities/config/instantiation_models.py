@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, FilePath, field_validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
+    PydanticDistributedEvaluationType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
     PydanticLRSchedulerIFType,
@@ -55,6 +56,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     checkpoint_saving: PydanticCheckpointSavingIFType
     training_loop: PydanticPytorchTrainingLoopType
     evaluation_loop: PydanticPytorchEvaluationLoopType
+    evaluation: Optional[PydanticDistributedEvaluationType] = None
     settings: TrainingSettings
 
 

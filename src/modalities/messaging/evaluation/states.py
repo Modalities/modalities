@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 
-from modalities.messaging.messages.payloads import ExperimentStatus
+from modalities.messaging.messages.payloads import BatchProgressUpdate
 from modalities.running_env.fsdp.reducer import Reducer
 
 
@@ -16,21 +16,14 @@ class RankReduceOperations(dist.ReduceOp):
 
 
 class LocalReduceOperations(Enum):
-    @staticmethod
-    def _sum(last, current) -> float | int:
+    def SUM(last, current):
         return last + current
 
-    @staticmethod
-    def _max(last, current) -> float | int:
+    def MAX(last, current):
         return np.max(last, current)
 
-    @staticmethod
-    def _replace(_, current) -> float | int:
+    def REPLACE(_, current):
         return current
-
-    SUM = _sum
-    MAX = _max
-    REPLACE = _replace
 
 
 @dataclass
@@ -39,7 +32,7 @@ class Trackable:
     value: float | int | torch.Tensor
     rank_reduce_op: RankReduceOperations
     local_reduce_op: LocalReduceOperations
-    tag: Optional[str] = ""
+    tag: Optional[str] = "default"
 
 
 @dataclass
@@ -51,15 +44,15 @@ class IntervalState:
 
         def set_trackable(self, trackable: Trackable):
             if trackable.key in self.state and trackable.tag in self.state[trackable.key]:
-                local_reduce_op_fun = trackable.local_reduce_op.value
+                local_reduce_op_fun = trackable.local_reduce_op
                 old_trackable = self.state[trackable.key][trackable.tag]
                 self.state[trackable.key][trackable.tag].value = local_reduce_op_fun(
-                    [old_trackable.value, trackable.value]
+                    old_trackable.value, trackable.value
                 )
             else:
                 self.state[trackable.key][trackable.tag] = trackable
 
-        def get_trackable(self, key: Enum, tag: str) -> Trackable:
+        def get_trackable(self, key: Enum, tag: str = "default") -> Trackable:
             return self.state[key][tag]
 
         def get_tags(self, key: Enum) -> List[str]:
@@ -68,14 +61,7 @@ class IntervalState:
         def get_keys(self) -> List[Enum]:
             return list(self.state.keys())
 
-    @dataclass
-    class MetaInformation:
-        step_id: int
-        num_steps: int
-        dataloader_tag: str
-        experiment_status: ExperimentStatus
-
-    meta_information: MetaInformation
+    meta_information: BatchProgressUpdate
     trackables: TrackableCollection = TrackableCollection()
 
     def reduce_values_across_ranks(self) -> Dict[Enum, torch.Tensor]:

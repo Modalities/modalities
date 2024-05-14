@@ -19,6 +19,8 @@ from modalities.loops.training.gradient_clipping.gradient_clipper import Gradien
 from modalities.loops.training.training_loop import TrainingLoop
 from modalities.loss_functions import Loss
 from modalities.messaging.broker.message_broker import MessageBrokerIF
+from modalities.messaging.evaluation.evaluator import DistributedEvaluation
+from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
 from modalities.messaging.publishers.publisher import MessagePublisherIF
 from modalities.messaging.subscribers.subscriber import MessageSubscriberIF
 from modalities.models.gpt2.collator import CollateFnIF
@@ -69,3 +71,6 @@ PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticT
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
 PydanticMessagePublisherIFType = Annotated[MessagePublisherIF, PydanticThirdPartyTypeIF(MessagePublisherIF)]
 PydanticMessageBrokerIFType = Annotated[MessageBrokerIF, PydanticThirdPartyTypeIF(MessageBrokerIF)]
+PydanticDistributedEvaluationType = Annotated[DistributedEvaluation, PydanticThirdPartyTypeIF(DistributedEvaluation)]
+PydanticLocalProcessorIFType = Annotated[LocalProcessorIF, PydanticThirdPartyTypeIF(LocalProcessorIF)]
+PydanticGlobalProcessorIFType = Annotated[GlobalProcessorIF, PydanticThirdPartyTypeIF(GlobalProcessorIF)]

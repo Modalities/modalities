@@ -17,9 +17,9 @@ class ExperimentStatus(Enum):
 class BatchProgressUpdate:
     """Object holding the state of the current batch computation progress."""
 
-    step_id: int
+    current_step_id: int
+    train_step_id: int
     num_steps: int
-    # Note: in case of ExperimentState.TRAIN, dataset_batch_id=global_train_batch_id
     experiment_status: ExperimentStatus
     dataloader_tag: str
 
@@ -34,17 +34,9 @@ class ModelState:
 
 @dataclass
 class StepState:
-    @dataclass
-    class MetaInformation:
-        step_id: int
-        num_steps: int
-        dataloader_tag: str
-        loss_fun_tag: str
-        experiment_status: ExperimentStatus
-
     trackable_values: Dict[Enum, float | int | torch.Tensor]
     inference_result_batch: InferenceResultBatch
-    meta_information: MetaInformation
+    meta_information: BatchProgressUpdate
 
 
 @dataclass
