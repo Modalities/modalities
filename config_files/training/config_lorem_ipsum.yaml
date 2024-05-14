@@ -20,6 +20,33 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
+training_loop: 
+  component_key: training_loop
+  variant_key: default
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    batch_progress_publisher: 
+      instance_key: batch_progress_publisher
+      pass_type: BY_REFERENCE
+    step_state_publisher:
+      instance_key: step_state_publisher
+      pass_type: BY_REFERENCE
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
+    gradient_clipper:
+      instance_key: gradient_clipper
+      pass_type: BY_REFERENCE
+
+evaluation_loop:
+  component_key: evaluation_loop
+  variant_key: default
+  config:
+    batch_progress_publisher: 
+      instance_key: batch_progress_publisher
+      pass_type: BY_REFERENCE
+    step_state_publisher:
+      instance_key: step_state_publisher
+      pass_type: BY_REFERENCE
+
 collate_fn:  
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
@@ -256,12 +283,31 @@ gradient_clipper:
     norm_type: P2_NORM
     max_norm: 1.0
 
+step_state_publisher:
+  component_key: message_publisher
+  variant_key: step_state_publisher
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
+    message_broker:
+      instance_key: message_broker
+      pass_type: BY_REFERENCE
+
+batch_progress_publisher:
+  component_key: message_publisher
+  variant_key: batch_progress_publisher
+  config:
+    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
+    message_broker:
+      instance_key: message_broker
+      pass_type: BY_REFERENCE
+
 batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
@@ -269,7 +315,6 @@ batch_progress_subscriber:
     eval_dataloaders:
         instance_key: eval_dataloaders
         pass_type: BY_REFERENCE
-
     
 eval_result_subscriber:
   component_key: results_subscriber
@@ -282,16 +327,17 @@ eval_result_subscriber:
     directory: "."
     config_file_path: ${settings.config_file_path}
 
-
 message_broker:
-  subscriptions: 
-    BATCH_PROGRESS_UPDATE: 
-      - instance_key: batch_progress_subscriber
-        pass_type: BY_REFERENCE
-    EVALUATION_RESULT: 
-      - instance_key: eval_result_subscriber
-        pass_type: BY_REFERENCE
-
+  component_key: message_broker
+  variant_key: default
+  config:  
+    subscriptions: 
+      BATCH_PROGRESS_UPDATE: 
+        - instance_key: batch_progress_subscriber
+          pass_type: BY_REFERENCE
+      EVALUATION_RESULT: 
+        - instance_key: eval_result_subscriber
+          pass_type: BY_REFERENCE
 
 evaluation:
   component_key: evaluation
@@ -304,5 +350,14 @@ evaluation:
     message_type_subscriptions:
       - STEP_STATE
       - BATCH_PROGRESS_UPDATE
-      - EVALUATION_RESULT
       - MODEL_STATE
+
+local_model_state_processor:
+  component_key: local_message_processor
+  variant_key: model_state
+  config: {}
+
+global_model_state_processor:
+  component_key: global_message_processor
+  variant_key: model_state
+  config: {}
