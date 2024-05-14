@@ -32,14 +32,18 @@ class CoCaCollatorFn(CollateFnIF):
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
         samples = {
-            sample_key: torch.stack([self._prepare_sample(d[sample_key]) for d in batch])
+            sample_key: torch.stack(
+                [torch.tensor(d[sample_key]) if type(d[sample_key]) != torch.Tensor else d[sample_key] for d in batch]
+            )
             for sample_key in self.sample_keys
         }
         if "attention_mask" in batch[0]:
             samples["attention_mask"] = torch.stack([self._prepare_sample(d["attention_mask"]) for d in batch])
 
         targets = {
-            target_key: torch.stack([self._prepare_sample(d[target_key]) for d in batch])
+            target_key: torch.stack(
+                [torch.tensor(d[target_key]) if type(d[target_key]) != torch.Tensor else d[target_key] for d in batch]
+            )
             for target_key in self.target_keys
         }
 
@@ -52,9 +56,3 @@ class CoCaCollatorFn(CollateFnIF):
             samples["attention_mask"] = samples["attention_mask"][:, :-1]
 
         return DatasetBatch(targets=targets, samples=samples)
-
-    @staticmethod
-    def _prepare_sample(x):
-        if isinstance(x, torch.Tensor):
-            return x
-        return torch.tensor(x)
