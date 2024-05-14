@@ -234,10 +234,10 @@ class CoCa(NNModel):
         text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
 
-    def _forward_decode(self, text_embd: torch.Tensor, vision_embd: torch.Tensor) -> torch.Tensor:
+    def _forward_decode(self, text_embd: torch.Tensor, modality_embd: torch.Tensor) -> torch.Tensor:
         decoder_inputs = {
             self.text_embd_prediction_key: text_embd,
-            "context": vision_embd,
+            "context": modality_embd,
         }
         decoder_outputs = self.multimodal_decoder(decoder_inputs)
         logits = decoder_outputs[self.multimodal_decoder.prediction_key]
