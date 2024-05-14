@@ -48,7 +48,7 @@ class PreConformer(nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        # x.shape: batch_size, n_input_dims, n_input_frames
+        x = x.transpose(1, 2)  # x.shape: batch_size, n_input_dims, n_input_frames
 
         x = self.subsampler(x)  # x.shape: batch_size, n_input_dims, ceil(n_input_frames / 4)
         x = x.transpose(1, 2)
@@ -100,7 +100,8 @@ class AudioTransformer(nn.Module):
         self,
         inputs: Dict[str, tuple[torch.Tensor, torch.Tensor]],
     ) -> Dict[str, tuple[torch.Tensor, torch.Tensor]]:
-        x, x_length = inputs[self.sample_key]  # x.shape: batch_size, n_input_dims, n_input_frames
+        x = inputs[self.sample_key]  # x.shape: batch_size, n_input_dims, n_input_frames
+        x_length = inputs["feats_len"]
         x = self.pre_conformer(x)  # x.shape: batch_size, ceil(n_input_frames / 4), n_input_dims
         x, x_length = self.conformer(x, x_length)  # x.shape: batch_size, ceil(n_input_frames / 4), n_input_dims
         x = self.post_conformer(x)
