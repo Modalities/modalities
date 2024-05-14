@@ -55,7 +55,7 @@ from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.loops.evaluation.evaluation_loop import EvaluationLoop
-from modalities.loops.evaluation.evaluation_loop_config import EvaluatorConfig
+from modalities.loops.evaluation.evaluation_loop_config import EvaluationLoopConfig
 from modalities.loops.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
     FSDPGradientClipper,
@@ -70,6 +70,8 @@ from modalities.loops.training.training_loop import TrainingLoop
 from modalities.loops.training.training_loop_config import TrainingLoopConfig
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.messaging.broker.message_broker_factory import MessageBrokerFactory
+from modalities.messaging.evaluation.evaluator import DistributedEvaluation
+from modalities.messaging.evaluation.evaluator_config import DistributedEvaluationConfig
 from modalities.messaging.evaluation.processors.model_state_processors import (
     GlobalModelStateProcessor,
     GlobalModelStateProcessorConfig,
@@ -105,7 +107,7 @@ COMPONENTS = [
     # Trainer
     ComponentEntity("training_loop", "default", TrainingLoop, TrainingLoopConfig),
     # Evaluator
-    ComponentEntity("evaluation_loop", "default", EvaluationLoop, EvaluatorConfig),
+    ComponentEntity("evaluation_loop", "default", EvaluationLoop, EvaluationLoopConfig),
     # models
     ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity(
@@ -191,6 +193,8 @@ COMPONENTS = [
         MessageBrokerFactory.get_message_broker,
         MessageBrokerConfig,
     ),
+    # Evlaluation
+    ComponentEntity("evaluation", "distributed", DistributedEvaluation, DistributedEvaluationConfig),
     # Message Publishers
     ComponentEntity(
         "message_publisher",

@@ -2,9 +2,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 
 import torch.distributed as dist
-from pydantic import BaseModel
 
-from modalities.config.pydanctic_if_types import PydanticMessageBrokerIFType
 from modalities.messaging.broker.message_broker import MessageBrokerIF
 from modalities.messaging.evaluation.processors.batch_progress_update_processors import BatchProgressUpdateProcessor
 from modalities.messaging.evaluation.processors.processors import GlobalProcessorIF, LocalProcessorIF
@@ -57,16 +55,22 @@ class DistributedEvaluation(MessageSubscriberIF):
         self.message_broker.distribute_message(message)
 
     def consume_message(self, message: Message):
+        if self.interval_state is None:
+            self.interval_state = IntervalState(meta_information=None)
         self._process_local(message)
 
         if message.message_type == MessageTypes.STEP_STATE:
             step_state: StepState = message.payload
-            step_id = step_state.meta_information.step_id
+            current_step_id = step_state.meta_information.current_step_id
+
+            # we want to trigger the loggin when
+            # 1) the training step is a multiple of the log interval and we are in training mode (i.e, is_log_step)
+            # 2) the last step of the training dataloader or one of the evaluation dataloaders (i.e, is_last_step)
             is_log_step = (
-                (step_id + 1) % self.training_log_interval_in_steps == 0
+                (current_step_id + 1) % self.training_log_interval_in_steps == 0
                 and self.interval_state.meta_information.experiment_status == ExperimentStatus.TRAIN
             )
-            is_last_step = (step_id + 1) == step_state.meta_information.num_steps
+            is_last_step = (current_step_id + 1) == step_state.meta_information.num_steps
             if is_log_step or is_last_step:
                 self.interval_state.reduce_values_across_ranks()
                 eval_result = self._process_global()
@@ -80,7 +84,7 @@ class DistributedEvaluation(MessageSubscriberIF):
     def _process_global(self) -> EvaluationResult:
         eval_result = EvaluationResult(
             dataloader_tag=self.interval_state.meta_information.dataloader_tag,
-            train_step_id=self.interval_state.meta_information.step_id,
+            train_step_id=self.interval_state.meta_information.train_step_id,
             experiment_status=self.interval_state.meta_information.experiment_status,
         )
         for global_processor in self.global_processors:
@@ -89,11 +93,3 @@ class DistributedEvaluation(MessageSubscriberIF):
 
     def _reset_train_step_state(self):
         self.interval_state = None
-
-
-class DistributedEvaluationConfig(BaseModel):
-    message_broker: PydanticMessageBrokerIFType
-    training_log_interval_in_steps: int
-    message_type_subscriptions: List[MessageTypes]
-    local_processors: Optional[Dict[Enum, List[LocalProcessorIF]]] = None
-    global_processors: Optional[List[GlobalProcessorIF]] = None

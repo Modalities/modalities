@@ -21,5 +21,5 @@ class CudaEnv:
         return self
 
     def __exit__(self, type, value, traceback):
-        dist.barrier()
+        # dist.barrier()
         dist.destroy_process_group()
