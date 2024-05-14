@@ -279,6 +279,17 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
     sequence_len: PositiveInt
 
 
+class SimpleDatasetConfig(BaseModel):
+    type_: str
+    audio_dataset_arrows: str
+    vision_dataset_arrows: str
+    bpe_to_ind: FilePath
+    bpecodes: FilePath
+    num_feats: int
+    freq_domain_mask_length: int
+    time_domain_mask_length: int
+
+
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]

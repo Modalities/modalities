@@ -46,6 +46,7 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    SimpleDatasetConfig,
     SimpleProgressSubscriberConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
@@ -156,6 +157,7 @@ COMPONENTS = [
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     ComponentEntity("dataset", "web_dataset", DatasetFactory.get_web_dataset, WebDatasetConfig),
+    ComponentEntity("dataset", "simple_dataset", DatasetFactory.get_simple_dataset, SimpleDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
