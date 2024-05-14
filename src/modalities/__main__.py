@@ -21,9 +21,7 @@ from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedD
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.gym import Gym
 from modalities.inference.inference import generate_text
-from modalities.loops.evaluation.evaluator import Evaluator
 from modalities.loops.training.activation_checkpointing import apply_activation_checkpointing_inplace
-from modalities.loops.training.trainer import Trainer
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -183,33 +181,10 @@ class Main:
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-            progress_subscriber=components.batch_progress_subscriber,
-            results_subscriber=components.evaluation_subscriber,
-            global_rank=components.settings.cuda_env.global_rank,
-            local_rank=components.settings.cuda_env.local_rank,
-        )
-
-        # Trainer
-        trainer = Trainer(
-            local_rank=components.settings.cuda_env.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-            gradient_acc_steps=components.settings.training.gradient_acc_steps,
-            gradient_clipper=components.gradient_clipper,
-        )
-
-        # Evaluator
-        evaluator = Evaluator(
-            local_rank=components.settings.cuda_env.local_rank,
-            batch_progress_publisher=batch_processed_publisher,
-            evaluation_result_publisher=evaluation_result_publisher,
-        )
-
         # Gym
         gym = Gym(
-            trainer=trainer,
-            evaluator=evaluator,
+            training_loop=components.training_loop,
+            evaluation_loop=components.evaluation_loop,
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
@@ -230,7 +205,6 @@ class Main:
             scheduler=components.scheduler,
             global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
             global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
-            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
         )
         print("done")
 

@@ -42,20 +42,18 @@ class EvaluationLoop:
     ) -> Dict[str, EvaluationResult]:
         model.eval()
         for data_loader in data_loaders:
-            EvaluationLoop._publish_progress(
-                batch_progress_publisher=self.batch_progress_publisher,
-                eval_step_id=0,  # Reset progress bar
-                num_steps=len(data_loader),
-                dataloader_tag=data_loader.dataloader_tag,
-            )
             forward_backward_time_recorder = TimeRecorder()
             forward_backward_time_recorder.start()
             for batch_id, batch in enumerate(data_loader):
-                EvaluationLoop._publish_progress(
-                    batch_progress_publisher=self.batch_progress_publisher,
-                    eval_step_id=batch_id,
+                batch_progress_update = BatchProgressUpdate(
+                    train_step_id=train_step_id,
+                    current_step_id=batch_id,
                     num_steps=len(data_loader),
+                    experiment_status=ExperimentStatus.EVALUATION,
                     dataloader_tag=data_loader.dataloader_tag,
+                )
+                self.batch_progress_publisher.publish_message(
+                    payload=batch_progress_update, message_type=MessageTypes.BATCH_PROGRESS_UPDATE
                 )
 
                 batch_loss, result_batch = self.evaluate_batch(
@@ -76,32 +74,12 @@ class EvaluationLoop:
                 eval_step_state = StepState(
                     trackable_values=trackable_values,
                     inference_result_batch=result_batch,
-                    meta_information=StepState.MetaInformation(
-                        step_id=train_step_id,
-                        num_steps=len(data_loader),
-                        dataloader_tag=data_loader.dataloader_tag,
-                        loss_fun_tag=loss_fun.tag,
-                        experiment_status=ExperimentStatus.EVALUATION,
-                    ),
+                    meta_information=batch_progress_update,
                 )
+
                 # send the train step state to the broker
                 self.step_state_publisher.publish_message(payload=eval_step_state, message_type=MessageTypes.STEP_STATE)
                 # we start the time recoder here again to also capture the time spend loading
                 # via the dataloader.
                 forward_backward_time_recorder.reset()
                 forward_backward_time_recorder.start()
-
-    @staticmethod
-    def _publish_progress(
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        eval_step_id: int,
-        num_steps: int,
-        dataloader_tag: str,
-    ):
-        payload = BatchProgressUpdate(
-            step_id=eval_step_id,
-            num_steps=num_steps,
-            experiment_status=ExperimentStatus.EVALUATION,
-            dataloader_tag=dataloader_tag,
-        )
-        batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)

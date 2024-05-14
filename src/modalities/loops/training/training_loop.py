@@ -83,11 +83,15 @@ class TrainingLoop:
             # Because we might resume training, we add the starting batch id of the data loader
             train_step_id = batch_id + train_loader.fast_forward_batch_id
 
-            self._publish_batch_progress_update(
-                batch_progress_publisher=self.batch_progress_publisher,
+            batch_progress_update = BatchProgressUpdate(
                 train_step_id=train_step_id,
+                current_step_id=train_step_id,
                 num_steps=len(train_loader),
+                experiment_status=ExperimentStatus.TRAIN,
                 dataloader_tag=train_loader.dataloader_tag,
+            )
+            self.batch_progress_publisher.publish_message(
+                payload=batch_progress_update, message_type=MessageTypes.BATCH_PROGRESS_UPDATE
             )
 
             # Train single batch
@@ -113,19 +117,12 @@ class TrainingLoop:
             if gradient_norm_score is not None:
                 trackable_values[TrackablesKeys.LAST_BATCH_GRADIENT_NORM] = gradient_norm_score.item()
 
+            # send the train step state to the broker
             train_step_state = StepState(
                 trackable_values=trackable_values,
                 inference_result_batch=result_batch,
-                meta_information=StepState.MetaInformation(
-                    step_id=train_step_id,
-                    num_steps=len(train_loader),
-                    dataloader_tag=train_loader.dataloader_tag,
-                    loss_fun_tag=loss_fun.tag,
-                    experiment_status=ExperimentStatus.TRAIN,
-                ),
+                meta_information=batch_progress_update,
             )
-
-            # send the train step state to the broker
             self.step_state_publisher.publish_message(payload=train_step_state, message_type=MessageTypes.STEP_STATE)
 
             evaluation_callback(train_step_id=train_step_id)
@@ -136,18 +133,3 @@ class TrainingLoop:
             forward_backward_time_recorder.reset()
             forward_backward_time_recorder.start()
             model.train()
-
-    @staticmethod
-    def _publish_batch_progress_update(
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        train_step_id: int,
-        num_steps: int,
-        dataloader_tag: str,
-    ):
-        payload = BatchProgressUpdate(
-            step_id=train_step_id,
-            num_steps=num_steps,
-            experiment_status=ExperimentStatus.TRAIN,
-            dataloader_tag=dataloader_tag,
-        )
-        batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
