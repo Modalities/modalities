@@ -25,14 +25,15 @@ def dummy_image_sample():
 
 
 def dummy_audio_sample():
-    audio_features = torch.randn(1, 128, 1000)
+    audio_features = torch.randn(1, 1000, 128)
     audio_len = torch.Tensor([1000 / 4])
     text_decoder_vocab_size = 50304
     text_decoder_block_size = 1024
     input_text = torch.randint(0, text_decoder_vocab_size, (1, text_decoder_block_size))
     AUDIO = torch.tensor([0])
     return dict(
-        audio=(audio_features, audio_len),
+        audio=audio_features,
+        feats_len=audio_len,
         input_ids=input_text,
         modality=AUDIO,
     )
@@ -67,8 +68,8 @@ def test_coca(yaml, dummy_sample):
     assert "modality_cls" in out
     assert "text_cls" in out
     assert out["logits"].shape == (1, 1024, 50304)
-    assert out["modality_cls"].shape == (1, 1, 768)
-    assert out["text_cls"].shape == (1, 1, 768)
+    assert out["modality_cls"].shape == (1, 768)
+    assert out["text_cls"].shape == (1, 768)
 
 
 def test_coca_audio_vision_together():

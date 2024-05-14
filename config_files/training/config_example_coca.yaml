@@ -54,7 +54,7 @@ train_dataset:
         sample_shape: [256]
         sample_type: int
       - sample_key: modality
-        sample_shape: [0]
+        sample_shape: [1]
         sample_type: const
 
 val_dataset:
@@ -70,7 +70,7 @@ val_dataset:
         sample_shape: [256]
         sample_type: int
       - sample_key: modality
-        sample_shape: [0]
+        sample_shape: [1]
         sample_type: const
 
 train_dataloader:

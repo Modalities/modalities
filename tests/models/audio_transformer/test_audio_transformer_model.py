@@ -45,12 +45,12 @@ def audio_transformer(
 
 @pytest.fixture
 def dummy_input_div4():
-    return {"audio_feats": (torch.randn(4, 80, 1000), torch.Tensor([1000 / 4] * 4))}
+    return {"audio_feats": torch.randn(4, 1000, 80), "feats_len": torch.Tensor([1000 / 4] * 4)}
 
 
 @pytest.fixture
 def dummy_input_notdiv4():
-    return {"audio_feats": (torch.randn(4, 80, 750), torch.Tensor([750 // 4] * 4))}
+    return {"audio_feats": torch.randn(4, 750, 80), "feats_len": torch.Tensor([750 / 4] * 4)}
 
 
 def test_audio_transformer_output_shape_div4(
