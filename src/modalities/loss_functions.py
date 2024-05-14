@@ -40,7 +40,10 @@ class CrossEntropyLoss(Loss):
         self.target_key = target_key
         self.prediction_key = prediction_key
         # Mean over the tokens in the local-batch (batch per rank)
-        self.loss_fun = TorchCrossEntropyLoss(reduction="mean")
+        self.loss_fun = TorchCrossEntropyLoss(
+            reduction="mean",
+            ignore_index=0,
+        )
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
