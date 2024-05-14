@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import pickle
 import shutil
 from pathlib import Path
 from typing import Dict, Tuple, Type
@@ -9,6 +10,8 @@ import click
 import click_pathlib
 import torch.distributed as dist
 from pydantic import BaseModel, FilePath
+from subword_nmt import apply_bpe
+from tqdm import tqdm
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
@@ -160,6 +163,43 @@ def entry_point_merge_packed_data(src_paths, target_path):
     join_embedded_stream_data(embedded_datasets, target_path)
 
 
+@data.command(name="get_coca_tokenizer_and_vocab")
+@click.argument("bpecodes_file", type=click.types.Path(path_type=Path))
+@click.argument("bpecodes_suffix", type=str)
+def entry_point_coca_step1(bpecodes_file, bpecodes_suffix):
+    """
+    TODO
+    """
+    with bpecodes_file.open() as filein:
+        bpe = apply_bpe.BPE(filein)
+
+    bpe_to_ind = {}
+    ind_to_bpe = {}
+    ind = 1
+    with open("training.txt", "r") as filein:
+        for line in tqdm(filein):
+            for tok in bpe.segment(line.strip("\n")).split() + ["</s>"]:
+                if tok not in bpe_to_ind:
+                    bpe_to_ind[tok] = ind
+                    ind_to_bpe[ind] = tok
+                    ind += 1
+
+    bpe_to_ind["<pad>"] = 0
+    ind_to_bpe[0] = "<pad>"
+    unk_ind = len(bpe_to_ind)
+    bpe_to_ind["<|unk|>"] = unk_ind
+    ind_to_bpe[unk_ind] = "<|unk|>"
+
+    with open("vocab_size.txt", "w") as fileout:
+        print(len(bpe_to_ind), file=fileout)
+
+    with open(f"bpe_to_ind_{bpecodes_suffix}.pkl", "wb") as fileout:
+        pickle.dump(bpe_to_ind, fileout)
+
+    with open(f"ind_to_bpe_{bpecodes_suffix}.pkl", "wb") as fileout:
+        pickle.dump(ind_to_bpe, fileout)
+
+
 class Main:
     def __init__(self, config_dict: Dict, config_path: Path) -> None:
         self.config_dict = config_dict
@@ -258,7 +298,10 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[
+        MessagePublisher[EvaluationResultBatch],
+        MessagePublisher[BatchProgressUpdate],
+    ]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
