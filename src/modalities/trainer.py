@@ -55,12 +55,13 @@ class Trainer:
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
             gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
+            gradient_norm_score_clipped = self.gradient_clipper.clip_gradients().sum()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            return loss, gradient_norm_score
+            return loss, gradient_norm_score, gradient_norm_score_clipped
         else:
-            return loss, None
+            return loss, None, None
 
     def train(
         self,
@@ -87,11 +88,12 @@ class Trainer:
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         gradient_norm_scores = []
+        gradient_norm_scores_clipped = []
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
             train_step_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
-            batch_loss, gradient_norm_score = self._train_batch(
+            batch_loss, gradient_norm_score, gradient_norm_score_clipped = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
@@ -109,6 +111,7 @@ class Trainer:
             # gradient norm is already synced across all ranks
             if gradient_norm_score is not None:
                 gradient_norm_scores.append(gradient_norm_score.item())
+                gradient_norm_scores_clipped.append(gradient_norm_score_clipped.item())
 
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
@@ -156,8 +159,11 @@ class Trainer:
                     metrics = {
                         "grad_norm_avg": torch.mean(torch.Tensor(gradient_norm_scores)),
                         "grad_norm_last_batch": gradient_norm_scores[-1],
+                        "grad_norm_avg_clipped": torch.mean(torch.Tensor(gradient_norm_scores_clipped)),
+                        "grad_norm_last_batch_clipped": gradient_norm_scores_clipped[-1],
                     }
                     gradient_norm_scores = []
+                    gradient_norm_scores_clipped = []
                 else:
                     metrics = {}
 
