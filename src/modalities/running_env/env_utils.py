@@ -48,6 +48,12 @@ bfSixteen_working = MixedPrecision(
     buffer_dtype=torch.bfloat16,
 )
 
+bfSixteen_modalities = MixedPrecision(
+    param_dtype=torch.bfloat16,
+    reduce_dtype=torch.float32,
+    buffer_dtype=torch.bfloat16,
+)
+
 fpThirtytwo = MixedPrecision(
     param_dtype=torch.float32,
     reduce_dtype=torch.float32,
@@ -59,4 +65,5 @@ class MixedPrecisionSettings(LookupEnum):
     FP_16 = fpSixteen
     BF_16 = bfSixteen
     BF_16_WORKING = bfSixteen_working
+    BF_16_MODALITIES = bfSixteen_modalities
     FP_32 = fpThirtytwo
