@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -200,7 +201,6 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
-    
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
@@ -300,7 +300,8 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    project: modalities_lorem_ipsum
-    mode: ONLINE
+    project: modalities_lorem_ipsum_moe
     experiment_id: ${settings.experiment_id}
+    mode: ONLINE
     directory: "."
+    config_file_path: ${settings.config_file_path}
