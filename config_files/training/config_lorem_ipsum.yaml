@@ -186,7 +186,6 @@ model:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    n_head_q: 8
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
