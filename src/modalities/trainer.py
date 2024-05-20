@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 import torch.distributed as dist
@@ -56,14 +56,15 @@ class Trainer:
         (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:
-            gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
+            gradient_norm_score = self.gradient_clipper.clip_gradients()
+            gradient_norm_score_clipped = self.gradient_clipper.clip_gradients()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
             num_train_steps_done += 1
-            return True, num_train_steps_done, loss, gradient_norm_score
+            return True, num_train_steps_done, loss, gradient_norm_score, gradient_norm_score_clipped
         else:
-            return False, num_train_steps_done, loss, None
+            return False, num_train_steps_done, loss, None, None
 
     def train(
         self,
