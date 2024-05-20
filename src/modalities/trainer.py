@@ -54,8 +54,8 @@ class Trainer:
         (loss / self.gradient_acc_steps).backward()
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
-            gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
-            gradient_norm_score_clipped = self.gradient_clipper.clip_gradients().sum()
+            gradient_norm_score = self.gradient_clipper.clip_gradients()
+            gradient_norm_score_clipped = self.gradient_clipper.clip_gradients()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
