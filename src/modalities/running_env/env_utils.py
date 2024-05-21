@@ -48,15 +48,24 @@ bfSixteen_working = MixedPrecision(
     buffer_dtype=torch.bfloat16,
 )
 
+megatron_strategy = MixedPrecision(
+    param_dtype=torch.bfloat16,
+    reduce_dtype=torch.float32,
+    #buffer_dtype=torch.bfloat16,
+)
+
 fpThirtytwo = MixedPrecision(
     param_dtype=torch.float32,
     reduce_dtype=torch.float32,
     buffer_dtype=torch.float32,
 )
 
+no_mixed_precision = None
 
 class MixedPrecisionSettings(LookupEnum):
     FP_16 = fpSixteen
     BF_16 = bfSixteen
     BF_16_WORKING = bfSixteen_working
     FP_32 = fpThirtytwo
+    MIXED_PRECISION_MEGATRON = megatron_strategy
+    NO_MIXED_PRECISION = no_mixed_precision
