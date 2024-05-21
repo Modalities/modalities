@@ -13,13 +13,18 @@ from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
 
 
+def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+    try:
+        return enum_type[name]
+    except KeyError:
+        raise ValidationError(f"Invalid {enum_type} member name: {name}")
+
+
 def get_callback_interval_in_batches_per_rank(
-    callback_interval_in_samples: int, local_train_micro_batch_size: int, world_size: int, gradient_acc_steps: int
+    local_callback_interval_in_samples: int, local_train_micro_batch_size: int, gradient_acc_steps: int
 ):
-    num_local_train_micro_batches_exact = callback_interval_in_samples / local_train_micro_batch_size / world_size
-    num_local_train_micro_batches_ret = max(
-        callback_interval_in_samples // local_train_micro_batch_size // world_size, 1
-    )
+    num_local_train_micro_batches_exact = local_callback_interval_in_samples / local_train_micro_batch_size
+    num_local_train_micro_batches_ret = max(local_callback_interval_in_samples // local_train_micro_batch_size, 1)
     if num_local_train_micro_batches_exact != num_local_train_micro_batches_ret:
         warnings.warn(
             f"Calculated callback_interval_in_batches_per_rank is not an integer."
@@ -29,14 +34,6 @@ def get_callback_interval_in_batches_per_rank(
         num_local_train_micro_batches_ret % gradient_acc_steps == 0
     ), "callback_interval_in_batches_per_rank must be divisible by gradient_acc_steps"
     return num_local_train_micro_batches_ret
-
-
-def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
-    try:
-        val = enum_type[name]
-        return val
-    except KeyError:
-        raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 
 def get_date_of_run():

@@ -4,20 +4,26 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Type
 
 import click
 import click_pathlib
+from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ComponentsModel, ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.instantiation_models import (
+    PackedDatasetComponentsInstantiationModel,
+    TrainingComponentsInstantiationModel,
+)
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
+from modalities.inference.inference import generate_text
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
@@ -26,8 +32,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters, get_callback_interval_in_batches_per_rank
-from modalities.utils.generate_text import main as generate_text_main
+from modalities.util import compute_number_of_trainable_parameters
 
 
 @click.group()
@@ -44,32 +49,21 @@ def main() -> None:
 )
 def entry_point_run_modalities(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path)
-    main = Main(config_dict, config_file_path)
-    main.run()
+    main_obj = Main(config_dict, config_file_path)
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        main_obj.run(components)
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=Path)
-@click.argument("config_path", type=Path)
 @click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
 )
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
-@click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+def entry_point_generate_text(config_file_path: FilePath):
+    generate_text(config_file_path)
 
 
 @main.group(name="data")
@@ -106,48 +100,8 @@ def entry_point_data_create_raw_index(src_path, index_path):
 
 
 @data.command(name="pack_encoded_data")
-@click.argument("src_path", type=Path)
-@click.option(
-    "--dst_path",
-    type=str,
-    default=None,
-    help="output path for packed data file. will use parent directory of src_path if none.",
-)
-@click.option(
-    "--index_path",
-    type=Path,
-    default=None,
-    help="input path for index. will search in parent directory of src_path if none.",
-)
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option(
-    "--jq_pattern",
-    type=str,
-    show_default=True,
-    default=".text",
-    help="jq pattern to extract the data from the json line.",
-)
-@click.option(
-    "--num-cpus",
-    type=int,
-    show_default=True,
-    default=os.cpu_count(),
-    help="Specify the number of tokenization workers. Default is the number of available CPUs.",
-)
-def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type, tokenizer_file, jq_pattern, num_cpus):
+@click.argument("config_path", type=FilePath)
+def entry_point_pack_encoded_data(config_path: FilePath):
     """
     Utility to encode an indexed, large jsonl-file.
 
@@ -161,15 +115,25 @@ def entry_point_pack_encoded_data(src_path, dst_path, index_path, tokenizer_type
     #  One would requires an object of it to instantiate the ResolverRegistry.
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generator = PackedDataGenerator(
-        src_path,
-        index_path=index_path,
-        tokenizer=tokenizer,
-        jq_pattern=jq_pattern,
-        number_of_processes=num_cpus,
+    config = load_app_config_dict(config_path)
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
+    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
+        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
     )
-    generator.run(dst_path)
+
+    generator = PackedDataGenerator(
+        components.settings.src_path,
+        index_path=components.settings.index_path,
+        tokenizer=components.tokenizer,
+        eod_token=components.settings.eod_token,
+        jq_pattern=components.settings.jq_pattern,
+        number_of_processes=components.settings.num_cpus,
+        processing_batch_size=components.settings.processing_batch_size,
+        raw_samples_queue_size=components.settings.raw_samples_queue_size,
+        processed_samples_queue_size=components.settings.processed_samples_queue_size,
+    )
+    generator.run(components.settings.dst_path)
 
 
 @data.command(name="merge_packed_data")
@@ -211,69 +175,67 @@ class Main:
             component_config_type=custom_config,
         )
 
-    def run(self):
-        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            components: ComponentsModel = self.component_factory.build_components(
-                config_dict=self.config_dict, components_model_type=ComponentsModel
-            )
+    def build_components(self, components_model_type: Type[BaseModel]) -> BaseModel:
+        components = self.component_factory.build_components(
+            config_dict=self.config_dict, components_model_type=components_model_type
+        )
+        return components
 
-            # save the config file to the checkpointing path
-            if components.settings.cuda_env.global_rank == 0:
-                experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
-                os.makedirs(experiment_path, exist_ok=True)
-                shutil.copy(self.config_path, experiment_path / self.config_path.name)
+    def run(self, components: TrainingComponentsInstantiationModel):
+        # save the config file to the checkpointing path
+        if components.settings.cuda_env.global_rank == 0:
+            experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+            os.makedirs(experiment_path, exist_ok=True)
+            shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-            evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-                progress_subscriber=components.batch_progress_subscriber,
-                results_subscriber=components.evaluation_subscriber,
-                global_rank=components.settings.cuda_env.global_rank,
-                local_rank=components.settings.cuda_env.local_rank,
-            )
+        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+            progress_subscriber=components.batch_progress_subscriber,
+            results_subscriber=components.evaluation_subscriber,
+            global_rank=components.settings.cuda_env.global_rank,
+            local_rank=components.settings.cuda_env.local_rank,
+        )
 
-            # Trainer
-            trainer = Trainer(
-                local_rank=components.settings.cuda_env.local_rank,
-                batch_progress_publisher=batch_processed_publisher,
-                evaluation_result_publisher=evaluation_result_publisher,
-                gradient_acc_steps=components.settings.training.gradient_acc_steps,
-            )
+        # Trainer
+        trainer = Trainer(
+            local_rank=components.settings.cuda_env.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+            gradient_acc_steps=components.settings.training.gradient_acc_steps,
+            gradient_clipper=components.gradient_clipper,
+        )
 
-            # Evaluator
-            evaluator = Evaluator(
-                local_rank=components.settings.cuda_env.local_rank,
-                batch_progress_publisher=batch_processed_publisher,
-                evaluation_result_publisher=evaluation_result_publisher,
-            )
+        # Evaluator
+        evaluator = Evaluator(
+            local_rank=components.settings.cuda_env.local_rank,
+            batch_progress_publisher=batch_processed_publisher,
+            evaluation_result_publisher=evaluation_result_publisher,
+        )
 
-            # Gym
-            gym = Gym(
-                trainer=trainer,
-                evaluator=evaluator,
-                loss_fun=components.loss_fn,
-                num_ranks=components.settings.cuda_env.world_size,
-            )
-            wrapped_model = components.wrapped_model
-            logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+        # Gym
+        gym = Gym(
+            trainer=trainer,
+            evaluator=evaluator,
+            loss_fun=components.loss_fn,
+            num_ranks=components.settings.cuda_env.world_size,
+        )
+        wrapped_model = components.wrapped_model
+        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
-            if components.settings.training.do_apply_activation_checkpointing:
-                apply_activation_checkpointing_inplace(wrapped_model)
+        if components.settings.training.do_apply_activation_checkpointing:
+            apply_activation_checkpointing_inplace(wrapped_model)
 
-            callback_interval_in_batches_per_rank = get_callback_interval_in_batches_per_rank(
-                callback_interval_in_samples=components.settings.training.callback_interval_in_samples,
-                local_train_micro_batch_size=components.settings.training.local_train_micro_batch_size,
-                gradient_acc_steps=components.settings.training.gradient_acc_steps,
-                world_size=components.settings.cuda_env.world_size,
-            )
-
-            gym.run(
-                callback_interval_in_batches=callback_interval_in_batches_per_rank,
-                train_data_loader=components.train_dataloader,
-                evaluation_data_loaders=components.eval_dataloaders,
-                checkpointing=components.checkpointing,
-                model=wrapped_model,
-                optimizer=components.optimizer,
-            )
-            print("done")
+        gym.run(
+            train_data_loader=components.train_dataloader,
+            evaluation_data_loaders=components.eval_dataloaders,
+            checkpoint_saving=components.checkpoint_saving,
+            model=wrapped_model,
+            optimizer=components.optimizer,
+            scheduler=components.scheduler,
+            global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
+            global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
+            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
+        )
+        print("done")
 
     def get_logging_publishers(
         self,

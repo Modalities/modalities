@@ -5,14 +5,15 @@ import os
 import pickle
 import warnings
 from pathlib import Path
-from typing import Callable, Iterator, List, Tuple
+from typing import Callable, Iterator, List, Optional, Tuple
 
 import jq
 import numpy as np
+from pydantic import FilePath
 from tqdm import tqdm
-from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,15 @@ class EmptySampleError(RuntimeError):
 class PackedDataGenerator:
     def __init__(
         self,
-        src_path: Path,
-        tokenizer: PreTrainedTokenizer,
-        index_path: Path = None,
-        jq_pattern: str = ".text",
-        number_of_processes: int = os.cpu_count(),
+        src_path: FilePath,
+        tokenizer: TokenizerWrapper,
+        eod_token: str,
+        number_of_processes: int,
+        jq_pattern: str,
+        processing_batch_size: int,
+        raw_samples_queue_size: int,
+        processed_samples_queue_size: int,
+        index_path: Optional[FilePath] = None,
     ):
         """
         Reads in a jsonl file and the corresponding index file and packs dataset file for LLM training.
@@ -37,30 +42,35 @@ class PackedDataGenerator:
                            and length of samples given in `src_path`.
                            If not defined, an index file next to `src_path` is picked,
                            by replacing its suffix with ".idx".
+        :processing_batch_size: The size of the batches that the workers process
+                                (has nothing to do with batch size during training!).
         :param tokenizer: PretrainedTokenizer object, which is used to pre-tokenize the provided data in `src_path`.
                           Tokenization is necessary to work on final lengths of token sequences.
         :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
         """
         self.src_path = src_path
         self.tokenizer = tokenizer
+        self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
-        encoded_eos_token = self.tokenizer(self.tokenizer.eos_token)["input_ids"][0]
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eos_token)
+        encoded_eod_token = self.tokenizer.get_token_id(self.eod_token)
+        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)
         self._total_num_of_tokens = 0
-        self._tokens_write_queue = multiprocessing.Queue()
+        self._raw_samples_queue = multiprocessing.Queue(maxsize=raw_samples_queue_size)
+        self.processed_samples_queue = multiprocessing.Queue(maxsize=processed_samples_queue_size)
         self._exception_buffer = []
+        self.processing_batch_size = processing_batch_size
 
     @staticmethod
     def _get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
         return math.ceil(math.log(math.log2(int_to_get_repr), 8))
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
-        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="big", signed=False)
+        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
 
-    def _default_destination_path(self, destination_path: Path = None) -> Path:
+    def _default_destination_path(self, destination_path: Optional[Path] = None) -> Path:
         if destination_path is None:
             default_destination_path = Path(self.src_path.parent, f"{self.src_path.stem}.pbin")
             print(
@@ -70,7 +80,7 @@ class PackedDataGenerator:
             return default_destination_path
         return Path(destination_path)
 
-    def run(self, dst_path: Path = None):
+    def run(self, dst_path: Optional[Path] = None):
         assert self._total_num_of_tokens == 0, f"This {self.__name__} was already used and is exhausted. Use another!"
         dst_path = self._default_destination_path(destination_path=dst_path)
 
@@ -90,6 +100,9 @@ class PackedDataGenerator:
             raise self._exception_buffer[0]
 
     def _launch_parallelized_workers(self, dst_path: Path):
+        reader = multiprocessing.Process(target=self._reader_thread())
+        reader.start()
+
         writer = multiprocessing.Process(target=self._writer_thread(dst_path))
         writer.start()
         processor_threads = [
@@ -103,16 +116,16 @@ class PackedDataGenerator:
         writer.join()
 
     def _stop_processing(self):
-        self._tokens_write_queue.put(None)
+        self.processed_samples_queue.put(None)
 
     def _generator_for_tokens_to_get_written(self):
         while True:
             if self._check_for_parallel_errors():
                 return
-            tokens = self._tokens_write_queue.get()
-            if tokens is None:
+            batch = self.processed_samples_queue.get()
+            if batch is None:
                 break
-            yield tokens
+            yield batch
 
     def _check_for_parallel_errors(self) -> bool:
         return bool(self._exception_buffer)
@@ -123,23 +136,24 @@ class PackedDataGenerator:
             with dst_path.open("wb") as f:
                 # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
                 # not possible to prepend header after determining size of data section
-                f.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+                f.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"))
                 f.write(
                     self._token_size_in_bytes.to_bytes(
-                        EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big"
+                        EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little"
                     )
                 )
                 curr_offset = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
 
                 # write data section (tokens)
-                for tokens_as_bytes in tqdm(
-                    self._generator_for_tokens_to_get_written(), desc="Processed Samples", total=len(self._reader)
-                ):
-                    f.write(tokens_as_bytes)
-                    segment_length = len(tokens_as_bytes)
-                    index_list.append((curr_offset, segment_length))
-                    curr_offset += segment_length
-
+                pbar = tqdm(total=len(self._reader), desc="Processed batches")
+                for batch in self._generator_for_tokens_to_get_written():
+                    # write the tokens for each document
+                    for tokens_as_bytes in batch:
+                        f.write(tokens_as_bytes)
+                        segment_length = len(tokens_as_bytes)
+                        index_list.append((curr_offset, segment_length))
+                        curr_offset += segment_length
+                    pbar.update(len(batch))
                 # write index
                 f.write(pickle.dumps(index_list))
 
@@ -147,33 +161,67 @@ class PackedDataGenerator:
 
         return writer
 
+    def _reader_thread(self) -> Callable:
+        def reader():
+            batch = []
+            for line_id, line in tqdm(enumerate(self._reader), desc="Reading jsonl", disable=True):
+                # line = self._reader[line_id]
+                batch.append((line_id, line))
+                if len(batch) % self.processing_batch_size == 0:
+                    self._raw_samples_queue.put(batch)
+                    batch = []
+
+            # add the remaining samples
+            if len(batch) > 0:
+                self._raw_samples_queue.put(batch)
+
+            for _ in range(self._number_of_processes):
+                self._raw_samples_queue.put(None)
+
+        return reader
+
     def _process_thread(self, process_id: int):
         if self._check_for_parallel_errors():
             return
-        for idx in range(process_id, len(self._reader), self._number_of_processes):
-            line = self._reader[idx]
+
+        while True:
+            if self._check_for_parallel_errors():
+                return
+            batch = self._raw_samples_queue.get()
+            if batch is None:
+                break
+
             try:
-                self._tokens_write_queue.put(self._process_line(line))
+                batch_processed = []
+                for line_id, line in batch:
+                    processed_line = self._process_line(line, process_id)
+                    batch_processed.append(processed_line)
+                self.processed_samples_queue.put(batch_processed)
             except EmptySampleError:
-                warnings.warn(f"Encountered empty sample in line {idx} of file {self.src_path}")
+                warnings.warn(
+                    f"Encountered empty sample in line {line_id} of file {self.src_path} within process {process_id}"
+                )
             except Exception as exception:
-                warnings.warn(f"could not process line of number {idx}. Raised the following error: {exception=}")
+                warnings.warn(
+                    f"Could not process line of number {line_id} within process {process_id}. "
+                    f"Raised the following error: {exception=}"
+                )
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
         start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
         length_of_byte_encoded_data_section = start_of_index_in_bytes - EmbeddedStreamData.HEADER_SIZE_IN_BYTES
         data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
-            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"
+            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
         )
         with dst_path.open("rb+") as fout:
             fout.seek(0)
             fout.write(data_section_length_in_bytes)
 
-    def _process_line(self, line: str) -> bytes:
+    def _process_line(self, line: str, process_id: int) -> bytes:
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
-        tokens = self.tokenizer(jq_retrieved_text)["input_ids"]
+        tokens = self.tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
         return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
@@ -198,12 +246,12 @@ class EmbeddedStreamData:
         with self._data_path.open("rb") as f:
             # get number of bytes in data section
             data_section_length_in_bytes = f.read(self.DATA_SECTION_LENGTH_IN_BYTES)
-            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="big")
+            self.data_len = int.from_bytes(data_section_length_in_bytes, byteorder="little")
 
             # get number of bytes for encoding a single token
             f.seek(self.DATA_SECTION_LENGTH_IN_BYTES)
             token_size_as_bytes = f.read(self.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
-            self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="big", signed=False)
+            self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="little", signed=False)
 
             # get index
             f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
@@ -238,9 +286,9 @@ def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file
             curr_offset -= embedded_stream_data.HEADER_SIZE_IN_BYTES
 
     with target_file.open("wb") as fout:
-        fout.write(data_len.to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="big"))
+        fout.write(data_len.to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"))
         fout.write(
-            token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="big")
+            token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little")
         )
         for data_chunk in tqdm(data_stream_generator, total=num_data_chunks, desc="Writing Data Chunks..."):
             fout.write(data_chunk)
