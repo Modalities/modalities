@@ -125,8 +125,35 @@ class ComponentFactory:
 
     def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
+        self._assert_valid_config_keys(
+            component_key=component_key,
+            variant_key=variant_key,
+            config_dict=config_dict,
+            component_config_type=component_config_type,
+        )
         comp_config = component_config_type(**config_dict, strict=True)
         return comp_config
+
+    def _assert_valid_config_keys(
+        self, component_key: str, variant_key: str, config_dict: Dict, component_config_type: Type[BaseModelChild]
+    ) -> None:
+        required_keys = []
+        optional_keys = []
+        for key, field in component_config_type.model_fields.items():
+            if field.is_required():
+                required_keys.append(key)
+            else:
+                optional_keys.append(key)
+
+        invalid_keys = []
+        for key in config_dict.keys():
+            if key not in required_keys and key not in optional_keys:
+                invalid_keys.append(key)
+        if len(invalid_keys) > 0:
+            message = f"Invalid keys {invalid_keys} for config `{component_key}.{variant_key}`"
+            message += f" of type {component_config_type}:\n{config_dict}\n"
+            message += f"Required keys: {required_keys}\nOptional keys: {optional_keys}"
+            raise ValueError(message)
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
         component_type: Type = self.registry.get_component(component_key, variant_key)
