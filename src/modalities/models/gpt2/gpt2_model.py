@@ -251,6 +251,7 @@ class CausalSelfAttention(nn.Module):
 
         return q, k, v
 
+    @torch.compiler.disable  # see https://github.com/Dao-AILab/flash-attention/issues/596
     @staticmethod
     def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
         # the next three lines are only needed for flash-attn from Daio Lab

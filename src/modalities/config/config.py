@@ -207,6 +207,8 @@ class FSDPWrappedModelConfig(BaseModel):
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
     block_names: List[str]
+    compile: bool
+    compile_debug: bool
 
     @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
