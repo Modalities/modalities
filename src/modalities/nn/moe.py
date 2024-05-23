@@ -75,6 +75,11 @@ class MoEExpertGLU(nn.Module):
         self.v1 = nn.Parameter(torch.empty(moe_num_experts * ffn_hidden_size, hidden_size))
         self.w2 = nn.Parameter(torch.empty(moe_num_experts * ffn_hidden_size, hidden_size))
 
+        with torch.no_grad():
+            torch.nn.init.normal_(self.w1)
+            torch.nn.init.normal_(self.v1)
+            torch.nn.init.normal_(self.w2)
+
     def forward(self, x: torch.Tensor, expert_idx: int) -> torch.Tensor:
         expert_w1 = self.w1.view(self.moe_num_experts, self.ffn_hidden_size, self.hidden_size)[expert_idx]
         expert_v1 = self.v1.view(self.moe_num_experts, self.ffn_hidden_size, self.hidden_size)[expert_idx]
