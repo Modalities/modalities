@@ -2,11 +2,11 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-import math
 from typing import Annotated, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
@@ -15,7 +15,6 @@ from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name
-import torch.nn.functional as F
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -110,10 +109,12 @@ class ActivationType(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
 
+
 class AttentionImplementation(str, Enum):
     MANUAL = "manual"
     PYTORCH_FLASH = "pytorch_flash"
     DAO_FLASH = "dao_flash"
+
 
 class AttentionConfig(BaseModel):
     class QueryKeyValueTransformConfig(BaseModel):
@@ -195,6 +196,10 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
         assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
+        if attention_impl in ["manual", "pytorch_flash"]:
+            assert (
+                n_head_q == n_head_kv
+            ), "manual/pytorch_flash attention don't support group query attn & require `n_head_q` == `n_head_kv`"
 
         self.n_rep = n_head_q // n_head_kv
         self.attention_impl = attention_impl
@@ -241,16 +246,15 @@ class CausalSelfAttention(nn.Module):
         )
 
         self.register_buffer(
-                "attn_mask",
-                # source and target sequences are block_size -1 long, since target is the source shifted by 1
-                torch.tril(torch.ones(block_size-1, block_size-1)).view(1, 1, block_size-1, block_size-1),
-            )
+            "attn_mask",
+            # source and target sequences are block_size-1 long, since target is the source shifted by 1
+            torch.tril(torch.ones(block_size - 1, block_size - 1)).view(1, 1, block_size - 1, block_size - 1),
+        )
 
     def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
 
-    
     @staticmethod
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
@@ -268,52 +272,48 @@ class CausalSelfAttention(nn.Module):
         return q, k, v
 
     @staticmethod
-    def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float, attention_impl: AttentionImplementation, attn_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def execute_flash_attention(
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        dropout: float,
+        attention_impl: AttentionImplementation,
+        attn_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         if attention_impl == AttentionImplementation.MANUAL:
             assert attn_mask is not None, "attn_mask is required for manual attention"
             seq_len = q.shape[-2]
-            #embd = q.shape[1] * q.shape[-1]
-            #batch_size = q.shape[0]
+            # embd = q.shape[1] * q.shape[-1]
+            # batch_size = q.shape[0]
 
             att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))  # (B, nh_q, T, T)
             att = att.masked_fill(attn_mask[:, :, :seq_len, :seq_len] == 0, float("-inf"))
             att = F.softmax(att, dim=-1)
             # TODO: Add attn dropout
-            #att = self.attn_dropout(att)
-            return att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hs) -> (B, nh_q, T, hs)
-            #y = (y.contiguous().view(batch_size,seq_len, embd))  # (B, T, n_embd), re-assemble all head outputs side by side
+            # att = self.attn_dropout(att)
+            y = att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hd) -> (B, nh_q, T, hd)
+            y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
-            return  torch.nn.functional.scaled_dot_product_attention(
+            y = torch.nn.functional.scaled_dot_product_attention(
                 query=q,
                 key=k,
                 value=v,
                 attn_mask=None,
                 dropout_p=dropout,
                 is_causal=True,
-            )
+            )  # (B, nh_q, T, hd)
+            y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.DAO_FLASH:
             # the next three lines are only needed for flash-attn from Daio Lab
             q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
             k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
             v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-            return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+            y = flash_attn_func(
+                q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
+            )  # (B, T, nh_q, hd)
         else:
             raise NotImplementedError(f"Attention implementation {attention_impl} not supported")
-
-        # the next three lines are only needed for flash-attn from Daio Lab
-        
-
-        
-        # return torch.nn.functional.scaled_dot_product_attention(
-        #         query=q,
-        #         key=k,
-        #         value=v,
-        #         attn_mask=None,
-        #         dropout_p=0.,
-        #         is_causal=True,
-        #     )
-        
-        # return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        return y  # (B, T, nh_q, hd)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
@@ -321,7 +321,9 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout, self.attention_impl, self.attn_mask)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_flash_attention(
+            q, k, v, self.dropout, self.attention_impl, self.attn_mask
+        )  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
@@ -428,7 +430,7 @@ class GPT2LLM(NNModel):
         # TODO: dependency injection
         if poe_type is PositionTypes.ABSOLUTE:
             # source and target sequences are block_size -1 long, since target is the source shifted by 1
-            wpe = nn.Embedding(num_embeddings=block_size-1, embedding_dim=n_embd)
+            wpe = nn.Embedding(num_embeddings=block_size - 1, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
             # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
             # https://github.com/huggingface/accelerate/issues/807
