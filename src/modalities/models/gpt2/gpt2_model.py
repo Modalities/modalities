@@ -330,10 +330,8 @@ class GPT2Block(nn.Module):
             raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.attention_norm(x)
-        x = x + self.attn(x)
-        x = self.ffn_norm(x)
-        x = x + self.mlp(x)
+        x = x + self.attn(self.attention_norm(x))
+        x = x + self.mlp(self.ffn_norm(x))
         return x
 
 
