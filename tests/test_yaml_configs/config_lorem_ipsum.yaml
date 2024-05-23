@@ -204,6 +204,7 @@ model:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+    attention_implementation: dao_flash
     activation_type: gelu
     weight_init:
       mean: 0.0
