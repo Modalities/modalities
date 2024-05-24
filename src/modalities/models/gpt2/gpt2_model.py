@@ -2,11 +2,10 @@ import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
-from typing import Annotated, Dict, List, Optional, Tuple
+from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
@@ -245,12 +244,6 @@ class CausalSelfAttention(nn.Module):
             for transform_config in attention_config.qkv_transforms
         )
 
-        self.register_buffer(
-            "attn_mask",
-            # source and target sequences are block_size-1 long, since target is the source shifted by 1
-            torch.tril(torch.ones(block_size - 1, block_size - 1)).view(1, 1, block_size - 1, block_size - 1),
-        )
-
     def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
@@ -278,20 +271,16 @@ class CausalSelfAttention(nn.Module):
         v: torch.Tensor,
         dropout: float,
         attention_impl: AttentionImplementation,
-        attn_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if attention_impl == AttentionImplementation.MANUAL:
-            assert attn_mask is not None, "attn_mask is required for manual attention"
-            seq_len = q.shape[-2]
-            # embd = q.shape[1] * q.shape[-1]
-            # batch_size = q.shape[0]
-
-            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))  # (B, nh_q, T, T)
-            att = att.masked_fill(attn_mask[:, :, :seq_len, :seq_len] == 0, float("-inf"))
-            att = F.softmax(att, dim=-1)
-            # TODO: Add attn dropout
-            # att = self.attn_dropout(att)
-            y = att @ v  # (B, nh_q, T, T) x (B, nh_q, T, hd) -> (B, nh_q, T, hd)
+            y = manual_scaled_dot_product_attention(
+                query=q,
+                key=k,
+                value=v,
+                attn_mask=None,
+                dropout_p=dropout,
+                is_causal=True,
+            )  # (B, nh_q, T, hd)
             y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
             y = torch.nn.functional.scaled_dot_product_attention(
@@ -321,9 +310,7 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(
-            q, k, v, self.dropout, self.attention_impl, self.attn_mask
-        )  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
@@ -518,3 +505,32 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+def manual_scaled_dot_product_attention(
+    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
+) -> torch.Tensor:
+    """
+    taken from https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+    """
+    L, S = query.size(-2), key.size(-2)
+    scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
+    attn_bias = torch.zeros(
+        L, S, dtype=query.dtype, device=query.device
+    )  # device added (not part of the original code)
+    if is_causal:
+        assert attn_mask is None
+        temp_mask = torch.ones(L, S, dtype=torch.bool, device=query.device).tril(diagonal=0)  # device added
+        attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
+        attn_bias.to(query.dtype)
+
+    if attn_mask is not None:
+        if attn_mask.dtype == torch.bool:
+            attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
+        else:
+            attn_bias += attn_mask
+    attn_weight = query @ key.transpose(-2, -1) * scale_factor
+    attn_weight += attn_bias
+    attn_weight = torch.softmax(attn_weight, dim=-1)
+    attn_weight = torch.dropout(attn_weight, dropout_p, train=True)
+    return attn_weight @ value
