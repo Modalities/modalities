@@ -152,14 +152,16 @@ class Trainer:
                     f"{loss_fun.tag} average": train_loss_avg,
                     f"{loss_fun.tag} last step": train_loss_last_batch,
                 }
+
+                consumed_tokens = torch.Tensor([(train_step_id + 1 ) * train_loader.batch_size  * self.gradient_acc_steps * dist.get_world_size() * len(batch.samples[model.sample_key][0])])
+                metrics = {
+                    "consumed_tokens": consumed_tokens,
+                }
+            
                 if len(gradient_norm_scores) > 0:
-                    metrics = {
-                        "grad_norm_avg": torch.mean(torch.Tensor(gradient_norm_scores)),
-                        "grad_norm_last_batch": gradient_norm_scores[-1],
-                    }
+                    metrics["grad_norm_avg"] = torch.mean(torch.Tensor(gradient_norm_scores))
+                    metrics["grad_norm_last_batch"] =  gradient_norm_scores[-1]
                     gradient_norm_scores = []
-                else:
-                    metrics = {}
 
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
