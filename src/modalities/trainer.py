@@ -46,14 +46,14 @@ class Trainer:
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
-        train_step_id: int,
+        micro_batch_id: int,
         data_loader: LLMDataLoader,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
         (loss / self.gradient_acc_steps).backward()
 
-        if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
+        if (micro_batch_id + 1) % self.gradient_acc_steps == 0 or (micro_batch_id + 1) == len(data_loader):
             gradient_norm_score = self.gradient_clipper.clip_gradients().sum()
             optimizer.step()
             scheduler.step()
@@ -89,7 +89,9 @@ class Trainer:
         gradient_norm_scores = []
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
-            train_step_id = batch_id + train_loader.fast_forward_batch_id
+            micro_batch_id = batch_id + train_loader.fast_forward_batch_id
+            # The train step id corresponds to the optimizer step
+            train_step_id = micro_batch_id // self.gradient_acc_steps
             # Train single batch
             batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
@@ -97,7 +99,7 @@ class Trainer:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 loss_fun=loss_fun,
-                train_step_id=train_step_id,
+                micro_batch_id=micro_batch_id,
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
@@ -120,7 +122,7 @@ class Trainer:
             )
 
             # Check, if model should be evaluated
-            if (train_step_id + 1) % global_training_log_interval_in_steps == 0:
+            if (train_step_id  + 1) % global_training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
