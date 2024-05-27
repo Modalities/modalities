@@ -168,6 +168,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
         gradient_clipper=gradient_clipper_mock,
+        tokens_per_train_step=1,
     )
 
 
