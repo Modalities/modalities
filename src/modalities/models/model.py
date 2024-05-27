@@ -21,25 +21,6 @@ class NNModel(nn.Module):
     def get_parameters(self) -> Dict[str, torch.Tensor]:
         return {name: param for name, param in self.named_parameters()}
 
-    @abstractmethod
-    def generate_text(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        context: str,
-        max_new_tokens: int,
-        temperature: float = 1.0,
-    ) -> str:
-        ...
-
-    @abstractmethod
-    def generate(
-            self,
-            stop_token_ids: List[int],
-            input_ids: torch.Tensor,
-            max_new_tokens: int,
-            temperature: float = 1.0,
-    ) -> torch.Tensor:
-        ...
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:

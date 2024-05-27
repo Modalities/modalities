@@ -14,8 +14,6 @@ from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavin
 from modalities.exceptions import CheckpointingError
 
 
-
-
 class CheckpointingEntityType(Enum):
     MODEL = "model"
     OPTIMIZER = "optimizer"

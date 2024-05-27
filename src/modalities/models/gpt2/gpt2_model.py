@@ -465,38 +465,3 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
-
-    def generate_text(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            context: str,
-            max_new_tokens: int,
-            temperature: float = 1.0,
-    ):
-        in_batch = tokenizer([context])
-        in_batch[self.sample_key] = torch.Tensor(in_batch[self.sample_key]).to(torch.int64)
-
-        for _ in range(max_new_tokens):
-            in_batch[self.sample_key] = (
-                in_batch[self.sample_key] if in_batch[self.sample_key].size(1) <= self.block_size else in_batch[
-                                                                                                           self.sample_key][
-                                                                                                       :,
-                                                                                                       -self.block_size:]
-            )
-            logits = self.forward(in_batch)[self.prediction_key]
-            logits = logits[:, -1, :] / temperature
-            probs = F.softmax(logits, dim=-1)
-            idx_next = torch.multinomial(probs, num_samples=1)
-            idx_next_str = tokenizer.decode(idx_next[0])
-            if idx_next_str == tokenizer.eos_token:
-                print("\n<reached eos token>", end="")
-                break
-            else:
-                print(idx_next_str, end="")
-                sys.stdout.flush()
-                in_batch[self.sample_key] = torch.cat((in_batch[self.sample_key], idx_next), dim=1)
-        print("")
-
-    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
-                 temperature: float = 1.0) -> torch.Tensor:
-        raise NotImplementedError

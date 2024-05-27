@@ -177,16 +177,3 @@ class CoCa(NNModel):
         decoder_outputs = self.multimodal_decoder(decoder_inputs)
         logits = decoder_outputs[self.multimodal_decoder.prediction_key]
         return logits
-
-    def generate_text(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            context: str,
-            max_new_tokens: int,
-            temperature: float = 1.0,
-    ):
-        raise NotImplementedError
-
-    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
-                 temperature: float = 1.0) -> torch.Tensor:
-        raise NotImplementedError

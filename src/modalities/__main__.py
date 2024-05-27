@@ -13,7 +13,7 @@ from pydantic import BaseModel, FilePath
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
@@ -56,33 +56,14 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=Path)
 @click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
     help="Path to a file with the YAML config file.",
 )
-@click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
-)
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
-@click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_file_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        generate_text_main(model_path, config_file_path, tokenizer, max_new_tokens, chat)
+def entry_point_generate_text(config_file_path: FilePath):
+    generate_text(config_file_path)
 
 
 @main.group(name="data")

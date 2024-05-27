@@ -72,16 +72,3 @@ class TextDecoder(NNModel):
         for block in self.transformer.h:
             x = block(x)
         return {self.prediction_key: x}
-
-    def generate_text(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            context: str,
-            max_new_tokens: int,
-            temperature: float = 1.0,
-    ):
-        raise NotImplementedError
-
-    def generate(self, stop_token_ids: List[int], input_ids: torch.Tensor, max_new_tokens: int,
-                 temperature: float = 1.0) -> torch.Tensor:
-        raise NotImplementedError
