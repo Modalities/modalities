@@ -1,5 +1,5 @@
 import torch
-# from torch import nn
+from torch import nn
 
 from modalities.models.mamba.mamba_block import MambaBlock, Block
 import pytest
