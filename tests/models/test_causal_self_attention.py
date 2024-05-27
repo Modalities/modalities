@@ -1,6 +1,6 @@
 """
 Note: test_attention_types_approximate_equality can print the output of different attention implementations. 
-      To do so, turn on verbose and run 'python tests/models/test_causal_self_attention.py -s'
+      To do so, turn on verbose and run 'pytest tests/models/test_causal_self_attention.py -s'
 """
 from copy import deepcopy
 
@@ -105,7 +105,7 @@ def test_forward_pass_shapes(seq_length, n_head_q, n_head_kv, head_dim, attentio
     key_orig = torch.rand(batch_size, n_head_kv, seq_length, head_dim, dtype=torch.bfloat16).cuda()
     value_orig = torch.rand(batch_size, n_head_kv, seq_length, head_dim, dtype=torch.bfloat16).cuda()
 
-    out_flash = CausalSelfAttention.execute_flash_attention(
+    out = CausalSelfAttention.execute_attention(
         query_orig,
         key_orig,
         value_orig,
@@ -114,7 +114,7 @@ def test_forward_pass_shapes(seq_length, n_head_q, n_head_kv, head_dim, attentio
     )
 
     # shape: (batch_size, seq_length, num_heads, head_dim)
-    assert out_flash.shape == (batch_size, seq_length, n_head_q, head_dim)
+    assert out.shape == (batch_size, seq_length, n_head_q, head_dim)
 
 
 @pytest.mark.parametrize(
@@ -122,7 +122,7 @@ def test_forward_pass_shapes(seq_length, n_head_q, n_head_kv, head_dim, attentio
     [
         # note that no group query attention is used (i.e. n_head_q == n_head_kv)
         # manual vs. pytorch_flash
-        (4, 4, 4, "manual", "pytorch_flash", False),
+        (4, 4, 4, "manual", "pytorch_flash", True),
         (4, 4, 32, "manual", "pytorch_flash", False),
         (4, 4, 768, "manual", "pytorch_flash", False),
         (8, 8, 2048, "manual", "pytorch_flash", False),
@@ -132,7 +132,7 @@ def test_forward_pass_shapes(seq_length, n_head_q, n_head_kv, head_dim, attentio
         (4, 4, 768, "manual", "dao_flash", False),
         (8, 8, 2048, "manual", "dao_flash", False),
         # pytorch_flash vs. dao_flash
-        (4, 4, 4, "pytorch_flash", "dao_flash", True),
+        (4, 4, 4, "pytorch_flash", "dao_flash", False),
         (4, 4, 32, "pytorch_flash", "dao_flash", False),
         (4, 4, 768, "pytorch_flash", "dao_flash", False),
         (8, 8, 2048, "pytorch_flash", "dao_flash", False),

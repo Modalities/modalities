@@ -265,7 +265,7 @@ class CausalSelfAttention(nn.Module):
         return q, k, v
 
     @staticmethod
-    def execute_flash_attention(
+    def execute_attention(
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
@@ -310,7 +310,7 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
