@@ -180,29 +180,6 @@ class GPT2LLMConfig(BaseModel):
         return self
 
 
-def _repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
-    """
-    Source code adopted from
-    https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
-    Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
-    """
-    B, nh_kv, T, hs = x.shape
-    if n_rep == 1:
-        return x
-    return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)
-
-
-def repeat_kv_heads(q, k, v):
-    # repeat k/v heads if self.n_rep > 1
-    n_head_q = q.shape[1]
-    n_head_kv = k.shape[1]
-    if n_head_q != n_head_kv:
-        n_rep = n_head_q // n_head_kv
-        k = _repeat_kv(k, n_rep)  # (B, nh_q, T, hs)
-        v = _repeat_kv(v, n_rep)  # (B, nh_q, T, hs)
-    return k, v
-
-
 class CausalSelfAttention(nn.Module):
     def __init__(
         self,
@@ -284,7 +261,31 @@ class CausalSelfAttention(nn.Module):
         return q, k, v
 
     @staticmethod
+    def _repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+        """
+        Source code adopted from
+        https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
+        Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
+        """
+        B, nh_kv, T, hs = x.shape
+        if n_rep == 1:
+            return x
+        return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)
+
+    @classmethod
+    def repeat_kv_heads(cls, q, k, v):
+        # repeat k/v heads if self.n_rep > 1
+        n_head_q = q.shape[1]
+        n_head_kv = k.shape[1]
+        if n_head_q != n_head_kv:
+            n_rep = n_head_q // n_head_kv
+            k = cls._repeat_kv(k, n_rep)  # (B, nh_q, T, hs)
+            v = cls._repeat_kv(v, n_rep)  # (B, nh_q, T, hs)
+        return k, v
+
+    @classmethod
     def execute_attention(
+        cls,
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
@@ -292,7 +293,7 @@ class CausalSelfAttention(nn.Module):
         attention_impl: AttentionImplementation,
     ) -> torch.Tensor:
         if attention_impl == AttentionImplementation.MANUAL:
-            k, v = repeat_kv_heads(q, k, v)  # for GQA (group query attention)
+            k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
             y = manual_scaled_dot_product_attention(
                 query=q,
                 key=k,
@@ -303,7 +304,7 @@ class CausalSelfAttention(nn.Module):
             )  # (B, nh_q, T, hd)
             y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
-            k, v = repeat_kv_heads(q, k, v)  # for GQA (group query attention)
+            k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
             y = torch.nn.functional.scaled_dot_product_attention(
                 query=q,
                 key=k,
