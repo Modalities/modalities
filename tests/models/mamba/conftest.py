@@ -249,7 +249,7 @@ def mixer_model_config(norm_epsilon, device, mamba_block_config):
 @pytest.fixture()
 def mamba_llm(d_model, n_layer, vocab_size, rms_norm, residual_in_fp32, fused_add_norm, prediction_key, sample_key,
               seed, dtype, initializer_cfg, mixer_model_config):
-    return MambaLLM(d_model=d_model, n_layer=n_layer, vocab_size=50257, rms_norm=rms_norm,
+    return MambaLLM(d_model=d_model, n_layer=n_layer, vocab_size=vocab_size, rms_norm=rms_norm,
                     residual_in_fp32=residual_in_fp32, fused_add_norm=fused_add_norm, pad_vocab_size_multiple=1,
                     tie_embeddings=False, prediction_key=prediction_key, sample_key=sample_key, seed=seed, dtype=dtype,
                     initializer_cfg=initializer_cfg, num_last_tokens=0, inference_params={},
