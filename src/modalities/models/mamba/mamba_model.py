@@ -14,7 +14,7 @@ from modalities.models.model import NNModel
 from transformers import PreTrainedTokenizer
 
 try:
-    from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
+    from modalities.models.mamba.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
 except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 

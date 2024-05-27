@@ -1,7 +1,8 @@
 import pytest
 import torch
 from transformers import AutoTokenizer
-from modalities.models.mamba.mamba_model import _init_weights, create_block
+from modalities.models.mamba.mamba_model import _init_weights, create_block, MambaLLM
+from tests.conftest import _ROOT_DIR
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
@@ -55,8 +56,13 @@ def test_tie_weights(mamba_llm):
     assert (mamba_llm.lm_head.weight == mamba_llm.backbone.embedding.weight).all()
 
 
-def test_generate_text(mamba_llm):
-    tokenizer = AutoTokenizer.from_pretrained("../../../data/tokenizer/hf_gpt2")
+def test_generate_text(d_model, n_layer, rms_norm, residual_in_fp32, fused_add_norm, prediction_key, sample_key, seed, dtype, initializer_cfg, mixer_model_config):
+    mamba_llm = MambaLLM(d_model=d_model, n_layer=n_layer, vocab_size=50257, rms_norm=rms_norm,
+                    residual_in_fp32=residual_in_fp32, fused_add_norm=fused_add_norm, pad_vocab_size_multiple=1,
+                    tie_embeddings=False, prediction_key=prediction_key, sample_key=sample_key, seed=seed, dtype=dtype,
+                    initializer_cfg=initializer_cfg, num_last_tokens=0, inference_params={},
+                    mixer_model_config=mixer_model_config)
+    tokenizer = AutoTokenizer.from_pretrained(_ROOT_DIR / "data/tokenizer/hf_gpt2")
     context = "My name is"
     output = mamba_llm.to("cuda").generate_text(tokenizer=tokenizer, context=context, max_new_tokens=5,
                                                 temperature=1)
