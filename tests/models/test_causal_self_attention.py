@@ -17,14 +17,13 @@ def _get_random_input_seq(embedding_shape):
     return torch.rand(size=embedding_shape, dtype=flash_attn_supported_dtype).cuda()
 
 
-def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, block_size, attention_impl, attention_config):
+def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, attention_impl, attention_config):
     self_attention_layer = CausalSelfAttention(
         n_head_q=n_head_q,
         n_head_kv=n_head_kv,
         n_embd=n_embd,
         bias=False,
         dropout=0.0,
-        block_size=block_size,
         attention_config=attention_config,
         attention_impl=attention_impl,
     ).cuda()
@@ -107,7 +106,6 @@ def test_forward_pass_success(n_head_q, n_head_kv, n_embd, attention_impl, succe
         "n_head_q": n_head_q,
         "n_head_kv": n_head_kv,
         "n_embd": n_embd,
-        "block_size": block_size,
         "attention_config": attention_config,
         "attention_impl": attention_impl,
     }
@@ -202,7 +200,6 @@ def test_attention_implementation_approximate_equality(
         "n_head_q": n_head_q,
         "n_head_kv": n_head_kv,
         "n_embd": n_embd,
-        "block_size": block_size,
         "attention_config": attention_config,
         "attention_impl": attention_impl_1,
     }

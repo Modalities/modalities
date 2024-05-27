@@ -190,7 +190,6 @@ class CausalSelfAttention(nn.Module):
         attention_impl: AttentionImplementation,
         bias: bool,
         dropout: float,
-        block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
@@ -372,7 +371,6 @@ class GPT2Block(nn.Module):
         attention_impl: AttentionImplementation,
         attention_config: AttentionConfig,
         dropout: float,
-        block_size: int,
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
@@ -388,7 +386,6 @@ class GPT2Block(nn.Module):
             attention_impl=attention_impl,
             bias=bias,
             dropout=dropout,
-            block_size=block_size,
         )
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
@@ -469,7 +466,6 @@ class GPT2LLM(NNModel):
                             attention_impl=attention_implementation,
                             attention_config=attention_config,
                             dropout=dropout,
-                            block_size=block_size,
                             ffn_hidden=ffn_hidden,
                             attention_norm=deepcopy(attention_norm),
                             ffn_norm=deepcopy(ffn_norm),
