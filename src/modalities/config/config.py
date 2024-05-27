@@ -301,7 +301,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_steps: Optional[int] = 0
+    skip_num_micro_steps: Optional[int] = 0
 
 
 class RepeatingDataLoaderConfig(BaseModel):

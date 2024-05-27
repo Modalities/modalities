@@ -27,7 +27,7 @@ def test_resumable_dataloader():
 
 def test_dataloader_from_config(dummy_config: Dict):
     start_index = 2
-    dummy_config["train_dataloader"]["config"]["skip_num_steps"] = start_index
+    dummy_config["train_dataloader"]["config"]["skip_num_micro_steps"] = start_index
 
     class DataloaderTestModel(BaseModel):
         train_dataloader: PydanticLLMDataLoaderIFType

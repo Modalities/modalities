@@ -17,9 +17,28 @@ class DataloaderFactory:
         num_workers: int,
         pin_memory: bool,
         shuffle: bool,
-        skip_num_steps: Optional[int] = 0,
+        skip_num_micro_steps: Optional[int] = 0,
     ) -> LLMDataLoader:
-        batch_sampler = ResumableBatchSampler(start_index=skip_num_steps, underlying_batch_sampler=batch_sampler)
+        """Factory method for the instantiation of LLMDataLoader
+
+        Args:
+            dataloader_tag (str): Tag for the dataloader
+            dataset (Dataset): Dataset to be used
+            batch_sampler (BatchSampler): batch sampler for batch-wise sampling from the dataset
+            collate_fn (Callable): Callable for shaping the batch
+            num_workers (int): Number of workers for the dataloader
+            pin_memory (bool): Boolean flag for pinning memory
+            shuffle (bool): Boolean flag for shuffling the dataset
+            skip_num_micro_steps (Optional[int], optional): Defines the number of micro steps to skip.
+              NOTE: The checkpoints are indexed with training steps (number of backward passes).
+              This must not be confused with the nubmer of micro steps which is the number of
+              forward passes (i.e, num train steps * gradient accumulation steps).
+              Defaults to 0.
+
+        Returns:
+            LLMDataLoader: Instance of LLMDataLoader
+        """
+        batch_sampler = ResumableBatchSampler(start_index=skip_num_micro_steps, underlying_batch_sampler=batch_sampler)
 
         dataloader = LLMDataLoader(
             dataloader_tag=dataloader_tag,
