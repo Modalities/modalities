@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -12,22 +13,12 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
-
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
-    max_length: ${settings.training.sequence_length}
 
 collate_fn:  
   component_key: collate_fn
@@ -143,25 +134,22 @@ eval_dataloaders:
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE 
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -194,7 +182,7 @@ model:
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head_q: 8
-    n_head_kv: 8
+    n_head_kv: 4
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
@@ -258,7 +246,15 @@ optimizer:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
-# message subscriber
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
 
 batch_progress_subscriber:
   component_key: progress_subscriber
@@ -284,3 +280,4 @@ evaluation_subscriber:
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}

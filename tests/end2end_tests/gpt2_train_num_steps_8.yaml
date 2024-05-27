@@ -12,9 +12,6 @@ settings:
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -70,25 +67,23 @@ train_dataloader:
 
 eval_dataloaders: []
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
+
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -179,7 +174,15 @@ optimizer:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
-# message subscriber
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
 
 batch_progress_subscriber:
   component_key: progress_subscriber

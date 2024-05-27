@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
-from modalities.checkpointing.checkpointing import CheckpointingIF
-from modalities.config.config import GradientClippingMode, load_app_config_dict
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -23,7 +23,7 @@ from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
-from modalities.utils.gradient_clipping import build_gradient_clipper
+from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -91,8 +91,8 @@ def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
 
 
 @pytest.fixture(scope="function")
-def checkpointing_mock():
-    return MagicMock(spec=CheckpointingIF)
+def checkpoint_saving_mock():
+    return MagicMock(spec=CheckpointSaving)
 
 
 @pytest.fixture(scope="function")
@@ -139,6 +139,13 @@ def scheduler_mock():
 
 
 @pytest.fixture(scope="function")
+def gradient_clipper_mock():
+    gradient_clipper = MagicMock(spec=GradientClipperIF)
+    gradient_clipper.clip_gradients = lambda: torch.Tensor([0.0])
+    return gradient_clipper
+
+
+@pytest.fixture(scope="function")
 def loss_mock():
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
 
@@ -154,13 +161,13 @@ def progress_publisher_mock():
 
 
 @pytest.fixture(scope="function")
-def trainer(progress_publisher_mock):
+def trainer(progress_publisher_mock, gradient_clipper_mock):
     return Trainer(
         local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
-        gradient_clipper=build_gradient_clipper(GradientClippingMode.NONE),
+        gradient_clipper=gradient_clipper_mock,
     )
 
 

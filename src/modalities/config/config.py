@@ -1,68 +1,31 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
-import torch.nn as nn
+import torch
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, GetCoreSchemaHandler, PositiveInt, field_validator, model_validator
-from pydantic_core import core_schema
+from pydantic import BaseModel, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data import Sampler
-from torch.utils.data.dataset import Dataset
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
-from modalities.checkpointing.checkpointing import Checkpointing
-from modalities.checkpointing.checkpointing_execution import CheckpointingExecutionIF
-from modalities.checkpointing.checkpointing_strategies import CheckpointingStrategyIF
 from modalities.config.lookup_enum import LookupEnum
-from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.subscriber import MessageSubscriberIF
-from modalities.loss_functions import Loss
-from modalities.models.gpt2.collator import CollateFnIF
+from modalities.config.pydanctic_if_types import (
+    PydanticCheckpointLoadingIFType,
+    PydanticCheckpointSavingExecutionIFType,
+    PydanticCheckpointSavingStrategyIFType,
+    PydanticCollateFnIFType,
+    PydanticDatasetIFType,
+    PydanticLLMDataLoaderIFType,
+    PydanticOptimizerIFType,
+    PydanticPytorchDeviceType,
+    PydanticPytorchModuleType,
+    PydanticSamplerIFType,
+    PydanticTokenizerIFType,
+)
+from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.util import get_date_of_run, parse_enum_by_name
-
-
-class PydanticThirdPartyTypeIF:
-    def __init__(self, third_party_type):
-        self.third_party_type = third_party_type
-
-    def __get_pydantic_core_schema__(
-            self,
-            _source_type: Any,
-            _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        # see: https://docs.pydantic.dev/latest/concepts/types/#handling-third-party-types
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.is_instance_schema(self.third_party_type),
-            python_schema=core_schema.is_instance_schema(self.third_party_type),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     lambda instance: instance.x
-            # ),
-        )
-
-
-PydanticCheckpointingType = Annotated[Checkpointing, PydanticThirdPartyTypeIF(Checkpointing)]
-PydanticCheckpointingStrategyIFType = Annotated[
-    CheckpointingStrategyIF, PydanticThirdPartyTypeIF(CheckpointingStrategyIF)
-]
-PydanticCheckpointingExecutionIFType = Annotated[
-    CheckpointingExecutionIF, PydanticThirdPartyTypeIF(CheckpointingExecutionIF)
-]
-PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
-PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
-PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
-PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
-PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
-PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
-PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
-PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
-PydanticLossIFType = Annotated[Loss, PydanticThirdPartyTypeIF(Loss)]
-PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPartyTypeIF(MessageSubscriberIF)]
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -85,15 +48,10 @@ class WandbMode(LookupEnum):
     DISABLED = "DISABLED"
 
 
-class GradientClippingMode(LookupEnum):
-    NONE = "NONE"  # Do not apply gradient clipping.
-    VALUE = "value"  # Clip all gradient values independently.
-    # For norm based clipping modes, the norm is computed over
-    # all gradients together, as if they were concatenated
-    # into a single vector.
-    P1_NORM = "p1_norm"  # manhattan norm based clipping.
-    P2_NORM = "p2_norm"  # Euclidean norm based clipping.
-    MAX_NORM = "max_norm"  # Maximum norm based clipping.
+class PrecisionEnum(LookupEnum):
+    FP32 = torch.float32
+    FP16 = torch.float16
+    BF16 = torch.bfloat16
 
 
 class ReferenceConfig(BaseModel):
@@ -115,10 +73,17 @@ class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
     k: Annotated[int, Field(strict=True, ge=-1)]
 
 
-class FSDPToDiscCheckpointingConfig(BaseModel):
-    checkpoint_path: Path
+class TorchCheckpointLoadingConfig(BaseModel):
+    device: PydanticPytorchDeviceType
+    precision: Optional[PrecisionEnum] = None
+
+    @field_validator("device", mode="before")
+    def parse_device(cls, device) -> PydanticPytorchDeviceType:
+        return parse_torch_device(device)
+
+
+class FSDPCheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
-    experiment_id: str
     block_names: List[str]
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
@@ -129,8 +94,8 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
             name=name, enum_type=MixedPrecisionSettings
         )
         if not has_bfloat_support() and (
-                mixed_precision_settings == MixedPrecisionSettings.BF_16
-                or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
         ):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
@@ -140,9 +105,15 @@ class FSDPToDiscCheckpointingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-class CheckpointingConfig(BaseModel):
-    checkpointing_strategy: PydanticCheckpointingStrategyIFType
-    checkpointing_execution: PydanticCheckpointingExecutionIFType
+class FSDPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+
+
+class CheckpointSavingConfig(BaseModel):
+    checkpoint_saving_strategy: PydanticCheckpointSavingStrategyIFType
+    checkpoint_saving_execution: PydanticCheckpointSavingExecutionIFType
 
 
 class AdamOptimizerConfig(BaseModel):
@@ -218,14 +189,14 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpointing: PydanticCheckpointingType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
-    checkpointing: PydanticCheckpointingType
+    checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
@@ -243,8 +214,8 @@ class FSDPWrappedModelConfig(BaseModel):
             name=name, enum_type=MixedPrecisionSettings
         )
         if not has_bfloat_support() and (
-                mixed_precision_settings == MixedPrecisionSettings.BF_16
-                or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
+            mixed_precision_settings == MixedPrecisionSettings.BF_16
+            or mixed_precision_settings == MixedPrecisionSettings.BF_16_WORKING
         ):
             raise ValueError("BF16 not supported in the current environment")
         return mixed_precision_settings
@@ -360,85 +331,12 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
     experiment_id: str
     mode: WandbMode
     directory: Path
-    experiment_config: Optional[Dict] = None
+    config_file_path: Path
 
 
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
     local_rank: int
-
-
-class CudaEnvConfig(BaseModel):
-    local_rank: Annotated[int, Field(strict=True, ge=0)]
-    world_size: Annotated[int, Field(strict=True, ge=1)]
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
-
-
-class PackedDatasetSettings(BaseModel):
-    src_path: FilePath
-    dst_path: Optional[Path] = None
-    index_path: Optional[FilePath] = None
-    jq_pattern: str
-    num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
-    eod_token: str
-    processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
-    raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-    processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-
-
-class TrainingSettings(BaseModel):
-    class Training(BaseModel):
-        class GradientClipping(BaseModel):
-            mode: GradientClippingMode
-            threshold: Optional[Annotated[float, Field(strict=True, gt=0.0)]] = None
-
-            @model_validator(mode="after")
-            def check_mode_none_iff_threshold_none(self) -> BaseModel:
-                if self.mode == GradientClippingMode.NONE and self.threshold is not None:
-                    raise ValueError("If gradient clipping is deactivated, no threshold should be set.")
-                if self.mode != GradientClippingMode.NONE and self.threshold is None:
-                    raise ValueError("A threshold value is required when gradient clipping is used.")
-                return self
-
-        global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-        do_apply_activation_checkpointing: bool
-        gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
-        local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
-        sequence_length: Annotated[int, Field(strict=True, ge=1)]
-        gradient_clipping: GradientClipping
-
-    class Paths(BaseModel):
-        checkpointing_path: Path
-
-    experiment_id: str
-    referencing_keys: Dict[str, str]
-    training: Training
-    cuda_env: CudaEnvConfig
-    paths: Paths
-
-
-class TrainingComponentsInstantiationModel(BaseModel):
-    wrapped_model: PydanticPytorchModuleType
-    optimizer: PydanticOptimizerIFType
-    scheduler: PydanticLRSchedulerIFType
-    loss_fn: PydanticLossIFType
-    train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
-    batch_progress_subscriber: PydanticMessageSubscriberIFType
-    evaluation_subscriber: PydanticMessageSubscriberIFType
-    checkpointing: PydanticCheckpointingType
-    settings: TrainingSettings
-
-
-class PackedDatasetComponentsInstantiationModel(BaseModel):
-    tokenizer: PydanticTokenizerIFType
-    settings: PackedDatasetSettings
-
-
-class ComponentsInferenceModel(BaseModel):
-    wrapped_model: PydanticPytorchModuleType
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -449,6 +347,8 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
     def modalities_env_resolver_fun(var_name: str) -> int:
         if var_name == "experiment_id":
             return get_date_of_run()
+        if var_name == "config_file_path":
+            return config_file_path
 
     def node_env_resolver_fun(var_name: str) -> int:
         if var_name == "num_cpus":

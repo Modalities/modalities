@@ -4,7 +4,8 @@ import pytest
 import torch
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.config import ProcessGroupBackendType, TrainingComponentsInstantiationModel
+from modalities.config.config import ProcessGroupBackendType
+from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.running_env.cuda_env import CudaEnv
 from tests.conftest import _ROOT_DIR
@@ -56,7 +57,7 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     config_dict = load_app_config_dict(dummy_config_path)
 
     # Disable checkpointing
-    config_dict["checkpointing"]["config"]["checkpointing_strategy"]["config"]["k"] = 0
+    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 0
 
     main = Main(config_dict, dummy_config_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):

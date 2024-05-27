@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-22__08-55-14/eid_2024-04-22__08-55-14-model-num_steps_1152.bin
+  model_path: /raid/s3/opengptx/max_lue/modalities/data/checkpoints/2024-04-28__13-06-00/eid_2024-04-28__13-06-00-model-num_steps_256.bin
   device: 0
   context_length: 2048
 
@@ -10,6 +10,7 @@ text_inference_component:
   component_key: inference_component
   variant_key: text
   config:
+    device: ${settings.device}
     model:
       instance_key: checkpointed_model
       pass_type: BY_REFERENCE
@@ -19,7 +20,7 @@ text_inference_component:
     context_length: ${settings.context_length}
     eod_token: <eod>
     prompt_template: "{prompt_input}" # "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
-    temperature: 0.000001
+    temperature: 0
     # chat: false
 
 checkpointed_model:

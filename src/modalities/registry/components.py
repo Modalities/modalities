@@ -1,24 +1,26 @@
 from dataclasses import dataclass
-from typing import Type
+from typing import Callable, Type
 
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 
-from modalities.checkpointing.checkpointing import Checkpointing
-from modalities.checkpointing.checkpointing_execution import FSDPToDiscCheckpointing
-from modalities.checkpointing.checkpointing_strategies import (
+from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
-    CheckpointingConfig,
+    CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
@@ -26,7 +28,8 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
-    FSDPToDiscCheckpointingConfig,
+    FSDPCheckpointLoadingConfig,
+    FSDPCheckpointSavingConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
@@ -43,6 +46,7 @@ from modalities.config.config import (
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
     StepLRSchedulerConfig,
+    TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
@@ -67,6 +71,16 @@ from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
+from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
+    DummyGradientClipper,
+    FSDPGradientClipper,
+    FSDPLoggingOnlyGradientClipper,
+)
+from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
+    DummyGradientClipperConfig,
+    FSDPDummyGradientClipperConfig,
+    FSDPGradientClipperConfig,
+)
 
 from modalities.models.mamba.mamba_model import MambaLLM
 
@@ -75,7 +89,7 @@ from modalities.models.mamba.mamba_model import MambaLLM
 class ComponentEntity:
     component_key: str
     variant_key: str
-    component_type: Type
+    component_type: Type | Callable
     component_config_type: Type[BaseModel]
 
 
@@ -140,24 +154,25 @@ COMPONENTS = [
         "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
     # checkpointing
-    ComponentEntity("checkpointing", "default", Checkpointing, CheckpointingConfig),
+    ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
     ComponentEntity(
-        "checkpointing_strategy",
+        "checkpoint_saving_strategy",
         "save_every_k_steps_checkpointing_strategy",
         SaveEveryKStepsCheckpointingStrategy,
         SaveEveryKStepsCheckpointingStrategyConfig,
     ),
     ComponentEntity(
-        "checkpointing_strategy",
+        "checkpoint_saving_strategy",
         "save_k_most_recent_checkpoints_strategy",
         SaveKMostRecentCheckpointsStrategy,
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
-    # checkpointing execution
-    ComponentEntity(
-        "checkpointing_execution", "fsdp_to_disc_checkpointing", FSDPToDiscCheckpointing, FSDPToDiscCheckpointingConfig
-    ),
+    # checkpoint saving execution
+    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    # checkpoint loading
+    ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(
         "progress_subscriber",
@@ -187,4 +202,10 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
+    # gradient clippers
+    ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity(
+        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+    ),
+    ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
 ]
