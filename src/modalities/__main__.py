@@ -196,12 +196,19 @@ class Main:
         )
 
         # Trainer
+        tokens_per_train_step = (
+            components.settings.training.local_train_micro_batch_size
+            * components.settings.training.sequence_length
+            * components.settings.training.gradient_acc_steps
+            * components.settings.cuda_env.world_size
+        )
         trainer = Trainer(
             local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
             gradient_clipper=components.gradient_clipper,
+            tokens_per_train_step=tokens_per_train_step,
         )
 
         # Evaluator
