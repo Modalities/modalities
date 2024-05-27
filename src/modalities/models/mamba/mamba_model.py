@@ -29,7 +29,7 @@ def create_block(
         layer_idx: int,
         device: str,
         dtype: str,
-):
+) -> Block:
     factory_kwargs = {"device": device, "dtype": dtype}
     mixer_cls = partial(MambaBlock, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs)
     norm_cls = partial(
@@ -43,12 +43,12 @@ def create_block(
 
 # https://github.com/huggingface/transformers/blob/c28d04e9e252a1a099944e325685f14d242ecdcd/src/transformers/models/gpt2/modeling_gpt2.py#L454
 def _init_weights(
-        module,
-        n_layer,
-        initializer_range=0.02,  # Now only used for embedding layer.
-        rescale_prenorm_residual=True,
-        n_residuals_per_layer=1,  # Change to 2 if we have MLP
-):
+        module: nn.Module,
+        n_layer: int,
+        initializer_range: float = 0.02,  # Now only used for embedding layer.
+        rescale_prenorm_residual: bool = True,
+        n_residuals_per_layer: int = 1,  # Change to 2 if we have MLP
+) -> None:
     if isinstance(module, nn.Linear):
         if module.bias is not None:
             if not getattr(module.bias, "_no_reinit", False):
@@ -123,13 +123,13 @@ class MixerModel(nn.Module):
             )
         )
 
-    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+    def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> dict:
         return {
             i: layer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
             for i, layer in enumerate(self.layers)
         }
 
-    def forward(self, input_ids: torch.Tensor, inference_params=None):
+    def forward(self, input_ids: torch.Tensor, inference_params: Optional[dict] = None) -> torch.Tensor:
         hidden_states = self.embedding(input_ids)
         residual = None
         for layer in self.layers:
@@ -220,11 +220,11 @@ class MambaLLM(NNModel):
         )
         self.tie_weights()
 
-    def tie_weights(self):
+    def tie_weights(self) -> None:
         if self.tie_embeddings:
             self.lm_head.weight = self.backbone.embedding.weight
 
-    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+    def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: str = None, **kwargs) -> dict:
         return self.backbone.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -244,7 +244,7 @@ class MambaLLM(NNModel):
             context: str,
             max_new_tokens: int,
             temperature: float = 1.0,
-    ):
+    ) -> str:
         assert temperature > 0
         if not context:
             raise ValueError("Context must be not empty")

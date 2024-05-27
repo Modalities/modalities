@@ -1,7 +1,7 @@
 # Copyright (c) 2023, Tri Dao, Albert Gu.
 
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -117,7 +117,7 @@ class MambaBlock(nn.Module):
 
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
 
-    def forward(self, hidden_states, inference_params=None):
+    def forward(self, hidden_states: torch.Tensor, inference_params: Optional[dict] = None) -> torch.Tensor:
         """
         hidden_states: (B, L, D)
         Returns: same shape as hidden_states
@@ -206,7 +206,8 @@ class MambaBlock(nn.Module):
             out = self.out_proj(y)
         return out
 
-    def step(self, hidden_states, conv_state, ssm_state):
+    def step(self, hidden_states: torch.Tensor, conv_state: torch.Tensor, ssm_state: torch.Tensor) -> Tuple[
+        torch.Tensor, torch.Tensor, torch.Tensor]:
         dtype = hidden_states.dtype
         assert hidden_states.shape[1] == 1, "Only support decoding with 1 token at a time for now"
         xz = self.in_proj(hidden_states.squeeze(1))  # (B 2D)
@@ -255,7 +256,8 @@ class MambaBlock(nn.Module):
         out = self.out_proj(y)
         return out.unsqueeze(1), conv_state, ssm_state
 
-    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+    def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> \
+            Tuple[torch.Tensor, torch.Tensor]:
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
         conv_state = torch.zeros(
@@ -268,7 +270,8 @@ class MambaBlock(nn.Module):
         )
         return conv_state, ssm_state
 
-    def _get_states_from_cache(self, inference_params, batch_size, initialize_states=False):
+    def _get_states_from_cache(self, inference_params: Optional[dict], batch_size: int,
+                               initialize_states: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
             batch_shape = (batch_size,)
@@ -331,7 +334,7 @@ class Block(nn.Module):
 
     def forward(
             self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Pass the input through the encoder layer.
 
         Args:
@@ -357,5 +360,5 @@ class Block(nn.Module):
         hidden_states = self.mixer(hidden_states, inference_params=inference_params)
         return hidden_states, residual
 
-    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+    def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> dict:
         return self.mixer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
