@@ -181,7 +181,6 @@ class Trainer:
                 )
                 thoughput_aggregator.remove_keys()
 
-                model.train()
                 cumulated_losses = self._reset_tracked_losses()
 
             evaluation_callback(train_step_id=train_step_id)
