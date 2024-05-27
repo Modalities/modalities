@@ -1,6 +1,6 @@
 import torch
 import pytest
-from mamba_ssm.utils.generation import InferenceParams
+from modalities.models.mamba.utils.generation import InferenceParams
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")

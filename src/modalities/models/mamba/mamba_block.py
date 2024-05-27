@@ -11,7 +11,7 @@ from torch import Tensor
 
 from einops import rearrange, repeat
 
-from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
+from modalities.models.mamba.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
 
 try:
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -19,12 +19,12 @@ except ImportError:
     causal_conv1d_fn, causal_conv1d_update = None, None
 
 try:
-    from mamba_ssm.ops.triton.selective_state_update import selective_state_update
+    from modalities.models.mamba.ops.triton.selective_state_update import selective_state_update
 except ImportError:
     selective_state_update = None
 
 try:
-    from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
+    from modalities.models.mamba.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
 except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
