@@ -13,7 +13,7 @@ from pydantic import BaseModel, FilePath
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, TokenizerTypes, load_app_config_dict
 from modalities.config.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
