@@ -7,7 +7,7 @@ from copy import deepcopy
 import pytest
 import torch
 
-from modalities.models.gpt2.gpt2_model import AttentionConfig, CausalSelfAttention, repeat_kv_heads
+from modalities.models.gpt2.gpt2_model import AttentionConfig, CausalSelfAttention
 
 torch.manual_seed(0)
 
@@ -41,7 +41,7 @@ def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, block_size, attenti
         (4, 4, 32),  # MHA (multi head attention)
         (32, 32, 768),  # MHA (multi head attention)
         (4, 2, 32),  # GQA (group query attention)
-        (6, 2, 32),  # GQA
+        (8, 2, 32),  # GQA
         (32, 4, 768),  # GQA
     ],
 )
@@ -55,7 +55,7 @@ def test_repeat_kv_heads(n_head_q, n_head_kv, n_embd):
     k_in = torch.rand(batch_size, n_head_kv, block_size - 1, head_dim, dtype=torch.bfloat16).cuda()
     v_in = torch.rand(batch_size, n_head_kv, block_size - 1, head_dim, dtype=torch.bfloat16).cuda()
 
-    k_out, v_out = repeat_kv_heads(q, k_in, v_in)
+    k_out, v_out = CausalSelfAttention.repeat_kv_heads(q, k_in, v_in)
 
     # assert that shapes are correct: (batch_size, num_heads, seq_length, head_dim)
     assert k_out.shape == q.shape
@@ -83,16 +83,19 @@ def test_repeat_kv_heads(n_head_q, n_head_kv, n_embd):
         (8, 2, 32, "manual", True),  # GQA
         (9, 8, 32, "manual", False),
         (8, 3, 32, "manual", False),
+        (6, 6, 32, "manual", False),
         # pytorch_flash
         (4, 4, 32, "pytorch_flash", True),  # MHA
         (8, 2, 32, "pytorch_flash", True),  # GQA
         (9, 8, 32, "pytorch_flash", False),
         (8, 3, 32, "pytorch_flash", False),
+        (6, 6, 32, "pytorch_flash", False),
         # dao_flash
         (4, 4, 32, "dao_flash", True),  # MHA
         (8, 2, 32, "dao_flash", True),  # GQA
         (9, 8, 32, "dao_flash", False),
         (8, 3, 32, "dao_flash", False),
+        (6, 6, 32, "dao_flash", False),
     ],
 )
 def test_forward_pass_success(n_head_q, n_head_kv, n_embd, attention_impl, successful):
