@@ -42,28 +42,35 @@ collate_fn:
 
 train_dataset:
   component_key: dataset
-  variant_key: simple_dataset
+  variant_key: arrow_dataset_av
   config:
     type_: train
+    batch_size: 124
     audio_dataset_arrows: gertv-arrow-remove-na/train
     vision_dataset_arrows: coco_captions_arrow/train
     bpe_to_ind: bpe_to_ind_test.pkl
     bpecodes: bpecodes_test
-    num_feats: 80
+    n_mels: 128
+    img_size: 224
+    block_size_audio_encoder: 2000
+    block_size_text_decoder: 512
     freq_domain_mask_length: 30
     time_domain_mask_length: 100
-    
 
 val_dataset:
   component_key: dataset
-  variant_key: simple_dataset
+  variant_key: arrow_dataset_av
   config:
     type_: val
+    batch_size: 124
     audio_dataset_arrows: gertv-arrow-remove-na/test
     vision_dataset_arrows: coco_captions_arrow/val
     bpe_to_ind: bpe_to_ind_test.pkl
     bpecodes: bpecodes_test
-    num_feats: 80
+    n_mels: 128
+    img_size: 224
+    block_size_audio_encoder: 2000
+    block_size_text_decoder: 512
     freq_domain_mask_length: 30
     time_domain_mask_length: 100
     
@@ -256,12 +263,14 @@ model:
       audio_transformer_config:
         sample_key: feats
         prediction_key: modality_embeddings
-        input_dims: 80
-        pre_conformer_dropout: 0.1
-        conformer_dropout: 0.1
-        n_heads: 4
+        block_size: 2000
+        n_mels: 128
         n_embd: 512
-        n_layers: 3
+        n_heads: 4
+        n_conformer_blocks: 3
+        attention_config:
+          attention_engine_type: default_attention
+        pointwise_conv_kernel_size: 1
         depthwise_conv_kernel_size: 31
     text_decoder_config:
       sample_key: ${settings.referencing_keys.sample_key}

@@ -42,30 +42,25 @@ collate_fn:
 
 train_dataset:
   component_key: dataset
-  variant_key: simple_dataset
+  variant_key: arrow_dataset_vision
   config:
-    type_: train
-    audio_dataset_arrows: gertv-arrow-remove-na/train
     vision_dataset_arrows: coco_captions_arrow/train
-    bpe_to_ind: 
-    bpecodes: bpecodescococaptions500
-    num_feats: 80
-    freq_domain_mask_length: 30
-    time_domain_mask_length: 100
+    bpe_to_ind: bpe_to_ind_test.pkl
+    bpecodes: bpecodes_test
+    img_size: 224
+    block_size_text_decoder: 512
+
     
 
 val_dataset:
   component_key: dataset
-  variant_key: simple_dataset
+  variant_key: arrow_dataset_vision
   config:
-    type_: val
-    audio_dataset_arrows: gertv-arrow-remove-na/test
     vision_dataset_arrows: coco_captions_arrow/val
-    bpe_to_ind: 
-    bpecodes: bpecodescococaptions500
-    num_feats: 80
-    freq_domain_mask_length: 30
-    time_domain_mask_length: 100
+    bpe_to_ind: bpe_to_ind_test.pkl
+    bpecodes: bpecodes_test
+    img_size: 224
+    block_size_text_decoder: 512
     
 
 # train_dataloader:
