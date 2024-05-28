@@ -25,8 +25,8 @@ def dummy_image_sample():
 
 
 def dummy_audio_sample():
-    audio_features = torch.randn(1, 1000, 128)
-    audio_len = torch.Tensor([1000 / 4])
+    audio_features = torch.randn(1, 500 * 4, 128)
+    audio_len = torch.tensor([1000 / 4]).type(torch.int16)
     text_decoder_vocab_size = 50304
     text_decoder_block_size = 1024
     input_text = torch.randint(0, text_decoder_vocab_size, (1, text_decoder_block_size))

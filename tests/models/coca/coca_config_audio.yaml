@@ -7,12 +7,14 @@ text_cls_prediction_key: text_cls
 modality_encoder_config:
   sample_key: audio
   prediction_key: modality_embeddings
-  input_dims: 128
-  pre_conformer_dropout: 0.1
-  conformer_dropout: 0.1
-  n_heads: 8
+  block_size: 500
+  n_mels: 128
   n_embd: 768
-  n_layers: 17
+  n_heads: 4
+  n_conformer_blocks: 3
+  attention_config:
+    attention_engine_type: default_attention
+  pointwise_conv_kernel_size: 1
   depthwise_conv_kernel_size: 31
 text_decoder_config:
   sample_key: input_ids
