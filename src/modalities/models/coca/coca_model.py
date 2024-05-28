@@ -223,7 +223,7 @@ class CoCa(NNModel):
         return vision_embd, vision_cls_token
 
     def _forward_encode_audio(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        audio_embd, _ = self.audio_encoder(inputs)[self.modality_embd_prediction_key]
+        audio_embd = self.audio_encoder(inputs)[self.modality_embd_prediction_key]
         queries = repeat(self.audio_queries, "n d -> b n d", b=audio_embd.shape[0])
         audio_embd = self.audio_attn_pool(queries, context=audio_embd)
         audio_embd, audio_cls_token = audio_embd[:, :-1, :], F.normalize(audio_embd[:, -1:, :], dim=-1)
