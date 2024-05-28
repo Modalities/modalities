@@ -18,7 +18,9 @@ from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpo
 from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
+    ArrowDatasetAudioConfig,
     ArrowDatasetAVConfig,
+    ArrowDatasetVisionConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
@@ -177,6 +179,10 @@ COMPONENTS = [
     ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
     ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
     ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
+    ComponentEntity(
+        "dataset", "arrow_dataset_vision", DatasetFactory.get_arrow_dataset_vision, ArrowDatasetVisionConfig
+    ),
+    ComponentEntity("dataset", "arrow_dataset_audio", DatasetFactory.get_arrow_dataset_audio, ArrowDatasetAudioConfig),
     ComponentEntity("dataset", "arrow_dataset_av", DatasetFactory.get_arrow_dataset_av, ArrowDatasetAVConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),

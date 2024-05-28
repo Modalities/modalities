@@ -6,7 +6,9 @@ from torch.utils.data.dataset import Dataset
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.dataset import (
+    ArrowDatasetAudio,
     ArrowDatasetAV,
+    ArrowDatasetVision,
     DummyDataset,
     DummySampleConfig,
     MemMapDataset,
@@ -37,6 +39,46 @@ class DatasetFactory:
     def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:
         dataset = DummyDataset(num_samples=num_samples, sample_definition=sample_definition)
         return dataset
+
+    @staticmethod
+    def get_arrow_dataset_vision(
+        vision_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        img_size: int,
+        block_size_text_decoder: int,
+    ) -> ArrowDatasetVision:
+        return ArrowDatasetVision(
+            vision_dataset_arrows=vision_dataset_arrows,
+            bpe_to_ind=bpe_to_ind,
+            bpecodes=bpecodes,
+            img_size=img_size,
+            block_size_text_decoder=block_size_text_decoder,
+        )
+
+    @staticmethod
+    def get_arrow_dataset_audio(
+        type_: str,
+        audio_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        n_mels: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
+        freq_domain_mask_length: int,
+        time_domain_mask_length: int,
+    ) -> ArrowDatasetAudio:
+        return ArrowDatasetAudio(
+            type_=type_,
+            audio_dataset_arrows=audio_dataset_arrows,
+            bpe_to_ind=bpe_to_ind,
+            bpecodes=bpecodes,
+            n_mels=n_mels,
+            block_size_audio_encoder=block_size_audio_encoder,
+            block_size_text_decoder=block_size_text_decoder,
+            freq_domain_mask_length=freq_domain_mask_length,
+            time_domain_mask_length=time_domain_mask_length,
+        )
 
     @staticmethod
     def get_arrow_dataset_av(

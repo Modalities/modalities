@@ -92,6 +92,149 @@ class DummyDataset(Dataset):
         return sample
 
 
+class ArrowDatasetVision(Dataset):
+    def __init__(
+        self,
+        vision_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        img_size: int,
+        block_size_text_decoder: int,
+    ):
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+
+        self.VISION = 1
+        self.img_size = img_size
+        self.block_size_text_decoder = block_size_text_decoder
+
+        self.dataset_hf = load_from_disk(vision_dataset_arrows)
+
+        with bpe_to_ind.open("rb") as filein:
+            self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
+
+        with bpecodes.open() as filein:
+            self.bpe = apply_bpe.BPE(filein)
+
+        self.tf = create_transform(input_size=(self.img_size))
+
+    def __len__(
+        self,
+    ):
+        return len(self.dataset_hf)
+
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        tokenized_transcript = self._tokenize(self.dataset_hf[idx]["json"]["text0"])
+
+        assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+        tokenized_transcript = torch.nn.functional.pad(
+            tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+        )
+
+        return {
+            "feats": self.tf(self.dataset_hf[idx]["jpg"]),
+            "feats_len": self.img_size,
+            "input_ids": tokenized_transcript,
+            "modality": [self.VISION],
+        }
+
+    def _tokenize(self, transcript):
+        return torch.tensor(
+            [
+                (self.bpe_to_ind[tok] if tok in self.bpe_to_ind else self.bpe_to_ind["<|unk|>"])
+                for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
+            ]
+        )
+
+
+class ArrowDatasetAudio(Dataset):
+    def __init__(
+        self,
+        type_: str,
+        audio_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        n_mels: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
+        freq_domain_mask_length: int,
+        time_domain_mask_length: int,
+    ):
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+
+        self.AUDIO = 0
+
+        self.type_ = type_
+
+        self.n_mels = n_mels
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.block_size_text_decoder = block_size_text_decoder
+
+        self.dataset_hf = load_from_disk(audio_dataset_arrows)
+
+        with bpe_to_ind.open("rb") as filein:
+            self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
+
+        with bpecodes.open() as filein:
+            self.bpe = apply_bpe.BPE(filein)
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.type_ == "train":
+            self.train_audio_transforms = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=time_domain_mask_length),
+            )
+
+    def __len__(
+        self,
+    ):
+        return len(self.dataset_hf)
+
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        waveform, sample_rate = torchaudio.load(self.dataset_hf[idx]["path"])
+        log_mel_spec = torch.clamp(self.extract_features(waveform), 1e-10).log10().squeeze(0)
+        log_mel_spec = self.train_audio_transforms(log_mel_spec) if self.type_ == "train" else log_mel_spec
+        feats_len = log_mel_spec.shape[-1] // 4
+
+        assert feats_len * 4 <= 4 * self.block_size_audio_encoder
+        log_mel_spec = torch.nn.functional.pad(
+            log_mel_spec, (0, 4 * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+        ).transpose(0, 1)
+
+        tokenized_transcript = self._tokenize(self.dataset_hf[idx]["transcript"])
+        assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+        tokenized_transcript = torch.nn.functional.pad(
+            tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+        )
+
+        return {
+            "feats": log_mel_spec,
+            "feats_len": feats_len,
+            "input_ids": tokenized_transcript,
+            "modality": [self.AUDIO],
+        }
+
+    def _tokenize(self, transcript):
+        return torch.tensor(
+            [
+                (self.bpe_to_ind[tok] if tok in self.bpe_to_ind else self.bpe_to_ind["<|unk|>"])
+                for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
+            ]
+        )
+
+
 class ArrowDatasetAV(Dataset):
     def __init__(
         self,
