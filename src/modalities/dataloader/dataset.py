@@ -89,31 +89,40 @@ class DummyDataset(Dataset):
         return sample
 
 
-class SimpleDataset(Dataset):
-    ## add normalization
-    ## think about other regularization techniques
-    ## tokenizer and bpecodes will not be integrated into modalities
-    ## so think of another solution.
-
+class ArrowDatasetAV(Dataset):
     def __init__(
         self,
         type_: str,
+        batch_size: int,
         audio_dataset_arrows: str,
         vision_dataset_arrows: str,
         bpe_to_ind: Path,
         bpecodes: Path,
-        num_feats: int,
+        n_mels: int,
+        img_size: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
         freq_domain_mask_length: int,
         time_domain_mask_length: int,
     ):
         super().__init__(raw_data_path=None, block_size=None, sample_key=None)
 
+        self.AUDIO = 0
+        self.VISION = 1
+
         self.type_ = type_
+        self.batch_size = batch_size
 
-        self.audio_dataset = load_from_disk(audio_dataset_arrows)
-        self.vision_dataset = load_from_disk(vision_dataset_arrows)
+        self.n_mels = n_mels
+        self.img_size = img_size
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.block_size_text_decoder = block_size_text_decoder
 
-        self.dataset_hf = concatenate_datasets([self.audio_dataset, self.vision_dataset])
+        audio_dataset = load_from_disk(audio_dataset_arrows)
+        self.audio_dataset_length = len(audio_dataset)
+        vision_dataset = load_from_disk(vision_dataset_arrows)
+
+        self.dataset_hf = concatenate_datasets([audio_dataset, vision_dataset])
 
         with bpe_to_ind.open("rb") as filein:
             self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
@@ -121,18 +130,18 @@ class SimpleDataset(Dataset):
         with bpecodes.open() as filein:
             self.bpe = apply_bpe.BPE(filein)
 
-        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=num_feats)
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
 
         if self.type_ == "train":
             self.train_audio_transforms = torch.nn.Sequential(
-                torchaudio.transforms.FrequencyMasking(freq_mask_param=30),
-                torchaudio.transforms.TimeMasking(time_mask_param=100),
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=time_domain_mask_length),
             )
 
-        self.tf = create_transform(input_size=(224))
+        self.tf = create_transform(input_size=(self.img_size))
 
         self.map = self._create_index_map(
-            audio_dataset_length=len(self.audio_dataset),
+            audio_dataset_length=self.audio_dataset_length,
             total_dataset_length=len(self),
         )
 
@@ -141,6 +150,52 @@ class SimpleDataset(Dataset):
     ):
         return len(self.dataset_hf)
 
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        if self.map[idx] < self.audio_dataset_length:
+            waveform, sample_rate = torchaudio.load(self.dataset_hf[self.map[idx]]["path"])
+            log_mel_spec = self.extract_features(torch.clamp(waveform), 1e-10).log10().squeeze(0)
+            log_mel_spec = self.train_audio_transforms(log_mel_spec) if self.type_ == "train" else log_mel_spec
+            feats_len = log_mel_spec.shape[-1] // 4
+
+            assert feats_len * 4 <= 4 * self.block_size_audio_encoder
+            log_mel_spec = torch.nn.functional.pad(
+                log_mel_spec, (0, 4 * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+            ).transpose(0, 1)
+
+            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["transcript"])
+            assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+            tokenized_transcript = torch.nn.functional.pad(
+                tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+            )
+
+            return {
+                "feats": log_mel_spec,
+                "feats_len": feats_len,
+                "input_ids": tokenized_transcript,
+                "modality": [self.AUDIO],
+            }
+
+        else:
+            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["json"]["text0"])
+
+            assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+            tokenized_transcript = torch.nn.functional.pad(
+                tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+            )
+
+            return {
+                "feats": self.tf(self.dataset_hf[self.map[idx]]["jpg"]),
+                "feats_len": self.img_size,
+                "input_ids": tokenized_transcript,
+                "modality": [self.VISION],
+            }
+
     def _tokenize(self, transcript):
         return torch.tensor(
             [
@@ -148,40 +203,6 @@ class SimpleDataset(Dataset):
                 for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
             ]
         )
-
-    def __getitem__(
-        self,
-        idx,
-    ):
-        if not 0 <= idx < len(self):
-            raise IndexError
-        if self.map[idx] < len(self.audio_dataset):
-            waveform, sample_rate = torchaudio.load(self.dataset_hf[self.map[idx]]["path"])
-            log_mel_spec = self.extract_features(torch.clamp(waveform, min=1e-10)).log10().squeeze(0)
-            log_mel_spec = self.train_audio_transforms(log_mel_spec) if self.type_ == "train" else log_mel_spec
-            log_mel_spec = torch.nn.functional.pad(log_mel_spec, (0, 2000 - log_mel_spec.shape[-1])).transpose(0, 1)
-            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["transcript"])
-            tokenized_transcript = torch.nn.functional.pad(
-                tokenized_transcript, (0, 512 - tokenized_transcript.shape[0])
-            )
-            return {
-                "feats": log_mel_spec,
-                "feats_len": log_mel_spec.shape[0] // 4,
-                "input_ids": tokenized_transcript,
-                "modality": [0],
-            }
-
-        else:
-            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["json"]["text0"])
-            tokenized_transcript = torch.nn.functional.pad(
-                tokenized_transcript, (0, 512 - tokenized_transcript.shape[0])
-            )
-            return {
-                "feats": self.tf(self.dataset_hf[self.map[idx]]["jpg"]),
-                "feats_len": 244,
-                "input_ids": tokenized_transcript,
-                "modality": [1],
-            }
 
     def _create_index_map(
         self,
@@ -204,7 +225,7 @@ class SimpleDataset(Dataset):
                 elif one_time_fill:
                     map_[ind] = sweep
                     ind += 1
-                    if sweep == 123:
+                    if sweep == self.batch_size - 1:
                         one_time_fill = False
             else:
                 if vp < total_dataset_length:
@@ -214,10 +235,10 @@ class SimpleDataset(Dataset):
                 elif one_time_fill:
                     map_[ind] = audio_dataset_length + sweep
                     ind += 1
-                    if sweep == 123:
+                    if sweep == self.batch_size - 1:
                         one_time_fill = False
             sweep += 1
-            if sweep == 124:
+            if sweep == self.batch_size:
                 sweep = 0
                 switch = not switch
             if ap == audio_dataset_length and vp == total_dataset_length:
