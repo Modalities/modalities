@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticLRSchedulerIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -132,6 +133,14 @@ class AdamWOptimizerConfig(BaseModel):
     weight_decay: float
 
 
+class WarmupLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    warmup_steps: Annotated[int, Field(strict=True, ge=0)]
+    warmup_lr_scheduler: PydanticLRSchedulerIFType
+    main_lr_scheduler: PydanticLRSchedulerIFType
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+
+
 class DummyLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
@@ -142,6 +151,14 @@ class StepLRSchedulerConfig(BaseModel):
     gamma: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
     verbose: bool = False
+
+
+class LinearLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    start_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    end_factor: Annotated[float, Field(strict=True, gt=0.0)]
+    total_iters: Annotated[int, Field(strict=True, ge=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
 
 
 class OneCycleLRSchedulerConfig(BaseModel):

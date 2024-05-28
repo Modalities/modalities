@@ -16,12 +16,23 @@ from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
-from modalities.util import Aggregator, TimeRecorder
+from modalities.util import Aggregator, ReduceOp, TimeRecorder
 
 
 class ThroughputAggregationKeys(Enum):
     NUM_SAMPLES = "NUM_SAMPLES"
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
+    PARAM_MEAN = "PARAM_MEAN"
+    PARAM_MAX = "PARAM_MAX"
+    PARAM_MIN = "PARAM_MIN"
+    PARAM_ABS_MIN = "PARAM_ABS_MIN"
+    PARAM_MEDIAN = "PARAM_MEDIAN"
+
+    GRAD_MEAN = "GRAD_MEAN"
+    GRAD_MAX = "GRAD_MAX"
+    GRAD_MIN = "GRAD_MIN"
+    GRAD_ABS_MIN = "GRAD_ABS_MIN"
+    GRAD_MEDIAN = "GRAD_MEDIAN"
 
 
 class Trainer:
@@ -54,14 +65,54 @@ class Trainer:
         (loss / self.gradient_acc_steps).backward()
 
         if (train_step_id + 1) % self.gradient_acc_steps == 0 or (train_step_id + 1) == len(data_loader):
+            grad_dict = {
+                "min": torch.inf,
+                "abs_min": torch.inf,
+                "max": -torch.inf,
+                "mean": torch.tensor(0.0),
+                "median": [],
+            }
+            param_dict = {
+                "min": torch.inf,
+                "abs_min": torch.inf,
+                "max": -torch.inf,
+                "mean": torch.tensor(0.0),
+                "median": [],
+            }
+
+            num_parameters = 0
+            for pn, p in model.named_parameters():
+                # we have to check for len(p) > 0 because sharded parameters are not available
+                if p.requires_grad and len(p) > 0:
+                    num_parameters += p.numel()
+
+                    grad_dict["min"] = torch.tensor(min(grad_dict["min"], p.grad.min().item()))
+                    grad_dict["abs_min"] = torch.tensor(min(grad_dict["abs_min"], p.grad.abs().min().item()))
+
+                    grad_dict["max"] = torch.tensor(max(grad_dict["max"], p.grad.max().item()))
+                    grad_dict["mean"] += p.grad.sum().item()
+                    grad_dict["median"].append(p.flatten())
+
+                    param_dict["min"] = torch.tensor(min(param_dict["min"], p.min().item()))
+                    param_dict["abs_min"] = torch.tensor(min(param_dict["abs_min"], p.abs().min().item()))
+                    param_dict["max"] = torch.tensor(max(param_dict["max"], p.max().item()))
+                    param_dict["mean"] += p.sum().item()
+                    param_dict["median"].append(p.flatten())
+
+            param_dict["mean"] = param_dict["mean"] / num_parameters
+            grad_dict["mean"] = grad_dict["mean"] / num_parameters
+
+            param_dict["median"] = torch.tensor(torch.cat(param_dict["median"]).median().item())
+            grad_dict["median"] = torch.tensor(torch.cat(grad_dict["median"]).median().item())
+
             gradient_norm_score = self.gradient_clipper.clip_gradients()
             gradient_norm_score_clipped = self.gradient_clipper.clip_gradients()
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            return loss, gradient_norm_score, gradient_norm_score_clipped
+            return loss, gradient_norm_score, gradient_norm_score_clipped, grad_dict, param_dict
         else:
-            return loss, None, None
+            return loss, None, None, None, None
 
     def train(
         self,
@@ -77,7 +128,7 @@ class Trainer:
         model.train()
         cumulated_losses = self._reset_tracked_losses()
 
-        thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+        throughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
         device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
 
@@ -93,7 +144,7 @@ class Trainer:
             # Because we might resume training, we add the starting batch id of the data loader
             train_step_id = batch_id + train_loader.fast_forward_batch_id
             # Train single batch
-            batch_loss, gradient_norm_score, gradient_norm_score_clipped = self._train_batch(
+            batch_loss, gradient_norm_score, gradient_norm_score_clipped, grad_dict, param_dict = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
@@ -114,7 +165,47 @@ class Trainer:
                 gradient_norm_scores_clipped.append(gradient_norm_score_clipped.item())
 
             batch_length_tensor = torch.tensor(len(batch)).to(device)
-            thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+            throughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.GRAD_MEAN, value=grad_dict["mean"].cuda(), reduce_operation=ReduceOp.SUM
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.GRAD_MAX, value=grad_dict["max"].cuda(), reduce_operation=ReduceOp.MAX
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.GRAD_MIN, value=grad_dict["min"].cuda(), reduce_operation=ReduceOp.MIN
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.GRAD_ABS_MIN,
+                value=grad_dict["abs_min"].cuda(),
+                reduce_operation=ReduceOp.MIN,
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.GRAD_MEDIAN,
+                value=grad_dict["median"].cuda(),
+                reduce_operation=ReduceOp.SUM,
+            )
+
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.PARAM_MEAN, value=param_dict["mean"].cuda(), reduce_operation=ReduceOp.SUM
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.PARAM_MAX, value=param_dict["max"].cuda(), reduce_operation=ReduceOp.MAX
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.PARAM_MIN, value=param_dict["min"].cuda(), reduce_operation=ReduceOp.MIN
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.PARAM_ABS_MIN,
+                value=param_dict["abs_min"].cuda(),
+                reduce_operation=ReduceOp.MIN,
+            )
+            throughput_aggregator.add_value(
+                key=ThroughputAggregationKeys.PARAM_MEDIAN,
+                value=param_dict["median"].cuda(),
+                reduce_operation=ReduceOp.SUM,
+            )
 
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
@@ -127,14 +218,62 @@ class Trainer:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
-                thoughput_aggregator.add_value(
+                throughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
                 )
-                synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-                synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
+                synced_num_samples = throughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+                synced_forward_backward_time = throughput_aggregator.get_all_reduced_value(
                     ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
                 )
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
+
+                # parameter and gradient value tracking
+                num_local_batches = cumulated_losses[-1]
+                num_global_batches = num_local_batches * dist.get_world_size()
+                grad_mean = (
+                    throughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.GRAD_MEAN, reduce_operation=dist.ReduceOp.SUM
+                    )
+                    / num_global_batches
+                )
+                grad_max = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.GRAD_MAX, reduce_operation=dist.ReduceOp.MAX
+                )
+                grad_min = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.GRAD_MIN, reduce_operation=dist.ReduceOp.MIN
+                )
+                grad_abs_min = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.GRAD_ABS_MIN, reduce_operation=dist.ReduceOp.MIN
+                )
+                grad_median = (
+                    throughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.GRAD_MEDIAN, reduce_operation=dist.ReduceOp.SUM
+                    )
+                    / num_global_batches
+                )
+
+                param_mean = (
+                    throughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.PARAM_MEAN, reduce_operation=dist.ReduceOp.SUM
+                    )
+                    / num_global_batches
+                )
+                param_max = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.PARAM_MAX, reduce_operation=dist.ReduceOp.MAX
+                )
+                param_min = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.PARAM_MIN, reduce_operation=dist.ReduceOp.MIN
+                )
+                param_abs_min = throughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.PARAM_ABS_MIN, reduce_operation=dist.ReduceOp.MIN
+                )
+                param_median = (
+                    throughput_aggregator.get_all_reduced_value(
+                        ThroughputAggregationKeys.PARAM_MEDIAN, reduce_operation=dist.ReduceOp.SUM
+                    )
+                    / num_global_batches
+                )
+
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
                 cumulated_losses[1] = batch_loss.item()
@@ -177,6 +316,16 @@ class Trainer:
                         "lr_min": torch.tensor(scheduler.get_last_lr()).min(),
                         "lr_max": torch.tensor(scheduler.get_last_lr()).max(),
                         "lr_first": torch.tensor(scheduler.get_last_lr())[0],
+                        "grad/mean": grad_mean,
+                        "grad/max": grad_max,
+                        "grad/min": grad_min,
+                        "grad/abs_min": grad_abs_min,
+                        "grad/median": grad_median,
+                        "param/mean": param_mean,
+                        "param/max": param_max,
+                        "param/min": param_min,
+                        "param/abs_min": param_abs_min,
+                        "param/median": param_median,
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     train_step_id=train_step_id,
@@ -185,7 +334,7 @@ class Trainer:
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,
                 )
-                thoughput_aggregator.remove_keys()
+                throughput_aggregator.remove_keys()
 
                 model.train()
                 cumulated_losses = self._reset_tracked_losses()

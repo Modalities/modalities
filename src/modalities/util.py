@@ -106,15 +106,21 @@ class TimeRecorder:
 T = TypeVar("T")
 
 
+class ReduceOp(Enum):
+    SUM = sum
+    MAX = max
+    MIN = min
+
+
 class Aggregator(Generic[T]):
     def __init__(self):
         self.key_to_value: Dict[T, torch.Tensor] = {}
 
-    def add_value(self, key: T, value: torch.Tensor):
+    def add_value(self, key: T, value: torch.Tensor, reduce_operation: ReduceOp = ReduceOp.SUM):
         if key not in self.key_to_value:
             self.key_to_value[key] = value
         else:
-            self.key_to_value[key] += value
+            self.key_to_value[key] = torch.Tensor(reduce_operation.value([self.key_to_value[key], value]))
 
     def remove_key(self, key: T):
         self.key_to_value.pop(key)
