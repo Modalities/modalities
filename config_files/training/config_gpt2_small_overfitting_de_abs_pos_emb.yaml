@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -134,7 +135,7 @@ checkpointing:
         experiment_id: ${settings.experiment_id} 
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
-        block_names: [TransformerBlockock]
+        block_names: [TransformerBlock]
 
 wrapped_model:
   component_key: model
@@ -146,7 +147,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [TransformerBlockock]
+    block_names: [TransformerBlock]
 
 model:
   component_key: model
@@ -170,13 +171,6 @@ model:
       mean: 0.0
       std: 0.02
     attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    ffn_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
@@ -276,6 +270,7 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}

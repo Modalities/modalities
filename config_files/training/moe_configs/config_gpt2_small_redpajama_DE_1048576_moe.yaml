@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -176,13 +177,6 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
@@ -219,7 +213,7 @@ model:
         moe_num_experts: 4
         moe_top_k: 2
         moe_normalize_expert_weights: 0.1
-        uniform_expert_assignment: true
+        uniform_expert_assignment: false
         moe_jitter_eps: 0.1
         moe_act_fn:
           component_key: moe_act_fn
@@ -289,3 +283,4 @@ evaluation_subscriber:
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}

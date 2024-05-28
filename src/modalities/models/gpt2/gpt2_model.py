@@ -470,10 +470,15 @@ class GPT2LLM(NNModel):
         else:
             raise TypeError(f"{poe_type} not supported")
 
-        if poe_type is not PositionTypes.NOPE and RotaryTransform in [
-            config.type_hint.value for config in gpt2block.attention_config.qkv_transforms
-        ]:
-            raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
+        try:
+            if (
+                gpt2block.attention_config
+                and poe_type is not PositionTypes.NOPE
+                and RotaryTransform in [config.type_hint.value for config in gpt2block.attention_config.qkv_transforms]
+            ):
+                raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
+        except AttributeError:
+            pass
 
         self.transformer = nn.ModuleDict(
             dict(
