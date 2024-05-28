@@ -6,12 +6,12 @@ from torch.utils.data.dataset import Dataset
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.dataset import (
+    ArrowDatasetAV,
     DummyDataset,
     DummySampleConfig,
     MemMapDataset,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
-    SimpleDataset,
 )
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 
@@ -39,23 +39,31 @@ class DatasetFactory:
         return dataset
 
     @staticmethod
-    def get_simple_dataset(
+    def get_arrow_dataset_av(
         type_: str,
+        batch_size,
         audio_dataset_arrows: str,
         vision_dataset_arrows: str,
         bpe_to_ind: Path,
         bpecodes: Path,
-        num_feats: int,
+        n_mels: int,
+        img_size: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
         freq_domain_mask_length: int,
         time_domain_mask_length: int,
-    ) -> SimpleDataset:
-        return SimpleDataset(
+    ) -> ArrowDatasetAV:
+        return ArrowDatasetAV(
             type_=type_,
+            batch_size=batch_size,
             audio_dataset_arrows=audio_dataset_arrows,
             vision_dataset_arrows=vision_dataset_arrows,
             bpe_to_ind=bpe_to_ind,
             bpecodes=bpecodes,
-            num_feats=num_feats,
+            n_mels=n_mels,
+            img_size=img_size,
+            block_size_audio_encoder=block_size_audio_encoder,
+            block_size_text_decoder=block_size_text_decoder,
             freq_domain_mask_length=freq_domain_mask_length,
             time_domain_mask_length=time_domain_mask_length,
         )

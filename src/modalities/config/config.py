@@ -279,13 +279,17 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
     sequence_len: PositiveInt
 
 
-class SimpleDatasetConfig(BaseModel):
+class ArrowDatasetAVConfig(BaseModel):
     type_: str
+    batch_size: int
     audio_dataset_arrows: str
     vision_dataset_arrows: str
     bpe_to_ind: FilePath
     bpecodes: FilePath
-    num_feats: int
+    n_mels: int
+    img_size: int
+    block_size_audio_encoder: int
+    block_size_text_decoder: int
     freq_domain_mask_length: int
     time_domain_mask_length: int
 
