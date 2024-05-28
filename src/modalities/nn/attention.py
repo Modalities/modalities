@@ -59,24 +59,41 @@ class MultiHeadAttention(nn.Module):
             )
         self.resid_dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
-    def forward(self, x: Tensor, context: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, context: Optional[Tensor] = None, mask: Tensor = None) -> Tensor:
         context = context if self.use_cross_attention else x
         B, T, C = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
         q, k, v = self._forward_input_projection(x, context=context)
         if self.use_flash:
-            y = F.scaled_dot_product_attention(
-                query=q,
-                key=k,
-                value=v,
-                attn_mask=None,
-                dropout_p=self.dropout if self.training else 0,
-                is_causal=self.is_causal,
+            y = (
+                self._flash_with_mask(query=q, key=k, value=v, mask=mask)
+                if mask is not None
+                else self._flash_without_mask(query=q, key=k, value=v)
             )
         else:
-            y = self._forward_attention(query=q, key=k, value=v)
+            y = self._forward_attention(query=q, key=k, value=v, mask=mask)
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.resid_dropout(self.c_proj(y))
         return y
+
+    def _flash_with_mask(self, query: Tensor, key: Tensor, value: Tensor, mask: Tensor) -> Tensor:
+        return F.scaled_dot_product_attention(
+            query=query,
+            key=key,
+            value=value,
+            attn_mask=(mask == 0).logical_not(),
+            dropout_p=self.dropout if self.training else 0,
+            is_causal=self.is_causal,
+        )
+
+    def _flash_without_mask(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+        return F.scaled_dot_product_attention(
+            query=query,
+            key=key,
+            value=value,
+            attn_mask=None,
+            dropout_p=self.dropout if self.training else 0,
+            is_causal=self.is_causal,
+        )
 
     def _forward_input_projection(self, x: Tensor, context: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         B, T, C = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
@@ -88,11 +105,13 @@ class MultiHeadAttention(nn.Module):
         v = self.wv(context).view(B, Tc, self.n_head, Cc // self.n_head).transpose(1, 2)
         return q, k, v
 
-    def _forward_attention(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+    def _forward_attention(self, query: Tensor, key: Tensor, value: Tensor, mask: Tensor) -> Tensor:
         att = (query @ key.transpose(-2, -1)) * (1.0 / math.sqrt(key.size(-1)))
         if self.is_causal:
             T = query.size(2)
             att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
+        if mask is not None:
+            att = att.masked_fill(mask == 0, float("-inf"))
         att = F.softmax(att, dim=-1)
         att = self.attn_dropout(att)
         return att @ value
