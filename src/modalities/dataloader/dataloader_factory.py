@@ -31,7 +31,7 @@ class DataloaderFactory:
             shuffle (bool): Boolean flag for shuffling the dataset
             skip_num_micro_steps (Optional[int], optional): Defines the number of micro steps to skip.
               NOTE: The checkpoints are indexed with training steps (number of backward passes).
-              This must not be confused with the nubmer of micro steps which is the number of
+              This must not be confused with the number of micro steps which is the number of
               forward passes (i.e, num train steps * gradient accumulation steps).
               Defaults to 0.
 
