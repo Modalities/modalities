@@ -42,7 +42,7 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_steps: ${settings.training.global_num_seen_steps}
+    skip_num_micro_steps: ${settings.training.global_num_seen_steps}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
