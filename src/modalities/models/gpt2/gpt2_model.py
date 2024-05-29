@@ -404,7 +404,7 @@ class GPT2LLM(NNModel):
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=lm_head_norm,
+                lm_head_norm=lm_head_norm,
             )
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
@@ -448,7 +448,7 @@ class GPT2LLM(NNModel):
 
         for block in self.transformer.h:
             x = block(x)
-        x = self.transformer.ln_f(x)
+        x = self.transformer.lm_head_norm(x)
         logits = self.lm_head(x)
         return {self.prediction_key: logits}
 
