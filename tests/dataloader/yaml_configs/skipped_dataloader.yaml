@@ -27,7 +27,7 @@ train_dataset:
 
 skip_num_batches: 
   component_key: number_conversion
-  variant_key: local_num_batches
+  variant_key: local_num_batches_from_num_samples
   config:
     num_ranks: ${settings.cuda_env.world_size}
     local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
