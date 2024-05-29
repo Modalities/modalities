@@ -242,6 +242,7 @@ class DistributedSamplerConfig(BaseModel):
     shuffle: bool
     dataset: PydanticDatasetIFType
     seed: Optional[int] = 0
+    drop_last: Literal[True] = True
 
 
 class MemMapDatasetConfig(BaseModel):
@@ -301,7 +302,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_micro_steps: Optional[int] = 0
+    skip_num_batches: Optional[int] = 0
 
 
 class RepeatingDataLoaderConfig(BaseModel):

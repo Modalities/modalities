@@ -1,10 +1,14 @@
+import math
+from pathlib import Path
 from typing import Dict
 
+import numpy as np
 import torch
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.samplers import ResumableBatchSampler
@@ -27,7 +31,7 @@ def test_resumable_dataloader():
 
 def test_dataloader_from_config(dummy_config: Dict):
     start_index = 2
-    dummy_config["train_dataloader"]["config"]["skip_num_micro_steps"] = start_index
+    dummy_config["train_dataloader"]["config"]["skip_num_batches"] = start_index
 
     class DataloaderTestModel(BaseModel):
         train_dataloader: PydanticLLMDataLoaderIFType
@@ -144,3 +148,74 @@ def test_repeating_dataloader_with_shuffling():
     # when we skip 2 batches only 3 batches are left, i.e., 6 samples
     assert len(set(batches_epoch_1.flatten().tolist())) == 6
     assert set(batches_epoch_2.flatten().tolist()) == set(range(10))
+
+
+def test_skipped_and_distributed_dataloader_from_config():
+    class DataloaderTestModel(BaseModel):
+        train_dataloader: PydanticLLMDataLoaderIFType
+        skip_num_batches: int
+
+    root_dir = Path(__file__).parents[0]
+
+    config_path = root_dir / "yaml_configs/skipped_dataloader.yaml"
+    config_dict = load_app_config_dict(config_path)
+
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
+
+    components_rank_0: DataloaderTestModel = component_factory.build_components(
+        config_dict=config_dict, components_model_type=DataloaderTestModel
+    )
+
+    config_dict["settings"]["cuda_env"]["global_rank"] = 1
+    config_dict["train_dataloader"]["config"]["batch_sampler"]["config"]["sampler"]["config"]["rank"] = 1
+    components_rank_1: DataloaderTestModel = component_factory.build_components(
+        config_dict=config_dict, components_model_type=DataloaderTestModel
+    )
+
+    dataset = components_rank_0.train_dataloader.dataset
+
+    batches_rank_0 = [batch for _, batch in zip(range(10), components_rank_0.train_dataloader)]
+    batches_rank_1 = [batch for _, batch in zip(range(10), components_rank_1.train_dataloader)]
+
+    # make sure that the dataloaders for the two ranks have the correct number of batches
+    assert (
+        len(components_rank_0.train_dataloader)
+        == math.ceil(len(dataset) // 2) // components_rank_0.train_dataloader.batch_size
+        - components_rank_0.skip_num_batches
+    )
+    assert (
+        len(components_rank_1.train_dataloader)
+        == math.ceil(len(dataset) // 2) // components_rank_0.train_dataloader.batch_size
+        - components_rank_0.skip_num_batches
+    )
+
+    # we manually build up the batches from each dataloader to compare on a value basis
+    dataset_indices_rank_0 = np.arange(0, 28, 2).reshape(-1, 2)[1:]
+    dataset_indices_rank_1 = np.arange(1, 29, 2).reshape(-1, 2)[1:]
+
+    batches_recomputed_rank_0 = []
+    for batch_indices in dataset_indices_rank_0:
+        sampled_pair = [torch.tensor(dataset[idx]["input_ids"]) for idx in batch_indices]
+        # we stack the two samples into a batch and remove the last token from each sample
+        # to get a proper "training" sample without the final target
+        samples_pair_tensor = torch.stack(sampled_pair, dim=1).transpose(0, 1)[:, :-1]
+        batches_recomputed_rank_0.append(samples_pair_tensor)
+
+    batches_recomputed_rank_1 = []
+    for batch_indices in dataset_indices_rank_1:
+        sampled_pair = [torch.tensor(dataset[idx]["input_ids"]) for idx in batch_indices]
+        # we stack the two samples into a batch and remove the last token from each sample
+        # to get a proper "training" sample without the final target
+        samples_pair_tensor = torch.stack(sampled_pair, dim=1).transpose(0, 1)[:, :-1]
+        batches_recomputed_rank_1.append(samples_pair_tensor)
+
+    for batch_1, batch_2 in zip(batches_rank_0, batches_recomputed_rank_0):
+        assert (batch_1.samples["input_ids"] == batch_2).all()
+
+    for batch_1, batch_2 in zip(batches_rank_1, batches_recomputed_rank_1):
+        assert (batch_1.samples["input_ids"] == batch_2).all()
+
+    for batch_1, batch_2 in zip(batches_rank_0, batches_rank_1):
+        assert ~(batch_1.samples["input_ids"] == batch_2.samples["input_ids"]).all()
+        assert ~(batch_1.targets["target_ids"] == batch_2.targets["target_ids"]).all()

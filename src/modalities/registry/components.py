@@ -80,6 +80,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
+from modalities.utils.number_conversion import LocalNumBatchesConfig, NumberConversion
 
 
 @dataclass
@@ -204,4 +205,8 @@ COMPONENTS = [
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # Number conversion
+    ComponentEntity(
+        "number_conversion", "local_num_batches", NumberConversion.get_local_num_batches, LocalNumBatchesConfig
+    ),
 ]
