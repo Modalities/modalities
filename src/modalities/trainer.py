@@ -31,14 +31,14 @@ class Trainer:
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
-        tokens_per_train_step: int,
+        global_num_tokens_per_train_step: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
         self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
-        self.tokens_per_train_step = tokens_per_train_step
+        self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
         self.gradient_clipper = gradient_clipper
 
     def _train_batch(
@@ -157,7 +157,7 @@ class Trainer:
                     f"{loss_fun.tag} last step": train_loss_last_batch,
                 }
 
-                consumed_tokens = torch.Tensor([(train_step_id + 1) * self.tokens_per_train_step])
+                consumed_tokens = torch.Tensor([(train_step_id + 1) * self.global_num_tokens_per_train_step])
                 metrics = {
                     "consumed_tokens": consumed_tokens,
                 }
