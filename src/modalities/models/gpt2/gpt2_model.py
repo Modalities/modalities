@@ -356,7 +356,7 @@ class GPT2LLM(NNModel):
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
     ):
-        super().__init__()
+        super().__init__(optimizer_module_groups=["linear", "embedding", "layernorm"])
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
