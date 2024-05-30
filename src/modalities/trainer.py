@@ -89,11 +89,15 @@ class Trainer:
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         gradient_norm_scores = []
+        # run evaluation callback and checkpointing callback before the first optimizer step
+        num_train_steps_done = 0
+        evaluation_callback(num_train_steps_done=num_train_steps_done)
+        checkpointing_callback(num_train_steps_done=num_train_steps_done)
+
         for batch_id, batch in enumerate(train_loader):
             # Because we might resume training, we add the starting batch id of the data loader
             micro_batch_id = batch_id + train_loader.fast_forward_batch_id
-            # The train step id corresponds to the optimizer step
-            train_step_id = micro_batch_id // self.gradient_acc_steps
+
             # Train single batch
             batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
@@ -117,14 +121,16 @@ class Trainer:
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
+            # The train step id corresponds to the optimizer step
+            num_train_steps_done = (micro_batch_id + 1) // self.gradient_acc_steps
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 dataloader_tag=train_loader.dataloader_tag,
             )
 
             # Check, if model should be evaluated
-            if (train_step_id + 1) % global_training_log_interval_in_steps == 0:
+            if num_train_steps_done % global_training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -157,7 +163,7 @@ class Trainer:
                     f"{loss_fun.tag} last step": train_loss_last_batch,
                 }
 
-                consumed_tokens = torch.Tensor([(train_step_id + 1) * self.global_num_tokens_per_train_step])
+                consumed_tokens = torch.Tensor([num_train_steps_done * self.global_num_tokens_per_train_step])
                 metrics = {
                     "consumed_tokens": consumed_tokens,
                 }
@@ -179,7 +185,7 @@ class Trainer:
                         "lr_first": torch.tensor(scheduler.get_last_lr())[0],
                     },
                     dataloader_tag=train_loader.dataloader_tag,
-                    train_step_id=train_step_id,
+                    num_train_steps_done=num_train_steps_done,
                 )
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
@@ -189,8 +195,8 @@ class Trainer:
 
                 cumulated_losses = self._reset_tracked_losses()
 
-            evaluation_callback(train_step_id=train_step_id)
-            checkpointing_callback(train_step_id=train_step_id)
+            evaluation_callback(num_train_steps_done=num_train_steps_done)
+            checkpointing_callback(num_train_steps_done=num_train_steps_done)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
@@ -208,11 +214,11 @@ class Trainer:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        train_step_id: int,
+        num_train_steps_done: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            step_id=train_step_id,
+            num_steps_done=num_train_steps_done,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )
