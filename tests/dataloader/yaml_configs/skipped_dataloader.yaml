@@ -4,7 +4,7 @@ settings:
     target_key: target_ids
   training:
     local_train_micro_batch_size: 2
-    global_num_seen_samples: 4
+    global_num_seen_tokens: 1024
     sequence_length: 256
   cuda_env:
     global_rank: 0
@@ -27,11 +27,12 @@ train_dataset:
 
 skip_num_batches: 
   component_key: number_conversion
-  variant_key: local_num_batches_from_num_samples
+  variant_key: local_num_batches_from_num_tokens
   config:
     num_ranks: ${settings.cuda_env.world_size}
     local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-    global_num_samples: ${settings.training.global_num_seen_samples}
+    global_num_tokens: ${settings.training.global_num_seen_tokens}
+    context_size: ${settings.training.sequence_length}
 
 train_dataloader:
   component_key: data_loader
