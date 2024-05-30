@@ -49,6 +49,7 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
+        num_train_steps_done: int,
         data_loader: LLMDataLoader,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         result_batch = model_predict_batch(model=model, batch=batch)
@@ -60,9 +61,10 @@ class Trainer:
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            return loss, gradient_norm_score
+            num_train_steps_done += 1
+            return num_train_steps_done, loss, gradient_norm_score
         else:
-            return loss, None
+            return num_train_steps_done, loss, None
 
     def train(
         self,
@@ -94,21 +96,21 @@ class Trainer:
         evaluation_callback(num_train_steps_done=num_train_steps_done)
         checkpointing_callback(num_train_steps_done=num_train_steps_done)
 
-        for batch_id, batch in enumerate(train_loader):
-            # Because we might resume training, we add the starting batch id of the data loader
-            micro_batch_id = batch_id + train_loader.fast_forward_batch_id
-
+        # Because we might resume training, we add the starting batch id of the data loader
+        for micro_batch_id, batch in enumerate(train_loader, start=train_loader.fast_forward_batch_id):
             # Train single batch
-            batch_loss, gradient_norm_score = self._train_batch(
+            num_train_steps_done, batch_loss, gradient_norm_score = self._train_batch(
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
                 scheduler=scheduler,
                 loss_fun=loss_fun,
                 micro_batch_id=micro_batch_id,
+                num_train_steps_done=num_train_steps_done,
                 data_loader=train_loader,
             )
             forward_backward_time_recorder.stop()
+
             # Save the batch loss
             cumulated_losses[0] += batch_loss.item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
@@ -121,8 +123,6 @@ class Trainer:
             batch_length_tensor = torch.tensor(len(batch)).to(device)
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
-            # The train step id corresponds to the optimizer step
-            num_train_steps_done = (micro_batch_id + 1) // self.gradient_acc_steps
             self._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
                 num_train_steps_done=num_train_steps_done,
