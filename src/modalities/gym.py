@@ -70,13 +70,13 @@ class Gym:
         self,
         model: nn.Module,
         optimizer: Optimizer,
-        train_step_id: int,
+        num_train_steps_done: int,
         checkpoint_saving: CheckpointSaving,
         global_checkpointing_interval_in_steps: int,
     ):
-        if (train_step_id + 1) % global_checkpointing_interval_in_steps == 0:
+        if num_train_steps_done % global_checkpointing_interval_in_steps == 0:
             checkpoint_saving.save_checkpoint(
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 model=model,
                 optimizer=optimizer,
@@ -86,14 +86,14 @@ class Gym:
     def _run_evaluation(
         self,
         model: nn.Module,
-        train_step_id: int,
+        num_train_steps_done: int,
         evaluation_data_loaders: List[LLMDataLoader],
         global_evaluation_interval_in_steps: int,
     ):
-        if (train_step_id + 1) % global_evaluation_interval_in_steps == 0:
+        if num_train_steps_done % global_evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
                 loss_fun=self.loss_fun,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
             )

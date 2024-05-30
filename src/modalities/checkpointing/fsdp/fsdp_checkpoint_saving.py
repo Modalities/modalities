@@ -43,17 +43,17 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
     def _get_checkpointing_path(
         self,
         experiment_id: str,
-        train_step_id: int,
+        num_train_steps_done: int,
         entity_type: CheckpointingEntityType,
     ) -> Path:
         entity_file_name = self.CHECKPOINT_STRUCTURE.format(
-            experiment_id=experiment_id, entity=entity_type.value, num_train_steps=str(train_step_id + 1)
+            experiment_id=experiment_id, entity=entity_type.value, num_train_steps=str(num_train_steps_done)
         )
 
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, train_step_id: int):
+    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, num_train_steps_done: int):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         # TODO Need to check if LR schedulers also need checkpointing
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
@@ -74,7 +74,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save model
             model_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 entity_type=CheckpointingEntityType.MODEL,
             )
             model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,7 +83,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save optimizer
             optimize_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
@@ -93,19 +93,19 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         # leading to wrong throughput measurements.
         dist.barrier()
 
-    def _get_paths_to_delete(self, train_step_id: int) -> List[Path]:
+    def _get_paths_to_delete(self, num_train_steps_done: int) -> List[Path]:
         return [
             self._get_checkpointing_path(
-                experiment_id=self.experiment_id, entity_type=entity_type, train_step_id=train_step_id
+                experiment_id=self.experiment_id, entity_type=entity_type, num_train_steps_done=num_train_steps_done
             )
             for entity_type in CheckpointEntityType
         ]
 
-    def _delete_checkpoint(self, train_step_id: int):
+    def _delete_checkpoint(self, num_train_steps_done: int):
         if self.global_rank != 0:
             return
 
-        files_paths_to_delete = self._get_paths_to_delete(train_step_id=train_step_id)
+        files_paths_to_delete = self._get_paths_to_delete(num_train_steps_done=num_train_steps_done)
         for full_path in files_paths_to_delete:
             if full_path.exists():
                 # unlink removes the file
