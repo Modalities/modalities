@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Callable
 
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,12 @@ class LocalNumBatchesFromNumTokensConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
     global_num_tokens: Annotated[int, Field(strict=True, ge=0)]
+    context_size: Annotated[int, Field(strict=True, gt=0)]
+
+
+class NumTokensFromNumStepsConfig(BaseModel):
+    num_ranks: Annotated[int, Field(strict=True, gt=0)]
+    local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
     context_size: Annotated[int, Field(strict=True, gt=0)]
 
 
@@ -57,3 +63,9 @@ class NumberConversion:
         return NumberConversion.get_local_num_batches_from_num_samples(
             num_ranks=num_ranks, local_micro_batch_size=local_micro_batch_size, global_num_samples=global_num_samples
         )
+
+    @staticmethod
+    def get_num_tokens_from_num_steps_callable(
+        num_ranks: int, local_micro_batch_size: int, context_size: int
+    ) -> Callable[[int], int]:
+        return lambda num_steps_done: num_steps_done * num_ranks * local_micro_batch_size * context_size
