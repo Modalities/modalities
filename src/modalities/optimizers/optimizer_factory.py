@@ -48,7 +48,7 @@ def get_parameter_groups(
     model: FSDP, weight_decay: float, weight_decay_excluded: List[str]
 ) -> List[Dict[str, List[nn.Parameter] | float]]:
     """
-    divide model parameters into 2 groups, one with and one without weight decay
+    divide model parameters into 2 groups (one with and one without weight decay)
 
     inspired by:
     - https://github.com/pytorch/pytorch/issues/101343
@@ -56,17 +56,23 @@ def get_parameter_groups(
     """
 
     print("[Optimizer Groups]")
-    if weight_decay == 0.0 or len(weight_decay_excluded) == 0:
+    if weight_decay == 0 or len(weight_decay_excluded) == 0:
         # all parameters have the same weight decay and there is only 1 group
-        optim_groups = [{"params": model.parameters(), "weight_decay": weight_decay}]
-        print(f"all parameters have weight_decay = {optim_groups[0]['weight_decay']}")
+        optim_groups = [{"params": list(model.parameters()), "weight_decay": weight_decay}]
+        num_modules = len(optim_groups[0]["params"])
+        num_params = sum(p.numel() for p in optim_groups[0]["params"])
+        print(
+            f"{num_modules} modules with {num_params:,} parameters "
+            + f"all have weight_decay = {optim_groups[0]['weight_decay']}"
+        )
     else:
         # example GPT2:
-        # groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
+        # group_mapping = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         # weight_decay_excluded = ["embedding", "layernorm"]
         group_mapping = model.module.optimizer_module_groups
         for group in weight_decay_excluded:
-            assert group in group_mapping.keys(), f"group = {group} specified in weight_decay_excluded is not defined."
+            assert group in group_mapping.keys(), f"group = {group} specified in weight_decay_excluded is not "
+            +f"in models optimizer_module_groups = {list(group_mapping.keys())}"
 
         params, num_params, num_modules = {}, {}, {}
         weight_decay_group = {
@@ -112,7 +118,7 @@ def get_parameter_groups(
 
         # create optimizer parameter groups
         optim_groups = [
-            {"params": params[group].values(), "weight_decay": weight_decay_group[group]}
+            {"params": list(params[group].values()), "weight_decay": weight_decay_group[group]}
             for group in group_mapping.keys()
         ]
 
