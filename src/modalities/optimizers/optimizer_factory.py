@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Tuple
 
 import torch.nn as nn
@@ -5,7 +6,6 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Adam, AdamW, Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
-from modalities.models.components.layer_norms import LayerNorms
 from modalities.util import compute_number_of_trainable_parameters
 
 
@@ -61,77 +61,66 @@ def get_parameter_groups(
         optim_groups = [{"params": model.parameters(), "weight_decay": weight_decay}]
         print(f"all parameters have weight_decay = {optim_groups[0]['weight_decay']}")
     else:
-        # preparation
-        groups = model.module.optimizer_module_groups  # e.g. for GPT2: ["linear", "embedding", "layernorm"]
-        for group in weight_decay_excluded:  # e.g. for GPT2: ["embedding", "layernorm"]
-            assert group in groups, f"group = {group} specified in weight_decay_excluded is not defined."
+        # example GPT2:
+        # groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
+        # weight_decay_excluded = ["embedding", "layernorm"]
+        group_mapping = model.module.optimizer_module_groups
+        for group in weight_decay_excluded:
+            assert group in group_mapping.keys(), f"group = {group} specified in weight_decay_excluded is not defined."
 
-        modules, params, num_modules, num_params = {}, {}, {}, {}
-        weight_decay_group = {group: weight_decay if group not in weight_decay_excluded else 0.0 for group in groups}
-
-        # create module groups
-        modules["all"] = {name: module for name, module in model.named_modules()}
-        modules["linear"] = {
-            name: module
-            for name, module in modules["all"].items()
-            if type(module) == nn.Linear and not name.endswith("lm_head")
+        params, num_params, num_modules = {}, {}, {}
+        weight_decay_group = {
+            group: weight_decay if group not in weight_decay_excluded else 0.0 for group in group_mapping.keys()
         }
-        modules["embedding"] = {name: module for name, module in modules["all"].items() if type(module) == nn.Embedding}
-        modules["layernorm"] = {
-            name: module for name, module in modules["all"].items() if type(module) in [e.value for e in LayerNorms]
-        }
-
-        if 0:  # This is for debugging and to help define new models
-            print_module_names_for_groups(modules, groups)
 
         # create parameter groups
-        param_dict = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+        params["all"] = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+        for group in group_mapping.keys():
+            params[group] = {
+                name: parameter
+                for name, parameter in params["all"].items()
+                if any([bool(re.search(regex_expression, name)) for regex_expression in group_mapping[group]])
+            }
 
-        # TODO: make this less error-prone and don't rely on existence of bias keys
-        params["linear"] = [
-            [param_dict[f"{name}.weight"], param_dict[f"{name}.bias"]] for name in modules["linear"].keys()
-        ]
-        params["embedding"] = [[param_dict[f"{name}.weight"]] for name in modules["embedding"].keys()]
-        params["layernorm"] = [
-            [param_dict[f"{name}.weight"], param_dict[f"{name}.bias"]] for name in modules["layernorm"].keys()
-        ]
+        # count parameters & modules
+        for group in group_mapping.keys():
+            num_modules[group] = len(params[group])
+            num_params[group] = sum(p.numel() for p in params[group].values())
 
-        for group in groups:
-            params[group], num_params[group] = flatten_and_count(params[group])
+        # print overview
+        if 0:  # This is for debugging and to help define new models
+            print_parameter_names_for_groups(params, group_mapping.keys())
 
-        # create optimizer parameter groups
-        optim_groups = [{"params": params[group], "weight_decay": weight_decay_group[group]} for group in groups]
-
-        # print overview & check total number of parameters
-        num_modules["all"] = sum([len(modules[group]) for group in groups])
-        num_params["all"] = sum([num_params[group] for group in groups])
+        num_modules["all"] = sum([num_modules[group] for group in group_mapping.keys()])
+        num_params["all"] = sum([num_params[group] for group in group_mapping.keys()])
         print(
-            f"{num_modules['all']} modules with {num_params['all']:,} parameters"
+            f"{num_modules['all']} modules with {num_params['all']:,} parameters "
             + "were split into the following optimizer groups:"
         )
-        for group in groups:
+        for group in group_mapping.keys():
             print(
-                f"{group} ({len(modules[group])} modules with {num_params[group]:,} parameters): "
-                + "weight_decay = {weight_decay_group[group]}"
+                f"{group} ({num_modules[group]} modules with {num_params[group]:,} parameters): "
+                + f"weight_decay = {weight_decay_group[group]}"
             )
 
+        # check total number of parameters
         num_params_check = compute_number_of_trainable_parameters(model)
         assert num_params["all"] == num_params_check, (
             f"ERROR! Inconsistent number of parameters (found {num_params['all']}, "
-            + "should be {num_params_check}) after split into optimizer parameter groups."
+            + f"should be {num_params_check}) after split into optimizer parameter groups."
         )
+
+        # create optimizer parameter groups
+        optim_groups = [
+            {"params": params[group].values(), "weight_decay": weight_decay_group[group]}
+            for group in group_mapping.keys()
+        ]
 
     return optim_groups
 
 
-def print_module_names_for_groups(modules, groups):
+def print_parameter_names_for_groups(params, groups):
     for group in groups:
-        print(f"module names of group={group}:")
-        for name in modules[group].keys():
-            print(name)
-
-
-def flatten_and_count(params):
-    params = [elem for sublist in params for elem in sublist]
-    num_params = sum(p.numel() for p in params)
-    return params, num_params
+        print(f"parameter names of group={group}:")
+        for i, name in enumerate(params[group].keys()):
+            print(i + 1, name)

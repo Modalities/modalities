@@ -8,14 +8,14 @@ from modalities.batch import DatasetBatch, InferenceResultBatch
 
 
 class NNModel(nn.Module):
-    def __init__(self, seed: int = None, optimizer_module_groups: List[str] = []):
+    def __init__(self, seed: int = None, optimizer_module_groups: Dict[str, List[str]] = {}):
         if seed is not None:
             torch.manual_seed(seed)
         self._optimizer_module_groups = optimizer_module_groups
         super(NNModel, self).__init__()
 
     @property
-    def optimizer_module_groups(self):
+    def optimizer_module_groups(self) -> Dict[str, List[str]]:
         return self._optimizer_module_groups
 
     @abstractmethod
