@@ -84,6 +84,8 @@ from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
     NumberConversion,
+    NumStepsFromNumSamplesConfig,
+    NumStepsFromNumTokensConfig,
     NumTokensFromNumStepsConfig,
 )
 
@@ -222,6 +224,18 @@ COMPONENTS = [
         "local_num_batches_from_num_tokens",
         NumberConversion.get_local_num_batches_from_num_tokens,
         LocalNumBatchesFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_samples",
+        NumberConversion.get_num_steps_from_num_samples,
+        NumStepsFromNumSamplesConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_tokens",
+        NumberConversion.get_num_steps_from_num_tokens,
+        NumStepsFromNumTokensConfig,
     ),
     ComponentEntity(
         "number_conversion",
