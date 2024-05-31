@@ -24,9 +24,9 @@ class Gym:
         model: nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        global_training_log_interval_in_steps: int,
-        global_checkpointing_interval_in_steps: int,
-        global_evaluation_interval_in_steps: int,
+        training_log_interval_in_steps: int,
+        checkpointing_interval_in_steps: int,
+        evaluation_interval_in_steps: int,
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: List[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
@@ -44,7 +44,7 @@ class Gym:
             self._run_evaluation,
             model=model,
             evaluation_data_loaders=evaluation_data_loaders,
-            global_evaluation_interval_in_steps=global_evaluation_interval_in_steps,
+            evaluation_interval_in_steps=evaluation_interval_in_steps,
         )
 
         checkpointing_callback: Callable[[int], None] = partial(
@@ -52,7 +52,7 @@ class Gym:
             model=model,
             optimizer=optimizer,
             checkpoint_saving=checkpoint_saving,
-            global_checkpointing_interval_in_steps=global_checkpointing_interval_in_steps,
+            checkpointing_interval_in_steps=checkpointing_interval_in_steps,
         )
 
         self.trainer.train(
@@ -63,7 +63,7 @@ class Gym:
             scheduler=scheduler,
             evaluation_callback=evaluation_callback,
             checkpointing_callback=checkpointing_callback,
-            global_training_log_interval_in_steps=global_training_log_interval_in_steps,
+            training_log_interval_in_steps=training_log_interval_in_steps,
         )
 
     def _run_checkpointing(
@@ -72,9 +72,9 @@ class Gym:
         optimizer: Optimizer,
         num_train_steps_done: int,
         checkpoint_saving: CheckpointSaving,
-        global_checkpointing_interval_in_steps: int,
+        checkpointing_interval_in_steps: int,
     ):
-        if num_train_steps_done % global_checkpointing_interval_in_steps == 0:
+        if num_train_steps_done % checkpointing_interval_in_steps == 0:
             checkpoint_saving.save_checkpoint(
                 num_train_steps_done=num_train_steps_done,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
@@ -88,9 +88,9 @@ class Gym:
         model: nn.Module,
         num_train_steps_done: int,
         evaluation_data_loaders: List[LLMDataLoader],
-        global_evaluation_interval_in_steps: int,
+        evaluation_interval_in_steps: int,
     ):
-        if num_train_steps_done % global_evaluation_interval_in_steps == 0:
+        if num_train_steps_done % evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,

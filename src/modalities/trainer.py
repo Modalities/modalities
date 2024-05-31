@@ -73,7 +73,7 @@ class Trainer:
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
-        global_training_log_interval_in_steps: int,
+        training_log_interval_in_steps: int,
         evaluation_callback: Callable[[int], None],
         checkpointing_callback: Callable[[int], None],
     ):
@@ -130,7 +130,7 @@ class Trainer:
             )
 
             # Check, if model should be evaluated
-            if num_train_steps_done % global_training_log_interval_in_steps == 0:
+            if num_train_steps_done % training_log_interval_in_steps == 0:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 

@@ -238,9 +238,9 @@ class Main:
             model=wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,
-            global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
-            global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
-            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
+            checkpointing_interval_in_steps=components.settings.training.checkpointing_interval_in_steps,
+            evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
+            training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
         print("done")
 

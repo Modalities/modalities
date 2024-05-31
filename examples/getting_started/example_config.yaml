@@ -4,9 +4,9 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 48
-    global_checkpointing_interval_in_steps: 48
-    global_evaluation_interval_in_steps: 48
+    training_log_interval_in_steps: 48
+    checkpointing_interval_in_steps: 48
+    evaluation_interval_in_steps: 48
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
