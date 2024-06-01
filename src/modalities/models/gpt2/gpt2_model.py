@@ -356,12 +356,12 @@ class GPT2LLM(NNModel):
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
     ):
-        optimizer_module_groups = {
+        weight_decay_groups = {
             "linear": [".attn", ".mlp"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        super().__init__(optimizer_module_groups=optimizer_module_groups)
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size

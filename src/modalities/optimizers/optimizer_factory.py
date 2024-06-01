@@ -8,6 +8,8 @@ from torch.optim import Adam, AdamW, Optimizer
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.util import compute_number_of_trainable_parameters
 
+OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
+
 
 class OptimizerFactory:
     def get_adam(
@@ -15,11 +17,11 @@ class OptimizerFactory:
         betas: Tuple[float, float],
         eps: float,
         weight_decay: float,
-        weight_decay_excluded: List[str],
+        weight_decay_groups_excluded: List[str],
         wrapped_model: nn.Module,
     ) -> Optimizer:
-        model_parameter_groups = get_parameter_groups(wrapped_model, weight_decay, weight_decay_excluded)
-        optimizer = Adam(params=model_parameter_groups, lr=lr, betas=betas, eps=eps)
+        optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
+        optimizer = Adam(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
         return optimizer
 
     def get_adam_w(
@@ -27,11 +29,11 @@ class OptimizerFactory:
         betas: Tuple[float, float],
         eps: float,
         weight_decay: float,
-        weight_decay_excluded: List[str],
+        weight_decay_groups_excluded: List[str],
         wrapped_model: nn.Module,
     ) -> Optimizer:
-        model_parameter_groups = get_parameter_groups(wrapped_model, weight_decay, weight_decay_excluded)
-        optimizer = AdamW(params=model_parameter_groups, lr=lr, betas=betas, eps=eps)
+        optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
+        optimizer = AdamW(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
         return optimizer
 
     @staticmethod
@@ -44,89 +46,121 @@ class OptimizerFactory:
         return wrapped_optimizer
 
 
-def get_parameter_groups(
-    model: FSDP, weight_decay: float, weight_decay_excluded: List[str]
-) -> List[Dict[str, List[nn.Parameter] | float]]:
+def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: List[str]) -> OptimizerGroups:
     """
-    divide model parameters into 2 groups (one with and one without weight decay)
+    divide model parameters into optimizer groups (with or without weight decay)
 
     inspired by:
     - https://github.com/pytorch/pytorch/issues/101343
     - https://github.com/karpathy/nanoGPT
     """
-
-    print("[Optimizer Groups]")
-    if weight_decay == 0 or len(weight_decay_excluded) == 0:
-        # all parameters have the same weight decay and there is only 1 group
-        optim_groups = [{"params": list(model.parameters()), "weight_decay": weight_decay}]
-        num_modules = len(optim_groups[0]["params"])
-        num_params = sum(p.numel() for p in optim_groups[0]["params"])
-        print(
-            f"{num_modules} modules with {num_params:,} parameters "
-            + f"all have weight_decay = {optim_groups[0]['weight_decay']}"
-        )
+    if weight_decay == 0 or len(weight_decay_groups_excluded) == 0:
+        # there will be 1 optimizer group, i.e. all parameters have the same weight decay
+        optimizer_groups = [{"params": list(model.parameters()), "weight_decay": weight_decay}]
+        optimizer_groups_names = ["all"]
     else:
-        # example GPT2:
-        # group_mapping = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
-        # weight_decay_excluded = ["embedding", "layernorm"]
-        group_mapping = model.module.optimizer_module_groups
-        for group in weight_decay_excluded:
-            assert group in group_mapping.keys(), f"group = {group} specified in weight_decay_excluded is not "
-            +f"in models optimizer_module_groups = {list(group_mapping.keys())}"
+        # there will be N optimizer groups, i.e. one for each model parameter group
+        _assert_existence_of_weight_decay_groups_excluded(model, weight_decay_groups_excluded)
+        optimizer_groups, optimizer_groups_names = _create_optimizer_groups(
+            model, weight_decay, weight_decay_groups_excluded
+        )
 
-        params, num_params, num_modules = {}, {}, {}
-        weight_decay_group = {
-            group: weight_decay if group not in weight_decay_excluded else 0.0 for group in group_mapping.keys()
+    _assert_completeness_of_optimizer_groups(model, optimizer_groups)
+    _print_optimizer_groups_overview(optimizer_groups, optimizer_groups_names)
+    return optimizer_groups
+
+
+def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: List[str]) -> None:
+    """
+    checks the existence of all groups
+    that are to be excluded from weight decay
+
+    Example GPT2:
+        weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
+        weight_decay_groups_excluded = ["embedding", "layernorm"]
+    """
+    weight_decay_groups = model.module.weight_decay_groups
+    for group in weight_decay_groups_excluded:
+        assert group in weight_decay_groups.keys(), (
+            f"group = {group} specified in weight_decay_groups_excluded is not "
+            + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}"
+        )
+
+
+def _create_optimizer_groups(
+    model: FSDP, weight_decay: float, weight_decay_groups_excluded: List[str]
+) -> Tuple[OptimizerGroups, List[str]]:
+    """
+    create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
+    """
+    weight_decay_groups = model.module.weight_decay_groups
+    params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+
+    if 0:  # This is for debugging only, and may serve as a convenient helper tool during the development of new models
+        _print_params(params)
+
+    optimizer_groups = [
+        {
+            "params": _filter_params_for_weight_decay_group(params, regex_expressions=weight_decay_groups[group]),
+            "weight_decay": weight_decay if group not in weight_decay_groups_excluded else 0.0,
         }
+        for group in weight_decay_groups.keys()
+    ]
+    return optimizer_groups, weight_decay_groups.keys()
 
-        # create parameter groups
-        params["all"] = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
-        for group in group_mapping.keys():
-            params[group] = {
-                name: parameter
-                for name, parameter in params["all"].items()
-                if any([bool(re.search(regex_expression, name)) for regex_expression in group_mapping[group]])
-            }
 
-        # count parameters & modules
-        for group in group_mapping.keys():
-            num_modules[group] = len(params[group])
-            num_params[group] = sum(p.numel() for p in params[group].values())
+def _filter_params_for_weight_decay_group(
+    params: Dict[str, List[nn.Parameter]], regex_expressions: List[str]
+) -> List[nn.Parameter]:
+    """
+    filter parameters by their name.
+    a parameter is kept if and only if it contains at least one of the regex expressions.
+    """
+    return [
+        parameter
+        for name, parameter in params.items()
+        if any([bool(re.search(regex_expression, name)) for regex_expression in regex_expressions])
+    ]
 
-        # print overview
-        if 0:  # This is for debugging and to help define new models
-            print_parameter_names_for_groups(params, group_mapping.keys())
 
-        num_modules["all"] = sum([num_modules[group] for group in group_mapping.keys()])
-        num_params["all"] = sum([num_params[group] for group in group_mapping.keys()])
+def _print_params(params) -> None:
+    """
+    for debugging only
+    """
+    for i, name in enumerate(params.keys()):
+        print(i + 1, name)
+
+
+def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: List[str]) -> None:
+    """
+    for each optimizer group, the following is printed:
+        - the number of modules
+        - the number of parameters
+        - the weight decay
+    """
+    assert len(optimizer_groups) == len(optimizer_groups_names)
+    num_modules_all, num_params_all = 0, 0
+    print("=> optimizer groups:")
+    for optimizer_group, optimizer_group_name in zip(optimizer_groups, optimizer_groups_names):
+        num_modules = len(optimizer_group["params"])
+        num_params = sum(parameter.numel() for parameter in optimizer_group["params"])
         print(
-            f"{num_modules['all']} modules with {num_params['all']:,} parameters "
-            + "were split into the following optimizer groups:"
+            f"{optimizer_group_name} ({num_modules} modules with {num_params:,} parameters): "
+            + f"weight_decay = {optimizer_group['weight_decay']}"
         )
-        for group in group_mapping.keys():
-            print(
-                f"{group} ({num_modules[group]} modules with {num_params[group]:,} parameters): "
-                + f"weight_decay = {weight_decay_group[group]}"
-            )
-
-        # check total number of parameters
-        num_params_check = compute_number_of_trainable_parameters(model)
-        assert num_params["all"] == num_params_check, (
-            f"ERROR! Inconsistent number of parameters (found {num_params['all']}, "
-            + f"should be {num_params_check}) after split into optimizer parameter groups."
-        )
-
-        # create optimizer parameter groups
-        optim_groups = [
-            {"params": list(params[group].values()), "weight_decay": weight_decay_group[group]}
-            for group in group_mapping.keys()
-        ]
-
-    return optim_groups
+        num_modules_all += num_modules
+        num_params_all += num_params
+    print(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
 
 
-def print_parameter_names_for_groups(params, groups):
-    for group in groups:
-        print(f"parameter names of group={group}:")
-        for i, name in enumerate(params[group].keys()):
-            print(i + 1, name)
+def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: OptimizerGroups) -> None:
+    """
+    checks that the number of parameters in the optimizer groups
+    sum up to the total number of model parameters as expected
+    """
+    num_params_check = compute_number_of_trainable_parameters(model)
+    num_params = sum(p.numel() for optimizer_group in optimizer_groups for p in optimizer_group["params"])
+    assert num_params == num_params_check, (
+        f"ERROR! Inconsistent number of parameters (found {num_params}, "
+        + f"should be {num_params_check}) after split into optimizer parameter groups."
+    )

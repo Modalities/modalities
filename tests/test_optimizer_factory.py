@@ -14,7 +14,7 @@ from modalities.config.config import ProcessGroupBackendType, PydanticPytorchMod
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.model_factory import ModelFactory
-from modalities.optimizers.optimizer_factory import get_parameter_groups
+from modalities.optimizers.optimizer_factory import get_optimizer_groups
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -81,7 +81,8 @@ COCA_ALL = 184502784
     reason="This test requires 1 GPU and a torchrun distributed environment.",
 )
 @pytest.mark.parametrize(
-    "model_name, weight_decay, weight_decay_excluded, success, num_decayed_parameters, num_nondecayed_parameters",
+    "model_name, weight_decay, weight_decay_groups_excluded, success,"
+    "num_decayed_parameters, num_nondecayed_parameters",
     [
         ("gpt2", 0, [], True, 0, GPT2_LINEAR + GPT2_EMBEDDING + GPT2_LAYERNORM),
         ("gpt2", 1e-1, [], True, GPT2_LINEAR + GPT2_EMBEDDING + GPT2_LAYERNORM, 0),
@@ -94,8 +95,8 @@ COCA_ALL = 184502784
         ("coca", 1e-1, ["non-existing-group"], False, None, None),
     ],
 )
-def test_get_parameter_groups(
-    model_name, weight_decay, weight_decay_excluded, success, num_decayed_parameters, num_nondecayed_parameters
+def test_get_optimizer_groups(
+    model_name, weight_decay, weight_decay_groups_excluded, success, num_decayed_parameters, num_nondecayed_parameters
 ):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if model_name == "gpt2":
@@ -105,14 +106,14 @@ def test_get_parameter_groups(
 
         if not success:
             with pytest.raises(Exception):
-                get_parameter_groups(model, weight_decay, weight_decay_excluded)
+                get_optimizer_groups(model, weight_decay, weight_decay_groups_excluded)
         else:
-            optim_groups = get_parameter_groups(model, weight_decay, weight_decay_excluded)
+            optimizer_groups = get_optimizer_groups(model, weight_decay, weight_decay_groups_excluded)
             test_num_decayed_parameters = sum(
-                p.numel() for group in optim_groups for p in group["params"] if group["weight_decay"] > 0
+                p.numel() for group in optimizer_groups for p in group["params"] if group["weight_decay"] > 0
             )
             test_num_nondecayed_parameters = sum(
-                p.numel() for group in optim_groups for p in group["params"] if group["weight_decay"] == 0
+                p.numel() for group in optimizer_groups for p in group["params"] if group["weight_decay"] == 0
             )
 
             assert test_num_decayed_parameters == num_decayed_parameters

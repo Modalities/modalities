@@ -122,7 +122,7 @@ class AdamOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
-    weight_decay_excluded: List[str]
+    weight_decay_groups_excluded: List[str]
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -131,7 +131,7 @@ class AdamWOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
-    weight_decay_excluded: List[str]
+    weight_decay_groups_excluded: List[str]
 
 
 class DummyLRSchedulerConfig(BaseModel):

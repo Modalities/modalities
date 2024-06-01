@@ -6,17 +6,19 @@ import torch.nn as nn
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
 
+WeightDecayGroups = Dict[str, List[str]]
+
 
 class NNModel(nn.Module):
-    def __init__(self, seed: int = None, optimizer_module_groups: Dict[str, List[str]] = {}):
+    def __init__(self, seed: int = None, weight_decay_groups: WeightDecayGroups = {}):
         if seed is not None:
             torch.manual_seed(seed)
-        self._optimizer_module_groups = optimizer_module_groups
+        self._weight_decay_groups = weight_decay_groups
         super(NNModel, self).__init__()
 
     @property
-    def optimizer_module_groups(self) -> Dict[str, List[str]]:
-        return self._optimizer_module_groups
+    def weight_decay_groups(self) -> WeightDecayGroups:
+        return self._weight_decay_groups
 
     @abstractmethod
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
