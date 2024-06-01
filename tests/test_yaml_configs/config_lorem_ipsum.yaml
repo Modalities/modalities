@@ -150,9 +150,13 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            context_size: ${settings.training.sequence_length} 
 
 # resolving class types via different enums sucks...
 loss_fn:

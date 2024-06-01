@@ -17,13 +17,13 @@ class LocalNumBatchesFromNumTokensConfig(BaseModel):
 class NumStepsFromNumSamplesConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
-    global_num_samples: Annotated[int, Field(strict=True, gt=0)]
+    global_num_samples: Annotated[int, Field(strict=True, ge=0)]
 
 
 class NumStepsFromNumTokensConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
-    global_num_tokens: Annotated[int, Field(strict=True, gt=0)]
+    global_num_tokens: Annotated[int, Field(strict=True, ge=0)]
     context_size: Annotated[int, Field(strict=True, gt=0)]
 
 
