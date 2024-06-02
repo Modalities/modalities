@@ -75,6 +75,7 @@ class Gym:
         checkpointing_interval_in_steps: int,
     ):
         if num_train_steps_done % checkpointing_interval_in_steps == 0:
+            print("run checkpointing")
             checkpoint_saving.save_checkpoint(
                 num_train_steps_done=num_train_steps_done,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
@@ -91,6 +92,7 @@ class Gym:
         evaluation_interval_in_steps: int,
     ):
         if num_train_steps_done % evaluation_interval_in_steps == 0:
+            print("run evaluation")
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
