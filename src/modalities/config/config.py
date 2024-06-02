@@ -321,6 +321,7 @@ class RichProgressSubscriberConfig(BaseModel):
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
     local_rank: int
+    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):
