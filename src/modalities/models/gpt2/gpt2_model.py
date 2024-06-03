@@ -152,7 +152,10 @@ class GPT2BlockConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2BlockConfig":
-        for param, param_name in zip([self.ffn_hidden, self.n_embd], ["ffn_hidden", "n_embd"]):
+        for param, param_name in zip(
+            [self.ffn_hidden, self.vocab_size, self.n_embd],
+            ["ffn_hidden", "vocab_size", "n_embd"],
+        ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
                 raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
@@ -237,7 +240,11 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        qkv_transforms: nn.ModuleList,
+        n_head_q: int,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size, block_size, embedding_dim = q.size()
         n_head_dim = embedding_dim // n_head_q
@@ -257,10 +264,22 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
         v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        return flash_attn_func(
+            q,
+            k,
+            v,
+            dropout_p=dropout,
+            causal=True,
+            softmax_scale=None,
+            window_size=(-1, -1),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
+        (
+            B,
+            T,
+            _,
+        ) = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
         q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
@@ -449,8 +468,9 @@ class GPT2LLM(NNModel):
         weight_init: WeightInitializationConfig,
         lm_head_norm: nn.Module,
         gpt2block: GPT2Block,
+        seed: int = None,
     ):
-        super().__init__()
+        super().__init__(seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
@@ -501,7 +521,11 @@ class GPT2LLM(NNModel):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
+                torch.nn.init.normal_(
+                    p,
+                    mean=weight_init.mean,
+                    std=weight_init.std / math.sqrt(2 * n_layer),
+                )
 
     def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):
