@@ -36,14 +36,14 @@ modality_encoder_config:
 text_decoder_config:
   sample_key: input_ids
   prediction_key: text_embeddings
-  block_size: 1024
-  vocab_size: 50304
+  block_size: 1_024
+  vocab_size: 50_304
   n_layer_text: 6
   n_layer_multimodal_text: 6
   attention_config:
     attention_engine_type: pytorch_flash_attention
   n_head: 12
-  ffn_hidden: 2048
+  ffn_hidden: 2_048
   n_embd: 768
   dropout: 0.0
   bias: true
