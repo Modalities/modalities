@@ -73,7 +73,8 @@ class TextInferenceComponent:
         print("\n max tokens reached", end="")
 
     def run(self):
-        prompt = TextInferenceComponent._get_prompt(self.prompt_template)
+        # prompt = TextInferenceComponent._get_prompt(self.prompt_template)
+        prompt = "Hello."
         try:
             self.generate_tokens(context=prompt)
         except KeyboardInterrupt:
