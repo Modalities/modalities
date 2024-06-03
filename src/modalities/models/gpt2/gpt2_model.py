@@ -153,8 +153,8 @@ class GPT2BlockConfig(BaseModel):
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2BlockConfig":
         for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd],
-            ["ffn_hidden", "vocab_size", "n_embd"],
+            [self.ffn_hidden, self.n_embd],
+            ["ffn_hidden", "n_embd"],
         ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
