@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, List
 
 import torch.nn as nn
-from accelerate.utils.dataclasses import get_module_class_from_name
+from accelerate import FullyShardedDataParallelPlugin
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 from modalities.config.lookup_enum import LookupEnum
