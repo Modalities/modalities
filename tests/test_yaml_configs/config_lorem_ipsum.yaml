@@ -276,6 +276,7 @@ batch_progress_subscriber:
         local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
         context_size: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE

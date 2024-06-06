@@ -50,7 +50,7 @@ class Trainer:
         loss_fun: Loss,
         micro_batch_id: int,
         num_train_steps_done: int,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
         (loss / self.gradient_acc_steps).backward()
@@ -130,7 +130,7 @@ class Trainer:
                 f"num_train_steps_done: {num_train_steps_done}, micro_batch_id: {micro_batch_id}",
                 f" (micro_batch_id +1) % GAS: {(micro_batch_id +1) % self.gradient_acc_steps}",
             )
-            # Check, if model should be evaluated
+            # Check if model performance should be logged
             if num_train_steps_done % training_log_interval_in_steps == 0 and step_performed:
                 print("call training log")
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
