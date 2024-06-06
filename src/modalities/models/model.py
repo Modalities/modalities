@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 import torch.nn as nn
@@ -10,10 +10,10 @@ WeightDecayGroups = Dict[str, List[str]]
 
 
 class NNModel(nn.Module):
-    def __init__(self, seed: int = None, weight_decay_groups: WeightDecayGroups = {}):
+    def __init__(self, seed: int = None, weight_decay_groups: Optional[WeightDecayGroups] = None):
         if seed is not None:
             torch.manual_seed(seed)
-        self._weight_decay_groups = weight_decay_groups
+        self._weight_decay_groups = weight_decay_groups if weight_decay_groups is not None else {}
         super(NNModel, self).__init__()
 
     @property
