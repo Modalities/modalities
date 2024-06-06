@@ -6,6 +6,8 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Adam, AdamW, Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.exceptions import OptimizerError
+from modalities.models.model import NNModel
 from modalities.util import compute_number_of_trainable_parameters
 
 OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
@@ -79,12 +81,14 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
         weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
-    weight_decay_groups = model.module.weight_decay_groups
+    nn_model: NNModel = model.module
+    weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
-        assert group in weight_decay_groups.keys(), (
-            f"group = {group} specified in weight_decay_groups_excluded is not "
-            + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}"
-        )
+        if group not in weight_decay_groups.keys():
+            raise OptimizerError(
+                f"group = {group} specified in weight_decay_groups_excluded is not "
+                + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}"
+            )
 
 
 def _create_optimizer_groups(
@@ -93,10 +97,13 @@ def _create_optimizer_groups(
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
-    weight_decay_groups = model.module.weight_decay_groups
+    nn_model: NNModel = model.module
+    weight_decay_groups = nn_model.weight_decay_groups
     params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
 
-    if 0:  # This is for debugging only, and may serve as a convenient helper tool during the development of new models
+    if (
+        False
+    ):  # This is for debugging only, and may serve as a convenient helper tool during the development of new models
         _print_params(params)
 
     optimizer_groups = [
@@ -160,7 +167,8 @@ def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: Opti
     """
     num_params_check = compute_number_of_trainable_parameters(model)
     num_params = sum(p.numel() for optimizer_group in optimizer_groups for p in optimizer_group["params"])
-    assert num_params == num_params_check, (
-        f"ERROR! Inconsistent number of parameters (found {num_params}, "
-        + f"should be {num_params_check}) after split into optimizer parameter groups."
-    )
+    if num_params != num_params_check:
+        raise OptimizerError(
+            f"ERROR! Inconsistent number of parameters (found {num_params}, "
+            + f"should be {num_params_check}) after split into optimizer parameter groups."
+        )
