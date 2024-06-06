@@ -8,22 +8,22 @@ from modalities.checkpointing.checkpoint_saving_instruction import Checkpointing
 
 class CheckpointSavingExecutionABC(ABC):
     @abstractmethod
-    def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, train_step_id: int):
+    def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, num_train_steps_done: int):
         raise NotImplementedError
 
     @abstractmethod
-    def _delete_checkpoint(self, train_step_id: int):
+    def _delete_checkpoint(self, num_train_steps_done: int):
         raise NotImplementedError
 
     def run_checkpoint_instruction(
         self,
         checkpointing_instruction: CheckpointingInstruction,
-        train_step_id: int,
+        num_train_steps_done: int,
         model: nn.Module,
         optimizer: Optimizer,
     ):
         if checkpointing_instruction.save_current:
-            self._save_checkpoint(model=model, optimizer=optimizer, train_step_id=train_step_id)
+            self._save_checkpoint(model=model, optimizer=optimizer, num_train_steps_done=num_train_steps_done)
 
-        for train_step_id in checkpointing_instruction.checkpoints_to_delete:
-            self._delete_checkpoint(train_step_id=train_step_id)
+        for num_train_steps_done in checkpointing_instruction.checkpoints_to_delete:
+            self._delete_checkpoint(num_train_steps_done=num_train_steps_done)

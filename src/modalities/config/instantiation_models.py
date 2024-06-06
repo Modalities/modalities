@@ -29,9 +29,9 @@ class CudaEnvSettings(BaseModel):
 class TrainingComponentsInstantiationModel(BaseModel):
     class TrainingSettings(BaseModel):
         class Training(BaseModel):
-            global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-            global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-            global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             do_apply_activation_checkpointing: bool
             gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
             local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]

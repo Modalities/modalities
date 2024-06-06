@@ -146,10 +146,10 @@ class TestWarmstart:
 
                     # we check if the losses for the model from scratch
                     # and the warm start model have the same loss values
-                    global_num_seen_steps = gpt2_warm_start_from_step_1_dict["settings"]["training"][
-                        "global_num_seen_steps"
+                    global_num_seen_tokens = gpt2_warm_start_from_step_1_dict["settings"]["training"][
+                        "global_num_seen_tokens"
                     ]
-                    assert loaded_loss_values_1[global_num_seen_steps:] == pytest.approx(
+                    assert loaded_loss_values_1[global_num_seen_tokens:] == pytest.approx(
                         loaded_loss_values_2, abs=1e-16
                     )
 

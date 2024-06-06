@@ -1,0 +1,69 @@
+settings:  
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+  training:
+    local_train_micro_batch_size: 2
+    global_num_seen_tokens: 512
+    sequence_length: 256
+  cuda_env:
+    global_rank: 0
+    world_size: 2
+
+collate_fn:  
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ./data/lorem_ipsum.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+
+skip_num_batches: 
+  component_key: number_conversion
+  variant_key: local_num_batches_from_num_tokens
+  config:
+    num_ranks: ${settings.cuda_env.world_size}
+    global_num_tokens: ${settings.training.global_num_seen_tokens}
+    context_size: ${settings.training.sequence_length}
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: train
+    skip_num_batches: 
+      instance_key: skip_num_batches
+      pass_type: BY_REFERENCE
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            drop_last: true
+            shuffle: false
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE

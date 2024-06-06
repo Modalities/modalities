@@ -1,6 +1,6 @@
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 
 import torch
 import torch.distributed as dist
@@ -20,13 +20,14 @@ class CheckpointingEntityType(Enum):
 
 
 class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
-    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_steps_{num_train_steps}.bin"
+    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_steps_{num_train_steps}-num_tokens_{num_tokens}.bin"
 
     def __init__(
         self,
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
+        get_num_tokens_from_num_steps_callable: Callable[[int], int],
     ):
         """
         Implementation of checkpointing to disc via FSDP
@@ -35,25 +36,32 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
+            get_num_tokens_from_num_steps_callable (Callable[[int], int]): callable to get the number
+                of tokens for a given number of train steps
         """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.experiment_id = experiment_id
+        self.get_num_tokens_from_num_steps_callable = get_num_tokens_from_num_steps_callable
 
     def _get_checkpointing_path(
         self,
         experiment_id: str,
-        train_step_id: int,
+        num_train_steps_done: int,
         entity_type: CheckpointingEntityType,
     ) -> Path:
+        num_tokens = self.get_num_tokens_from_num_steps_callable(num_train_steps_done)
         entity_file_name = self.CHECKPOINT_STRUCTURE.format(
-            experiment_id=experiment_id, entity=entity_type.value, num_train_steps=str(train_step_id + 1)
+            experiment_id=experiment_id,
+            entity=entity_type.value,
+            num_train_steps=str(num_train_steps_done),
+            num_tokens=str(num_tokens),
         )
 
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, train_step_id: int):
+    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, num_train_steps_done: int):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         # TODO Need to check if LR schedulers also need checkpointing
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
@@ -74,7 +82,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save model
             model_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 entity_type=CheckpointingEntityType.MODEL,
             )
 
@@ -84,7 +92,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save optimizer
             optimize_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
@@ -94,19 +102,19 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         # leading to wrong throughput measurements.
         dist.barrier()
 
-    def _get_paths_to_delete(self, train_step_id: int) -> List[Path]:
+    def _get_paths_to_delete(self, num_train_steps_done: int) -> List[Path]:
         return [
             self._get_checkpointing_path(
-                experiment_id=self.experiment_id, entity_type=entity_type, train_step_id=train_step_id
+                experiment_id=self.experiment_id, entity_type=entity_type, num_train_steps_done=num_train_steps_done
             )
             for entity_type in CheckpointEntityType
         ]
 
-    def _delete_checkpoint(self, train_step_id: int):
+    def _delete_checkpoint(self, num_train_steps_done: int):
         if self.global_rank != 0:
             return
 
-        files_paths_to_delete = self._get_paths_to_delete(train_step_id=train_step_id)
+        files_paths_to_delete = self._get_paths_to_delete(num_train_steps_done=num_train_steps_done)
         for full_path in files_paths_to_delete:
             if full_path.exists():
                 # unlink removes the file

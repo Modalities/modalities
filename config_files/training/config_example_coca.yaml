@@ -5,11 +5,11 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 2
-    global_checkpointing_interval_in_steps: 2
-    global_evaluation_interval_in_steps: 2
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 2
+    evaluation_interval_in_steps: 2
     global_num_training_samples: 12
-    global_num_seen_steps: 0
+    global_num_seen_tokens: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
@@ -144,10 +144,13 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-        mixed_precision_settings: FP_16
-        sharding_strategy: FULL_SHARD
-        block_names: [TransformerBlock, VisionTransformerBlock]
-
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            context_size: ${settings.training.sequence_length}
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
@@ -258,7 +261,15 @@ batch_progress_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    global_num_seen_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        context_size: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
