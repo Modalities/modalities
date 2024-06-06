@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
@@ -109,6 +109,7 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
+    get_num_tokens_from_num_steps_callable: Callable[[int], int]
 
 
 class CheckpointSavingConfig(BaseModel):
@@ -244,6 +245,7 @@ class DistributedSamplerConfig(BaseModel):
     shuffle: bool
     dataset: PydanticDatasetIFType
     seed: Optional[int] = 0
+    drop_last: Literal[True] = True
 
 
 class MemMapDatasetConfig(BaseModel):
@@ -303,7 +305,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_steps: Optional[int] = 0
+    skip_num_batches: Optional[int] = 0
 
 
 class RepeatingDataLoaderConfig(BaseModel):
@@ -321,6 +323,7 @@ class RichProgressSubscriberConfig(BaseModel):
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
     local_rank: int
+    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):

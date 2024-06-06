@@ -80,6 +80,14 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
+from modalities.utils.number_conversion import (
+    LocalNumBatchesFromNumSamplesConfig,
+    LocalNumBatchesFromNumTokensConfig,
+    NumberConversion,
+    NumStepsFromNumSamplesConfig,
+    NumStepsFromNumTokensConfig,
+    NumTokensFromNumStepsConfig,
+)
 
 
 @dataclass
@@ -204,4 +212,35 @@ COMPONENTS = [
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # Number conversion
+    ComponentEntity(
+        "number_conversion",
+        "local_num_batches_from_num_samples",
+        NumberConversion.get_local_num_batches_from_num_samples,
+        LocalNumBatchesFromNumSamplesConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "local_num_batches_from_num_tokens",
+        NumberConversion.get_local_num_batches_from_num_tokens,
+        LocalNumBatchesFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_samples",
+        NumberConversion.get_num_steps_from_num_samples,
+        NumStepsFromNumSamplesConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_tokens",
+        NumberConversion.get_num_steps_from_num_tokens,
+        NumStepsFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_tokens_from_num_steps_callable",
+        NumberConversion.get_num_tokens_from_num_steps_callable,
+        NumTokensFromNumStepsConfig,
+    ),
 ]

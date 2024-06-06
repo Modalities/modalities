@@ -4,10 +4,10 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 48
-    global_checkpointing_interval_in_steps: 48
-    global_evaluation_interval_in_steps: 48
-    global_num_seen_steps: 0
+    training_log_interval_in_steps: 48
+    checkpointing_interval_in_steps: 48
+    evaluation_interval_in_steps: 48
+    global_num_seen_tokens: 0
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 8
@@ -227,7 +227,14 @@ batch_progress_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    global_num_seen_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        context_size: ${settings.training.sequence_length}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE

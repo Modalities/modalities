@@ -178,7 +178,7 @@ class TestFSDPToDiscCheckpointing:
         gpt2_model_config_dict: Dict,
     ):
         experiment_id = "0"
-        train_step_id = 1
+        num_train_steps_done = 1
 
         checkpoint_saving = FSDPCheckpointSaving(
             checkpoint_path=temporary_checkpoint_folder_path, experiment_id=experiment_id, global_rank=dist.get_rank()
@@ -207,12 +207,14 @@ class TestFSDPToDiscCheckpointing:
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
-        checkpoint_saving._save_checkpoint(model=fsdp_wrapped_model, optimizer=optimizer, train_step_id=train_step_id)
+        checkpoint_saving._save_checkpoint(
+            model=fsdp_wrapped_model, optimizer=optimizer, num_train_steps_done=num_train_steps_done
+        )
 
         # load the model checkpoint
         model_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            train_step_id=train_step_id,
+            num_train_steps_done=num_train_steps_done,
             entity_type=CheckpointingEntityType.MODEL,
         )
         fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint(
@@ -223,7 +225,7 @@ class TestFSDPToDiscCheckpointing:
 
         optimizer_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            train_step_id=train_step_id,
+            num_train_steps_done=num_train_steps_done,
             entity_type=CheckpointingEntityType.OPTIMIZER,
         )
         checkpoint_loading.load_optimizer_checkpoint(
