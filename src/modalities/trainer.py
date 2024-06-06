@@ -50,7 +50,7 @@ class Trainer:
         loss_fun: Loss,
         micro_batch_id: int,
         num_train_steps_done: int,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
         (loss / self.gradient_acc_steps).backward()
