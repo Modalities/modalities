@@ -1,4 +1,3 @@
-import math
 from copy import deepcopy
 from enum import Enum
 from functools import partial
@@ -357,7 +356,12 @@ class GPT2LLM(NNModel):
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
     ):
-        super().__init__()
+        weight_decay_groups = {
+            "linear": [".attn", ".mlp"],
+            "embedding": [".wte", ".wpe"],
+            "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
+        }
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size
@@ -405,7 +409,7 @@ class GPT2LLM(NNModel):
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=lm_head_norm,
+                lm_head_norm=lm_head_norm,
             )
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
@@ -418,9 +422,9 @@ class GPT2LLM(NNModel):
         # init all weights
         self.apply(partial(self._init_weights, weight_init=weight_init))
         # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
+        # for pn, p in self.named_parameters():
+        #     if pn.endswith("c_proj.weight"):
+        #         torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
 
     def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):
@@ -449,7 +453,7 @@ class GPT2LLM(NNModel):
 
         for block in self.transformer.h:
             x = block(x)
-        x = self.transformer.ln_f(x)
+        x = self.transformer.lm_head_norm(x)
         logits = self.lm_head(x)
         return {self.prediction_key: logits}
 

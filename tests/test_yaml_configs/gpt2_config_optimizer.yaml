@@ -1,0 +1,43 @@
+model:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: "input_ids"
+    poe_type: ABSOLUTE
+    prediction_key: "logits"
+    block_size: 2048
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head_q: 12
+    n_head_kv: 12
+    ffn_hidden: 2048
+    n_embd: 768
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms: []
+    activation_type: gelu
+    weight_init:
+      mean: 0.0
+      std: 0.02
+    attention_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model.config.n_embd}
+        bias: true
+        epsilon: 1e-5

@@ -26,7 +26,8 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
-        # NOTE: The model and optimizer need to be sharded after calling this function!
+        # After loading the model to CPU RAM, the model is wraped with FSDP and sharded
+        # across the ranks according to the sharding strategy.
 
         # model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         # optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
