@@ -248,6 +248,9 @@ class CausalSelfAttention(nn.Module):
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size, block_size, embedding_dim = q.size()
+        # hidden dimension of single head
+        # Note, that number of heads does not change the overall parameters of the networks
+        # to scale up the network we either have to increase the embedding_dim or the number of layers
         n_head_dim = embedding_dim // n_head_q
 
         q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
@@ -272,7 +275,7 @@ class CausalSelfAttention(nn.Module):
         return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)
 
     @classmethod
-    def repeat_kv_heads(cls, q, k, v):
+    def repeat_kv_heads(cls, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
         # repeat k/v heads if self.n_rep > 1
         n_head_q = q.shape[1]
         n_head_kv = k.shape[1]
@@ -327,7 +330,7 @@ class CausalSelfAttention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
-        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
+        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd // n_rep), v: (B, T, n_embd // n_rep)
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
@@ -501,14 +504,14 @@ class GPT2LLM(NNModel):
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
         device = input_ids.device
-        b, t = input_ids.size()
+        b, t = input_ids.size()  # batch size, sequence length
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
 
         if self.poe_type is PositionTypes.ABSOLUTE:
+            pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
             pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
             tok_emb = tok_emb + pos_emb
 
