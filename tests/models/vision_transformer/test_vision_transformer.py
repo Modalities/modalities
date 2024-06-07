@@ -33,6 +33,31 @@ def test_vision_transformer():
     assert "logits" in out
     assert out["logits"].shape == (1, 1000)
 
+    # Test for video input
+    # Create model
+    config_file_path2 = _ROOT_DIR / Path("tests/models/vision_transformer/vision_transformer_config2.yaml")
+    config_dict2 = load_app_config_dict(config_file_path=config_file_path2)
+    config2 = VisionTransformerConfig.model_validate(config_dict2)
+    model2 = VisionTransformer(**dict(config2))
+
+    # Create dummy inputs
+    dummy_input_video = torch.randn(1, 3, 16, 224, 224)  # [b c T h w]
+    dummy_input2 = dict(videos=dummy_input_video)
+
+    # Create optimizer
+    optimizer2 = torch.optim.SGD(model2.parameters(), lr=0.001, momentum=0.9)
+
+    # Run one training step
+    optimizer2.zero_grad()
+    out2 = model2(dummy_input2)
+    loss2 = out2["logits"].sum()
+    loss2.backward()
+    optimizer2.step()
+
+    # Test outputs
+    assert "logits" in out2
+    assert out2["logits"].shape == (1, 1000)
+
 
 @pytest.mark.parametrize(
     "img_size,patch_size,patch_stride,add_cls_token,target_block_size",
