@@ -38,7 +38,7 @@ def test_get_num_steps_from_num_samples(
 
 @pytest.mark.parametrize(
     "num_ranks,local_micro_batch_size,global_num_tokens,context_size,expected",
-    [(2, 2, 20, 2, 2), (2, 2, 21, 2, 2), (2, 2, 22, 2, 2), (2, 2, 24, 2, 2)],
+    [(2, 2, 20, 2, 2), (2, 2, 21, 2, 2), (2, 2, 22, 2, 2), (2, 2, 24, 2, 3)],
 )
 def test_get_num_steps_from_num_tokens(
     num_ranks: int, local_micro_batch_size: int, global_num_tokens: int, context_size: int, expected: int
