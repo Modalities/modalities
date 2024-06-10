@@ -25,7 +25,7 @@ N_IMG_CHANNELS = 3
 # audio_transformer_config
 AUDIO_BLOCK_SIZE = 500
 N_MELS = 128
-N_HEADS = 4
+SUB_SAMPLING_FACTOR = 4
 
 
 def dummy_image_sample():
@@ -40,8 +40,8 @@ def dummy_image_sample():
 
 
 def dummy_audio_sample():
-    audio_features = torch.randn(1, AUDIO_BLOCK_SIZE * N_HEADS, N_MELS)
-    audio_len = torch.tensor([N_IMAGE_CLASSES / N_HEADS]).type(torch.int16)
+    audio_features = torch.randn(1, AUDIO_BLOCK_SIZE * SUB_SAMPLING_FACTOR, N_MELS)
+    audio_len = torch.tensor([N_IMAGE_CLASSES / SUB_SAMPLING_FACTOR]).type(torch.int16)
     input_text = torch.randint(0, TEXT_DECODER_VOCAB_SIZE, (1, TEXT_DECODER_BLOCK_SIZE))
     AUDIO = torch.tensor([0])
     return dict(
@@ -87,7 +87,7 @@ def test_coca(yaml, dummy_sample):
 
 def test_coca_audio_vision_together():
     # Create model
-    config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config_av.yaml")
+    config_file_path = _ROOT_DIR / Path("coca/coca_config_av.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     coca_config = CoCaConfig.model_validate(config_dict)
     model = CoCa(**dict(coca_config))
