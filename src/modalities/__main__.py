@@ -12,6 +12,7 @@ from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
+from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
@@ -65,6 +66,45 @@ def entry_point_run_modalities(config_file_path: Path):
 def entry_point_generate_text(config_file_path: FilePath):
     generate_text(config_file_path)
 
+
+@main.command(name="convert_pytorch_to_hf_checkpoint")
+@click.option(
+    "--checkpoint_dir",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Load pytorch checkpoint from this directory.",
+)
+@click.option(
+    "--config_file_name",
+    type=str,
+    required=False,
+    default="model_config.yaml",
+    help="Name of the config file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
+)
+@click.option(
+    "--model_file_name",
+    type=str,
+    required=False,
+    default="model.bin",
+    help="Name of the model file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
+)
+@click.option(
+    "--output_hf_checkpoint_dir",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Converted hf checkpoint will be written to this directory.",
+)
+def entry_point_convert_pytorch_to_hf_checkpoint(
+    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+):
+    _entry_point_convert_pytorch_to_hf_checkpoint(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
+
+def _entry_point_convert_pytorch_to_hf_checkpoint(
+    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+):
+    cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
+    cp.convert_pytorch_to_hf_checkpoint()
+    
 
 @main.group(name="data")
 def data():
