@@ -16,10 +16,10 @@ from tqdm import tqdm
 from transformers import BatchEncoding
 
 from modalities.config.config import PydanticTokenizerIFType
+from modalities.dataloader.create_packed_data import EmbeddedStreamData
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
-
-from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import EmbeddedStreamData
+from modalities.util import flatten_dict
 
 
 class Dataset(TorchdataSet):
@@ -255,7 +255,7 @@ class ImageTransformConfig(TransformConfig):
 
 
 class TextTransformConfig(TransformConfig):
-    tokenizer: TokenizerWrapper
+    tokenizer: PydanticTokenizerIFType
     max_length: int = 77
     padding: str = "max_length"
     truncation: bool = True
@@ -287,65 +287,30 @@ def dummy_nodesplitter(src, group=None):
     yield from src
 
 
-class WebDataset(IterableDataset):
+class MultimodalWebDatasetBuilder:
     def __init__(
         self,
-        urls: Dict[Tuple[ModalityEnum, ...], Union[List[str], str]],
+        urls: Union[List[str], str],
         modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]],
         modality_transforms_configs: Dict[ModalityEnum, TransformConfig],
-        num_samples: Dict[Tuple[ModalityEnum, ...], int],
-        mixing_ratios: Optional[Dict[Tuple[ModalityEnum, ...], int]] = None,
-        shardshuffle: int = 100,
-        repeat: bool = False,
-        resample: bool = True,
-        shuffle_buffer: Optional[int] = 10_000,
+        num_samples: int,
     ):
-        """WebDataset for loading and combining multimodal datasets.
+        """A multimodal dataset instance for the WebDataset.
 
         Args:
-            urls: Webdataset urls for each modality combination.
-                For example: {(ModalityEnum.IMAGE, ModalityEnum.TEXT): "/data/path/{00000..00012.tar"}}
-
+            urls: A webdataset url. For example: "/data/path/{00000..00012.tar".
             modality_key_mapping: Mapping from dataset keys to keys expected by the forward pass of the model.
                 For example: {ModalityEnum.IMAGE: ("jpg", "image"), ModalityEnum.TEXT: ("text", "caption")}}
             modality_transforms_configs: The transform config for each modality.
             num_samples: The number of samples for each modality combination.
-                For example: {(ModalityEnum.IMAGE, ModalityEnum.TEXT): 1_234_567}}
-            mixing_ratios: Mixing ratios of the different modality combinations.
-                For example: {
-                    (ModalityEnum.IMAGE, ModalityEnum.TEXT): 0.7,
-                    (ModalityEnum.VIDEO, ModalityEnum.TEXT): 0.3}
-                }
-            shardshuffle: Number of sharfs that should be used for shuffling. Defaults to 100.
-            repeat: Repeat the dataset. Defaults to False.
-            resample: Instead if iterating in order sample random shards.
-                This has the issue that the model will see sample multiple times but if significantly more
-                efficient. Defaults to True.
-            shuffle_buffer: Number of samples that should be used for shuffling. Defaults to 10_000.
         """
-        self.num_samples = num_samples
-        self.total_num_samples = sum([self.num_samples[k] for k in urls.keys()])
+        self.urls = urls
         self.modality_key_mapping = modality_key_mapping
         self.modality_transforms_configs = modality_transforms_configs
-
-        # Create webdatasets for each modality combination
-        self.web_datasets = {
-            k: wds.WebDataset(
-                urls=u,
-                nodesplitter=dummy_nodesplitter if not resample else None,
-                shardshuffle=shardshuffle,
-                repeat=repeat,
-                handler=wds.ignore_and_continue,
-                resampled=resample,
-            )
-            for k, u in urls.items()
-        }
-
-        # Setup mixing ratios
-        self.mixing_ratios = mixing_ratios
-        if self.mixing_ratios is None and len(self.web_datasets) > 1:
-            uniform_ratio = 1 / len(self.web_datasets)
-            self.mixing_ratios = {k: uniform_ratio for k in self.web_datasets.keys()}
+        assert self.modality_key_mapping.keys() == self.modality_transforms_configs.keys()
+        self.modalities = list(self.modality_key_mapping.keys())
+        self.num_samples = num_samples
+        self.web_dataset = None
 
         # Mapping between modality and the decode "function"
         self.modality_to_decode_fn = {
@@ -355,11 +320,16 @@ class WebDataset(IterableDataset):
             ModalityEnum.AUDIO: wds.torch_audio,
         }
 
+        self.additional_extreacted_keys = []
+
         # Some transforms require objects such as image
         if ModalityEnum.IMAGE in self.modality_transforms_configs:
             self._timm_image_transform = create_transform(
                 **self.modality_transforms_configs[ModalityEnum.IMAGE].model_dump()
             )
+
+        if ModalityEnum.TEXT in self.modality_transforms_configs:
+            self.additional_extreacted_keys.append("attention_mask")
 
         # Mapping between modality and transform
         self.modality_to_transform_fn = {
@@ -369,22 +339,46 @@ class WebDataset(IterableDataset):
             ModalityEnum.AUDIO: self._transform_audio,
         }
 
-        for k, web_dataset in self.web_datasets:
-            # Apply shuffling to samples
-            if shuffle_buffer is not None and shuffle_buffer > 0:
-                web_dataset.append(wds.filters.shuffle(shuffle_buffer))
+    def prepare(
+        self, shardshuffle: int = 100, resample: bool = True, repeat: bool = False, shuffle_buffer: int = 10_000
+    ):
+        self.web_dataset = wds.WebDataset(
+            urls=self.urls,
+            nodesplitter=dummy_nodesplitter if not resample else None,
+            shardshuffle=shardshuffle,
+            repeat=repeat,
+            handler=wds.ignore_and_continue,
+            resampled=resample,
+        )
 
-            # Load the actual data
-            for modality_key in k:
-                transform_fn = self.modality_to_transform_fn[modality_key]
-                self.append(wds.filters.map(transform_fn))
+        # Apply shuffling to samples
+        if shuffle_buffer is not None and shuffle_buffer > 0:
+            self.web_dataset.append(wds.filters.shuffle(shuffle_buffer))
+
+        # Flatten the json structure for convenience
+        self.web_dataset.append(wds.filters.decode(partial=True))  # Decode json byte string
+        self.web_dataset.append(wds.filters.map(self._flatten_sample))
+
+        # Load the actual data
+        for modality_key in self.modalities:
+            decode_fn = self.modality_to_decode_fn[modality_key]
+            if decode_fn is None:
+                continue
+            self.web_dataset.append(wds.filters.decode(decode_fn, partial=True))
+
+        # Transform the data
+        for modality_key in self.modalities:
+            transform_fn = self.modality_to_transform_fn[modality_key]
+            self.web_dataset.append(wds.filters.map(transform_fn))
+
+        self.web_dataset.append(wds.filters.map(self._select_keys))
 
     def _transform_text(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.TEXT]
         config: TextTransformConfig = self.modality_transforms_configs[ModalityEnum.TEXT]
         batch_encoding: BatchEncoding = config.tokenizer.tokenizer(
             sample[source_key],
-            max_length=config.block_size,
+            max_length=config.max_length,
             padding=config.padding,
             truncation=config.truncation,
             return_attention_mask=config.return_attention_mask,
@@ -404,26 +398,90 @@ class WebDataset(IterableDataset):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
         # config: VideoTransformConfig = self.modality_transforms_configs[ModalityEnum.VIDEO]
         # TODO add video transform
+        sample[target_key] = sample[source_key]
+        del sample[source_key]
         return sample
 
     def _transform_audio(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
         # config: AudioTransformConfig = self.modality_transforms_configs[ModalityEnum.AUDIO]
         # TODO add audio transform
+        sample[target_key] = sample[source_key]
+        del sample[source_key]
         return sample
 
+    def _flatten_sample(self, sample):
+        return flatten_dict(sample)
+
+    def _select_keys(self, sample):
+        select_keys = self.additional_extreacted_keys + [v[1] for v in self.modality_key_mapping.values()]
+        new_sample = {}
+        for k, v in sample.items():
+            if k not in select_keys:
+                continue
+            new_sample[k] = v
+        return new_sample
+
+
+class MultimodalWebDataset(IterableDataset):
+    def __init__(
+        self,
+        builders: List[MultimodalWebDatasetBuilder],
+        mixing_ratios: Optional[List[int]] = None,
+        shardshuffle: int = 100,
+        repeat: bool = False,
+        resample: bool = True,
+        shuffle_buffer: Optional[int] = 10_000,
+    ):
+        """WebDataset for loading and combining multimodal datasets.
+
+        Args:
+            builders: WebDatasetBuilder instances.
+            mixing_ratios: Mixing ratios of the different modality combinations.
+                For example: [0.3, 0.7]
+            shardshuffle: Number of sharfs that should be used for shuffling. Defaults to 100.
+            repeat: Repeat the dataset. Defaults to False.
+            resample: Instead if iterating in order sample random shards.
+                This has the issue that the model will see sample multiple times but if significantly more
+                efficient. Defaults to True.
+            shuffle_buffer: Number of samples that should be used for shuffling. Defaults to 10_000.
+        """
+        self.builders = builders
+
+        self.output_keys_by_modality = {}
+        for b in builders:
+            for k, v in b.modality_key_mapping.items():
+                if k not in self.output_keys_by_modality:
+                    self.output_keys_by_modality[k] = v[1]
+                else:
+                    assert (
+                        self.output_keys_by_modality[k] == v[1]
+                    ), "Output keys for the same modality of all builders should be the same."
+
+        # Build datasets
+        [
+            b.prepare(shardshuffle=shardshuffle, resample=resample, repeat=repeat, shuffle_buffer=shuffle_buffer)
+            for b in self.builders
+        ]
+
+        # Setup mixing ratios
+        self.mixing_ratios = mixing_ratios
+        if self.mixing_ratios is None:
+            uniform_ratio = 1 / len(self.builders)
+            self.mixing_ratios = [uniform_ratio for _ in self.builders]
+        assert len(self.mixing_ratios) == len(self.builders)
+
     def __iter__(self):
-        if len(self.web_datasets) > 1:
+        if len(self.builders) > 1:
             datasets = []
-            ratios = []
-            for k in self.web_datasets.keys():
-                datasets.append(self.web_datasets[k])
-                ratios.append(self.mixing_ratios[k])
-            dataset = wds.RandomMix(datasets, ratios)  # Apply mixing at sample level
+            for b in self.builders:
+                datasets.append(b.web_dataset)
+            dataset = wds.RandomMix(datasets, self.mixing_ratios)  # Apply mixing at sample level
             return iter(dataset)
 
-        dataset = next(iter(self.web_datasets.values()))
+        dataset = self.builders[0].web_dataset
         return iter(dataset)
 
     def __len__(self):
-        return self.total_num_samples
+        total_num_samples = sum([b.num_samples for b in self.builders])
+        return total_num_samples
