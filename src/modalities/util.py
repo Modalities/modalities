@@ -136,3 +136,25 @@ class Aggregator(Generic[T]):
             post_processing_fun=postprocessing_fun,  # lambda t: t[0] / t[1],
         )
         return value
+
+
+def flatten_dict(d, parent_key="", sep="_"):
+    """
+    Flatten a nested dictionary.
+
+    Args:
+        d: The dictionary to flatten.
+        parent_key: The base key to use for concatenation.
+        sep: The separator to use between concatenated keys.
+
+    Return:
+        A flattened dictionary with concatenated keys.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
