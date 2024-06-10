@@ -1,6 +1,10 @@
 import pytest
 
-from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer, TokenizerWrapper
+from modalities.tokenization.tokenizer_wrapper import (
+    PreTrainedHFTokenizer,
+    PreTrainedSPTokenizer,
+    TokenizerWrapper,
+)
 
 
 def _assert_tokenization(tokenizer: TokenizerWrapper):
@@ -12,7 +16,9 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
 def test_hf_tokenize():
     tokenizer_model_file = "data/tokenizer/hf_gpt2"
     tokenizer = PreTrainedHFTokenizer(
-        pretrained_model_name_or_path=tokenizer_model_file, max_length=20, truncation=False, padding=False
+        pretrained_model_name_or_path=tokenizer_model_file,
+        truncation=False,
+        padding=False,
     )
     _assert_tokenization(tokenizer)
 

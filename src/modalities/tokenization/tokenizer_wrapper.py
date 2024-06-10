@@ -22,9 +22,15 @@ class TokenizerWrapper(ABC):
 
 class PreTrainedHFTokenizer(TokenizerWrapper):
     def __init__(
-        self, pretrained_model_name_or_path: str, max_length: int, truncation: bool = True, padding: str = "max_length"
+        self,
+        pretrained_model_name_or_path: str,
+        truncation: bool = False,
+        padding: bool = False,
+        max_length: int = None,
     ) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=pretrained_model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=pretrained_model_name_or_path
+        )
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
