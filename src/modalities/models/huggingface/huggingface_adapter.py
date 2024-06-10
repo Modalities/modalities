@@ -14,35 +14,31 @@ from modalities.models.model_factory import ModelFactory
 
 class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
     model_type = "modalities"
-    def __init__(self, checkpointed_model_config: CheckpointedModelConfig, **kwargs):
-        self.checkpointed_model_config = checkpointed_model_config
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     # TODO check if this is still needed
     # @abstractmethod
     # def to_json_string(self, use_diff: bool = True) -> str:
     #     raise NotImplementedError()
-    
-    
+
+
 class HuggingFaceModel(PreTrainedModel):
     config_class = HuggingFaceAdapterConfig
 
     def __init__(self, config: HuggingFaceAdapterConfig, model: nn.Module):
         super().__init__(config)
         # TODO pass correct model type to __init__
-        self.model = ModelFactory.get_checkpointed_model(
-            checkpoint_loading=TorchCheckpointLoading,
-            checkpoint_path=self.checkpointed_model_config.checkpoint_path,
-            model=model
-        )
+        self.model = model
 
     def forward(
-        self,
-        input_ids: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        return_dict: Optional[bool] = False,
-        output_attentions: Optional[bool] = False,
-        output_hidden_states: Optional[bool] = False,
+            self,
+            input_ids: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            return_dict: Optional[bool] = False,
+            output_attentions: Optional[bool] = False,
+            output_hidden_states: Optional[bool] = False,
     ):
         if output_attentions or output_hidden_states:
             raise NotImplementedError
@@ -54,7 +50,7 @@ class HuggingFaceModel(PreTrainedModel):
             return model_forward_output[self.config.config.prediction_key]
 
     def prepare_inputs_for_generation(
-        self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
+            self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
     ) -> Dict[str, Any]:
         """
         Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the

@@ -95,16 +95,19 @@ def entry_point_generate_text(config_file_path: FilePath):
     help="Converted hf checkpoint will be written to this directory.",
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
-    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+        checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
 ):
-    _entry_point_convert_pytorch_to_hf_checkpoint(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
+    _entry_point_convert_pytorch_to_hf_checkpoint(checkpoint_dir, config_file_name, model_file_name,
+                                                  output_hf_checkpoint_dir)
+
 
 def _entry_point_convert_pytorch_to_hf_checkpoint(
-    checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+        checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
 ):
     cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
-    cp.convert_pytorch_to_hf_checkpoint()
-    
+    hf_model = cp.convert_pytorch_to_hf_checkpoint()
+    return hf_model
+
 
 @main.group(name="data")
 def data():
@@ -278,11 +281,11 @@ class Main:
         print("done")
 
     def get_logging_publishers(
-        self,
-        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
-        results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
-        global_rank: int,
-        local_rank: int,
+            self,
+            progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
+            results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
+            global_rank: int,
+            local_rank: int,
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
