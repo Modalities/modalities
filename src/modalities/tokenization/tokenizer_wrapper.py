@@ -19,8 +19,10 @@ class TokenizerWrapper(ABC):
     def get_token_id(self, token: str) -> int:
         raise NotImplementedError
 
+
     def get_token_id(self, token: str) -> int:
         raise NotImplementedError
+
 
 class PreTrainedHFTokenizer(TokenizerWrapper):
     def __init__(
@@ -44,9 +46,11 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         )["input_ids"]
         return tokens
 
+
     def decode(self, token_ids: List[int]) -> str:
         decoded_text = self.tokenizer.decode(token_ids)
         return decoded_text
+
 
     def get_token_id(self, token: str) -> int:
         token_id = self.tokenizer.convert_tokens_to_ids(token)
