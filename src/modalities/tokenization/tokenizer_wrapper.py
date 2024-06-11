@@ -14,7 +14,11 @@ class TokenizerWrapper(ABC):
 
     @property
     def vocab_size(self) -> int:
+        raise NotImplementedError("Tokenizer must be implemented by a subclass.")
+
+    def get_token_id(self, token: str) -> int:
         raise NotImplementedError
+
 
     def get_token_id(self, token: str) -> int:
         raise NotImplementedError
@@ -42,9 +46,11 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         )["input_ids"]
         return tokens
 
+
     def decode(self, token_ids: List[int]) -> str:
         decoded_text = self.tokenizer.decode(token_ids)
         return decoded_text
+
 
     def get_token_id(self, token: str) -> int:
         token_id = self.tokenizer.convert_tokens_to_ids(token)
