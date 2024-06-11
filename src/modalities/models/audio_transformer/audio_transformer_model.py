@@ -197,7 +197,8 @@ class AudioTransformer(nn.Module):
         inputs: Dict[str, tuple[torch.Tensor, torch.Tensor]],
     ) -> Dict[str, tuple[torch.Tensor, torch.Tensor]]:
         x = inputs[self.sample_key]  # x.shape: B, T, D
-        attn_key_mask = self._get_attn_key_mask(inputs["feats_len"])
+        feat_lens = [log_mel_spec.shape[-1] // 4 for log_mel_spec in inputs["audio"]]
+        attn_key_mask = self._get_attn_key_mask(feat_lens, inputs["attention_mask"][-1])
         # x.shape: B, T, D
         x = self.project(x.transpose(1, 2))  # x.shape: B, D, T
         x = self.subsampler(x)  # x.shape: B, D, T/4
@@ -211,7 +212,8 @@ class AudioTransformer(nn.Module):
 
     def _get_attn_key_mask(
         self,
-        lengths: torch.Tensor,
+        lengths: list[int],
+        device: str,
     ):
         return (
             torch.nn.utils.rnn.pad_sequence(
@@ -221,4 +223,4 @@ class AudioTransformer(nn.Module):
             )
             .transpose(1, 2)[:-1]
             .unsqueeze_(1)
-        ).to(lengths.device)
+        ).to(device)
