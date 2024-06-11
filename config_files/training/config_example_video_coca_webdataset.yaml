@@ -34,7 +34,7 @@ collate_fn:
   variant_key: coca_collator
   config:
     sample_keys:
-      - images
+      - videos
       - ${settings.referencing_keys.sample_key}
     target_keys: []
     text_sample_key: ${settings.referencing_keys.sample_key}
@@ -60,9 +60,9 @@ train_video_builder:
   component_key: dataset
   variant_key: web_dataset_builder
   config:
-    urls: "/path/to/data/{000000..000009}.tar"
+    urls: "/nm-raid/video/Kinetics/kinetics-dataset/k400/dummy_wds/{000000..000010}.tar"
     modality_key_mapping:
-      TEXT: ["caption", "input_ids"]
+      TEXT: ["json", "input_ids"]
       VIDEO: ["mp4", "videos"]
     modality_transforms:
       VIDEO:
@@ -198,7 +198,7 @@ model:
     text_cls_prediction_key: text_cls
     logit_scale_prediction_key: logit_scale
     vision_encoder_config:
-      sample_key: images
+      sample_key: videos
       prediction_key: vision_embeddings
       img_size: 256 # 288 in the original coca
       n_classes: Null # Disable vision transformer head

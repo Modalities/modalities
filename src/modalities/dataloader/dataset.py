@@ -316,7 +316,7 @@ class RandomTemporalCrop:
     def __call__(self, video):
         total_frames = len(video)
         start = random.randint(0, total_frames - self.num_frames)
-        return video[start : start + self.num_frames]
+        return video[start : start + self.num_frames].permute(0, 3, 1, 2)  # F C H W
 
 
 class VideoTransformConfig(TransformConfig):
@@ -334,18 +334,19 @@ class VideoTransform(Transform):
     ):
         self.spatial_transform = transforms.Compose(
             [
-                transforms.RandomResizedCrop(input_size),
+                transforms.RandomResizedCrop(input_size, antialias=True),
                 transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
-                transforms.ToTensor(),
+                transforms.ConvertImageDtype(torch.float),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
         self.temporal_transform = RandomTemporalCrop(num_frames=16)
 
     def __call__(self, video):
+        video = video[0]
         video = self.temporal_transform(video)
-        return torch.stack([self.spatial_transform(frame) for frame in video])
+        return self.spatial_transform(video)
 
 
 class MultimodalWebDatasetBuilderConfig(BaseModel):

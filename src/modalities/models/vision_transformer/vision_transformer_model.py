@@ -70,9 +70,9 @@ class VideoPatchEmbedding(nn.Module):
         n_embd: int = 768,
         patch_size: int = 16,
         patch_stride: int = 16,
-        add_cls_token: bool = True,
     ) -> None:
         super().__init__()
+        self.input_rearrange = Rearrange("b T c h w -> b c T h w")
         self.conv = nn.Conv3d(
             in_channels=n_img_channels,
             out_channels=n_embd,
@@ -83,16 +83,10 @@ class VideoPatchEmbedding(nn.Module):
         # See https://github.com/arogozhnikov/einops/wiki/Using-torch.compile-with-einops
         self.rearrange = Rearrange("b c T h w -> b T (h w) c")  # TODO: this might change when implementing dataloader
 
-        self.cls_token = None
-        if add_cls_token:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, n_embd))
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.input_rearrange(x)
         x = self.conv(x)
         x = self.rearrange(x)
-        B, T = x.shape[:2]
-        if self.cls_token is not None:  # TODO: remove cls token at the frame level
-            x = torch.cat([self.cls_token.repeat(B, T, 1, 1), x], dim=2)
         return x  # [b T S D]
 
 
@@ -196,6 +190,7 @@ class VisionTransformer(nn.Module):
     ) -> None:
         super().__init__()
         self.sample_key = sample_key
+        self.has_cls_token = add_cls_token
         self.prediction_key = prediction_key
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         self.block_size = self._calculate_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
@@ -212,7 +207,6 @@ class VisionTransformer(nn.Module):
             self.embedding_fn = VideoPatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride)  # [b T S D]
             self.time_embd = nn.Parameter(torch.randn(num_video_frames, 1, n_embd))  # [T,1,d]
             if add_cls_token:
-                # self.block_size -= 1  # to remove cls token at frame level
                 n_latents += 1  # to count for a video level cls token
             self.latents = nn.Parameter(torch.randn(n_latents, n_embd))  # [R,d]
             self.rearrange = Rearrange("b T S D -> b (T S) D")
@@ -277,7 +271,7 @@ class VisionTransformer(nn.Module):
         else:
             x = self.forward_images(x)
         if self.head:
-            if self.embedding_fn.cls_token is not None:
+            if self.has_cls_token:
                 x = x[:, 0]
             else:
                 x = x.mean(dim=1)
