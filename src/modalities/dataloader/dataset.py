@@ -488,6 +488,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         """
         super().__init__()
         self.builders = builders
+        assert len(builders) == 1, "Multiple dataset builders are not supported yet"  # TODO
 
         self.output_keys_by_modality = {}
         for b in builders:
