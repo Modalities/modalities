@@ -77,6 +77,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 train_step_id=train_step_id,
                 entity_type=CheckpointingEntityType.MODEL,
             )
+
             model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model_state, model_checkpoint_path)
 
