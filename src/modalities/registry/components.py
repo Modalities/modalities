@@ -63,6 +63,8 @@ from modalities.dataloader.dataset import (
     MultimodalWebDatasetConfig,
     TextTransform,
     TextTransformConfig,
+    VideoTransform,
+    VideoTransformConfig,
 )
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
@@ -173,6 +175,7 @@ COMPONENTS = [
     # Data transforms & augmentations
     ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
     ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
+    ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers

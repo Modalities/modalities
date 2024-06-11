@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import random
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
+import torch
 import webdataset as wds
 from pydantic import BaseModel, Field
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data.dataset import Dataset as TorchdataSet
+from torchvision import transforms
 from tqdm import tqdm
 from transformers import BatchEncoding
 
@@ -267,8 +270,8 @@ class ImageTransform(Transform):
     def __init__(self, **kwargs):
         self._timm_image_transform = create_transform(**kwargs)
 
-    def __call__(self, *args, **kwargs):
-        return self._timm_image_transform(*args, **kwargs)
+    def __call__(self, image):
+        return self._timm_image_transform(image)
 
 
 class TextTransformConfig(TransformConfig):
@@ -304,6 +307,45 @@ class TextTransform(Transform):
             return_attention_mask=self.return_attention_mask,
         )
         return batch_encoding
+
+
+class RandomTemporalCrop:
+    def __init__(self, num_frames):
+        self.num_frames = num_frames
+
+    def __call__(self, video):
+        total_frames = len(video)
+        start = random.randint(0, total_frames - self.num_frames)
+        return video[start : start + self.num_frames]
+
+
+class VideoTransformConfig(TransformConfig):
+    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    is_training: bool = False
+    num_frames: int = 16
+
+
+class VideoTransform(Transform):
+    def __init__(
+        self,
+        input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224,
+        is_training: bool = False,
+        num_frames: int = 16,
+    ):
+        self.spatial_transform = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(input_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        self.temporal_transform = RandomTemporalCrop(num_frames=16)
+
+    def __call__(self, video):
+        video = self.temporal_transform(video)
+        return torch.stack([self.spatial_transform(frame) for frame in video])
 
 
 class MultimodalWebDatasetBuilderConfig(BaseModel):
@@ -411,9 +453,8 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_video(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
-        # config: VideoTransformConfig = self.modality_transforms_configs[ModalityEnum.VIDEO]
-        # TODO add video transform
-        sample[target_key] = sample[source_key]
+        transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
+        sample[target_key] = transform(sample[source_key])
         del sample[source_key]
         return sample
 
