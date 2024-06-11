@@ -22,6 +22,7 @@ dependencies = [
     "xformers",
     "class_resolver",
     "wandb",
+    "packaging",
     "einops>=0.7.0",
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
 ]
