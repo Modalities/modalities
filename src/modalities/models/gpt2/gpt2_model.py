@@ -1,4 +1,5 @@
 import math
+import sys
 from copy import deepcopy
 from enum import Enum
 from functools import partial
@@ -9,11 +10,14 @@ import torch.nn as nn
 import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
+from torch.nn import functional as F
+from transformers import PreTrainedTokenizer
 
-from modalities.config.config import PydanticPytorchModuleType
+from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
 from modalities.util import parse_enum_by_name
+
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -25,20 +29,20 @@ class PositionTypes(str, Enum):
 
 class QueryKeyValueTransform(nn.Module):
     def forward(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pass
 
 
 class IdentityTransform(QueryKeyValueTransform):
     def forward(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return q, k, v
 
@@ -90,7 +94,7 @@ class RotaryTransform(QueryKeyValueTransform):
         return (x * cos) + (self.rotate_half(x) * sin)
 
     def forward(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+            self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
@@ -165,7 +169,7 @@ class GPT2LLMConfig(BaseModel):
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+                [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
@@ -175,14 +179,14 @@ class GPT2LLMConfig(BaseModel):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-        self,
-        n_head_q: int,
-        n_head_kv: int,
-        n_embd: int,
-        attention_config: AttentionConfig,
-        bias: bool,
-        dropout: float,
-        block_size: int,
+            self,
+            n_head_q: int,
+            n_head_kv: int,
+            n_embd: int,
+            attention_config: AttentionConfig,
+            bias: bool,
+            dropout: float,
+            block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
@@ -225,7 +229,9 @@ class CausalSelfAttention(nn.Module):
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
-            transform_config.type_hint.value(**convert_base_model_config_to_dict(transform_config.config))
+            transform_config.type_hint.value(
+                **convert_base_model_config_to_dict(transform_config.config)
+            )  # TODO refactor, still uses the legacy type_hint
             for transform_config in attention_config.qkv_transforms
         )
 
@@ -235,15 +241,14 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+            q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size = q.shape[0]
-        block_size = q.shape[1]
-        n_head_dim = q.shape[2] // n_head_q
+        batch_size, block_size, embedding_dim = q.size()
+        n_head_dim = embedding_dim // n_head_q
 
-        q = q.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_q, T, hd)
-        k = k.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, -1, block_size, n_head_dim)  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
+        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -252,11 +257,10 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
-        q = q.transpose(1, 2)  # (B, T, nh_q, hd)
-        k = k.transpose(1, 2)  # (B, T, nh_kv, hd)
-        v = v.transpose(1, 2)  # (B, T, nh_kv, hd)
-
-        # TODO: make parameters configurable
+        # the next three lines are only needed for flash-attn from Daio Lab
+        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
         return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -267,7 +271,6 @@ class CausalSelfAttention(nn.Module):
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
         y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
-
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
@@ -297,18 +300,18 @@ class TransformerMLP(nn.Module):
 
 class GPT2Block(nn.Module):
     def __init__(
-        self,
-        n_embd: int,
-        bias: bool,
-        n_head_q: int,
-        n_head_kv: int,
-        activation_type: ActivationType,
-        attention_config: AttentionConfig,
-        dropout: float,
-        block_size: int,
-        ffn_hidden: int,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
+            self,
+            n_embd: int,
+            bias: bool,
+            n_head_q: int,
+            n_head_kv: int,
+            activation_type: ActivationType,
+            attention_config: AttentionConfig,
+            dropout: float,
+            block_size: int,
+            ffn_hidden: int,
+            attention_norm: nn.Module,
+            ffn_norm: nn.Module,
     ):
         super().__init__()
         self.attention_norm = attention_norm
@@ -339,28 +342,32 @@ class GPT2Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
+
+
     def __init__(
-        self,
-        sample_key: str,
-        prediction_key: str,
-        poe_type: PositionTypes,
-        block_size: int,
-        vocab_size: int,
-        n_layer: int,
-        n_head_q: int,
-        n_head_kv: int,
-        n_embd: int,
-        ffn_hidden: int,
-        dropout: float,
-        bias: bool,
-        activation_type: ActivationType,
-        weight_init: WeightInitializationConfig,
-        attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
+            self,
+            sample_key: str,
+            prediction_key: str,
+            poe_type: PositionTypes,
+            block_size: int,
+            vocab_size: int,
+            n_layer: int,
+            n_head_q: int,
+            n_head_kv: int,
+            n_embd: int,
+            ffn_hidden: int,
+            dropout: float,
+            bias: bool,
+            activation_type: ActivationType,
+            weight_init: WeightInitializationConfig,
+            attention_config: AttentionConfig,
+            attention_norm: nn.Module,
+            ffn_norm: nn.Module,
+            lm_head_norm: nn.Module,
+            seed: int = None
     ):
-        super().__init__()
+
+        super().__init__(seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.block_size = block_size

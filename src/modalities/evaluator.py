@@ -104,6 +104,9 @@ class Evaluator:
                 evaluation_result=evaluation_result,
             )
             result_dict[data_loader.dataloader_tag] = evaluation_result
+
+        model.train()
+
         return result_dict
 
     @staticmethod

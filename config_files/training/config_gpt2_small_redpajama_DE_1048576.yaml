@@ -5,17 +5,14 @@ settings:
     target_key: target_ids
     prediction_key: logits
   training:
-    global_training_log_interval_in_steps: 8
-    global_checkpointing_interval_in_steps: 8
-    global_evaluation_interval_in_steps: 8
+    global_training_log_interval_in_steps: 32
+    global_checkpointing_interval_in_steps: 8192
+    global_evaluation_interval_in_steps: 1024
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 16
     sequence_length: 2048
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -34,40 +31,46 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1048576/redpyjama_v2_default_DE_num_docs_1048576.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1050391/redpyjama_v2_sample_1050391.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
-  variant_key: default
+  variant_key: repeating_data_loader
   config:
-    num_workers: 2
-    pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
-    dataset:
-      instance_key: train_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
+    reshuffle_after_epoch: false
+    num_epochs: 100
+    dataloader:
+      component_key: data_loader
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "train"
+        dataset:
+          instance_key: train_dataset
+          pass_type: BY_REFERENCE
+        batch_sampler:
+          component_key: batch_sampler
+          variant_key: default
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            dataset:
-              instance_key: train_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
+            batch_size: ${settings.training.local_train_micro_batch_size}
+            drop_last: true
+            sampler:
+              component_key: sampler
+              variant_key: distributed_sampler
+              config:
+                rank: ${settings.cuda_env.global_rank}
+                num_replicas: ${settings.cuda_env.world_size}
+                shuffle: true
+                dataset:
+                  instance_key: train_dataset
+                  pass_type: BY_REFERENCE
+        collate_fn:
+          instance_key: collate_fn
+          pass_type: BY_REFERENCE
 
 val_dataset:
   component_key: dataset
@@ -112,25 +115,22 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
-        mixed_precision_settings: BF_16
-        sharding_strategy: FULL_SHARD
-        block_names: [GPT2Block]
 
 wrapped_model:
   component_key: model
@@ -149,7 +149,7 @@ model:
   variant_key: gpt2
   config:
     sample_key: ${settings.referencing_keys.sample_key}
-    poe_type: NOPE
+    poe_type: ABSOLUTE
     block_size: ${settings.training.sequence_length}
     prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
@@ -161,12 +161,12 @@ model:
     dropout: 0.0
     bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
     attention_config:
-      qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
+      qkv_transforms: []
+        # - type_hint: RotaryTransform
+        #   config:
+        #     n_embd: ${model.config.n_embd}
+        #     n_head: ${model.config.n_head_q} #it has to be head_q here
+        #     seq_length_dim: -2
     activation_type: gelu
     weight_init:
       mean: 0.0
@@ -204,10 +204,10 @@ optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
-    lr: 0.0001
-    betas: [0.9, 0.95]
+    lr: 0.000001
+    betas: [0.9, 0.99]
     eps: 1e-8
-    weight_decay: 1e-1
+    weight_decay: 1e-2
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -219,6 +219,17 @@ scheduler:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+    
 
 
 batch_progress_subscriber:

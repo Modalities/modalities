@@ -2,7 +2,8 @@ import pytest
 import torch.cuda
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType, TrainingComponentsInstantiationModel
+from modalities.config.config import ProcessGroupBackendType
+from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.running_env.cuda_env import CudaEnv
 
 
