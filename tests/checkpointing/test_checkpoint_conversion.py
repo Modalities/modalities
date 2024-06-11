@@ -1,7 +1,9 @@
 import os
+import shutil
 from pathlib import Path
 
 import pytest
+import torch
 from pydantic import BaseModel
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
@@ -19,6 +21,11 @@ def set_env():
     os.environ["WORLD_SIZE"] = "1"
 
 
+@pytest.fixture
+def device():
+    return "cuda:0"
+
+
 @pytest.fixture()
 def component_factory():
     registry = Registry(COMPONENTS)
@@ -27,23 +34,17 @@ def component_factory():
 
 
 @pytest.fixture()
-def config_filename():
-    return "config_mamba_small.yaml"
+def config_file_path():
+    return Path("configs_for_testing/mamba_config_test.yaml")
 
 
 @pytest.fixture()
-def checkpoint_dir():
-    return Path("/raid/s3/opengptx/maxr/ogptx/modalities/data/checkpoints/2024-06-10__14-28-32")
-
-
-@pytest.fixture()
-def config_dict(checkpoint_dir, config_filename):
-    config_file_path = checkpoint_dir / config_filename
+def config_dict(config_file_path):
     return load_app_config_dict(config_file_path)
 
 
 @pytest.fixture()
-def initialized_model(component_factory, config_dict):
+def initialized_model(set_env, component_factory, config_dict):
     class ModelConfig(BaseModel):
         model: PydanticPytorchModuleType
 
@@ -53,73 +54,39 @@ def initialized_model(component_factory, config_dict):
     return components.model
 
 
-def test_entry_point_convert_pytorch_to_hf_checkpoint(initialized_model, checkpoint_dir, config_filename, set_env):
+def test_entry_point_convert_pytorch_to_hf_checkpoint(
+        initialized_model,
+        config_file_path,
+        device,
+        tmp_path
+):
+    output_hf_checkpoint_dir = tmp_path / "converted_hf_checkpoint"
+    model_file_path = tmp_path / "pytorch_model.bin"
+
+    torch.save(initialized_model.state_dict(), model_file_path)
     checkpoint_conversion = CheckpointConversion(
-        checkpoint_dir=checkpoint_dir,
-        config_file_name=config_filename,
-        model_file_name="eid_2024-06-10__14-28-32-model-num_steps_15.bin",
-        output_hf_checkpoint_dir=checkpoint_dir / "converted_hf_checkpoint",
+        config_file_path=config_file_path,
+        output_hf_checkpoint_dir=output_hf_checkpoint_dir,
     )
 
+    checkpoint_conversion.config_dict["checkpointed_model"]["config"][
+        "checkpoint_path"] = model_file_path
     pytorch_model = checkpoint_conversion._setup_model()
+    hf_model = checkpoint_conversion.convert_pytorch_to_hf_checkpoint()
 
-    breakpoint()
+    assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
+    assert hf_model.__class__.__name__ == "HuggingFaceModel"
+    assert os.listdir(output_hf_checkpoint_dir)
 
-#
-# from pathlib import Path
-# from unittest.mock import patch
-#
-# import pytest
-# import torch
-# from transformers import AutoConfig, AutoModelForCausalLM
-#
-# from modalities.checkpointing import checkpoint_conversion
-# from modalities.models.gpt2.gpt2_model import GPT2HuggingFaceAdapterConfig
-# from modalities.models.gpt2.huggingface_model import HuggingFaceModel
-#
-#
-# @pytest.fixture
-# def device():
-#     return "cpu"
-#
-#
-# @pytest.fixture
-# def dummy_cfg_path(dummy_config_path, dummy_config) -> Path:
-#     # use `dummy_config`-fixture to initialize ENV-Variables for OmegaConfig to resolve
-#     return dummy_config_path
-#
-#
-# def test_convert_to_hf_checkpoint(tmp_path, device, dummy_cfg_path):
-#     # load test checkpoint
-#     cp = checkpoint_conversion.CheckpointConversion(
-#         checkpoint_dir=dummy_cfg_path.parent,
-#         config_file_name=dummy_cfg_path.name,
-#         model_file_name="",
-#         output_hf_checkpoint_dir=tmp_path,
-#     )
-#     pytorch_model = cp._setup_model()
-#     with patch.object(
-#             checkpoint_conversion.CheckpointConversion, "_get_model_from_checkpoint", return_value=pytorch_model
-#     ):
-#         cp.convert_pytorch_to_hf_checkpoint()
-#
-#     pytorch_model.eval()
-#     pytorch_model = pytorch_model.to(device)
-#
-#     # check that model before and after loading return the same output
-#     test_tensor = torch.randint(10, size=(5, 10))
-#     test_tensor = test_tensor.to(device)
-#     output_before_loading = pytorch_model.forward({"input_ids": test_tensor})["logits"]
-#
-#     # register config and model
-#     AutoConfig.register("modalities_gpt2", GPT2HuggingFaceAdapterConfig)
-#     AutoModelForCausalLM.register(GPT2HuggingFaceAdapterConfig, HuggingFaceModel)
-#
-#     # load saved model
-#     hf_model = AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=pytorch_model.lm_head.weight.dtype)
-#     hf_model = hf_model.to(device)
-#
-#     assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
-#     hf_model.eval()
-#     output_after_loading = hf_model.forward(test_tensor)
-#     assert (output_after_loading == output_before_loading).all()
+    # Evaluating whether the model before and after conversion produces the same output
+    pytorch_model.eval()
+    pytorch_model = pytorch_model.to(device)
+    hf_model.eval()
+    hf_model = hf_model.to(device)
+
+    test_tensor = torch.randint(10, size=(5, 10))
+    test_tensor = test_tensor.to(device)
+    output_pytorch_model = pytorch_model.forward({"input_ids": test_tensor})["logits"]
+
+    output_hf_model = hf_model.forward(test_tensor)
+    assert (output_hf_model == output_pytorch_model).all()

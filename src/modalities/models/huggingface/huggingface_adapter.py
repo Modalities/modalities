@@ -47,7 +47,7 @@ class HuggingFaceModel(PreTrainedModel):
         if return_dict:
             return ModalitiesModelOutput(**model_forward_output)
         else:
-            return model_forward_output[self.config.config.prediction_key]
+            return model_forward_output[self.model.prediction_key]
 
     def prepare_inputs_for_generation(
             self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
