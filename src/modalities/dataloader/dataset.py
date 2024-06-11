@@ -3,7 +3,7 @@ from __future__ import annotations
 import pickle
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Annotated, Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
@@ -11,16 +11,17 @@ import torch
 import torchaudio
 import webdataset as wds
 from datasets import concatenate_datasets, load_from_disk
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from subword_nmt import apply_bpe
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from torch.utils.data import IterableDataset
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
 from transformers import BatchEncoding
 
 from modalities.config.config import PydanticTokenizerIFType
+from modalities.config.lookup_enum import LookupEnum
+from modalities.config.pydanctic_if_types import PydanticThirdPartyTypeIF
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
@@ -525,7 +526,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         return index
 
 
-class ModalityEnum(Enum):
+class ModalityEnum(LookupEnum):
     TEXT = "text"
     IMAGE = "image"
     VIDEO = "video"
@@ -534,6 +535,13 @@ class ModalityEnum(Enum):
 
 class TransformConfig(BaseModel):
     pass
+
+
+class Transform:
+    pass
+
+
+PydanticTransformIFType = Annotated[Transform, PydanticThirdPartyTypeIF(Transform)]
 
 
 class ImageTransformConfig(TransformConfig):
@@ -565,12 +573,105 @@ class ImageTransformConfig(TransformConfig):
     separate: bool = False
 
 
+# @register_component("transform", "image_transform", ImageTransformConfig)
+class ImageTransform(Transform):
+    def __init__(self, **kwargs):
+        self._timm_image_transform = create_transform(**kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self._timm_image_transform(*args, **kwargs)
+
+
 class TextTransformConfig(TransformConfig):
     tokenizer: PydanticTokenizerIFType
     max_length: int = 77
     padding: str = "max_length"
     truncation: bool = True
     return_attention_mask: bool = True
+
+
+# @register_component("transform", "text_transform", TextTransformConfig)
+class TextTransform(Transform):
+    def __init__(
+        self,
+        tokenizer: TokenizerWrapper,
+        max_length: int = 77,
+        padding: str = "max_length",
+        truncation: bool = True,
+        return_attention_mask: bool = True,
+    ):
+        self.tokenizer = tokenizer
+        # # Ensure the tokenizer has a pad token
+        # if self.tokenizer.pad_token is None:
+        #     self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+        self.max_length = max_length
+        self.padding = padding
+        self.truncation = truncation
+        self.return_attention_mask = return_attention_mask
+
+    def __call__(self, text):
+        batch_encoding: BatchEncoding = self.tokenizer.tokenizer(
+            text,
+            max_length=self.max_length,
+            padding=self.padding,
+            truncation=self.truncation,
+            return_attention_mask=self.return_attention_mask,
+        )
+        return batch_encoding
+
+
+class MultimodalWebDatasetBuilderConfig(BaseModel):
+    urls: Union[List[str], str]
+    modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
+    modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
+    num_samples: Annotated[int, Field(ge=1)]
+
+
+class AudioTransformConfig(TransformConfig):
+    is_training: bool = False
+    n_mels: int = 128
+    freq_domain_mask_length: int = 30
+    time_domain_mask_length: int = 100
+    block_size_audio_encoder: int
+
+
+# @register_component("transform", "audio_transform", AudioTransformConfig)
+class AudioTransform(Transform):
+    def __init__(
+        self,
+        block_size_audio_encoder: int,
+        is_training: bool = False,
+        n_mels: int = 128,
+        freq_domain_mask_length: int = 30,
+        time_domain_mask_length: int = 100,
+    ):
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.is_training = is_training
+        self.n_mels = n_mels
+        self.freq_domain_mask_length = freq_domain_mask_length
+        self.time_domain_mask_length = time_domain_mask_length
+
+    def __call__(self, raw_audio: tuple[torch.Tensor, int]) -> torch.Tensor:
+        SUB_SAMPLING_FACTOR = 4
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.is_training:
+            self.masking = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=self.freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
+            )
+
+        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
+        log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
+        feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
+
+        assert feats_len * SUB_SAMPLING_FACTOR <= SUB_SAMPLING_FACTOR * self.block_size_audio_encoder
+        log_mel_spec = torch.nn.functional.pad(
+            log_mel_spec, (0, SUB_SAMPLING_FACTOR * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+        ).transpose(0, 1)
+        return log_mel_spec
 
 
 class WebDatasetConfig(BaseModel):
@@ -589,21 +690,13 @@ class WebDatasetConfig(BaseModel):
     shuffle: int = 0
 
 
-def dummy_nodesplitter(src, group=None):
-    # This node splitter is not actually splitting the data over the nodes
-    # but keeps the complete dataset on each node.
-    # This is required so that each node has the same amount of data.
-    # In the case of 25 shards and 16 ranks for example 7 ranks are
-    # without data in the second iteration. This will cause a crash once all_gather is called.
-    yield from src
-
-
+# @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
 class MultimodalWebDatasetBuilder:
     def __init__(
         self,
         urls: Union[List[str], str],
-        modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]],
-        modality_transforms_configs: Dict[ModalityEnum, TransformConfig],
+        modality_key_mapping: Dict[str, Tuple[str, str]],
+        modality_transforms: Dict[str, Transform],
         num_samples: int,
     ):
         """A multimodal dataset instance for the WebDataset.
@@ -612,13 +705,14 @@ class MultimodalWebDatasetBuilder:
             urls: A webdataset url. For example: "/data/path/{00000..00012.tar".
             modality_key_mapping: Mapping from dataset keys to keys expected by the forward pass of the model.
                 For example: {ModalityEnum.IMAGE: ("jpg", "image"), ModalityEnum.TEXT: ("text", "caption")}}
-            modality_transforms_configs: The transform config for each modality.
+            modality_transforms: The transforms for each modality.
             num_samples: The number of samples for each modality combination.
         """
         self.urls = urls
         self.modality_key_mapping = modality_key_mapping
-        self.modality_transforms_configs = modality_transforms_configs
-        assert self.modality_key_mapping.keys() == self.modality_transforms_configs.keys()
+        self.modality_transforms = modality_transforms
+
+        assert self.modality_key_mapping.keys() == self.modality_transforms.keys()
         self.modalities = list(self.modality_key_mapping.keys())
         self.num_samples = num_samples
         self.web_dataset = None
@@ -632,14 +726,7 @@ class MultimodalWebDatasetBuilder:
         }
 
         self.additional_extreacted_keys = []
-
-        # Some transforms require objects such as image
-        if ModalityEnum.IMAGE in self.modality_transforms_configs:
-            self._timm_image_transform = create_transform(
-                **self.modality_transforms_configs[ModalityEnum.IMAGE].model_dump()
-            )
-
-        if ModalityEnum.TEXT in self.modality_transforms_configs:
+        if ModalityEnum.TEXT in self.modality_transforms:
             self.additional_extreacted_keys.append("attention_mask")
 
         # Mapping between modality and transform
@@ -655,7 +742,7 @@ class MultimodalWebDatasetBuilder:
     ):
         self.web_dataset = wds.WebDataset(
             urls=self.urls,
-            nodesplitter=dummy_nodesplitter if not resample else None,
+            nodesplitter=self.dummy_nodesplitter if not resample else None,
             shardshuffle=shardshuffle,
             repeat=repeat,
             handler=wds.ignore_and_continue,
@@ -686,14 +773,8 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_text(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.TEXT]
-        config: TextTransformConfig = self.modality_transforms_configs[ModalityEnum.TEXT]
-        batch_encoding: BatchEncoding = config.tokenizer.tokenizer(
-            sample[source_key],
-            max_length=config.max_length,
-            padding=config.padding,
-            truncation=config.truncation,
-            return_attention_mask=config.return_attention_mask,
-        )
+        transform: TextTransform = self.modality_transforms[ModalityEnum.TEXT]
+        batch_encoding: BatchEncoding = transform(sample[source_key])
         del sample[source_key]
         sample[target_key] = batch_encoding.input_ids
         sample["attention_mask"] = batch_encoding.attention_mask
@@ -701,7 +782,8 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_image(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.IMAGE]
-        sample[target_key] = self._timm_image_transform(sample[source_key])
+        transform: TextTransform = self.modality_transforms[ModalityEnum.IMAGE]
+        sample[target_key] = transform(sample[source_key])
         del sample[source_key]
         return sample
 
@@ -715,9 +797,8 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_audio(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
-        # config: AudioTransformConfig = self.modality_transforms_configs[ModalityEnum.AUDIO]
-        # TODO add audio transform
-        sample[target_key] = sample[source_key]
+        transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
+        sample[target_key] = transform(sample[source_key])
         del sample[source_key]
         return sample
 
@@ -733,8 +814,33 @@ class MultimodalWebDatasetBuilder:
             new_sample[k] = v
         return new_sample
 
+    @staticmethod
+    def dummy_nodesplitter(src, group=None):
+        # This node splitter is not actually splitting the data over the nodes
+        # but keeps the complete dataset on each node.
+        # This is required so that each node has the same amount of data.
+        # In the case of 25 shards and 16 ranks for example 7 ranks are
+        # without data in the second iteration. This will cause a crash once all_gather is called.
+        # This is only relevant for validation.
+        yield from src
 
-class MultimodalWebDataset(IterableDataset):
+
+PydanticMultimodalWebDatasetBuilderIFType = Annotated[
+    MultimodalWebDatasetBuilder, PydanticThirdPartyTypeIF(MultimodalWebDatasetBuilder)
+]
+
+
+class MultimodalWebDatasetConfig(BaseModel):
+    builders: List[PydanticMultimodalWebDatasetBuilderIFType]
+    mixing_ratios: Optional[List[int]] = None
+    shardshuffle: int = 100
+    repeat: bool = False
+    resample: bool = True
+    shuffle_buffer: Optional[int] = 10_000
+
+
+# @register_component("dataset", "web_dataset", MultimodalWebDatasetConfig)
+class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
         builders: List[MultimodalWebDatasetBuilder],
@@ -757,6 +863,7 @@ class MultimodalWebDataset(IterableDataset):
                 efficient. Defaults to True.
             shuffle_buffer: Number of samples that should be used for shuffling. Defaults to 10_000.
         """
+        super().__init__()
         self.builders = builders
 
         self.output_keys_by_modality = {}
@@ -782,17 +889,13 @@ class MultimodalWebDataset(IterableDataset):
             self.mixing_ratios = [uniform_ratio for _ in self.builders]
         assert len(self.mixing_ratios) == len(self.builders)
 
-    def __iter__(self):
         if len(self.builders) > 1:
             datasets = []
             for b in self.builders:
                 datasets.append(b.web_dataset)
             dataset = wds.RandomMix(datasets, self.mixing_ratios)  # Apply mixing at sample level
-            return iter(dataset)
+            self.pipeline.extend(dataset.pipeline)
+        else:
+            self.pipeline.extend(self.builders[0].web_dataset.pipeline)
 
-        dataset = self.builders[0].web_dataset
-        return iter(dataset)
-
-    def __len__(self):
-        total_num_samples = sum([b.num_samples for b in self.builders])
-        return total_num_samples
+        self.with_length(sum([b.num_samples for b in self.builders]))
