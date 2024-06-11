@@ -53,7 +53,17 @@ from modalities.config.config import (
     WebLoaderConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
-from modalities.dataloader.dataset import DummyDatasetConfig, WebDatasetConfig
+from modalities.dataloader.dataset import (
+    DummyDatasetConfig,
+    ImageTransform,
+    ImageTransformConfig,
+    MultimodalWebDataset,
+    MultimodalWebDatasetBuilder,
+    MultimodalWebDatasetBuilderConfig,
+    MultimodalWebDatasetConfig,
+    TextTransform,
+    TextTransformConfig,
+)
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -155,7 +165,11 @@ COMPONENTS = [
         "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
-    ComponentEntity("dataset", "web_dataset", DatasetFactory.get_web_dataset, WebDatasetConfig),
+    ComponentEntity("dataset", "web_dataset", MultimodalWebDataset, MultimodalWebDatasetConfig),
+    ComponentEntity("dataset", "web_dataset_builder", MultimodalWebDatasetBuilder, MultimodalWebDatasetBuilderConfig),
+    # Data transforms & augmentations
+    ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
+    ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers

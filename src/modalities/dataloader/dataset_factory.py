@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from pydantic import FilePath
 from torch.utils.data.dataset import Dataset
@@ -8,11 +8,9 @@ from transformers import PreTrainedTokenizer
 from modalities.dataloader.dataset import (
     DummyDataset,
     DummySampleConfig,
-    ImageTransformConfig,
     MemMapDataset,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
-    WebDataset,
 )
 from modalities.dataloader.open_gptx_dataset.open_gptx_dataset import OpenGPTXMMapDataset
 
@@ -92,36 +90,3 @@ class DatasetFactory:
         # TODO: Fix the OpenGPTX implementation and get rid of this hack.
         dataset_wrapped = OpenGPTXDatasetWrapper(open_gptx_dataset=dataset, num_samples=num_samples)
         return dataset_wrapped
-
-    @staticmethod
-    def get_web_dataset(
-        urls: Union[List[str], str],
-        source_image_key: str,
-        image_key: str,
-        source_text_key: str,
-        text_key: str,
-        tokenizer: PreTrainedTokenizer,
-        block_size: int,
-        num_samples: int,
-        image_transform_config: Optional[ImageTransformConfig] = None,
-        shardshuffle: Optional[int] = None,
-        repeat: bool = False,
-        resample: bool = False,
-        shuffle: int = 0,
-    ) -> WebDataset:
-        dataset = WebDataset(
-            urls=urls,
-            source_image_key=source_image_key,
-            image_key=image_key,
-            source_text_key=source_text_key,
-            text_key=text_key,
-            tokenizer=tokenizer,
-            block_size=block_size,
-            num_samples=num_samples,
-            image_transform_config=image_transform_config,
-            shardshuffle=shardshuffle,
-            repeat=repeat,
-            resample=resample,
-            shuffle=shuffle,
-        )
-        return dataset

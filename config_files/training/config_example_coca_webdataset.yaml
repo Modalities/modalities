@@ -8,7 +8,7 @@ settings:
     global_training_log_interval_in_steps: 30 # Needs to be a multiple of gradient_acc_steps
     global_checkpointing_interval_in_steps: 9_990
     global_evaluation_interval_in_steps: 4_980
-    global_num_training_samples: ${train_dataset.config.num_samples} # 491 steps with 8 gpus and global bs of 1152
+    global_num_training_samples: 566748 # 491 steps with 8 gpus and global bs of 1152
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 30
@@ -25,7 +25,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: gpt2
+    pretrained_model_name_or_path: openai/clip-vit-base-patch32
     padding: true
     max_length: ${settings.training.sequence_length}
 
@@ -40,47 +40,61 @@ collate_fn:
     text_sample_key: ${settings.referencing_keys.sample_key}
     text_target_key: ${settings.referencing_keys.target_key}
 
+train_image_transform:
+  component_key: transform
+  variant_key: image_transform
+  config:
+    is_training: True
+    input_size: 256
+
+text_transform:
+  component_key: transform
+  variant_key: text_transform
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+train_coco_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "/nm-raid/video/multimodal_data/coco_captions/data/train/{000000..000011}.tar"
+    modality_key_mapping:
+      TEXT: ["json_text0", "input_ids"]
+      IMAGE: ["jpg", "images"]
+    modality_transforms:
+      IMAGE:
+        instance_key: train_image_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 566_748
+
 train_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
-    urls: "/hpcwork/rwth1597/coco/train/{000000..000566}.tar"
-    source_image_key: jpg
-    image_key: images
-    source_text_key: txt
-    text_key: input_ids
-    block_size: ${settings.training.sequence_length}
-    num_samples: 566_747
+    builders:
+      - instance_key: train_coco_dataset_builder
+        pass_type: BY_REFERENCE
     shardshuffle: 1000
     repeat: true
     resample: true
     shuffle: 1_000
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
-    image_transform_config:
-      is_training: True
-      input_size: 256
 
 val_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
-    urls: "/hpcwork/rwth1597/coco/val/{000000..000025}.tar"
-    source_image_key: jpg
-    image_key: images
-    source_text_key: txt
-    text_key: input_ids
-    block_size: ${settings.training.sequence_length}
-    num_samples: 25_010
-    resample: false
-    shuffle: 0 # Disable shuffling
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
-    image_transform_config:
-      is_training: False
-      input_size: 256
+    builders:
+      - instance_key: train_coco_dataset_builder
+        pass_type: BY_REFERENCE
+    shardshuffle: 1000
+    repeat: true
+    resample: true
+    shuffle: 1_000
 
 train_dataloader:
   component_key: data_loader
