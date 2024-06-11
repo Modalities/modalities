@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
@@ -15,19 +16,23 @@ from modalities.models.model_factory import ModelFactory
 class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
     model_type = "modalities"
 
-    def __init__(self, **kwargs):
+    def __init__(self, config_dict = None, **kwargs):
         super().__init__(**kwargs)
+        self.config_dict = config_dict
+        # TODO Iterate over all dict and change PosixPath to str
+        if config_dict:
+            self.config_dict["settings"]["config_file_path"] = str(self.config_dict["settings"]["config_file_path"])
 
-    # TODO check if this is still needed
-    # @abstractmethod
+    # # TODO check if this is still needed
     # def to_json_string(self, use_diff: bool = True) -> str:
-    #     raise NotImplementedError()
+    #     cfg = dict(config=self.config_dict.model_dump(), model_type=self.model_type)
+    #     return json.dumps(cfg)
 
 
 class HuggingFaceModel(PreTrainedModel):
     config_class = HuggingFaceAdapterConfig
 
-    def __init__(self, config: HuggingFaceAdapterConfig, model: nn.Module):
+    def __init__(self, config: HuggingFaceAdapterConfig, model: Optional[nn.Module] = None):
         super().__init__(config)
         # TODO pass correct model type to __init__
         self.model = model

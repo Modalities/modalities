@@ -5,11 +5,13 @@ from pathlib import Path
 import pytest
 import torch
 from pydantic import BaseModel
+from transformers import AutoModelForCausalLM, AutoConfig
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.models.huggingface.huggingface_adapter import HuggingFaceAdapterConfig, HuggingFaceModel
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -74,6 +76,14 @@ def test_entry_point_convert_pytorch_to_hf_checkpoint(
     pytorch_model = checkpoint_conversion._setup_model()
     hf_model = checkpoint_conversion.convert_pytorch_to_hf_checkpoint()
 
+    # register config and model
+    AutoConfig.register("modalities", HuggingFaceAdapterConfig)
+    AutoModelForCausalLM.register(HuggingFaceAdapterConfig, HuggingFaceModel)
+
+    hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(output_hf_checkpoint_dir,
+                                                                    torch_dtype=pytorch_model.lm_head.weight.dtype)
+    hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
+
     assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
     assert hf_model.__class__.__name__ == "HuggingFaceModel"
     assert os.listdir(output_hf_checkpoint_dir)
@@ -89,4 +99,7 @@ def test_entry_point_convert_pytorch_to_hf_checkpoint(
     output_pytorch_model = pytorch_model.forward({"input_ids": test_tensor})["logits"]
 
     output_hf_model = hf_model.forward(test_tensor)
+    output_hf_model_from_checkpoint = hf_model_from_checkpoint.forward(test_tensor)
+
     assert (output_hf_model == output_pytorch_model).all()
+    assert (output_hf_model == output_hf_model_from_checkpoint).all()

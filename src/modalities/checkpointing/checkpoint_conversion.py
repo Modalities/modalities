@@ -24,7 +24,7 @@ class CheckpointConversion:
 
     def convert_pytorch_to_hf_checkpoint(self):
         model = self._setup_model()
-        config = HuggingFaceAdapterConfig()
+        config = HuggingFaceAdapterConfig(config_dict=self.config_dict)
         hf_model = HuggingFaceModel(config=config, model=model)
         hf_model.save_pretrained(self.output_hf_checkpoint_dir, safe_serialization=False)
         return hf_model
