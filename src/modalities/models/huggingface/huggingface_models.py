@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
-from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer, PreTrainedTokenizer
+
+from pydantic import BaseModel, ConfigDict
+from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
@@ -35,6 +36,10 @@ class HuggingFacePretrainedModelConfig(BaseModel):
     sample_key: str
     model_args: Optional[Any] = None
     kwargs: Optional[Any] = None
+
+    # avoid warning about protected namespace 'model_', see
+    # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class HuggingFacePretrainedModel(NNModel):
