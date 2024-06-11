@@ -48,6 +48,9 @@ def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
         eod_token="<|endoftext|>",
         index_path=indexed_dummy_data_path.index_path,
         jq_pattern=".text",
+        processing_batch_size=2,
+        raw_samples_queue_size=2,
+        processed_samples_queue_size=2,
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()

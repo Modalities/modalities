@@ -13,18 +13,17 @@ from pydantic import BaseModel, FilePath
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import (
-    PackedDatasetComponentsModel,
-    ProcessGroupBackendType,
-    TokenizerTypes,
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.instantiation_models import (
+    PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
-    load_app_config_dict,
 )
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
+from modalities.inference.inference import generate_text
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
@@ -34,8 +33,6 @@ from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters
-from modalities.utils.generate_text import main as generate_text_main
-from modalities.utils.gradient_clipping import build_gradient_clipper
 
 
 @click.group()
@@ -59,27 +56,14 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.argument("model_path", type=Path)
-@click.argument("config_path", type=Path)
 @click.option(
-    "--tokenizer_type",
-    type=TokenizerTypes,
-    show_default=True,
-    default=TokenizerTypes.GPT2TokenizerFast,
-    help="Specify which Tokenizer (inheriting from transformers.PretrainedTokenizers) should get used.",
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
 )
-@click.option(
-    "--tokenizer_file",
-    type=Path,
-    show_default=True,
-    default=Path(__file__).parents[2] / Path("data/tokenizer/tokenizer.json"),
-    help="path to tokenizer json",
-)
-@click.option("--max_new_tokens", type=int, show_default=True, default=200, help="maximum amount of tokens to generate")
-@click.option("--chat", is_flag=True, show_default=True, default=False, help="activate 'chat' mode")
-def entry_point_generate_text(model_path, config_path, tokenizer_type, tokenizer_file, max_new_tokens, chat):
-    tokenizer = tokenizer_type.value(tokenizer_file=str(tokenizer_file))
-    generate_text_main(model_path, config_path, tokenizer, max_new_tokens, chat)
+def entry_point_generate_text(config_file_path: FilePath):
+    generate_text(config_file_path)
 
 
 @main.group(name="data")
@@ -134,18 +118,20 @@ def entry_point_pack_encoded_data(config_path: FilePath):
     config = load_app_config_dict(config_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsModel = component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsModel
+    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
+        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
     )
 
-    tokenizer = components.tokenizer
     generator = PackedDataGenerator(
         components.settings.src_path,
         index_path=components.settings.index_path,
-        tokenizer=tokenizer,
+        tokenizer=components.tokenizer,
         eod_token=components.settings.eod_token,
         jq_pattern=components.settings.jq_pattern,
         number_of_processes=components.settings.num_cpus,
+        processing_batch_size=components.settings.processing_batch_size,
+        raw_samples_queue_size=components.settings.raw_samples_queue_size,
+        processed_samples_queue_size=components.settings.processed_samples_queue_size,
     )
     generator.run(components.settings.dst_path)
 
@@ -215,10 +201,7 @@ class Main:
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
-            gradient_clipper=build_gradient_clipper(
-                gradient_clipping_mode=components.settings.training.gradient_clipping.mode,
-                gradient_clipping_threshold=components.settings.training.gradient_clipping.threshold,
-            ),
+            gradient_clipper=components.gradient_clipper,
         )
 
         # Evaluator
@@ -244,7 +227,7 @@ class Main:
         gym.run(
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
-            checkpointing=components.checkpointing,
+            checkpoint_saving=components.checkpoint_saving,
             model=wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,

@@ -2,11 +2,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
+
 from pydantic import BaseModel, ConfigDict
 from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
+
 
 # Huggingface Model dependencies
 #
@@ -41,15 +43,16 @@ class HuggingFacePretrainedModelConfig(BaseModel):
 
 
 class HuggingFacePretrainedModel(NNModel):
+
     def __init__(
-        self,
-        model_type: HuggingFaceModelTypes,
-        model_name: str,
-        prediction_key: str,
-        huggingface_prediction_subscription_key: str,
-        sample_key: str,
-        model_args: Optional[Any] = None,
-        kwargs: Optional[Any] = None,
+            self,
+            model_type: HuggingFaceModelTypes,
+            model_name: str,
+            prediction_key: str,
+            huggingface_prediction_subscription_key: str,
+            sample_key: str,
+            model_args: Optional[Any] = None,
+            kwargs: Optional[Any] = None,
     ):
         super().__init__()
         if model_args is None:

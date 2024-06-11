@@ -6,15 +6,17 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
-from modalities.checkpointing.checkpointing import Checkpointing
+from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 
 
 class ModelFactory:
     @staticmethod
-    def get_checkpointed_model(checkpointing: Checkpointing, checkpoint_path: Path, model: nn.Module) -> nn.Module:
-        wrapped_model = checkpointing.load_model_checkpoint(
+    def get_checkpointed_model(
+        checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, model: nn.Module
+    ) -> nn.Module:
+        wrapped_model = checkpoint_loading.load_model_checkpoint(
             file_path=checkpoint_path,
             model=model,
         )

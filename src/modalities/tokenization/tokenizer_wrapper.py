@@ -1,16 +1,24 @@
+from abc import ABC
 from typing import List
 
 import sentencepiece as spm
 from transformers import AutoTokenizer
 
 
-class TokenizerWrapper:
+class TokenizerWrapper(ABC):
     def tokenize(self, text: str) -> List[int]:
-        raise NotImplementedError("Tokenizer must be implemented by a subclass.")
+        raise NotImplementedError
+
+    def decode(self, input_ids: List[int]) -> str:
+        raise NotImplementedError
 
     @property
     def vocab_size(self) -> int:
         raise NotImplementedError("Tokenizer must be implemented by a subclass.")
+
+    def get_token_id(self, token: str) -> int:
+        raise NotImplementedError
+
 
     def get_token_id(self, token: str) -> int:
         raise NotImplementedError
@@ -38,6 +46,12 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         )["input_ids"]
         return tokens
 
+
+    def decode(self, token_ids: List[int]) -> str:
+        decoded_text = self.tokenizer.decode(token_ids)
+        return decoded_text
+
+
     def get_token_id(self, token: str) -> int:
         token_id = self.tokenizer.convert_tokens_to_ids(token)
         if isinstance(token_id, list):
@@ -54,6 +68,10 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
     def tokenize(self, text: str) -> List[int]:
         tokens = self.tokenizer.encode(text)
         return tokens
+
+    def decode(self, token_ids: List[int]) -> str:
+        decoded_text = self.tokenizer.decode(token_ids)
+        return decoded_text
 
     @property
     def vocab_size(self) -> int:

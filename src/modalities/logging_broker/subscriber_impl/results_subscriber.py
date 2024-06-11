@@ -1,11 +1,10 @@
 from pathlib import Path
-from typing import Dict, Optional
 
 import rich
+import wandb
 from rich.console import Group
 from rich.panel import Panel
 
-import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
@@ -55,18 +54,14 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         project: str,
         experiment_id: str,
         mode: WandbMode,
-        directory: Path,
-        experiment_config: Optional[Dict] = None,
+        logging_directory: Path,
+        config_file_path: Path,
     ) -> None:
         super().__init__()
 
-        # experiment_config_json = None
-        # if experiment_config is not None:
-        #     experiment_config_json = experiment_config.model_dump(mode="json")
+        run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory)
 
-        wandb.init(
-            project=project, name=experiment_id, mode=mode.value.lower(), dir=directory, config=experiment_config
-        )
+        run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
