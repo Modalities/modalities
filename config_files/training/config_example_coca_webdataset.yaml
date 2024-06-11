@@ -79,10 +79,10 @@ train_dataset:
     builders:
       - instance_key: train_coco_dataset_builder
         pass_type: BY_REFERENCE
-    shardshuffle: 1000
+    shardshuffle: 100
     repeat: true
     resample: true
-    shuffle: 1_000
+    shuffle_buffer: 10_000
 
 val_dataset:
   component_key: dataset
@@ -94,7 +94,7 @@ val_dataset:
     shardshuffle: 1000
     repeat: true
     resample: true
-    shuffle: 1_000
+    shuffle_buffer: 10_000
 
 train_dataloader:
   component_key: data_loader
@@ -148,9 +148,6 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-        mixed_precision_settings: FP_16
-        sharding_strategy: HYBRID_SHARD
-        block_names: [TransformerBlock, VisionTransformerBlock]
 
 captioning_loss:
   component_key: loss
@@ -276,7 +273,6 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.global_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
