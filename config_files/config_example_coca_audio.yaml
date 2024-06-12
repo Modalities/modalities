@@ -1,19 +1,19 @@
 settings:
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
   training:
-    callback_interval_in_samples: 10000
+    global_training_log_interval_in_steps: 10000 # Needs to be a multiple of gradient_acc_steps
+    global_checkpointing_interval_in_steps: 10000
+    global_evaluation_interval_in_steps: 10000
     global_num_training_samples: 1925398
-    global_num_seen_samples: 0
+    global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
     local_train_micro_batch_size: 256
     sequence_length: 512
-    gradient_clipping:
-      mode: p2_norm
-      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -21,11 +21,6 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
-tokenizer:
-  component_key: tokenizer
-  variant_key: gpt2_tokenizer_fast
-  config:
-    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
 
 collate_fn:
   component_key: collate_fn
@@ -46,8 +41,8 @@ train_dataset:
   config:
     type_: train
     audio_dataset_arrows: gertv-arrow-remove-na/train
-    bpe_to_ind: bpe_to_ind_audio.pkl
-    bpecodes: bpecodes_audio
+    bpe_to_ind: bpe_to_ind_gertv_2000.pkl
+    bpecodes: bpecodes_gertv_2000
     n_mels: 128
     block_size_audio_encoder: 500
     block_size_text_decoder: 512
@@ -61,8 +56,8 @@ val_dataset:
   config:
     type_: val
     audio_dataset_arrows: gertv-arrow-remove-na/test
-    bpe_to_ind: bpe_to_ind_audio.pkl
-    bpecodes: bpecodes_audio
+    bpe_to_ind: bpe_to_ind_gertv_2000.pkl
+    bpecodes: bpecodes_gertv_2000
     n_mels: 128
     block_size_audio_encoder: 500
     block_size_text_decoder: 512
@@ -86,7 +81,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -117,7 +112,7 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -136,40 +131,42 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
 
-checkpointing:
-  component_key: checkpointing
+checkpoint_saving:
+  component_key: checkpoint_saving
   variant_key: default
   config:
-    checkpointing_strategy:
-      component_key: checkpointing_strategy
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1 # -1 to save all checkpoints
-    checkpointing_execution:
-      component_key: checkpointing_execution
-      variant_key: fsdp_to_disc_checkpointing
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-        mixed_precision_settings: FP_16
-        sharding_strategy: FULL_SHARD
-        block_names: [TransformerBlock, AudioTransformer]
+        # mixed_precision_settings: FP_16
+        # sharding_strategy: FULL_SHARD
+        # block_names: [TransformerBlock, AudioTransformer]
 
 
 captioning_loss:
   component_key: loss
-  variant_key: clm_cross_entropy_loss
+  variant_key: cross_entropy_loss
   config:
     target_key: ${settings.referencing_keys.target_key}
-    prediction_key: logits
+    prediction_key: ${model.config.prediction_key}
+    tag: captioning_loss
 
 contrastive_loss:
   component_key: loss
-  variant_key: nce_loss
+  variant_key: clip_loss
   config:
     prediction_key1: ${model.config.modality_cls_prediction_key}
     prediction_key2: ${model.config.text_cls_prediction_key}
+    logit_scale_key: ${model.config.logit_scale_prediction_key}
     tag: contrastive_loss
 
 loss_fn:
@@ -200,6 +197,7 @@ model:
     text_embd_prediction_key: text_embeddings
     modality_cls_prediction_key: modality_cls
     text_cls_prediction_key: text_cls
+    logit_scale_prediction_key: logit_scale
     modality_encoder_config:
       sample_key: feats
       prediction_key: modality_embeddings
@@ -216,7 +214,7 @@ model:
       sample_key: ${settings.referencing_keys.sample_key}
       prediction_key: ${model.config.prediction_key}
       block_size: 512
-      vocab_size: 141
+      vocab_size: 2134
       n_layer_text: 3
       n_layer_multimodal_text: 3
       attention_config:
@@ -263,13 +261,23 @@ optimizer:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+
 batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
-    global_num_seen_samples: ${settings.training.global_num_seen_samples}
+    # world_size: ${settings.cuda_env.world_size}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -286,3 +294,4 @@ evaluation_subscriber:
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}
