@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict
 
 import torch
 from torch import nn
@@ -7,25 +7,24 @@ from modalities.models.coca.multi_modal_decoder import TransformerBlock
 from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel
 from modalities.nn.attention import AttentionConfig, AttentionType
-from transformers import PreTrainedTokenizer
 
 
 class TextDecoder(NNModel):
     def __init__(
-            self,
-            sample_key: str,
-            prediction_key: str,
-            block_size: int,
-            vocab_size: int,
-            n_layer: int,
-            n_head: int,
-            n_embd: int,
-            ffn_hidden: int,
-            dropout: float,
-            bias: bool,
-            activation: ActivationType,
-            epsilon: float,
-            attention_config: AttentionConfig = None,
+        self,
+        sample_key: str,
+        prediction_key: str,
+        block_size: int,
+        vocab_size: int,
+        n_layer: int,
+        n_head: int,
+        n_embd: int,
+        ffn_hidden: int,
+        dropout: float,
+        bias: bool,
+        activation: ActivationType,
+        epsilon: float,
+        attention_config: AttentionConfig = None,
     ):
         super().__init__()
         self.sample_key = sample_key

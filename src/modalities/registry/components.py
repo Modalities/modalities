@@ -67,6 +67,7 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.mamba.mamba_config import MambaLLMConfig
+from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -81,8 +82,6 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
-
-from modalities.models.mamba.mamba_model import MambaLLM
 
 
 @dataclass
