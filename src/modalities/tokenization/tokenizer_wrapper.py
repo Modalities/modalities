@@ -26,7 +26,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         pretrained_model_name_or_path: str,
         truncation: bool = False,
         padding: bool = False,
-        max_length: int = None,
+        max_length: Optional[int] = None,
     ) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path
