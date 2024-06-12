@@ -110,7 +110,7 @@ class QueryKeyValueTransformType(Enum):
 
 class ActivationType(str, Enum):
     GELU = "gelu"
-    FUSED_SWIGLU = "fused_swiglu"
+    SWIGLU = "swiglu"
 
 
 class AttentionConfig(BaseModel):
@@ -297,6 +297,31 @@ class TransformerMLP(nn.Module):
         x = self.dropout(x)
         return x
 
+class SwiGLU(nn.Module):
+    def __init__(self, n_embd: int, bias: bool):
+        super().__init__()
+        # Best practice: 4 * n_embd
+        hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+
+        self.c_fc = nn.Linear(
+            in_features=n_embd,
+            out_features=hidden_dim,  
+            bias=bias,
+        )
+        self.silu = nn.SiLU()
+        self.c_proj = nn.Linear(
+            in_features=n_embd,
+            out_features=hidden_dim,
+            bias=bias,
+        )
+        self.out_proj = nn.Linear(
+            in_features=hidden_dim,
+            out_features=n_embd,
+            bias=bias,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out_proj(self.silu(self.c_fc(x)) * self.c_proj(x))
 
 class GPT2Block(nn.Module):
     def __init__(
@@ -327,9 +352,8 @@ class GPT2Block(nn.Module):
         )
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation_type == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        elif activation_type == ActivationType.SWIGLU:
+            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
 
