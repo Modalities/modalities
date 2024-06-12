@@ -206,7 +206,7 @@ model:
       n_embd: 768
       dropout: 0.0
       bias: true
-      activation: fused_swiglu
+      activation: swiglu
       epsilon: 1e-5
     n_pool_head: 8
     n_vision_queries: 256
