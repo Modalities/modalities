@@ -302,13 +302,16 @@ def test_hf_tokenize(
 
     token_ids = tokenizer.tokenize(text)
 
+    # make sure that the overall token sequence length is correct
     assert len(token_ids) == expected_length
-    assert (
-        len(token_ids) - sum(np.array(token_ids) == 43488)
-        == expected_num_paddding_tokens
+
+    # check number of non-padding tokens
+    assert sum(np.array(token_ids) == 43488) == (
+        expected_length - expected_num_paddding_tokens
     )
 
-    _assert_tokenization(tokenizer)
+    # check number of padding tokens
+    assert sum(np.array(token_ids) == 50257) == expected_num_paddding_tokens
 
 
 @pytest.mark.skip(reason="Missing pretrained unigram sp tokenizer.")
