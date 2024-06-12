@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import List
+from typing import Dict, List, Optional
 
 import sentencepiece as spm
 from transformers import AutoTokenizer
@@ -27,10 +27,21 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         truncation: bool = False,
         padding: bool = False,
         max_length: Optional[int] = None,
+        special_tokens: Optional[Dict[str, str]] = None,
     ) -> None:
+        # also see here for the truncation and padding options and their effects:
+        # https://huggingface.co/docs/transformers/pad_truncation#padding-and-truncation
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path
         )
+        if special_tokens is not None:
+            # TODO check if we always want to set
+            # replace_additional_special_tokens=False
+            self.tokenizer.add_special_tokens(
+                special_tokens_dict=special_tokens,
+                replace_additional_special_tokens=False,
+            )
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
@@ -38,6 +49,10 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
     @property
     def vocab_size(self):
         return self.tokenizer.vocab_size
+
+    @property
+    def special_tokens(self) -> Dict[str, str | List[str]]:
+        return self.tokenizer.special_tokens_map
 
     def tokenize(self, text: str) -> List[int]:
         tokens = self.tokenizer.__call__(
