@@ -3,6 +3,8 @@
 import logging
 import os
 import shutil
+import subprocess
+from os.path import isfile
 from pathlib import Path
 from typing import Dict, Tuple, Type
 
@@ -34,10 +36,57 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters
 
+_ROOT_DIR = Path(__file__).parents[2]
+
 
 @click.group()
 def main() -> None:
     pass
+
+
+@main.command(name="test")
+@click.argument("devices", type=int, nargs=-1)
+@click.option("--e2e_only", "-e", is_flag=True, default=False, help="Do only end-to-end testing.")
+def test(devices: Tuple[int], e2e_only: bool = False):
+    """
+    Run unit tests and/or end-to-end tests
+    """
+    devices = devices if len(devices) <= 2 else devices[:2]  # use max 2 devices
+    test_flags = {
+        "cpu": True,
+        "gpu_single": len(devices) >= 1 and e2e_only is False,
+        "gpu_multiple": len(devices) == 2,
+    }
+    print(f"> UNIT       TESTS ON          CPU: {test_flags['cpu']}")
+    print(
+        f"> UNIT       TESTS ON   SINGLE GPU: {test_flags['gpu_single']} "
+        + f"(device={devices[0] if test_flags['gpu_single'] else None})"
+    )
+    print(
+        f"> END-TO-END TESTS ON MULTIPLE GPU: {test_flags['gpu_multiple']} "
+        + f"(devices={devices if test_flags['gpu_multiple'] else None})"
+    )
+
+    # run unit tests
+    if test_flags["gpu_single"]:
+        command_unit_tests = f"CUDA_VISIBLE_DEVICES={devices[0]} pytest"
+
+        print("\n=== RUN UNIT TESTS ===")
+        print(command_unit_tests)
+        subprocess.run(command_unit_tests, shell=True, capture_output=False, text=True)
+
+    # run end-to-end tests
+    if test_flags["gpu_multiple"]:
+        run_distributed_tests_directory = _ROOT_DIR / "tests"
+        run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
+        assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
+        command_end_to_end_tests = (
+            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]}"
+        )
+
+        print("\n=== RUN END-TO-END TESTS ===")
+        print(command_end_to_end_tests)
+        subprocess.run(command_end_to_end_tests, shell=True, capture_output=False, text=True)
 
 
 @main.command(name="run")

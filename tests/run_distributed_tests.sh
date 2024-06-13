@@ -1,12 +1,25 @@
 #!/bin/sh
 
+#######################
+### INPUT ARGUMENTS ###
+#######################
+if [ -z "$1" ] || [ -z "$2" ]  # if one of the two input arguments does not exist
+  then
+    echo "Need to specify 2 GPU devices as arguments, e.g. bash run_distributed_tests.sh 0 1"
+    exit
+fi
+if [[ $1 =~ [^0-7] ]] || [[ $2 =~ [^0-7] ]]  # if one of the two input arguments is not an integer 0-7
+    then
+        echo "Need to specify integers 0-7 as arguments, e.g. bash run_distributed_tests.sh 0 1"
+        exit
+fi
+
 #################
 ### VARIABLES ###
 #################
-DEV0=3
-DEV1=4
+DEV0=$1 
+DEV1=$2
 COVERAGE=--no-cov
-
 
 #############
 ### TESTS ###
@@ -29,7 +42,3 @@ CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 torchrun --rdzv-endpoint localhost:29502 --nnod
 
 # test optimizer
 CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) test_optimizer_factory.py $COVERAGE
-
-# test initialization
-CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) test_initialization.py $COVERAGE
-
