@@ -42,7 +42,6 @@ class CrossEntropyLoss(Loss):
         # Mean over the tokens in the local-batch (batch per rank)
         self.loss_fun = TorchCrossEntropyLoss(
             reduction="mean",
-            ignore_index=0,
         )
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
