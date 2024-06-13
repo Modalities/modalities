@@ -5,15 +5,15 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 30 # Needs to be a multiple of gradient_acc_steps
-    global_checkpointing_interval_in_steps: 9_990
-    global_evaluation_interval_in_steps: 4_980
-    global_num_training_samples: 566748 # 491 steps with 8 gpus and global bs of 1152
+    global_training_log_interval_in_steps: 10000 # Needs to be a multiple of gradient_acc_steps
+    global_checkpointing_interval_in_steps: 10000
+    global_evaluation_interval_in_steps: 10000
+    global_num_training_samples: 10000
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
-    gradient_acc_steps: 30
-    local_train_micro_batch_size: 8
-    sequence_length: 64
+    gradient_acc_steps: 1
+    local_train_micro_batch_size: 2
+    sequence_length: 512
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -34,21 +34,23 @@ collate_fn:
   variant_key: coca_collator
   config:
     sample_keys:
-      - audio
+      - feats
+      - feats_len
       - ${settings.referencing_keys.sample_key}
+      - modality
     target_keys: []
     text_sample_key: ${settings.referencing_keys.sample_key}
     text_target_key: ${settings.referencing_keys.target_key}
 
-audio_transform:
+train_audio_transform:
   component_key: transform
   variant_key: audio_transform
   config:
     is_training: True
     block_size_audio_encoder: 2_000
-    block_size_text_decoder: 512
     freq_domain_mask_length: 30
     time_domain_mask_length: 100
+    
 
 text_transform:
   component_key: transform
@@ -58,29 +60,29 @@ text_transform:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
 
-train_audio_dataset_builder:
+train_coco_dataset_builder:
   component_key: dataset
   variant_key: web_dataset_builder
   config:
-    urls: "/home/operation/data/audio_data_wav_{000000..000004}.tar"
+    urls: commonvoice_17_train_wav_000001.tar
     modality_key_mapping:
-      TEXT: ["transcript.txt", "input_ids"]
-      AUDIO: ["wav", "audio"]
+      TEXT: ["transcript.txt", "input_ids"] # source and target keys
+      AUDIO: ["wav", "feats"]
     modality_transforms:
       AUDIO:
-        instance_key: audio_transform
+        instance_key: train_audio_transform
         pass_type: BY_REFERENCE
       TEXT:
         instance_key: text_transform
         pass_type: BY_REFERENCE
-    num_samples: 500
+    num_samples: 10000
 
 train_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
     builders:
-      - instance_key: train_audio_dataset_builder
+      - instance_key: train_coco_dataset_builder
         pass_type: BY_REFERENCE
     shardshuffle: 100
     repeat: true
@@ -92,7 +94,7 @@ val_dataset:
   variant_key: web_dataset
   config:
     builders:
-      - instance_key: train_audio_dataset_builder
+      - instance_key: train_coco_dataset_builder
         pass_type: BY_REFERENCE
     shardshuffle: 1000
     repeat: true
@@ -103,7 +105,7 @@ train_dataloader:
   component_key: data_loader
   variant_key: web_loader
   config:
-    num_workers: 8
+    num_workers: 2
     pin_memory: true
     drop_last: true
     dataloader_tag: "train"
@@ -119,7 +121,7 @@ val_dataloader:
   component_key: data_loader
   variant_key: web_loader
   config:
-    num_workers: 8
+    num_workers: 2
     pin_memory: true
     drop_last: false
     dataloader_tag: "val"
@@ -159,17 +161,15 @@ captioning_loss:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${model.config.prediction_key}
     tag: captioning_loss
-    weight: 2.0
 
 contrastive_loss:
   component_key: loss
   variant_key: clip_loss
   config:
-    prediction_key1: ${model.config.vision_cls_prediction_key}
+    prediction_key1: ${model.config.modality_cls_prediction_key}
     prediction_key2: ${model.config.text_cls_prediction_key}
     logit_scale_key: ${model.config.logit_scale_prediction_key}
     tag: contrastive_loss
-    weight: 1.0
 
 loss_fn:
   - instance_key: captioning_loss
@@ -186,7 +186,7 @@ wrapped_model:
       pass_type: BY_REFERENCE
     sync_module_states: true
     mixed_precision_settings: FP_16
-    sharding_strategy: HYBRID_SHARD
+    sharding_strategy: FULL_SHARD
     block_names: [TransformerBlock, AudioTransformer]
 
 model:
@@ -194,61 +194,42 @@ model:
   variant_key: coca
   config:
     prediction_key: logits
-    audio_embd_prediction_key: audio_embeddings
-    vision_embd_prediction_key: vision_embeddings
+    modality_key: modality
+    modality_embd_prediction_key: modality_embeddings
     text_embd_prediction_key: text_embeddings
-    audio_cls_prediction_key: audio_cls
-    vision_cls_prediction_key: vision_cls
+    modality_cls_prediction_key: modality_cls
     text_cls_prediction_key: text_cls
     logit_scale_prediction_key: logit_scale
-    audio_encoder_config:
-      sample_key: audio
-      prediction_key: audio_embeddings
+    modality_encoder_config:
+      sample_key: feats
+      prediction_key: modality_embeddings
       block_size: 2000
       n_mels: 128
       n_embd: 512
-      n_heads: 4
-      n_conformer_blocks: 3
+      n_heads: 1
+      n_conformer_blocks: 1
       attention_config:
         attention_engine_type: default_attention
       pointwise_conv_kernel_size: 1
-      depthwise_conv_kernel_size: 31
-    vision_encoder_config:
-      sample_key: videos
-      prediction_key: vision_embeddings
-      img_size: 256 # 288 in the original coca
-      n_classes: Null # Disable vision transformer head
-      n_layer: 12
-      attention_config:
-        attention_engine_type: default_attention
-      n_head: 12
-      n_embd: 768
-      dropout: 0.0
-      patch_size: 16 # 18 in the original coca
-      patch_stride: 16 # 18 in the original coca
-      n_img_channels: 3
-      add_cls_token: False
-      bias: True
-      num_video_frames: 16
-      n_latents: 64
+      depthwise_conv_kernel_size: 3
     text_decoder_config:
       sample_key: ${settings.referencing_keys.sample_key}
       prediction_key: ${model.config.prediction_key}
-      block_size: 1024
-      vocab_size: 50304 # 64k in the original coca
-      n_layer_text: 12
-      n_layer_multimodal_text: 12
+      block_size: 512
+      vocab_size: 50304
+      n_layer_text: 1
+      n_layer_multimodal_text: 1
       attention_config:
         attention_engine_type: default_attention
-      n_head: 12
-      ffn_hidden: 2048
-      n_embd: 768
+      n_head: 4
+      ffn_hidden: 1024
+      n_embd: 512
       dropout: 0.0
       bias: true
       activation: fused_swiglu
       epsilon: 1e-5
     n_pool_head: 8
-    n_vision_queries: 256
+    n_vision_queries: Null
     n_audio_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
@@ -258,22 +239,26 @@ model:
 
 scheduler:
   component_key: scheduler
-  variant_key: cosine_annealing_with_warmup_lr # COCA uses linear decay
+  variant_key: onecycle_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    num_warmup_steps: 2_000
-    num_training_steps: 500_000
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 962699
+    pct_start: 0.01
+    anneal_strategy: cos
 
 optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
-    lr: 8e-4
-    betas: [0.9, 0.999]
+    lr: 0.00001
+    betas: [0.9, 0.95]
     eps: 1e-8
-    weight_decay: 0.01
+    weight_decay: 1e-1
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -292,7 +277,7 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.global_rank}
+    local_rank: ${settings.cuda_env.local_rank}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
@@ -305,9 +290,9 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.global_rank}
+    local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
