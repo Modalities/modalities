@@ -26,6 +26,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
+from modalities.utils.number_conversion import NumberConversion
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
@@ -83,7 +84,12 @@ class TestFSDPToDiscCheckpointing:
     @pytest.fixture
     def optimizer(self, fsdp_wrapped_model: nn.Module) -> Optimizer:
         optimizer = OptimizerFactory.get_adam_w(
-            wrapped_model=fsdp_wrapped_model, lr=0.001, betas=[0.9, 0.95], eps=1e-8, weight_decay=1e-1
+            wrapped_model=fsdp_wrapped_model,
+            lr=0.001,
+            betas=[0.9, 0.95],
+            eps=1e-8,
+            weight_decay=1e-1,
+            weight_decay_groups_excluded=[],
         )
         return optimizer
 
@@ -96,6 +102,10 @@ class TestFSDPToDiscCheckpointing:
     def cuda_env_context(self):
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
             yield
+
+    @staticmethod
+    def _clone_parameters(fsdp_wrapped_model):
+        return [p.clone() for p in fsdp_wrapped_model.parameters() if p.requires_grad and p.numel() > 0]
 
     @staticmethod
     def _generate_batch(gpt2_model_config: Dict):
@@ -139,9 +149,13 @@ class TestFSDPToDiscCheckpointing:
         optimizer_1_state_dict: Dict, optimizer_2_state_dict: Dict, must_be_equal: bool
     ):
         if must_be_equal:
-            assert optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+            assert (
+                optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+            ), "_assert_equality_optimizer_param_group failed (must_be_equal = True)"
         else:
-            assert not (optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"])
+            assert not (
+                optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+            ), "_assert_equality_optimizer_param_group failed (must_be_equal = False)"
 
     @staticmethod
     def _assert_equality_optimizer_state(
@@ -157,17 +171,21 @@ class TestFSDPToDiscCheckpointing:
             assert set(state_1.keys()) == set(state_2.keys())
             for state_key in state_1.keys():
                 if must_be_equal:
-                    assert torch.equal(state_1[state_key], state_2[state_key])
+                    assert torch.equal(
+                        state_1[state_key], state_2[state_key]
+                    ), "_assert_equality_optimizer_state failed (must_be_equal = True)"
                 else:
-                    assert not torch.equal(state_1[state_key], state_2[state_key])
+                    assert not torch.equal(
+                        state_1[state_key], state_2[state_key]
+                    ), "_assert_equality_optimizer_state failed (must_be_equal = False)"
 
     @staticmethod
     def _assert_equality_two_models(params_1, params_2, must_be_equal: bool):
         for p1, p2 in zip(params_1, params_2):
             if must_be_equal:
-                assert torch.equal(p1, p2)
+                assert torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = True)"
             else:
-                assert not torch.equal(p1, p2)
+                assert not torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = False)"
 
     def test_save_checkpoint_after_backward_pass(
         self,
@@ -180,8 +198,15 @@ class TestFSDPToDiscCheckpointing:
         experiment_id = "0"
         num_train_steps_done = 1
 
+        context_size = gpt2_model_config_dict["model"]["config"]["block_size"]
+        get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
+            num_ranks=2, local_micro_batch_size=4, context_size=context_size
+        )
         checkpoint_saving = FSDPCheckpointSaving(
-            checkpoint_path=temporary_checkpoint_folder_path, experiment_id=experiment_id, global_rank=dist.get_rank()
+            checkpoint_path=temporary_checkpoint_folder_path,
+            experiment_id=experiment_id,
+            global_rank=dist.get_rank(),
+            get_num_tokens_from_num_steps_callable=get_num_tokens_from_num_steps_callable,
         )
 
         checkpoint_loading = FSDPCheckpointLoading(
@@ -191,7 +216,7 @@ class TestFSDPToDiscCheckpointing:
             sharding_strategy=ShardingStrategy.FULL_SHARD,
         )
 
-        untrained_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
+        untrained_model_parameters = self._clone_parameters(fsdp_wrapped_model)
         untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
@@ -203,7 +228,7 @@ class TestFSDPToDiscCheckpointing:
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
-        updated_model_parameters = [p.clone() for p in fsdp_wrapped_model.parameters()]
+        updated_model_parameters = self._clone_parameters(fsdp_wrapped_model)
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
@@ -232,7 +257,7 @@ class TestFSDPToDiscCheckpointing:
             optimizer=optimizer_2, wrapped_model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
-        loaded_and_updated_model_parameters = [p.clone() for p in fsdp_wrapped_model_2.parameters()]
+        loaded_and_updated_model_parameters = self._clone_parameters(fsdp_wrapped_model)
         loaded_and_updated_optimizer_state_dict = deepcopy(optimizer_2.state_dict())
 
         # make sure that after the update all weights are DIFFERENT from the original ones
@@ -272,7 +297,7 @@ class TestFSDPToDiscCheckpointing:
             batch_target_ids=batch_target_ids,
         )
 
-        assert loss_1 == loss_2
+        assert loss_1 == loss_2, f"loss_1 = {loss_1} does not equal loss_2 = {loss_2}"
 
         # make sure that after another update the two models and optimizers are the same
         self._assert_equality_two_models(
