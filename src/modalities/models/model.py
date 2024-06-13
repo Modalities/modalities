@@ -21,7 +21,35 @@ class NNModel(nn.Module):
     def get_parameters(self) -> Dict[str, torch.Tensor]:
         return {name: param for name, param in self.named_parameters()}
 
+class SwiGLU(nn.Module):
+    def __init__(self, n_embd: int, bias: bool):
+        super().__init__()
+        # Best practice: 4 * n_embd
+        # Because we add an additional linear layer, we need to adjust the hidden_dim to 2/3 of the original value
+        # which is equivalent to the number of parameters in TransformerMLP, i.e.
+        # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
+        # Besides, we ensure that hidden_dim is the smallest multiple of 256 that is greater than or equal the provided hidden_dim 
+        hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
 
+        self.c_fc = nn.Linear(
+            in_features=n_embd,
+            out_features=hidden_dim,  
+            bias=bias,
+        )
+        self.silu = nn.SiLU()
+        self.c_proj = nn.Linear(
+            in_features=n_embd,
+            out_features=hidden_dim,
+            bias=bias,
+        )
+        self.out_proj = nn.Linear(
+            in_features=hidden_dim,
+            out_features=n_embd,
+            bias=bias,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out_proj(self.silu(self.c_fc(x)) * self.c_proj(x))
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
     forward_result = model.forward(batch.samples)
