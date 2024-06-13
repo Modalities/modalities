@@ -314,6 +314,51 @@ class TextTransform(Transform):
         return batch_encoding
 
 
+class AudioTransformConfig(TransformConfig):
+    is_training: bool = False
+    n_mels: int = 128
+    freq_domain_mask_length: int = 30
+    time_domain_mask_length: int = 100
+    block_size_audio_encoder: int
+
+
+class AudioTransform(Transform):
+    def __init__(
+        self,
+        block_size_audio_encoder: int,
+        is_training: bool = False,
+        n_mels: int = 128,
+        freq_domain_mask_length: int = 30,
+        time_domain_mask_length: int = 100,
+    ):
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.is_training = is_training
+        self.n_mels = n_mels
+        self.freq_domain_mask_length = freq_domain_mask_length
+        self.time_domain_mask_length = time_domain_mask_length
+
+    def __call__(self, raw_audio: tuple[torch.Tensor, int]) -> tuple[torch.Tensor, int]:
+        SUB_SAMPLING_FACTOR = 4
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.is_training:
+            self.masking = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=self.freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
+            )
+
+        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
+        log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
+        feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
+
+        assert feats_len * SUB_SAMPLING_FACTOR <= SUB_SAMPLING_FACTOR * self.block_size_audio_encoder
+        log_mel_spec = torch.nn.functional.pad(
+            log_mel_spec, (0, SUB_SAMPLING_FACTOR * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+        ).transpose(0, 1)
+        return log_mel_spec, feats_len
+
+
 class RandomTemporalCrop:
     def __init__(self, num_frames):
         self.num_frames = num_frames
@@ -396,8 +441,12 @@ class MultimodalWebDatasetBuilder:
         }
 
         self.additional_extreacted_keys = []
+        self.additional_extreacted_keys.append("modality")
         if ModalityEnum.TEXT in self.modality_transforms:
             self.additional_extreacted_keys.append("attention_mask")
+
+        if ModalityEnum.AUDIO in self.modality_transforms:
+            self.additional_extreacted_keys.append("feats_len")
 
         # Mapping between modality and transform
         self.modality_to_transform_fn = {
@@ -466,10 +515,10 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_audio(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
-        # config: AudioTransformConfig = self.modality_transforms_configs[ModalityEnum.AUDIO]
-        # TODO add audio transform
-        sample[target_key] = sample[source_key]
+        transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
+        sample[target_key], sample["feats_len"] = transform(sample[source_key])
         del sample[source_key]
+        sample["modality"] = [0]
         return sample
 
     def _flatten_sample(self, sample):

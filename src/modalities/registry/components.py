@@ -54,6 +54,8 @@ from modalities.config.config import (
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import (
+    AudioTransform,
+    AudioTransformConfig,
     DummyDatasetConfig,
     ImageTransform,
     ImageTransformConfig,
@@ -176,6 +178,7 @@ COMPONENTS = [
     # Data transforms & augmentations
     ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
     ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
+    ComponentEntity("transform", "audio_transform", AudioTransform, AudioTransformConfig),
     ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
