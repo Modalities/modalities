@@ -16,6 +16,7 @@ model:
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
       qkv_transforms: []
+    attention_implementation: manual
     activation_type: gelu
     weight_init:
       mean: 0.0
