@@ -1,5 +1,6 @@
 import torch
-from modalities.models.gpt2.gpt2_model import SwiGLU
+
+from modalities.models.model import SwiGLU
 from modalities.nn.mlp import MLP
 
 

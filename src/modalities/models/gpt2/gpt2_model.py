@@ -1,5 +1,5 @@
 import math
-import sys
+
 from copy import deepcopy
 from enum import Enum
 from functools import partial
@@ -7,15 +7,13 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 from torch.nn import functional as F
-from transformers import PreTrainedTokenizer
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import NNModel
+from modalities.models.model import NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
 
@@ -296,32 +294,6 @@ class TransformerMLP(nn.Module):
         x = self.c_proj(x)
         x = self.dropout(x)
         return x
-
-class SwiGLU(nn.Module):
-    def __init__(self, n_embd: int, bias: bool):
-        super().__init__()
-        # Best practice: 4 * n_embd
-        hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-
-        self.c_fc = nn.Linear(
-            in_features=n_embd,
-            out_features=hidden_dim,  
-            bias=bias,
-        )
-        self.silu = nn.SiLU()
-        self.c_proj = nn.Linear(
-            in_features=n_embd,
-            out_features=hidden_dim,
-            bias=bias,
-        )
-        self.out_proj = nn.Linear(
-            in_features=hidden_dim,
-            out_features=n_embd,
-            bias=bias,
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.out_proj(self.silu(self.c_fc(x)) * self.c_proj(x))
 
 class GPT2Block(nn.Module):
     def __init__(

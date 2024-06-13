@@ -4,8 +4,8 @@ from typing import Dict, List
 import torch
 from torch import nn
 
-from modalities.models.gpt2.gpt2_model import ActivationType, SwiGLU
-from modalities.models.model import NNModel
+from modalities.models.gpt2.gpt2_model import ActivationType
+from modalities.models.model import NNModel, SwiGLU
 from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 from modalities.nn.mlp import MLP
 
