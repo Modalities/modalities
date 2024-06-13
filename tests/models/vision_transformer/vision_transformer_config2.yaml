@@ -1,4 +1,4 @@
-sample_key: images
+sample_key: videos
 prediction_key: logits
 img_size: 224
 n_classes: 1000
@@ -11,5 +11,5 @@ patch_stride: 16
 n_img_channels: 3
 add_cls_token: True
 bias: True
-num_video_frames: 1  
+num_video_frames: 16  
 n_latents: 64

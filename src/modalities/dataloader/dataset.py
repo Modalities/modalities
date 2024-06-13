@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pickle
+import random
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Tuple, Union
@@ -16,6 +17,7 @@ from subword_nmt import apply_bpe
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data.dataset import Dataset as TorchdataSet
+from torchvision import transforms
 from tqdm import tqdm
 from transformers import BatchEncoding
 
@@ -578,8 +580,8 @@ class ImageTransform(Transform):
     def __init__(self, **kwargs):
         self._timm_image_transform = create_transform(**kwargs)
 
-    def __call__(self, *args, **kwargs):
-        return self._timm_image_transform(*args, **kwargs)
+    def __call__(self, image):
+        return self._timm_image_transform(image)
 
 
 class TextTransformConfig(TransformConfig):
@@ -601,10 +603,6 @@ class TextTransform(Transform):
         return_attention_mask: bool = True,
     ):
         self.tokenizer = tokenizer
-        # # Ensure the tokenizer has a pad token
-        # if self.tokenizer.pad_token is None:
-        #     self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-
         self.max_length = max_length
         self.padding = padding
         self.truncation = truncation
@@ -621,73 +619,51 @@ class TextTransform(Transform):
         return batch_encoding
 
 
+class RandomTemporalCrop:
+    def __init__(self, num_frames):
+        self.num_frames = num_frames
+
+    def __call__(self, video):
+        total_frames = len(video)
+        start = random.randint(0, total_frames - self.num_frames)
+        return video[start : start + self.num_frames].permute(0, 3, 1, 2)  # F C H W
+
+
+class VideoTransformConfig(TransformConfig):
+    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    is_training: bool = False
+    num_frames: int = 16
+
+
+class VideoTransform(Transform):
+    def __init__(
+        self,
+        input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224,
+        is_training: bool = False,
+        num_frames: int = 16,
+    ):
+        self.spatial_transform = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(input_size, antialias=True),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+                transforms.ConvertImageDtype(torch.float),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        self.temporal_transform = RandomTemporalCrop(num_frames=16)
+
+    def __call__(self, video):
+        video = video[0]
+        video = self.temporal_transform(video)
+        return self.spatial_transform(video)
+
+
 class MultimodalWebDatasetBuilderConfig(BaseModel):
     urls: Union[List[str], str]
     modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
     modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
     num_samples: Annotated[int, Field(ge=1)]
-
-
-class AudioTransformConfig(TransformConfig):
-    is_training: bool = False
-    n_mels: int = 128
-    freq_domain_mask_length: int = 30
-    time_domain_mask_length: int = 100
-    block_size_audio_encoder: int
-
-
-# @register_component("transform", "audio_transform", AudioTransformConfig)
-class AudioTransform(Transform):
-    def __init__(
-        self,
-        block_size_audio_encoder: int,
-        is_training: bool = False,
-        n_mels: int = 128,
-        freq_domain_mask_length: int = 30,
-        time_domain_mask_length: int = 100,
-    ):
-        self.block_size_audio_encoder = block_size_audio_encoder
-        self.is_training = is_training
-        self.n_mels = n_mels
-        self.freq_domain_mask_length = freq_domain_mask_length
-        self.time_domain_mask_length = time_domain_mask_length
-
-    def __call__(self, raw_audio: tuple[torch.Tensor, int]) -> torch.Tensor:
-        SUB_SAMPLING_FACTOR = 4
-
-        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
-
-        if self.is_training:
-            self.masking = torch.nn.Sequential(
-                torchaudio.transforms.FrequencyMasking(freq_mask_param=self.freq_domain_mask_length),
-                torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
-            )
-
-        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
-        log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
-        feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
-
-        assert feats_len * SUB_SAMPLING_FACTOR <= SUB_SAMPLING_FACTOR * self.block_size_audio_encoder
-        log_mel_spec = torch.nn.functional.pad(
-            log_mel_spec, (0, SUB_SAMPLING_FACTOR * self.block_size_audio_encoder - log_mel_spec.shape[-1])
-        ).transpose(0, 1)
-        return log_mel_spec
-
-
-class WebDatasetConfig(BaseModel):
-    urls: Union[List[str], str]
-    source_image_key: str
-    image_key: str
-    source_text_key: str
-    text_key: str
-    tokenizer: PydanticTokenizerIFType
-    block_size: int
-    num_samples: int
-    image_transform_config: Optional[ImageTransformConfig] = None
-    shardshuffle: Optional[int] = None
-    repeat: bool = False
-    resample: bool = False
-    shuffle: int = 0
 
 
 # @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
@@ -711,7 +687,6 @@ class MultimodalWebDatasetBuilder:
         self.urls = urls
         self.modality_key_mapping = modality_key_mapping
         self.modality_transforms = modality_transforms
-
         assert self.modality_key_mapping.keys() == self.modality_transforms.keys()
         self.modalities = list(self.modality_key_mapping.keys())
         self.num_samples = num_samples
@@ -789,16 +764,16 @@ class MultimodalWebDatasetBuilder:
 
     def _transform_video(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
-        # config: VideoTransformConfig = self.modality_transforms_configs[ModalityEnum.VIDEO]
-        # TODO add video transform
-        sample[target_key] = sample[source_key]
+        transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
+        sample[target_key] = transform(sample[source_key])
         del sample[source_key]
         return sample
 
     def _transform_audio(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
-        transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
-        sample[target_key] = transform(sample[source_key])
+        # config: AudioTransformConfig = self.modality_transforms_configs[ModalityEnum.AUDIO]
+        # TODO add audio transform
+        sample[target_key] = sample[source_key]
         del sample[source_key]
         return sample
 
@@ -865,6 +840,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         """
         super().__init__()
         self.builders = builders
+        assert len(builders) == 1, "Multiple dataset builders are not supported yet"  # TODO
 
         self.output_keys_by_modality = {}
         for b in builders:

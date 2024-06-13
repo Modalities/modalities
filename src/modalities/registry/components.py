@@ -18,6 +18,9 @@ from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpo
 from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
+    ArrowDatasetAudioConfig,
+    ArrowDatasetAVConfig,
+    ArrowDatasetVisionConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
@@ -54,8 +57,6 @@ from modalities.config.config import (
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import (
-    AudioTransform,
-    AudioTransformConfig,
     DummyDatasetConfig,
     ImageTransform,
     ImageTransformConfig,
@@ -65,6 +66,8 @@ from modalities.dataloader.dataset import (
     MultimodalWebDatasetConfig,
     TextTransform,
     TextTransformConfig,
+    VideoTransform,
+    VideoTransformConfig,
 )
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
@@ -88,6 +91,9 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
 )
+
+# from modalities.models.mamba.mamba_config import MambaLLMConfig
+# from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -115,6 +121,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    # ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -172,7 +179,12 @@ COMPONENTS = [
     # Data transforms & augmentations
     ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
     ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
-    ComponentEntity("transform", "audio_transform", AudioTransform, AudioTransformConfig),
+    ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
+    ComponentEntity(
+        "dataset", "arrow_dataset_vision", DatasetFactory.get_arrow_dataset_vision, ArrowDatasetVisionConfig
+    ),
+    ComponentEntity("dataset", "arrow_dataset_audio", DatasetFactory.get_arrow_dataset_audio, ArrowDatasetAudioConfig),
+    ComponentEntity("dataset", "arrow_dataset_av", DatasetFactory.get_arrow_dataset_av, ArrowDatasetAVConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
