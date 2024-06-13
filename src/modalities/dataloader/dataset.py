@@ -1,20 +1,33 @@
 from __future__ import annotations
 
+import pickle
+import random
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Annotated, Dict, List, Optional, Tuple, Union
 
 import jq
 import numpy as np
-from pydantic import BaseModel
+import torch
+import torchaudio
+import webdataset as wds
+from datasets import concatenate_datasets, load_from_disk
+from pydantic import BaseModel, Field
+from subword_nmt import apply_bpe
+from timm.data import create_transform
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data.dataset import Dataset as TorchdataSet
+from torchvision import transforms
 from tqdm import tqdm
 from transformers import BatchEncoding
 
+from modalities.config.config import PydanticTokenizerIFType
+from modalities.config.lookup_enum import LookupEnum
+from modalities.config.pydanctic_if_types import PydanticThirdPartyTypeIF
+from modalities.dataloader.create_packed_data import EmbeddedStreamData
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
-
-from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import EmbeddedStreamData
+from modalities.util import flatten_dict
 
 
 class Dataset(TorchdataSet):
@@ -31,6 +44,7 @@ class Dataset(TorchdataSet):
 class DummySampleDataType(str, Enum):
     FLOAT = "float"
     INT = "int"
+    CONSTANT = "const"
 
 
 class DummySampleConfig(BaseModel):
@@ -55,6 +69,8 @@ class DummyDataset(Dataset):
         self.num_samples = num_samples
         self.sample_definition = sample_definition
 
+        self.VISION = 1
+
     def __len__(self) -> int:
         return self.num_samples
 
@@ -68,10 +84,313 @@ class DummyDataset(Dataset):
                 data = np.random.randn(*s.sample_shape)
             elif s.sample_type == DummySampleDataType.INT:
                 data = np.random.randint(low=0, high=512, size=s.sample_shape)
+            elif s.sample_type == DummySampleDataType.CONSTANT:
+                data = self.VISION
             else:
                 raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
             sample[s.sample_key] = data
         return sample
+
+
+class ArrowDatasetVision(Dataset):
+    def __init__(
+        self,
+        vision_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        img_size: int,
+        block_size_text_decoder: int,
+    ):
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+
+        self.VISION = 1
+        self.img_size = img_size
+        self.block_size_text_decoder = block_size_text_decoder
+
+        self.dataset_hf = load_from_disk(vision_dataset_arrows)
+
+        with bpe_to_ind.open("rb") as filein:
+            self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
+
+        with bpecodes.open() as filein:
+            self.bpe = apply_bpe.BPE(filein)
+
+        self.tf = create_transform(input_size=(self.img_size))
+
+    def __len__(
+        self,
+    ):
+        return len(self.dataset_hf)
+
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        tokenized_transcript = self._tokenize(self.dataset_hf[idx]["json"]["text0"])
+
+        assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+        tokenized_transcript = torch.nn.functional.pad(
+            tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+        )
+
+        return {
+            "feats": self.tf(self.dataset_hf[idx]["jpg"]),
+            "feats_len": self.img_size,
+            "input_ids": tokenized_transcript,
+            "modality": [self.VISION],
+        }
+
+    def _tokenize(self, transcript):
+        return torch.tensor(
+            [
+                (self.bpe_to_ind[tok] if tok in self.bpe_to_ind else self.bpe_to_ind["<|unk|>"])
+                for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
+            ]
+        )
+
+
+class ArrowDatasetAudio(Dataset):
+    def __init__(
+        self,
+        type_: str,
+        audio_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        n_mels: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
+        freq_domain_mask_length: int,
+        time_domain_mask_length: int,
+    ):
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+
+        self.AUDIO = 0
+
+        self.type_ = type_
+
+        self.n_mels = n_mels
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.block_size_text_decoder = block_size_text_decoder
+
+        self.dataset_hf = load_from_disk(audio_dataset_arrows)
+
+        with bpe_to_ind.open("rb") as filein:
+            self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
+
+        with bpecodes.open() as filein:
+            self.bpe = apply_bpe.BPE(filein)
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.type_ == "train":
+            self.train_audio_transforms = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=time_domain_mask_length),
+            )
+
+    def __len__(
+        self,
+    ):
+        return len(self.dataset_hf)
+
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        waveform, sample_rate = torchaudio.load(self.dataset_hf[idx]["path"])
+        log_mel_spec = torch.clamp(self.extract_features(waveform), 1e-10).log10().squeeze(0)
+        log_mel_spec = self.train_audio_transforms(log_mel_spec) if self.type_ == "train" else log_mel_spec
+        feats_len = log_mel_spec.shape[-1] // 4
+
+        assert feats_len * 4 <= 4 * self.block_size_audio_encoder
+        log_mel_spec = torch.nn.functional.pad(
+            log_mel_spec, (0, 4 * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+        ).transpose(0, 1)
+
+        tokenized_transcript = self._tokenize(self.dataset_hf[idx]["transcript"])
+        assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+        tokenized_transcript = torch.nn.functional.pad(
+            tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+        )
+
+        return {
+            "feats": log_mel_spec,
+            "feats_len": feats_len,
+            "input_ids": tokenized_transcript,
+            "modality": [self.AUDIO],
+        }
+
+    def _tokenize(self, transcript):
+        return torch.tensor(
+            [
+                (self.bpe_to_ind[tok] if tok in self.bpe_to_ind else self.bpe_to_ind["<|unk|>"])
+                for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
+            ]
+        )
+
+
+class ArrowDatasetAV(Dataset):
+    def __init__(
+        self,
+        type_: str,
+        batch_size: int,
+        audio_dataset_arrows: str,
+        vision_dataset_arrows: str,
+        bpe_to_ind: Path,
+        bpecodes: Path,
+        n_mels: int,
+        img_size: int,
+        block_size_audio_encoder: int,
+        block_size_text_decoder: int,
+        freq_domain_mask_length: int,
+        time_domain_mask_length: int,
+    ):
+        super().__init__(raw_data_path=None, block_size=None, sample_key=None)
+
+        self.AUDIO = 0
+        self.VISION = 1
+
+        self.type_ = type_
+        self.batch_size = batch_size
+
+        self.n_mels = n_mels
+        self.img_size = img_size
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.block_size_text_decoder = block_size_text_decoder
+
+        audio_dataset = load_from_disk(audio_dataset_arrows)
+        self.audio_dataset_length = len(audio_dataset)
+        vision_dataset = load_from_disk(vision_dataset_arrows)
+
+        self.dataset_hf = concatenate_datasets([audio_dataset, vision_dataset])
+
+        with bpe_to_ind.open("rb") as filein:
+            self.bpe_to_ind = pickle.load(filein)  # this should include the </s> token
+
+        with bpecodes.open() as filein:
+            self.bpe = apply_bpe.BPE(filein)
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.type_ == "train":
+            self.train_audio_transforms = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=time_domain_mask_length),
+            )
+
+        self.tf = create_transform(input_size=(self.img_size))
+
+        self.map = self._create_index_map(
+            audio_dataset_length=self.audio_dataset_length,
+            total_dataset_length=len(self),
+        )
+
+    def __len__(
+        self,
+    ):
+        return len(self.dataset_hf)
+
+    def __getitem__(
+        self,
+        idx,
+    ):
+        if not 0 <= idx < len(self):
+            raise IndexError
+
+        if self.map[idx] < self.audio_dataset_length:
+            waveform, sample_rate = torchaudio.load(self.dataset_hf[self.map[idx]]["path"])
+            log_mel_spec = self.extract_features(torch.clamp(waveform), 1e-10).log10().squeeze(0)
+            log_mel_spec = self.train_audio_transforms(log_mel_spec) if self.type_ == "train" else log_mel_spec
+            feats_len = log_mel_spec.shape[-1] // 4
+
+            assert feats_len * 4 <= 4 * self.block_size_audio_encoder
+            log_mel_spec = torch.nn.functional.pad(
+                log_mel_spec, (0, 4 * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+            ).transpose(0, 1)
+
+            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["transcript"])
+            assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+            tokenized_transcript = torch.nn.functional.pad(
+                tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+            )
+
+            return {
+                "feats": log_mel_spec,
+                "feats_len": feats_len,
+                "input_ids": tokenized_transcript,
+                "modality": [self.AUDIO],
+            }
+
+        else:
+            tokenized_transcript = self._tokenize(self.dataset_hf[self.map[idx]]["json"]["text0"])
+
+            assert tokenized_transcript.shape[-1] <= self.block_size_text_decoder
+            tokenized_transcript = torch.nn.functional.pad(
+                tokenized_transcript, (0, self.block_size_text_decoder - tokenized_transcript.shape[0])
+            )
+
+            return {
+                "feats": self.tf(self.dataset_hf[self.map[idx]]["jpg"]),
+                "feats_len": self.img_size,
+                "input_ids": tokenized_transcript,
+                "modality": [self.VISION],
+            }
+
+    def _tokenize(self, transcript):
+        return torch.tensor(
+            [
+                (self.bpe_to_ind[tok] if tok in self.bpe_to_ind else self.bpe_to_ind["<|unk|>"])
+                for tok in self.bpe.segment(transcript.lower().strip().strip("\n")).split() + ["</s>"]
+            ]
+        )
+
+    def _create_index_map(
+        self,
+        audio_dataset_length,
+        total_dataset_length,
+    ):
+        map_ = {}
+        ind = 0
+        ap = 0
+        vp = audio_dataset_length
+        sweep = 0
+        switch = False
+        one_time_fill = True
+        while True:
+            if not switch:
+                if ap < audio_dataset_length:
+                    map_[ind] = ap
+                    ind += 1
+                    ap += 1
+                elif one_time_fill:
+                    map_[ind] = sweep
+                    ind += 1
+                    if sweep == self.batch_size - 1:
+                        one_time_fill = False
+            else:
+                if vp < total_dataset_length:
+                    map_[ind] = vp
+                    ind += 1
+                    vp += 1
+                elif one_time_fill:
+                    map_[ind] = audio_dataset_length + sweep
+                    ind += 1
+                    if sweep == self.batch_size - 1:
+                        one_time_fill = False
+            sweep += 1
+            if sweep == self.batch_size:
+                sweep = 0
+                switch = not switch
+            if ap == audio_dataset_length and vp == total_dataset_length:
+                break
+
+        return map_
 
 
 class MemMapDataset(Dataset):
@@ -207,3 +526,401 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class ModalityEnum(LookupEnum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+
+
+class TransformConfig(BaseModel):
+    pass
+
+
+class Transform:
+    pass
+
+
+PydanticTransformIFType = Annotated[Transform, PydanticThirdPartyTypeIF(Transform)]
+
+
+class ImageTransformConfig(TransformConfig):
+    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    is_training: bool = False
+    no_aug: bool = False
+    train_crop_mode: Optional[str] = None
+    scale: Optional[Tuple[float, float]] = None
+    ratio: Optional[Tuple[float, float]] = None
+    hflip: float = 0.5
+    vflip: float = 0.0
+    color_jitter: Union[float, Tuple[float, ...]] = 0.4
+    color_jitter_prob: Optional[float] = None
+    grayscale_prob: float = 0.0
+    gaussian_blur_prob: float = 0.0
+    auto_augment: Optional[str] = None
+    interpolation: str = "bilinear"
+    mean: Tuple[float, ...] = IMAGENET_DEFAULT_MEAN
+    std: Tuple[float, ...] = IMAGENET_DEFAULT_STD
+    re_prob: float = 0.0
+    re_mode: str = "const"
+    re_count: int = 1
+    re_num_splits: int = 0
+    crop_pct: Optional[float] = None
+    crop_mode: Optional[str] = None
+    crop_border_pixels: Optional[int] = None
+    tf_preprocessing: bool = False
+    use_prefetcher: bool = False
+    separate: bool = False
+
+
+# @register_component("transform", "image_transform", ImageTransformConfig)
+class ImageTransform(Transform):
+    def __init__(self, **kwargs):
+        self._timm_image_transform = create_transform(**kwargs)
+
+    def __call__(self, image):
+        return self._timm_image_transform(image)
+
+
+class TextTransformConfig(TransformConfig):
+    tokenizer: PydanticTokenizerIFType
+    max_length: int = 77
+    padding: str = "max_length"
+    truncation: bool = True
+    return_attention_mask: bool = True
+
+
+# @register_component("transform", "text_transform", TextTransformConfig)
+class TextTransform(Transform):
+    def __init__(
+        self,
+        tokenizer: TokenizerWrapper,
+        max_length: int = 77,
+        padding: str = "max_length",
+        truncation: bool = True,
+        return_attention_mask: bool = True,
+    ):
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.padding = padding
+        self.truncation = truncation
+        self.return_attention_mask = return_attention_mask
+
+    def __call__(self, text):
+        batch_encoding: BatchEncoding = self.tokenizer.tokenizer(
+            text,
+            max_length=self.max_length,
+            padding=self.padding,
+            truncation=self.truncation,
+            return_attention_mask=self.return_attention_mask,
+        )
+        return batch_encoding
+
+
+class AudioTransformConfig(TransformConfig):
+    is_training: bool = False
+    n_mels: int = 128
+    freq_domain_mask_length: int = 30
+    time_domain_mask_length: int = 100
+    block_size_audio_encoder: int
+
+
+class AudioTransform(Transform):
+    def __init__(
+        self,
+        block_size_audio_encoder: int,
+        is_training: bool = False,
+        n_mels: int = 128,
+        freq_domain_mask_length: int = 30,
+        time_domain_mask_length: int = 100,
+    ):
+        self.block_size_audio_encoder = block_size_audio_encoder
+        self.is_training = is_training
+        self.n_mels = n_mels
+        self.freq_domain_mask_length = freq_domain_mask_length
+        self.time_domain_mask_length = time_domain_mask_length
+
+    def __call__(self, raw_audio: tuple[torch.Tensor, int]) -> tuple[torch.Tensor, int]:
+        SUB_SAMPLING_FACTOR = 4
+
+        self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
+
+        if self.is_training:
+            self.masking = torch.nn.Sequential(
+                torchaudio.transforms.FrequencyMasking(freq_mask_param=self.freq_domain_mask_length),
+                torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
+            )
+
+        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
+        log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
+        feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
+
+        assert feats_len * SUB_SAMPLING_FACTOR <= SUB_SAMPLING_FACTOR * self.block_size_audio_encoder
+        log_mel_spec = torch.nn.functional.pad(
+            log_mel_spec, (0, SUB_SAMPLING_FACTOR * self.block_size_audio_encoder - log_mel_spec.shape[-1])
+        ).transpose(0, 1)
+        return log_mel_spec, feats_len
+
+
+class RandomTemporalCrop:
+    def __init__(self, num_frames):
+        self.num_frames = num_frames
+
+    def __call__(self, video):
+        total_frames = len(video)
+        start = random.randint(0, total_frames - self.num_frames)
+        return video[start : start + self.num_frames].permute(0, 3, 1, 2)  # F C H W
+
+
+class VideoTransformConfig(TransformConfig):
+    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    is_training: bool = False
+    num_frames: int = 16
+
+
+class VideoTransform(Transform):
+    def __init__(
+        self,
+        input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224,
+        is_training: bool = False,
+        num_frames: int = 16,
+    ):
+        self.spatial_transform = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(input_size, antialias=True),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+                transforms.ConvertImageDtype(torch.float),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        self.temporal_transform = RandomTemporalCrop(num_frames=16)
+
+    def __call__(self, video):
+        video = video[0]
+        video = self.temporal_transform(video)
+        return self.spatial_transform(video)
+
+
+class MultimodalWebDatasetBuilderConfig(BaseModel):
+    urls: Union[List[str], str]
+    modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
+    modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
+    num_samples: Annotated[int, Field(ge=1)]
+
+
+# @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
+class MultimodalWebDatasetBuilder:
+    def __init__(
+        self,
+        urls: Union[List[str], str],
+        modality_key_mapping: Dict[str, Tuple[str, str]],
+        modality_transforms: Dict[str, Transform],
+        num_samples: int,
+    ):
+        """A multimodal dataset instance for the WebDataset.
+
+        Args:
+            urls: A webdataset url. For example: "/data/path/{00000..00012.tar".
+            modality_key_mapping: Mapping from dataset keys to keys expected by the forward pass of the model.
+                For example: {ModalityEnum.IMAGE: ("jpg", "image"), ModalityEnum.TEXT: ("text", "caption")}}
+            modality_transforms: The transforms for each modality.
+            num_samples: The number of samples for each modality combination.
+        """
+        self.urls = urls
+        self.modality_key_mapping = modality_key_mapping
+        self.modality_transforms = modality_transforms
+        assert self.modality_key_mapping.keys() == self.modality_transforms.keys()
+        self.modalities = list(self.modality_key_mapping.keys())
+        self.num_samples = num_samples
+        self.web_dataset = None
+
+        # Mapping between modality and the decode "function"
+        self.modality_to_decode_fn = {
+            ModalityEnum.TEXT: None,
+            ModalityEnum.IMAGE: "pil",
+            ModalityEnum.VIDEO: wds.torch_video,
+            ModalityEnum.AUDIO: wds.torch_audio,
+        }
+
+        self.additional_extreacted_keys = []
+        self.additional_extreacted_keys.append("modality")
+        if ModalityEnum.TEXT in self.modality_transforms:
+            self.additional_extreacted_keys.append("attention_mask")
+
+        if ModalityEnum.AUDIO in self.modality_transforms:
+            self.additional_extreacted_keys.append("feats_len")
+
+        # Mapping between modality and transform
+        self.modality_to_transform_fn = {
+            ModalityEnum.TEXT: self._transform_text,
+            ModalityEnum.IMAGE: self._transform_image,
+            ModalityEnum.VIDEO: self._transform_video,
+            ModalityEnum.AUDIO: self._transform_audio,
+        }
+
+    def prepare(
+        self, shardshuffle: int = 100, resample: bool = True, repeat: bool = False, shuffle_buffer: int = 10_000
+    ):
+        self.web_dataset = wds.WebDataset(
+            urls=self.urls,
+            nodesplitter=self.dummy_nodesplitter if not resample else None,
+            shardshuffle=shardshuffle,
+            repeat=repeat,
+            handler=wds.ignore_and_continue,
+            resampled=resample,
+        )
+
+        # Apply shuffling to samples
+        if shuffle_buffer is not None and shuffle_buffer > 0:
+            self.web_dataset.append(wds.filters.shuffle(shuffle_buffer))
+
+        # Flatten the json structure for convenience
+        self.web_dataset.append(wds.filters.decode(partial=True))  # Decode json byte string
+        self.web_dataset.append(wds.filters.map(self._flatten_sample))
+
+        # Load the actual data
+        for modality_key in self.modalities:
+            decode_fn = self.modality_to_decode_fn[modality_key]
+            if decode_fn is None:
+                continue
+            self.web_dataset.append(wds.filters.decode(decode_fn, partial=True))
+
+        # Transform the data
+        for modality_key in self.modalities:
+            transform_fn = self.modality_to_transform_fn[modality_key]
+            self.web_dataset.append(wds.filters.map(transform_fn))
+
+        self.web_dataset.append(wds.filters.map(self._select_keys))
+
+    def _transform_text(self, sample):
+        source_key, target_key = self.modality_key_mapping[ModalityEnum.TEXT]
+        transform: TextTransform = self.modality_transforms[ModalityEnum.TEXT]
+        batch_encoding: BatchEncoding = transform(sample[source_key])
+        del sample[source_key]
+        sample[target_key] = batch_encoding.input_ids
+        sample["attention_mask"] = batch_encoding.attention_mask
+        return sample
+
+    def _transform_image(self, sample):
+        source_key, target_key = self.modality_key_mapping[ModalityEnum.IMAGE]
+        transform: TextTransform = self.modality_transforms[ModalityEnum.IMAGE]
+        sample[target_key] = transform(sample[source_key])
+        del sample[source_key]
+        return sample
+
+    def _transform_video(self, sample):
+        source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
+        transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
+        sample[target_key] = transform(sample[source_key])
+        del sample[source_key]
+        return sample
+
+    def _transform_audio(self, sample):
+        source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
+        transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
+        sample[target_key], sample["feats_len"] = transform(sample[source_key])
+        del sample[source_key]
+        sample["modality"] = [0]
+        return sample
+
+    def _flatten_sample(self, sample):
+        return flatten_dict(sample)
+
+    def _select_keys(self, sample):
+        select_keys = self.additional_extreacted_keys + [v[1] for v in self.modality_key_mapping.values()]
+        new_sample = {}
+        for k, v in sample.items():
+            if k not in select_keys:
+                continue
+            new_sample[k] = v
+        return new_sample
+
+    @staticmethod
+    def dummy_nodesplitter(src, group=None):
+        # This node splitter is not actually splitting the data over the nodes
+        # but keeps the complete dataset on each node.
+        # This is required so that each node has the same amount of data.
+        # In the case of 25 shards and 16 ranks for example 7 ranks are
+        # without data in the second iteration. This will cause a crash once all_gather is called.
+        # This is only relevant for validation.
+        yield from src
+
+
+PydanticMultimodalWebDatasetBuilderIFType = Annotated[
+    MultimodalWebDatasetBuilder, PydanticThirdPartyTypeIF(MultimodalWebDatasetBuilder)
+]
+
+
+class MultimodalWebDatasetConfig(BaseModel):
+    builders: List[PydanticMultimodalWebDatasetBuilderIFType]
+    mixing_ratios: Optional[List[int]] = None
+    shardshuffle: int = 100
+    repeat: bool = False
+    resample: bool = True
+    shuffle_buffer: Optional[int] = 10_000
+
+
+# @register_component("dataset", "web_dataset", MultimodalWebDatasetConfig)
+class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
+    def __init__(
+        self,
+        builders: List[MultimodalWebDatasetBuilder],
+        mixing_ratios: Optional[List[int]] = None,
+        shardshuffle: int = 100,
+        repeat: bool = False,
+        resample: bool = True,
+        shuffle_buffer: Optional[int] = 10_000,
+    ):
+        """WebDataset for loading and combining multimodal datasets.
+
+        Args:
+            builders: WebDatasetBuilder instances.
+            mixing_ratios: Mixing ratios of the different modality combinations.
+                For example: [0.3, 0.7]
+            shardshuffle: Number of sharfs that should be used for shuffling. Defaults to 100.
+            repeat: Repeat the dataset. Defaults to False.
+            resample: Instead if iterating in order sample random shards.
+                This has the issue that the model will see sample multiple times but if significantly more
+                efficient. Defaults to True.
+            shuffle_buffer: Number of samples that should be used for shuffling. Defaults to 10_000.
+        """
+        super().__init__()
+        self.builders = builders
+        assert len(builders) == 1, "Multiple dataset builders are not supported yet"  # TODO
+
+        self.output_keys_by_modality = {}
+        for b in builders:
+            for k, v in b.modality_key_mapping.items():
+                if k not in self.output_keys_by_modality:
+                    self.output_keys_by_modality[k] = v[1]
+                else:
+                    assert (
+                        self.output_keys_by_modality[k] == v[1]
+                    ), "Output keys for the same modality of all builders should be the same."
+
+        # Build datasets
+        [
+            b.prepare(shardshuffle=shardshuffle, resample=resample, repeat=repeat, shuffle_buffer=shuffle_buffer)
+            for b in self.builders
+        ]
+
+        # Setup mixing ratios
+        self.mixing_ratios = mixing_ratios
+        if self.mixing_ratios is None:
+            uniform_ratio = 1 / len(self.builders)
+            self.mixing_ratios = [uniform_ratio for _ in self.builders]
+        assert len(self.mixing_ratios) == len(self.builders)
+
+        if len(self.builders) > 1:
+            datasets = []
+            for b in self.builders:
+                datasets.append(b.web_dataset)
+            dataset = wds.RandomMix(datasets, self.mixing_ratios)  # Apply mixing at sample level
+            self.pipeline.extend(dataset.pipeline)
+        else:
+            self.pipeline.extend(self.builders[0].web_dataset.pipeline)
+
+        self.with_length(sum([b.num_samples for b in self.builders]))

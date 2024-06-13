@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, FilePath, field_validator
 
@@ -49,7 +49,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
-    loss_fn: PydanticLossIFType
+    loss_fn: Union[PydanticLossIFType, List[PydanticLossIFType]]
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
     batch_progress_subscriber: PydanticMessageSubscriberIFType

@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 
-import logging
 import os
+import pickle
 import shutil
 from pathlib import Path
 from typing import Dict, Tuple, Type
 
 import click
 import click_pathlib
+import torch.distributed as dist
 from pydantic import BaseModel, FilePath
+from subword_nmt import apply_bpe
+from tqdm import tqdm
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
@@ -48,11 +51,12 @@ def main() -> None:
     help="Path to a file with the YAML config file.",
 )
 def entry_point_run_modalities(config_file_path: Path):
-    config_dict = load_app_config_dict(config_file_path)
-    main_obj = Main(config_dict, config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        config_dict = load_app_config_dict(config_file_path)
+        main_obj = Main(config_dict, config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
+        dist.barrier()
 
 
 @main.command(name="generate_text")
@@ -159,6 +163,43 @@ def entry_point_merge_packed_data(src_paths, target_path):
     join_embedded_stream_data(embedded_datasets, target_path)
 
 
+@data.command(name="get_coca_tokenizer_and_vocab")
+@click.argument("bpecodes_file", type=click.types.Path(path_type=Path))
+@click.argument("bpecodes_suffix", type=str)
+def entry_point_coca_step1(bpecodes_file, bpecodes_suffix):
+    """
+    TODO
+    """
+    with bpecodes_file.open() as filein:
+        bpe = apply_bpe.BPE(filein)
+
+    bpe_to_ind = {}
+    ind_to_bpe = {}
+    ind = 1
+    with open("training.txt", "r") as filein:
+        for line in tqdm(filein):
+            for tok in bpe.segment(line.strip("\n")).split() + ["</s>"]:
+                if tok not in bpe_to_ind:
+                    bpe_to_ind[tok] = ind
+                    ind_to_bpe[ind] = tok
+                    ind += 1
+
+    bpe_to_ind["<pad>"] = 0
+    ind_to_bpe[0] = "<pad>"
+    unk_ind = len(bpe_to_ind)
+    bpe_to_ind["<|unk|>"] = unk_ind
+    ind_to_bpe[unk_ind] = "<|unk|>"
+
+    with open("vocab_size.txt", "w") as fileout:
+        print(len(bpe_to_ind), file=fileout)
+
+    with open(f"bpe_to_ind_{bpecodes_suffix}.pkl", "wb") as fileout:
+        pickle.dump(bpe_to_ind, fileout)
+
+    with open(f"ind_to_bpe_{bpecodes_suffix}.pkl", "wb") as fileout:
+        pickle.dump(ind_to_bpe, fileout)
+
+
 class Main:
     def __init__(self, config_dict: Dict, config_path: Path) -> None:
         self.config_dict = config_dict
@@ -219,7 +260,18 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+
+        if int(os.environ["RANK"]) == 0:
+            # TODO calculate parameters for full model
+            print(
+                f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters (per process)."
+            )
+
+            # Print global batch size
+            world_size = dist.get_world_size()
+            acc_steps = components.settings.training.gradient_acc_steps
+            local_batch_size = components.settings.training.local_train_micro_batch_size
+            print(f"Training model with a global batch size of {world_size * acc_steps* local_batch_size} samples.")
 
         if components.settings.training.do_apply_activation_checkpointing:
             apply_activation_checkpointing_inplace(wrapped_model)
@@ -235,7 +287,10 @@ class Main:
             global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
             global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
         )
-        print("done")
+
+        dist.barrier()
+        if os.environ["RANK"] == 0:
+            print("done")
 
     def get_logging_publishers(
         self,
@@ -243,7 +298,10 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[
+        MessagePublisher[EvaluationResultBatch],
+        MessagePublisher[BatchProgressUpdate],
+    ]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,

@@ -5,6 +5,7 @@ requires-python = ">=3.8,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
 dependencies = [
     "torch>=2.0",
+"torchaudio",
     "tqdm",
     "pyyaml",
     "transformers",
@@ -24,7 +25,9 @@ dependencies = [
     "wandb",
     "packaging",
     "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+    "webdataset>=0.2.86",
+    "timm>=0.9.16",
+    "subword-nmt",
 ]
 
 [project.optional-dependencies]

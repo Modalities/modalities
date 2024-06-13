@@ -3,6 +3,7 @@ from typing import Callable, Type
 
 import torch
 import torch.nn as nn
+import transformers
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, DistributedSampler
 
@@ -17,13 +18,16 @@ from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpo
 from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
+    ArrowDatasetAudioConfig,
+    ArrowDatasetAVConfig,
+    ArrowDatasetVisionConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
-    CLMCrossEntropyLossConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    CosineAnnealingWithWarmupLRSchedulerConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -45,18 +49,41 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    SimpleProgressSubscriberConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WebLoaderConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
-from modalities.dataloader.dataset import DummyDatasetConfig
+from modalities.dataloader.dataset import (
+    AudioTransform,
+    AudioTransformConfig,
+    DummyDatasetConfig,
+    ImageTransform,
+    ImageTransformConfig,
+    MultimodalWebDataset,
+    MultimodalWebDatasetBuilder,
+    MultimodalWebDatasetBuilderConfig,
+    MultimodalWebDatasetConfig,
+    TextTransform,
+    TextTransformConfig,
+    VideoTransform,
+    VideoTransformConfig,
+)
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import (
+    ClipLoss,
+    ClipLossConfig,
+    CrossEntropyLoss,
+    CrossEntropyLossConfig,
+    NCELoss,
+    NCELossConfig,
+)
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -66,7 +93,9 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
 )
-from modalities.models.mamba.mamba_config import MambaLLMConfig
+
+# from modalities.models.mamba.mamba_config import MambaLLMConfig
+# from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -82,8 +111,6 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPGradientClipperConfig,
 )
 
-from modalities.models.mamba.mamba_model import MambaLLM
-
 
 @dataclass
 class ComponentEntity:
@@ -96,7 +123,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
-    ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
+    # ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -104,7 +131,9 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # losses
-    ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity("loss", "cross_entropy_loss", CrossEntropyLoss, CrossEntropyLossConfig),
+    ComponentEntity("loss", "nce_loss", NCELoss, NCELossConfig),
+    ComponentEntity("loss", "clip_loss", ClipLoss, ClipLossConfig),
     # optmizers
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
@@ -118,6 +147,12 @@ COMPONENTS = [
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler",
+        "cosine_annealing_with_warmup_lr",
+        transformers.get_linear_schedule_with_warmup,
+        CosineAnnealingWithWarmupLRSchedulerConfig,
     ),
     # tokenizers
     ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
@@ -141,6 +176,18 @@ COMPONENTS = [
         "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
+    ComponentEntity("dataset", "web_dataset", MultimodalWebDataset, MultimodalWebDatasetConfig),
+    ComponentEntity("dataset", "web_dataset_builder", MultimodalWebDatasetBuilder, MultimodalWebDatasetBuilderConfig),
+    # Data transforms & augmentations
+    ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
+    ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
+    ComponentEntity("transform", "audio_transform", AudioTransform, AudioTransformConfig),
+    ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
+    ComponentEntity(
+        "dataset", "arrow_dataset_vision", DatasetFactory.get_arrow_dataset_vision, ArrowDatasetVisionConfig
+    ),
+    ComponentEntity("dataset", "arrow_dataset_audio", DatasetFactory.get_arrow_dataset_audio, ArrowDatasetAudioConfig),
+    ComponentEntity("dataset", "arrow_dataset_av", DatasetFactory.get_arrow_dataset_av, ArrowDatasetAVConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
@@ -150,6 +197,7 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    ComponentEntity("data_loader", "web_loader", DataloaderFactory.get_web_loader, WebLoaderConfig),
     ComponentEntity(
         "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
@@ -179,6 +227,12 @@ COMPONENTS = [
         "dummy",
         ProgressSubscriberFactory.get_dummy_progress_subscriber,
         DummyProgressSubscriberConfig,
+    ),
+    ComponentEntity(
+        "progress_subscriber",
+        "simple",
+        ProgressSubscriberFactory.get_simple_progress_subscriber,
+        SimpleProgressSubscriberConfig,
     ),
     ComponentEntity(
         "progress_subscriber",

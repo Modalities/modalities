@@ -59,11 +59,6 @@ class ReferenceConfig(BaseModel):
     pass_type: PassType
 
 
-class CLMCrossEntropyLossConfig(BaseModel):
-    target_key: str
-    prediction_key: str
-
-
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
@@ -188,6 +183,13 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     verbose: bool = False
 
 
+class CosineAnnealingWithWarmupLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    num_warmup_steps: Annotated[int, Field(strict=True, gt=0)]
+    num_training_steps: Annotated[int, Field(strict=True, gt=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+
+
 class CheckpointedOptimizerConfig(BaseModel):
     checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
@@ -277,6 +279,41 @@ class OpenGPTXMMapDatasetConfig(BaseModel):
     sequence_len: PositiveInt
 
 
+class ArrowDatasetVisionConfig(BaseModel):
+    vision_dataset_arrows: str
+    bpe_to_ind: FilePath
+    bpecodes: FilePath
+    img_size: int
+    block_size_text_decoder: int
+
+
+class ArrowDatasetAudioConfig(BaseModel):
+    type_: str
+    audio_dataset_arrows: str
+    bpe_to_ind: FilePath
+    bpecodes: FilePath
+    n_mels: int
+    block_size_audio_encoder: int
+    block_size_text_decoder: int
+    freq_domain_mask_length: int
+    time_domain_mask_length: int
+
+
+class ArrowDatasetAVConfig(BaseModel):
+    type_: str
+    batch_size: int
+    audio_dataset_arrows: str
+    vision_dataset_arrows: str
+    bpe_to_ind: FilePath
+    bpecodes: FilePath
+    n_mels: int
+    img_size: int
+    block_size_audio_encoder: int
+    block_size_text_decoder: int
+    freq_domain_mask_length: int
+    time_domain_mask_length: int
+
+
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
@@ -304,6 +341,16 @@ class LLMDataLoaderConfig(BaseModel):
     skip_num_steps: Optional[int] = 0
 
 
+class WebLoaderConfig(BaseModel):
+    dataloader_tag: str
+    dataset: PydanticDatasetIFType
+    batch_size: int
+    collate_fn: PydanticCollateFnIFType
+    num_workers: Annotated[int, Field(strict=True, ge=0)]
+    pin_memory: bool
+    drop_last: bool
+
+
 class RepeatingDataLoaderConfig(BaseModel):
     dataloader: PydanticLLMDataLoaderIFType
     reshuffle_after_epoch: Optional[bool] = False
@@ -312,6 +359,14 @@ class RepeatingDataLoaderConfig(BaseModel):
 
 class DummyProgressSubscriberConfig(BaseModel):
     pass
+
+
+class SimpleProgressSubscriberConfig(BaseModel):
+    train_dataloader: PydanticLLMDataLoaderIFType
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    world_size: int
+    global_num_seen_samples: int
+    local_rank: int
 
 
 class RichProgressSubscriberConfig(BaseModel):
