@@ -172,7 +172,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
             15,
             0,
         ),
-        # If truncation=False and len(text)<model max length, we want a sequence to be truncated to the max_length, irrespective of the padding flag.
+        # If truncation=False and len(text)<model max length, we want a sequence to be unmodified, irrespective of the padding flag.
         (
             "AAAAAAAA" * 15,
             PreTrainedHFTokenizerConfig(
