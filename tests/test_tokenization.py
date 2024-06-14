@@ -305,7 +305,7 @@ def test_hf_tokenize(
     # make sure that the overall token sequence length is correct
     assert len(token_ids) == expected_length
 
-    # check number of non-padding tokens
+    # check number of non-padding tokens (token_id = 43488 corresponds to "AAAAAAAA")
     assert sum(np.array(token_ids) == 43488) == (
         expected_length - expected_num_paddding_tokens
     )
