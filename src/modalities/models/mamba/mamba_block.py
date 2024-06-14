@@ -6,12 +6,10 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pydantic import BaseModel
+from einops import rearrange, repeat
 from torch import Tensor
 
-from einops import rearrange, repeat
-
-from modalities.models.mamba.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
+from modalities.models.mamba.ops.selective_scan_interface import mamba_inner_fn, selective_scan_fn
 
 try:
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -31,23 +29,23 @@ except ImportError:
 
 class MambaBlock(nn.Module):
     def __init__(
-            self,
-            d_model: int,
-            d_state: int,
-            d_conv: int,
-            expand: int,
-            dt_rank: str,
-            dt_min: float,
-            dt_max: float,
-            dt_init: str,
-            dt_scale: float,
-            dt_init_floor: float,
-            conv_bias: bool,
-            bias: bool,
-            use_fast_path: bool,
-            layer_idx: int,
-            device: Optional[str],
-            dtype: Optional[str],
+        self,
+        d_model: int,
+        d_state: int,
+        d_conv: int,
+        expand: int,
+        dt_rank: str,
+        dt_min: float,
+        dt_max: float,
+        dt_init: str,
+        dt_scale: float,
+        dt_init_floor: float,
+        conv_bias: bool,
+        bias: bool,
+        use_fast_path: bool,
+        layer_idx: int,
+        device: Optional[str],
+        dtype: Optional[str],
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -75,13 +73,11 @@ class MambaBlock(nn.Module):
         self.activation = "silu"
         self.act = nn.SiLU()
 
-        self.x_proj = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
-        )
+        self.x_proj = nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs)
         self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
-        dt_init_std = self.dt_rank ** -0.5 * dt_scale
+        dt_init_std = self.dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -91,8 +87,7 @@ class MambaBlock(nn.Module):
 
         # Initialize dt bias so that F.softplus(dt_bias) is between dt_min and dt_max
         dt = torch.exp(
-            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         ).clamp(min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
         inv_dt = dt + torch.log(-torch.expm1(-dt))
@@ -143,7 +138,9 @@ class MambaBlock(nn.Module):
 
         A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
-        if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
+        if (
+            self.use_fast_path and causal_conv1d_fn is not None and inference_params is None
+        ):  # Doesn't support outputting the states
             out = mamba_inner_fn(
                 xz,
                 self.conv1d.weight,
@@ -206,8 +203,9 @@ class MambaBlock(nn.Module):
             out = self.out_proj(y)
         return out
 
-    def step(self, hidden_states: torch.Tensor, conv_state: torch.Tensor, ssm_state: torch.Tensor) -> Tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor]:
+    def step(
+        self, hidden_states: torch.Tensor, conv_state: torch.Tensor, ssm_state: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         dtype = hidden_states.dtype
         assert hidden_states.shape[1] == 1, "Only support decoding with 1 token at a time for now"
         xz = self.in_proj(hidden_states.squeeze(1))  # (B 2D)
@@ -256,25 +254,22 @@ class MambaBlock(nn.Module):
         out = self.out_proj(y)
         return out.unsqueeze(1), conv_state, ssm_state
 
-    def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> \
-            Tuple[torch.Tensor, torch.Tensor]:
+    def allocate_inference_cache(
+        self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
-        conv_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype
-        )
+        conv_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype)
         ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
         # ssm_dtype = torch.float32
-        ssm_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype
-        )
+        ssm_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype)
         return conv_state, ssm_state
 
-    def _get_states_from_cache(self, inference_params: Optional[dict], batch_size: int,
-                               initialize_states: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_states_from_cache(
+        self, inference_params: Optional[dict], batch_size: int, initialize_states: bool = False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
-            batch_shape = (batch_size,)
             conv_state = torch.zeros(
                 batch_size,
                 self.d_model * self.expand,
@@ -302,12 +297,12 @@ class MambaBlock(nn.Module):
 
 class Block(nn.Module):
     def __init__(
-            self,
-            d_model: int,
-            mixer_cls: MambaBlock,
-            norm_cls: nn.LayerNorm,
-            fused_add_norm: bool,
-            residual_in_fp32: bool,
+        self,
+        d_model: int,
+        mixer_cls: MambaBlock,
+        norm_cls: nn.LayerNorm,
+        fused_add_norm: bool,
+        residual_in_fp32: bool,
     ):
         """
         Simple block wrapping a mixer class with LayerNorm/RMSNorm and residual connection"
@@ -333,7 +328,7 @@ class Block(nn.Module):
             ), "Only LayerNorm and RMSNorm are supported for fused_add_norm"
 
     def forward(
-            self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
+        self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Pass the input through the encoder layer.
 
