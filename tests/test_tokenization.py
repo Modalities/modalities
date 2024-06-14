@@ -16,7 +16,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
 
 
 @pytest.mark.parametrize(
-    "text,tokenizer_config,expected_length,expected_num_paddding_tokens",
+    "text,tokenizer_config,expected_length,expected_num_padding_tokens",
     [
         # Test cases 1: Sequence is shorter than max_length, i.e., len(text) < max_length
         # If padding="max_length", we want a sequence to be padded to the max_length, irrespective of the truncation flag
@@ -292,7 +292,7 @@ def test_hf_tokenize(
     text: str,
     tokenizer_config: PreTrainedHFTokenizerConfig,
     expected_length: int,
-    expected_num_paddding_tokens: int,
+    expected_num_padding_tokens: int,
 ):
     # also see here for the truncation and padding options and their effects:
     # https://huggingface.co/docs/transformers/pad_truncation#padding-and-truncation
@@ -307,11 +307,11 @@ def test_hf_tokenize(
 
     # check number of non-padding tokens (token_id = 43488 corresponds to "AAAAAAAA")
     assert sum(np.array(token_ids) == 43488) == (
-        expected_length - expected_num_paddding_tokens
+        expected_length - expected_num_padding_tokens
     )
 
     # check number of padding tokens
-    assert sum(np.array(token_ids) == 50257) == expected_num_paddding_tokens
+    assert sum(np.array(token_ids) == 50257) == expected_num_padding_tokens
 
 
 @pytest.mark.skip(reason="Missing pretrained unigram sp tokenizer.")
