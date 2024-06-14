@@ -22,7 +22,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
         # If padding="max_length", we want a sequence to be padded to the max_length, irrespective of the truncation flag
         # and only if max_length is specified.
         # If max_length is not specified, we pad to the max model input length (i.e., 1024 for the gpt2 model).
-        # NOTE: "AAAAAAAA" is a single token for the gpt2 tokenizer, there is "A" sequence longer than that in the vocabulary
+        # NOTE: "AAAAAAAA" is a single token for the gpt2 tokenizer, there is no "A" sequence longer than that in the vocabulary.
         (
             "AAAAAAAA" * 6,
             PreTrainedHFTokenizerConfig(
