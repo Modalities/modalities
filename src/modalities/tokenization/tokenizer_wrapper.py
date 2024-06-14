@@ -25,7 +25,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         self,
         pretrained_model_name_or_path: str,
         truncation: bool = False,
-        padding: bool = False,
+        padding: bool | str = False,
         max_length: Optional[int] = None,
         special_tokens: Optional[Dict[str, str]] = None,
     ) -> None:
