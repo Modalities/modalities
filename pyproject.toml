@@ -24,6 +24,8 @@ dependencies = [
     "einops>=0.7.0",
     "mamba-ssm",
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+    "mamba-ssm",
+    "causal-conv1d>=1.2.0",
 ]
 
 [project.optional-dependencies]

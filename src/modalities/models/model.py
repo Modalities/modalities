@@ -1,11 +1,10 @@
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict
 
 import torch
 import torch.nn as nn
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
-from transformers import PreTrainedTokenizer
 
 
 class NNModel(nn.Module):

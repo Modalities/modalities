@@ -9,13 +9,13 @@ import torch
 import torch.nn as nn
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
+
 from torch.nn import functional as F
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
-
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -27,20 +27,20 @@ class PositionTypes(str, Enum):
 
 class QueryKeyValueTransform(nn.Module):
     def forward(
-            self,
-            q: torch.Tensor,
-            k: torch.Tensor,
-            v: torch.Tensor,
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pass
 
 
 class IdentityTransform(QueryKeyValueTransform):
     def forward(
-            self,
-            q: torch.Tensor,
-            k: torch.Tensor,
-            v: torch.Tensor,
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return q, k, v
 
@@ -92,7 +92,7 @@ class RotaryTransform(QueryKeyValueTransform):
         return (x * cos) + (self.rotate_half(x) * sin)
 
     def forward(
-            self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
@@ -167,7 +167,7 @@ class GPT2LLMConfig(BaseModel):
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
         for param, param_name in zip(
-                [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
@@ -177,14 +177,14 @@ class GPT2LLMConfig(BaseModel):
 
 class CausalSelfAttention(nn.Module):
     def __init__(
-            self,
-            n_head_q: int,
-            n_head_kv: int,
-            n_embd: int,
-            attention_config: AttentionConfig,
-            bias: bool,
-            dropout: float,
-            block_size: int,
+        self,
+        n_head_q: int,
+        n_head_kv: int,
+        n_embd: int,
+        attention_config: AttentionConfig,
+        bias: bool,
+        dropout: float,
+        block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
@@ -239,7 +239,7 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-            q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size, block_size, embedding_dim = q.size()
         n_head_dim = embedding_dim // n_head_q
@@ -297,18 +297,18 @@ class TransformerMLP(nn.Module):
 
 class GPT2Block(nn.Module):
     def __init__(
-            self,
-            n_embd: int,
-            bias: bool,
-            n_head_q: int,
-            n_head_kv: int,
-            activation_type: ActivationType,
-            attention_config: AttentionConfig,
-            dropout: float,
-            block_size: int,
-            ffn_hidden: int,
-            attention_norm: nn.Module,
-            ffn_norm: nn.Module,
+        self,
+        n_embd: int,
+        bias: bool,
+        n_head_q: int,
+        n_head_kv: int,
+        activation_type: ActivationType,
+        attention_config: AttentionConfig,
+        dropout: float,
+        block_size: int,
+        ffn_hidden: int,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
     ):
         super().__init__()
         self.attention_norm = attention_norm
@@ -338,31 +338,28 @@ class GPT2Block(nn.Module):
 
 
 class GPT2LLM(NNModel):
-
-
     def __init__(
-            self,
-            sample_key: str,
-            prediction_key: str,
-            poe_type: PositionTypes,
-            block_size: int,
-            vocab_size: int,
-            n_layer: int,
-            n_head_q: int,
-            n_head_kv: int,
-            n_embd: int,
-            ffn_hidden: int,
-            dropout: float,
-            bias: bool,
-            activation_type: ActivationType,
-            weight_init: WeightInitializationConfig,
-            attention_config: AttentionConfig,
-            attention_norm: nn.Module,
-            ffn_norm: nn.Module,
-            lm_head_norm: nn.Module,
-            seed: int = None
+        self,
+        sample_key: str,
+        prediction_key: str,
+        poe_type: PositionTypes,
+        block_size: int,
+        vocab_size: int,
+        n_layer: int,
+        n_head_q: int,
+        n_head_kv: int,
+        n_embd: int,
+        ffn_hidden: int,
+        dropout: float,
+        bias: bool,
+        activation_type: ActivationType,
+        weight_init: WeightInitializationConfig,
+        attention_config: AttentionConfig,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
+        lm_head_norm: nn.Module,
+        seed: int = None,
     ):
-
         super().__init__(seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
