@@ -24,7 +24,7 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     def __init__(self, n_embd: int, bias: bool):
         super().__init__()
-        # Best practice: 4 * n_embd
+        # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
         # Because we add an additional linear layer, we need to adjust the hidden_dim to 2/3 of the original value
         # which is equivalent to the number of parameters in TransformerMLP, i.e.
         # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
