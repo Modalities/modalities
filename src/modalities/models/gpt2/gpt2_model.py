@@ -137,6 +137,7 @@ class GPT2BlockConfig(BaseModel):
     bias: bool
     n_head_q: int
     n_head_kv: int
+    activation_type: ActivationType
     attention_config: AttentionConfig
     dropout: float
     block_size: int
@@ -363,6 +364,7 @@ class TransformerBlock(GPT2Block):
         bias: bool,
         n_head_q: int,
         n_head_kv: int,
+        activation_type: ActivationType,
         attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -375,6 +377,7 @@ class TransformerBlock(GPT2Block):
             bias,
             n_head_q,
             n_head_kv,
+            activation_type,
             attention_config,
             dropout,
             block_size,
@@ -392,6 +395,7 @@ class SwiGLUBlock(GPT2Block):
         bias: bool,
         n_head_q: int,
         n_head_kv: int,
+        activation_type: ActivationType,
         attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -404,6 +408,7 @@ class SwiGLUBlock(GPT2Block):
             bias,
             n_head_q,
             n_head_kv,
+            activation_type,
             attention_config,
             dropout,
             block_size,
@@ -422,6 +427,7 @@ class MoEBlock(GPT2Block):
         bias: bool,
         n_head_q: int,
         n_head_kv: int,
+        activation_type: ActivationType,
         attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -440,6 +446,7 @@ class MoEBlock(GPT2Block):
             bias,
             n_head_q,
             n_head_kv,
+            activation_type,
             attention_config,
             dropout,
             block_size,
