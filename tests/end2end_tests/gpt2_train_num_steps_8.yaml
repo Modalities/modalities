@@ -42,6 +42,13 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
+    skip_num_batches: 
+      component_key: number_conversion
+      variant_key: local_num_batches_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        context_size: ${settings.training.sequence_length}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -218,13 +225,3 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: save_all
   config: {}
-
-# evaluation_subscriber:
-#   component_key: results_subscriber
-#   variant_key: wandb
-#   config:
-#     local_rank: ${settings.cuda_env.local_rank}
-#     project: modalities_lorem_ipsum
-#     mode: ONLINE
-#     experiment_id: ${settings.experiment_id}
-#     directory: "."

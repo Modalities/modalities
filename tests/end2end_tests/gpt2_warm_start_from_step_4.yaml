@@ -7,7 +7,7 @@ settings:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 4
     evaluation_interval_in_steps: 1
-    global_num_seen_tokens: 4
+    global_num_seen_tokens:  2048 # 4 steps * 256 tokens per step * 2 ranks
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
@@ -42,7 +42,13 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_micro_steps: ${settings.training.global_num_seen_tokens}
+    skip_num_batches:
+      component_key: number_conversion
+      variant_key: local_num_batches_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        context_size: ${settings.training.sequence_length}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE

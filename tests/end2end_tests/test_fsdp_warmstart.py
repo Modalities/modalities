@@ -154,13 +154,15 @@ class TestWarmstart:
                     )
 
     def test_warmstart_dataloader(self):
+        # non-skipped config
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
         gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
         # adopt dataset path
         gpt2_two_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
+        # skipped config
         gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
         # adopt dataset path
         gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
@@ -189,10 +191,19 @@ class TestWarmstart:
             dl_2_samples = [s for s in dataloader_2]
 
             # fast forward the first dataloader
+
             num_skip_steps = dataloader_2.fast_forward_batch_id
+
+            # make sure that we actually skip as defined in the config
+            assert num_skip_steps == 4
+            assert len(dl_1_samples) == num_skip_steps + len(dl_2_samples)
+
+            # make sure that the first dataloader is not skipped
+            assert dataloader_1.fast_forward_batch_id == 0
 
             # iterate through both sample lists from the dataloaders
             # and assert the equality of the samples
+
             for i in range(len(dataloader_2)):
                 assert dl_1_samples[i + num_skip_steps].samples["input_ids"].equal(dl_2_samples[i].samples["input_ids"])
 
