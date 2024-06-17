@@ -1,17 +1,15 @@
 # Copyright (c) 2023, Albert Gu, Tri Dao.
 
 import math
-import sys
 from functools import partial
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 from modalities.models.mamba.mamba_block import Block, MambaBlock
-from modalities.models.mamba.mamba_config import MixerModelConfig, MambaBlockConfig
+from modalities.models.mamba.mamba_config import MambaBlockConfig, MixerModelConfig
 from modalities.models.model import NNModel
-from transformers import PreTrainedTokenizer
 
 try:
     from modalities.models.mamba.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
@@ -20,34 +18,37 @@ except ImportError:
 
 
 def create_block(
-        d_model: int,
-        ssm_cfg: dict,
-        norm_epsilon: float,
-        rms_norm: bool,
-        residual_in_fp32: bool,
-        fused_add_norm: bool,
-        layer_idx: int,
-        device: str,
-        dtype: str,
+    d_model: int,
+    ssm_cfg: dict,
+    norm_epsilon: float,
+    rms_norm: bool,
+    residual_in_fp32: bool,
+    fused_add_norm: bool,
+    layer_idx: int,
+    device: str,
+    dtype: str,
 ) -> Block:
     factory_kwargs = {"device": device, "dtype": dtype}
     mixer_cls = partial(MambaBlock, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs)
-    norm_cls = partial(
-        nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs
+    norm_cls = partial(nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs)
+    block = Block(
+        d_model=d_model,
+        mixer_cls=mixer_cls,
+        norm_cls=norm_cls,
+        fused_add_norm=fused_add_norm,
+        residual_in_fp32=residual_in_fp32,
     )
-    block = Block(d_model=d_model, mixer_cls=mixer_cls, norm_cls=norm_cls, fused_add_norm=fused_add_norm,
-                  residual_in_fp32=residual_in_fp32)
     block.layer_idx = layer_idx
     return block
 
 
 # https://github.com/huggingface/transformers/blob/c28d04e9e252a1a099944e325685f14d242ecdcd/src/transformers/models/gpt2/modeling_gpt2.py#L454
 def _init_weights(
-        module: nn.Module,
-        n_layer: int,
-        initializer_range: float = 0.02,  # Now only used for embedding layer.
-        rescale_prenorm_residual: bool = True,
-        n_residuals_per_layer: int = 1,  # Change to 2 if we have MLP
+    module: nn.Module,
+    n_layer: int,
+    initializer_range: float = 0.02,  # Now only used for embedding layer.
+    rescale_prenorm_residual: bool = True,
+    n_residuals_per_layer: int = 1,  # Change to 2 if we have MLP
 ) -> None:
     if isinstance(module, nn.Linear):
         if module.bias is not None:
@@ -76,18 +77,18 @@ def _init_weights(
 
 class MixerModel(nn.Module):
     def __init__(
-            self,
-            d_model: int,
-            n_layer: int,
-            vocab_size: int,
-            norm_epsilon: float,
-            rms_norm: bool,
-            initializer_cfg: dict,
-            fused_add_norm: bool,
-            residual_in_fp32: bool,
-            device: Optional[str],
-            dtype: Optional[str],
-            mamba_block_config: MambaBlockConfig,
+        self,
+        d_model: int,
+        n_layer: int,
+        vocab_size: int,
+        norm_epsilon: float,
+        rms_norm: bool,
+        initializer_cfg: dict,
+        fused_add_norm: bool,
+        residual_in_fp32: bool,
+        device: Optional[str],
+        dtype: Optional[str],
+        mamba_block_config: MambaBlockConfig,
     ) -> None:
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -112,9 +113,7 @@ class MixerModel(nn.Module):
                 for i in range(n_layer)
             ]
         )
-        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(
-            d_model, eps=norm_epsilon, **factory_kwargs
-        )
+        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(d_model, eps=norm_epsilon, **factory_kwargs)
         self.apply(
             partial(
                 _init_weights,
@@ -133,9 +132,7 @@ class MixerModel(nn.Module):
         hidden_states = self.embedding(input_ids)
         residual = None
         for layer in self.layers:
-            hidden_states, residual = layer(
-                hidden_states, residual, inference_params=inference_params
-            )
+            hidden_states, residual = layer(hidden_states, residual, inference_params=inference_params)
         if not self.fused_add_norm:
             residual = (hidden_states + residual) if residual is not None else hidden_states
             hidden_states = self.norm_f(residual.to(dtype=self.norm_f.weight.dtype))
@@ -155,25 +152,24 @@ class MixerModel(nn.Module):
 
 
 class MambaLLM(NNModel):
-
     def __init__(
-            self,
-            d_model: int,
-            n_layer: int,
-            vocab_size: int,
-            rms_norm: bool,
-            residual_in_fp32: bool,
-            fused_add_norm: bool,
-            pad_vocab_size_multiple: int,
-            tie_embeddings: bool,
-            prediction_key: str,
-            sample_key: str,
-            seed: Optional[int],
-            dtype: Optional[str],
-            initializer_cfg: dict,
-            num_last_tokens: int,
-            inference_params: dict,
-            mixer_model_config: MixerModelConfig,
+        self,
+        d_model: int,
+        n_layer: int,
+        vocab_size: int,
+        rms_norm: bool,
+        residual_in_fp32: bool,
+        fused_add_norm: bool,
+        pad_vocab_size_multiple: int,
+        tie_embeddings: bool,
+        prediction_key: str,
+        sample_key: str,
+        seed: Optional[int],
+        dtype: Optional[str],
+        initializer_cfg: dict,
+        num_last_tokens: int,
+        inference_params: dict,
+        mixer_model_config: MixerModelConfig,
     ):
         super().__init__(seed=seed)
 
@@ -208,7 +204,7 @@ class MambaLLM(NNModel):
             dtype=self.dtype,
             norm_epsilon=self.mixer_model_config.norm_epsilon,
             device=self.mixer_model_config.device,
-            mamba_block_config=self.mixer_model_config.mamba_block_config
+            mamba_block_config=self.mixer_model_config.mamba_block_config,
         )
         self.lm_head = nn.Linear(self.d_model, self.vocab_size, bias=False, dtype=self.dtype)
         self.apply(
@@ -234,6 +230,6 @@ class MambaLLM(NNModel):
 
         hidden_states = self.backbone(inputs[self.sample_key], inference_params=self.inference_params)
         if self.num_last_tokens > 0:
-            hidden_states = hidden_states[:, -self.num_last_tokens:]
+            hidden_states = hidden_states[:, -self.num_last_tokens :]
         lm_logits = self.lm_head(hidden_states.to(self.lm_head.weight.dtype))
         return {self.prediction_key: lm_logits}

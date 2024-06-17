@@ -320,6 +320,7 @@ class GPT2Block(nn.Module):
         bias: bool,
         n_head_q: int,
         n_head_kv: int,
+        activation_type: ActivationType,
         attention_config: AttentionConfig,
         dropout: float,
         block_size: int,
@@ -339,6 +340,13 @@ class GPT2Block(nn.Module):
             dropout=dropout,
             block_size=block_size,
         )
+        if activation_type == ActivationType.GELU:
+            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+        elif activation_type == ActivationType.FUSED_SWIGLU:
+            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        else:
+            raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.attention_norm(x)

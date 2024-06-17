@@ -11,7 +11,7 @@ tokenizer:
   config:
     tokenizer_model_file: /workspaces/modalities/notebooks/tokenizer/unigram_tokenizer.model
     padding: false
-    max_length: 2048
+    truncation: false
 
 train_dataset:  
   component_key: dataset

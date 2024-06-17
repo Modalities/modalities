@@ -1,8 +1,7 @@
 import pytest
 import torch
-from transformers import AutoTokenizer
-from modalities.models.mamba.mamba_model import _init_weights, create_block, MambaLLM
-from tests.conftest import _ROOT_DIR
+
+from modalities.models.mamba.mamba_model import _init_weights, create_block
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
@@ -40,11 +39,20 @@ def test_mamba_llm_forward(mamba_llm, batch_size, sequence_length, vocab_size, p
     assert y[prediction_key].shape == (batch_size, sequence_length, vocab_size)
 
 
-def test__create_block(d_model, ssm_cfg, norm_epsilon, rms_norm, residual_in_fp32, fused_add_norm, layer_idx, device,
-                       dtype):
-    test_block = create_block(d_model=d_model, ssm_cfg=ssm_cfg, norm_epsilon=norm_epsilon, rms_norm=rms_norm,
-                              residual_in_fp32=residual_in_fp32, fused_add_norm=fused_add_norm, layer_idx=layer_idx,
-                              device=device, dtype=dtype)
+def test__create_block(
+    d_model, ssm_cfg, norm_epsilon, rms_norm, residual_in_fp32, fused_add_norm, layer_idx, device, dtype
+):
+    test_block = create_block(
+        d_model=d_model,
+        ssm_cfg=ssm_cfg,
+        norm_epsilon=norm_epsilon,
+        rms_norm=rms_norm,
+        residual_in_fp32=residual_in_fp32,
+        fused_add_norm=fused_add_norm,
+        layer_idx=layer_idx,
+        device=device,
+        dtype=dtype,
+    )
     assert test_block.norm.normalized_shape[0] == d_model
     assert test_block.mixer.d_model == d_model
 
