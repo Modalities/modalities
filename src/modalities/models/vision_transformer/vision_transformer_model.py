@@ -19,6 +19,7 @@ class VisionTransformerConfig(BaseModel):
     attention_config: AttentionConfig = None
     n_head: Annotated[int, Field(ge=1)] = 8
     n_embd: Annotated[int, Field(ge=1)] = 768
+    ffn_hidden: Annotated[int, Field(ge=1)] = 3072
     dropout: Annotated[float, Field(ge=0.0)] = 0.0
     patch_size: Annotated[int, Field(ge=1)] = 16
     patch_stride: Annotated[int, Field(ge=1)] = 16
