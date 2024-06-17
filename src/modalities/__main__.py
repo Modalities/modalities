@@ -3,8 +3,6 @@
 import logging
 import os
 import shutil
-import subprocess
-from os.path import isfile
 from pathlib import Path
 from typing import Dict, Tuple, Type
 
@@ -36,69 +34,10 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import compute_number_of_trainable_parameters
 
-_ROOT_DIR = Path(__file__).parents[2]
-
 
 @click.group()
 def main() -> None:
     pass
-
-
-@main.command(name="test")
-@click.option("--cpu", "-c", is_flag=True, default=False, help="Do cpu testing.")
-@click.option("--single-gpu", "-s", is_flag=True, default=False, help="Do single-gpu testing.")
-@click.option("--multi-gpu", "-m", is_flag=True, default=False, help="Do multi-gpu testing.")
-@click.option("--devices", "-d", type=str, nargs=1, default="0,1")
-def test(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: Tuple[int] = [0, 1]):
-    """
-    Run tests on cpu, single gpu and multiple gpus
-
-    Examples:
-    modalities test:                           run CPU tests + single-GPU tests on GPU 0 + multi-GPU tests on GPUs 0/1
-    modalities test --devices 4,5:             run CPU tests + single-GPU tests on GPU 4 + multi-GPU tests on GPUs 4/5
-    modalities test --cpu:                     run CPU tests
-    modalities test --single-gpu --devices 3:  run CPU tests + single-GPU tests on GPU 3
-    modalities test --multi-gpu --devices 3,4: run multi-GPU tests on GPUs 3/4
-    """
-    # parse input
-    if not cpu and not single_gpu and not multi_gpu:  # run all tests
-        cpu, single_gpu, multi_gpu = True, True, True
-    if single_gpu:  # cpu & single_gpu are both executed together via pytest
-        cpu = True
-    devices = [int(device) for device in devices.split(",")]  # e.g. '1,2' -> [1, 2]
-    devices = devices if len(devices) <= 2 else devices[:2]  # use max 2 devices
-
-    # check input
-    if single_gpu and len(devices) < 1:
-        exit(f"ERROR! Need at least 1 device to run single_gpu tests. Specified devices = {devices}.")
-    if multi_gpu and len(devices) < 2:
-        exit(f"ERROR! Need 2 devices to run multi_gpu tests. Specified devices = {devices}.")
-
-    # start
-    print(f"> TESTS ON          CPU: {cpu}")
-    print(f"> TESTS ON   SINGLE GPU: {single_gpu} " + f"(device={devices[0] if single_gpu else None})")
-    print(f"> TESTS ON MULTIPLE GPU: {multi_gpu} " + f"(devices={devices if multi_gpu else None})")
-
-    # run cpu / single-gpu tests
-    if cpu or single_gpu:
-        command_unit_tests = f"CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} pytest"
-
-        print("\n=== RUN CPU & SINGLE-GPU TESTS ===" if single_gpu else "\n=== RUN CPU TESTS ===")
-        print(command_unit_tests)
-        subprocess.run(command_unit_tests, shell=True, capture_output=False, text=True)
-
-    # run multi-gpu tests
-    if multi_gpu:
-        run_distributed_tests_directory = _ROOT_DIR / "tests"
-        run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
-        assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
-        command_end_to_end_tests = (
-            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]}"
-        )
-
-        print("\n=== RUN MULTI-GPU TESTS ===")
-        print(command_end_to_end_tests)
-        subprocess.run(command_end_to_end_tests, shell=True, capture_output=False, text=True)
 
 
 @main.command(name="run")
