@@ -68,40 +68,44 @@ class HuggingFaceModel(PreTrainedModel):
         # TODO pass correct model type to __init__
 
         if not model:
-            config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"] = MambaBlockConfig(**config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"])
-            config.config["model"]["config"]["mixer_model_config"] = MixerModelConfig(**config.config["model"]["config"]["mixer_model_config"])
+            mamba_block_config = config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"]
+            mamba_block_config = MambaBlockConfig(**mamba_block_config)
+            mixer_model_config = config.config["model"]["config"]["mixer_model_config"]
+            mixer_model_config = MixerModelConfig(**mixer_model_config)
             self.model: MambaLLM = MambaLLM(**config.config["model"]["config"])
         else:
             self.model = model
 
-    def forward(
-            self,
-            input_ids: torch.Tensor,
-            attention_mask: Optional[torch.Tensor] = None,
-            return_dict: Optional[bool] = False,
-            output_attentions: Optional[bool] = False,
-            output_hidden_states: Optional[bool] = False,
-    ):
-        if output_attentions or output_hidden_states:
-            raise NotImplementedError
-        model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
-        model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
-        if return_dict:
-            return ModalitiesModelOutput(**model_forward_output)
-        else:
-            return model_forward_output[self.model.prediction_key]
 
-    def prepare_inputs_for_generation(
-            self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the
-        generate method.
-        """
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-        }
+def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        return_dict: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
+):
+    if output_attentions or output_hidden_states:
+        raise NotImplementedError
+    model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
+    model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
+    if return_dict:
+        return ModalitiesModelOutput(**model_forward_output)
+    else:
+        return model_forward_output[self.model.prediction_key]
+
+
+def prepare_inputs_for_generation(
+        self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
+) -> Dict[str, Any]:
+    """
+    Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the
+    generate method.
+    """
+    return {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+    }
 
 
 @dataclass
