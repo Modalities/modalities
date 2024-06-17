@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
+from pydantic import BaseModel
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
@@ -52,8 +53,10 @@ class HuggingFaceModel(PreTrainedModel):
         super().__init__(config)
 
         if not model:
-            self.config = self.convert_config_dict_to_pydantic(config)
-            self.model: MambaLLM = MambaLLM(**self.config)
+            mamba_llm_config = self.convert_config_to_mamba_llm_config(config)
+            self.model: MambaLLM = MambaLLM(**mamba_llm_config)
+
+            self.config = self.convert_config_config_to_pydantic(mamba_llm_config)
         else:
             self.model = model
 
@@ -86,7 +89,7 @@ class HuggingFaceModel(PreTrainedModel):
             "attention_mask": attention_mask,
         }
 
-    def convert_config_dict_to_pydantic(self, config):
+    def convert_config_to_mamba_llm_config(self, config):
         config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"] = MambaBlockConfig(
             **config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"])
         config.config["model"]["config"]["mixer_model_config"] = MixerModelConfig(
@@ -94,9 +97,34 @@ class HuggingFaceModel(PreTrainedModel):
 
         return config.config["model"]["config"]
 
+    def convert_config_config_to_pydantic(self, config):
+
+        config["is_encoder_decoder"] = False
+        return HuggingFaceModelConfig(**config)
+
 
 @dataclass
 class ModalitiesModelOutput(ModelOutput):
     logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
+
+
+class HuggingFaceModelConfig(BaseModel):
+    d_model: int
+    n_layer: int
+    vocab_size: int
+    rms_norm: bool
+    residual_in_fp32: bool
+    fused_add_norm: bool
+    pad_vocab_size_multiple: int
+    tie_embeddings: bool
+    prediction_key: str
+    sample_key: str
+    seed: Optional[int]
+    dtype: Optional[str]
+    initializer_cfg: Dict
+    num_last_tokens: int
+    inference_params: Dict
+    mixer_model_config: MixerModelConfig
+    is_encoder_decoder: bool
