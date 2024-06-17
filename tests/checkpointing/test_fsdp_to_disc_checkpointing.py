@@ -254,7 +254,7 @@ class TestFSDPToDiscCheckpointing:
             entity_type=CheckpointingEntityType.OPTIMIZER,
         )
         checkpoint_loading.load_optimizer_checkpoint(
-            optimizer=optimizer_2, wrapped_model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
+            optimizer=optimizer_2, model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
         loaded_and_updated_model_parameters = self._clone_parameters(fsdp_wrapped_model)
