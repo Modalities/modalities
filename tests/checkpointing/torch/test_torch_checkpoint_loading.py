@@ -1,5 +1,6 @@
 from typing import Dict
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -17,6 +18,7 @@ class DummyModel(nn.Module):
         return {"output": output}
 
 
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 def test_load_model_checkpoint(tmp_path):
     # After storing the state_dict on disc, the model state does not
     # contain any information about the device or precision
