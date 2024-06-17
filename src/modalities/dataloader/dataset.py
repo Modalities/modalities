@@ -560,7 +560,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
             for b in self.builders:
                 datasets.append(b.web_dataset)
             dataset = wds.RandomMix(datasets, self.mixing_ratios)  # Apply mixing at sample level
-            self.pipeline.extend(dataset.pipeline)
+            self.pipeline.append(dataset)
         else:
             self.pipeline.extend(self.builders[0].web_dataset.pipeline)
 
