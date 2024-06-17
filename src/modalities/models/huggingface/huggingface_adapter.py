@@ -10,23 +10,54 @@ from transformers.utils import ModelOutput
 
 from modalities.config.config import CheckpointedModelConfig
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
+from modalities.models.mamba.mamba_config import MambaBlockConfig, MixerModelConfig
+from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
+
+import os
+from pathlib import PosixPath
 
 
 class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
     model_type = "modalities"
 
-    def __init__(self, config_dict = None, **kwargs):
+    def __init__(self, config_dict=None, **kwargs):
         super().__init__(**kwargs)
         self.config_dict = config_dict
         # TODO Iterate over all dict and change PosixPath to str
-        if config_dict:
-            self.config_dict["settings"]["config_file_path"] = str(self.config_dict["settings"]["config_file_path"])
+        if self.config_dict:
+            # self.config_dict["settings"]["config_file_path"] = str(self.config_dict["settings"]["config_file_path"])
+            self.convert_posixpath_to_str(self.config_dict)
 
     # # TODO check if this is still needed
-    # def to_json_string(self, use_diff: bool = True) -> str:
-    #     cfg = dict(config=self.config_dict.model_dump(), model_type=self.model_type)
-    #     return json.dumps(cfg)
+    def to_json_string(self, use_diff: bool = True) -> str:
+
+        if self.config_dict:
+            json_dict = {"config": self.config_dict.copy(), "model_type": self.model_type}
+            # json_dict["config"]["attention"] = {
+            #     "attention_type": self.config.attention.attention_type.value,
+            #     "scaling_factor": self.config.attention.scaling_factor,
+            # }
+            # json_dict["config"]["weight_init"] = {
+            #     "mean": self.config.weight_init.mean,
+            #     "std": self.config.weight_init.std,
+            # }
+        else:
+            json_dict = {}
+
+        return json.dumps(json_dict)
+
+    def convert_posixpath_to_str(self, d):
+        """
+        Recursively iterate over the dictionary and convert PosixPath values to strings.
+        """
+        for key, value in d.items():
+            if isinstance(value, PosixPath):
+                d[key] = str(value)
+            elif isinstance(value, dict):
+                self.convert_posixpath_to_str(value)
+            elif isinstance(value, list):
+                d[key] = [str(item) if isinstance(item, PosixPath) else item for item in value]
 
 
 class HuggingFaceModel(PreTrainedModel):
@@ -35,7 +66,13 @@ class HuggingFaceModel(PreTrainedModel):
     def __init__(self, config: HuggingFaceAdapterConfig, model: Optional[nn.Module] = None):
         super().__init__(config)
         # TODO pass correct model type to __init__
-        self.model = model
+
+        if not model:
+            config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"] = MambaBlockConfig(**config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"])
+            config.config["model"]["config"]["mixer_model_config"] = MixerModelConfig(**config.config["model"]["config"]["mixer_model_config"])
+            self.model: MambaLLM = MambaLLM(**config.config["model"]["config"])
+        else:
+            self.model = model
 
     def forward(
             self,
