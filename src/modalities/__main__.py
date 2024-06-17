@@ -53,8 +53,8 @@ def test(devices: Tuple[int], e2e_only: bool = False):
     """
     devices = devices if len(devices) <= 2 else devices[:2]  # use max 2 devices
     test_flags = {
-        "cpu": e2e_only is False,
-        "gpu_single": len(devices) >= 1 and e2e_only is False,
+        "cpu": not e2e_only,
+        "gpu_single": len(devices) >= 1 and not e2e_only,
         "gpu_multiple": len(devices) == 2,
     }
     print(f"> UNIT       TESTS ON          CPU: {test_flags['cpu']}")
@@ -68,7 +68,7 @@ def test(devices: Tuple[int], e2e_only: bool = False):
     )
 
     # run unit tests
-    if e2e_only is False:
+    if not e2e_only:
         command_unit_tests = f"CUDA_VISIBLE_DEVICES={devices[0] if len(devices) > 0 else None} pytest"
 
         print("\n=== RUN UNIT TESTS ===")
