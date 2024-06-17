@@ -24,9 +24,9 @@ dependencies = [
     "wandb",
     "einops>=0.7.0",
 ]
-# "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
 
 [project.optional-dependencies]
+gpu = ["flash-attn"]
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov"]
 install_helper = ["ninja"]
