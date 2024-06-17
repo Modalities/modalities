@@ -143,7 +143,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [TransformerBlock]
+    block_names: [MoEBlock]
 
 model:
   component_key: model
@@ -186,7 +186,7 @@ model:
         epsilon: 1e-5
     gpt2block:
       component_key: block
-      variant_key: transformer_block
+      variant_key: moe_block
       config:
         block_size: ${settings.training.sequence_length}
         n_embd: ${model.config.n_embd}
@@ -210,6 +210,15 @@ model:
         bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
         n_head_q: ${model.config.n_head_q}
         n_head_kv: 12    
+        moe_num_experts: 4
+        moe_top_k: 2
+        moe_normalize_expert_weights: 0.1
+        uniform_expert_assignment: false
+        moe_jitter_eps: 0.1
+        moe_act_fn:
+          component_key: moe_act_fn
+          variant_key: silu
+          config:
 
 loss_fn:
   component_key: loss

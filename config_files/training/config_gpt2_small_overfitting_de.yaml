@@ -1,5 +1,6 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
@@ -39,7 +40,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_en.pbin
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/overfitting/hf_gpt2_2048/data_overfitting_de.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -143,7 +144,7 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    block_names: [TransformerBlock]
 
 model:
   component_key: model
@@ -156,36 +157,11 @@ model:
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
     n_head_q: 12
-    n_head_kv: 12
-    ffn_hidden: 2048
     n_embd: 768
     dropout: 0.0
-    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
-    attention_config:
-      qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
-    activation_type: gelu
     weight_init:
       mean: 0.0
       std: 0.02
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
@@ -193,7 +169,40 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
-
+    gpt2block:
+      component_key: block
+      variant_key: transformer_block
+      config:
+        block_size: ${settings.training.sequence_length}
+        n_embd: ${model.config.n_embd}
+        attention_norm:
+          component_key: layer_norm
+          variant_key: rms_norm
+          config:
+            ndim: ${model.config.n_embd}
+            bias: true
+            epsilon: 1e-5
+        ffn_norm:
+          component_key: layer_norm
+          variant_key: rms_norm
+          config:
+            ndim: ${model.config.n_embd}
+            bias: true
+            epsilon: 1e-5
+        activation_type: gelu    
+        attention_config:
+          qkv_transforms:
+            - type_hint: RotaryTransform
+              config:
+                n_embd: ${model.config.n_embd}
+                n_head: ${model.config.n_head_q} #it has to be head_q here
+                seq_length_dim: -2
+        dropout: ${model.config.dropout}
+        ffn_hidden: 2048
+        bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+        n_head_q: ${model.config.n_head_q}
+        n_head_kv: 12
+        
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
@@ -237,7 +246,6 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
@@ -256,3 +264,4 @@ evaluation_subscriber:
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
+    config_file_path: ${settings.config_file_path}

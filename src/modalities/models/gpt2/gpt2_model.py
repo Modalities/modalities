@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import NNModel
+from modalities.nn.moe import MoEFFN, MoEFFNConfig
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -104,9 +105,11 @@ class QueryKeyValueTransformType(Enum):
     RotaryTransform = RotaryTransform
 
 
+# FIXME Move or delete
 class ActivationType(str, Enum):
     GELU = "gelu"
     FUSED_SWIGLU = "fused_swiglu"
+    SILU = "silu"
 
 
 class AttentionConfig(BaseModel):
@@ -129,48 +132,49 @@ class AttentionConfig(BaseModel):
     qkv_transforms: List[QueryKeyValueTransformConfig]
 
 
-class WeightInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
-    std: Annotated[float, Field(strict=True, ge=0.0)]
-
-
-class GPT2LLMConfig(BaseModel):
-    sample_key: str
-    prediction_key: str
-    poe_type: PositionTypes
-    block_size: Annotated[int, Field(strict=True, ge=1)]
-    vocab_size: Annotated[
-        int, Field(strict=True, ge=1)
-    ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: Annotated[int, Field(strict=True, ge=1)]
-    n_head_q: Annotated[int, Field(strict=True, ge=1)]
-    n_head_kv: Annotated[int, Field(strict=True, ge=1)]
-    n_embd: Annotated[int, Field(strict=True, ge=1)]
-    ffn_hidden: Annotated[int, Field(strict=True, ge=1)]
-    dropout: Annotated[float, Field(strict=True, ge=0.0)]
-    bias: bool  # True: bias in Linears like GPT-2. False: a bit better and faster
-    attention_config: AttentionConfig
+class GPT2BlockConfig(BaseModel):
+    n_embd: int
+    bias: bool
+    n_head_q: int
+    n_head_kv: int
     activation_type: ActivationType
+    attention_config: AttentionConfig
+    dropout: float
+    block_size: int
+    ffn_hidden: int
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
-    lm_head_norm: PydanticPytorchModuleType
-    weight_init: WeightInitializationConfig
 
     @model_validator(mode="after")
-    def check_divisibility(self) -> "GPT2LLMConfig":
+    def check_divisibility(self) -> "GPT2BlockConfig":
         if self.n_head_q % self.n_head_kv != 0:
             raise ValueError("n_head_q must be divisible by n_head_kv")
         return self
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "GPT2LLMConfig":
+    def validate_sizes(self) -> "GPT2BlockConfig":
         for param, param_name in zip(
-            [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
+            [self.ffn_hidden, self.n_embd],
+            ["ffn_hidden", "n_embd"],
         ):
             if param % 128 != 0:
                 # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
                 raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
         return self
+
+
+class MoEBlockConfig(GPT2BlockConfig):
+    moe_num_experts: int
+    moe_top_k: int
+    moe_normalize_expert_weights: float
+    uniform_expert_assignment: bool
+    moe_act_fn: PydanticPytorchModuleType
+    moe_jitter_eps: float
+
+
+class WeightInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)]
 
 
 class CausalSelfAttention(nn.Module):
@@ -237,7 +241,11 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        qkv_transforms: nn.ModuleList,
+        n_head_q: int,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size, block_size, embedding_dim = q.size()
         n_head_dim = embedding_dim // n_head_q
@@ -257,10 +265,22 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
         v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+        return flash_attn_func(
+            q,
+            k,
+            v,
+            dropout_p=dropout,
+            causal=True,
+            softmax_scale=None,
+            window_size=(-1, -1),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
+        (
+            B,
+            T,
+            _,
+        ) = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
         q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
@@ -312,22 +332,16 @@ class GPT2Block(nn.Module):
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
+        self.attention_config = attention_config
         self.attn = CausalSelfAttention(
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
             n_embd=n_embd,
-            attention_config=attention_config,
+            attention_config=self.attention_config,
             bias=bias,
             dropout=dropout,
             block_size=block_size,
         )
-        if activation_type == ActivationType.GELU:
-            self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation_type == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
-        else:
-            raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.attention_norm(x)
@@ -335,6 +349,117 @@ class GPT2Block(nn.Module):
         x = self.ffn_norm(x)
         x = x + self.mlp(x)
         return x
+
+
+class TransformerBlock(GPT2Block):
+    def __init__(
+        self,
+        n_embd: int,
+        bias: bool,
+        n_head_q: int,
+        n_head_kv: int,
+        activation_type: ActivationType,
+        attention_config: AttentionConfig,
+        dropout: float,
+        block_size: int,
+        ffn_hidden: int,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
+    ):
+        super().__init__(
+            n_embd,
+            bias,
+            n_head_q,
+            n_head_kv,
+            activation_type,
+            attention_config,
+            dropout,
+            block_size,
+            ffn_hidden,
+            attention_norm,
+            ffn_norm,
+        )
+        self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
+
+
+class SwiGLUBlock(GPT2Block):
+    def __init__(
+        self,
+        n_embd: int,
+        bias: bool,
+        n_head_q: int,
+        n_head_kv: int,
+        activation_type: ActivationType,
+        attention_config: AttentionConfig,
+        dropout: float,
+        block_size: int,
+        ffn_hidden: int,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
+    ):
+        super().__init__(
+            n_embd,
+            bias,
+            n_head_q,
+            n_head_kv,
+            activation_type,
+            attention_config,
+            dropout,
+            block_size,
+            ffn_hidden,
+            attention_norm,
+            ffn_norm,
+        )
+        hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+        self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+
+
+class MoEBlock(GPT2Block):
+    def __init__(
+        self,
+        n_embd: int,
+        bias: bool,
+        n_head_q: int,
+        n_head_kv: int,
+        activation_type: ActivationType,
+        attention_config: AttentionConfig,
+        dropout: float,
+        block_size: int,
+        ffn_hidden: int,
+        attention_norm: nn.Module,
+        ffn_norm: nn.Module,
+        moe_num_experts: int,
+        moe_top_k: int,
+        moe_normalize_expert_weights: float,
+        uniform_expert_assignment: bool,
+        moe_act_fn: nn.Module,
+        moe_jitter_eps: float,
+    ):
+        super().__init__(
+            n_embd,
+            bias,
+            n_head_q,
+            n_head_kv,
+            activation_type,
+            attention_config,
+            dropout,
+            block_size,
+            ffn_hidden,
+            attention_norm,
+            ffn_norm,
+        )
+
+        moe_config = MoEFFNConfig(
+            moe_num_experts=moe_num_experts,
+            moe_top_k=moe_top_k,
+            moe_normalize_expert_weights=moe_normalize_expert_weights,
+            uniform_expert_assignment=uniform_expert_assignment,
+            ffn_hidden_size=ffn_hidden,
+            act_fn=lambda: deepcopy(moe_act_fn),
+            moe_jitter_eps=moe_jitter_eps,
+        )
+
+        self.mlp = MoEFFN(hidden_router_size=n_embd, config=moe_config)  # change the ffn_hidden parameter's name
 
 
 class GPT2LLM(NNModel):
@@ -346,18 +471,12 @@ class GPT2LLM(NNModel):
         block_size: int,
         vocab_size: int,
         n_layer: int,
-        n_head_q: int,
-        n_head_kv: int,
         n_embd: int,
-        ffn_hidden: int,
+        n_head_q: int,
         dropout: float,
-        bias: bool,
-        activation_type: ActivationType,
         weight_init: WeightInitializationConfig,
-        attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
+        gpt2block: GPT2Block,
         seed: int = None,
     ):
         super().__init__(seed=seed)
@@ -380,9 +499,11 @@ class GPT2LLM(NNModel):
         else:
             raise TypeError(f"{poe_type} not supported")
 
-        if poe_type is not PositionTypes.NOPE and RotaryTransform in [
-            config.type_hint.value for config in attention_config.qkv_transforms
-        ]:
+        if (
+            gpt2block.attention_config
+            and poe_type is not PositionTypes.NOPE
+            and RotaryTransform in [config.type_hint.value for config in gpt2block.attention_config.qkv_transforms]
+        ):
             raise ValueError('It is expected to use "RotaryTransform" together with "NOPE".')
 
         self.transformer = nn.ModuleDict(
@@ -390,24 +511,7 @@ class GPT2LLM(NNModel):
                 wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
                 wpe=wpe,
                 drop=nn.Dropout(dropout),
-                h=nn.ModuleList(
-                    [
-                        GPT2Block(
-                            n_embd=n_embd,
-                            bias=bias,
-                            n_head_q=n_head_q,
-                            n_head_kv=n_head_kv,
-                            activation_type=activation_type,
-                            attention_config=attention_config,
-                            dropout=dropout,
-                            block_size=block_size,
-                            ffn_hidden=ffn_hidden,
-                            attention_norm=deepcopy(attention_norm),
-                            ffn_norm=deepcopy(ffn_norm),
-                        )
-                        for _ in range(n_layer)
-                    ]
-                ),
+                h=nn.ModuleList([deepcopy(gpt2block) for _ in range(n_layer)]),
                 ln_f=lm_head_norm,
             )
         )
@@ -423,7 +527,11 @@ class GPT2LLM(NNModel):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
+                torch.nn.init.normal_(
+                    p,
+                    mean=weight_init.mean,
+                    std=weight_init.std / math.sqrt(2 * n_layer),
+                )
 
     def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):
@@ -458,3 +566,28 @@ class GPT2LLM(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+class GPT2LLMConfig(BaseModel):
+    sample_key: str
+    prediction_key: str
+    poe_type: PositionTypes
+    block_size: Annotated[int, Field(strict=True, ge=1)]
+    vocab_size: Annotated[
+        int, Field(strict=True, ge=1)
+    ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: Annotated[int, Field(strict=True, ge=1)]
+    n_embd: Annotated[int, Field(strict=True, ge=1)]
+    n_head_q: Annotated[int, Field(strict=True, ge=1)]
+    dropout: Annotated[float, Field(strict=True, ge=0.0)]
+    lm_head_norm: PydanticPytorchModuleType
+    weight_init: WeightInitializationConfig
+    gpt2block: PydanticPytorchModuleType
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "GPT2LLMConfig":
+        for param, param_name in zip([self.vocab_size, self.n_embd], ["vocab_size", "n_embd"]):
+            if param % 128 != 0:
+                # See https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+                raise ValueError(f"{param_name} with value {param} should be divisible by 128 for efficient training.")
+        return self

@@ -61,7 +61,15 @@ from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.gpt2.gpt2_model import (
+    GPT2LLM,
+    GPT2BlockConfig,
+    GPT2LLMConfig,
+    MoEBlock,
+    MoEBlockConfig,
+    SwiGLUBlock,
+    TransformerBlock,
+)
 from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
@@ -69,6 +77,7 @@ from modalities.models.huggingface.huggingface_models import (
 from modalities.models.mamba.mamba_config import MambaLLMConfig
 from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.activations import ActivationConfig, LeakyReLUConfig
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -97,10 +106,23 @@ COMPONENTS = [
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
     ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
-        "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
+        "model",
+        "huggingface_pretrained_model",
+        HuggingFacePretrainedModel,
+        HuggingFacePretrainedModelConfig,
     ),
-    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
-    ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity(
+        "model",
+        "checkpointed",
+        ModelFactory.get_checkpointed_model,
+        CheckpointedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
+        "fsdp_wrapped",
+        ModelFactory.get_fsdp_wrapped_model,
+        FSDPWrappedModelConfig,
+    ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
@@ -108,22 +130,53 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+        "optimizer",
+        "checkpointed",
+        OptimizerFactory.get_checkpointed_optimizer,
+        CheckpointedOptimizerConfig,
     ),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
-    ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
-    ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
-        "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+        "scheduler",
+        "constant_lr",
+        torch.optim.lr_scheduler.ConstantLR,
+        ConstantLRSchedulerConfig,
+    ),
+    ComponentEntity(
+        "scheduler",
+        "onecycle_lr",
+        torch.optim.lr_scheduler.OneCycleLR,
+        OneCycleLRSchedulerConfig,
+    ),
+    ComponentEntity(
+        "scheduler",
+        "cosine_annealing_lr",
+        torch.optim.lr_scheduler.CosineAnnealingLR,
+        CosineAnnealingLRSchedulerConfig,
     ),
     # tokenizers
-    ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
-    ComponentEntity("tokenizer", "pretrained_sp_tokenizer", PreTrainedSPTokenizer, PreTrainedSPTokenizerConfig),
+    ComponentEntity(
+        "tokenizer",
+        "pretrained_hf_tokenizer",
+        PreTrainedHFTokenizer,
+        PreTrainedHFTokenizerConfig,
+    ),
+    ComponentEntity(
+        "tokenizer",
+        "pretrained_sp_tokenizer",
+        PreTrainedSPTokenizer,
+        PreTrainedSPTokenizerConfig,
+    ),
     # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
-    ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),
+    ComponentEntity(
+        "dataset",
+        "mem_map_dataset",
+        DatasetFactory.get_mem_map_dataset,
+        MemMapDatasetConfig,
+    ),
     ComponentEntity(
         "dataset",
         "packed_mem_map_dataset_continuous",
@@ -137,7 +190,10 @@ COMPONENTS = [
         PackedMemMapDatasetMegatronConfig,
     ),
     ComponentEntity(
-        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
+        "dataset",
+        "open_gptx_mmap_dataset",
+        DatasetFactory.get_open_gptx_mmap_dataset,
+        OpenGPTXMMapDatasetConfig,
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers
@@ -150,7 +206,10 @@ COMPONENTS = [
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity(
-        "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
+        "data_loader",
+        "repeating_data_loader",
+        DataloaderFactory.get_repeating_dataloader,
+        RepeatingDataLoaderConfig,
     ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
@@ -168,10 +227,20 @@ COMPONENTS = [
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
     # checkpoint saving execution
-    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    ComponentEntity(
+        "checkpoint_saving_execution",
+        "fsdp",
+        FSDPCheckpointSaving,
+        FSDPCheckpointSavingConfig,
+    ),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
-    ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
+    ComponentEntity(
+        "checkpoint_loading",
+        "torch",
+        TorchCheckpointLoading,
+        TorchCheckpointLoadingConfig,
+    ),
     # Progress subscriber
     ComponentEntity(
         "progress_subscriber",
@@ -187,10 +256,16 @@ COMPONENTS = [
     ),
     # Results subscriber
     ComponentEntity(
-        "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
+        "results_subscriber",
+        "dummy",
+        ResultsSubscriberFactory.get_dummy_result_subscriber,
+        DummyResultSubscriberConfig,
     ),
     ComponentEntity(
-        "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig
+        "results_subscriber",
+        "rich",
+        ResultsSubscriberFactory.get_rich_result_subscriber,
+        RichResultSubscriberConfig,
     ),
     ComponentEntity(
         "results_subscriber",
@@ -201,10 +276,21 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
+    # block configs
+    ComponentEntity("block", "moe_block", MoEBlock, MoEBlockConfig),
+    ComponentEntity("block", "transformer_block", TransformerBlock, GPT2BlockConfig),
+    ComponentEntity("block", "swiglu_block", SwiGLUBlock, GPT2BlockConfig),
+    # moe activation_fn configs
+    ComponentEntity("moe_act_fn", "silu", nn.SiLU, ActivationConfig),
+    ComponentEntity("moe_act_fn", "relu", nn.ReLU, ActivationConfig),
+    ComponentEntity("moe_act_fn", "leaky_relu", nn.LeakyReLU, LeakyReLUConfig),
     # gradient clippers
     ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+        "gradient_clipper",
+        "fsdp_logging_only",
+        FSDPLoggingOnlyGradientClipper,
+        FSDPDummyGradientClipperConfig,
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
 ]
