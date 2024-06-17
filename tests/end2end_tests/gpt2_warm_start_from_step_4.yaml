@@ -125,7 +125,7 @@ wrapped_model:
     checkpoint_loading:
       instance_key: checkpoint_loading
       pass_type: BY_REFERENCE
-    checkpoint_path: tmp/checkpoints/0/eid_0-model-num_steps_4.bin
+    checkpoint_path: must_be_set_in_test_impl
 
 model:
   component_key: model
@@ -185,7 +185,22 @@ scheduler:
       instance_key: optimizer
       pass_type: BY_REFERENCE
 
-optimizer:  
+optimizer:
+  component_key: optimizer
+  variant_key: checkpointed
+  config:
+    optimizer:
+      instance_key: optimizer_original
+      pass_type: BY_REFERENCE
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    checkpoint_loading:
+      instance_key: checkpoint_loading
+      pass_type: BY_REFERENCE
+    checkpoint_path: must_be_set_in_test_impl
+
+optimizer_original:  
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -233,13 +248,3 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: save_all
   config: {}
-
-# evaluation_subscriber:
-#   component_key: results_subscriber
-#   variant_key: wandb
-#   config:
-#     local_rank: ${settings.cuda_env.local_rank}
-#     project: modalities_lorem_ipsum
-#     mode: ONLINE
-#     experiment_id: ${settings.experiment_id}
-#     directory: "."

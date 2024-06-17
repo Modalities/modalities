@@ -62,7 +62,7 @@ class TestWarmstart:
             gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
 
             # adopt the checkpoint path
-            checkpoint_path = temp_dir  # "/raid/s3/opengptx/max_lue/modalities/data/checkpoints"
+            checkpoint_path = temp_dir  # "/raid/s3/opengptx/max_lue/modalities/data/checkpoints/test"
             experiment_id_1 = "0"
             gpt2_two_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
@@ -72,7 +72,7 @@ class TestWarmstart:
             ] = experiment_id_1
             gpt2_two_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
             gpt2_two_steps_config_dict["settings"]["experiment_id"] = experiment_id_1
-            loss_values_1_path = checkpoint_path + "/0/loss_scores.txt"
+            loss_values_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
 
             # adopt dataset path
             gpt2_two_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
@@ -84,11 +84,20 @@ class TestWarmstart:
             # adopt the checkpoint path
             experiment_id_2 = "1"
             gpt2_warm_start_from_step_1_dict["wrapped_model"]["config"]["checkpoint_path"] = (
-                checkpoint_path + "/0/eid_0-model-num_steps_4.bin"
+                checkpoint_path + "/0/eid_0-model-num_steps_4-num_tokens_2048.bin"
             )
+            gpt2_warm_start_from_step_1_dict["optimizer"]["config"]["checkpoint_path"] = (
+                checkpoint_path + "/0/eid_0-optimizer-num_steps_4-num_tokens_2048.bin"
+            )
+            gpt2_warm_start_from_step_1_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+                "checkpoint_path"
+            ] = checkpoint_path
+            gpt2_warm_start_from_step_1_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+                "experiment_id"
+            ] = experiment_id_2
             gpt2_warm_start_from_step_1_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
             gpt2_warm_start_from_step_1_dict["settings"]["experiment_id"] = experiment_id_2
-            loss_values_2_path = checkpoint_path + "/1/loss_scores.txt"
+            loss_values_2_path = checkpoint_path + "/experiment_2_loss_scores.txt"
 
             # adopt dataset path
             gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = (
@@ -96,7 +105,6 @@ class TestWarmstart:
             )
 
             main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
-
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
                 main_obj_1.add_custom_component(
                     component_key="results_subscriber",
@@ -111,7 +119,7 @@ class TestWarmstart:
                 rank_1 = dist.get_rank()
                 if rank_1 == 0:
                     messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
-                    loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "CLMCrossEntropyLoss interval average")
+                    loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "CLMCrossEntropyLoss average")
                     with open(loss_values_1_path, "w") as f:
                         json.dump(loss_scores_1, f)
 
@@ -131,7 +139,7 @@ class TestWarmstart:
                 rank_2 = dist.get_rank()
                 if rank_2 == 0:
                     messages_2: List[Message[EvaluationResultBatch]] = components_2.evaluation_subscriber.message_list
-                    loss_scores_2 = TestWarmstart.get_loss_scores(messages_2, "CLMCrossEntropyLoss interval average")
+                    loss_scores_2 = TestWarmstart.get_loss_scores(messages_2, "CLMCrossEntropyLoss average")
                     with open(loss_values_2_path, "w") as f:
                         json.dump(loss_scores_2, f)
 
@@ -146,12 +154,7 @@ class TestWarmstart:
 
                     # we check if the losses for the model from scratch
                     # and the warm start model have the same loss values
-                    global_num_seen_tokens = gpt2_warm_start_from_step_1_dict["settings"]["training"][
-                        "global_num_seen_tokens"
-                    ]
-                    assert loaded_loss_values_1[global_num_seen_tokens:] == pytest.approx(
-                        loaded_loss_values_2, abs=1e-16
-                    )
+                    assert loaded_loss_values_1[4:] == pytest.approx(loaded_loss_values_2, abs=1e-16)
 
     def test_warmstart_dataloader(self):
         # non-skipped config

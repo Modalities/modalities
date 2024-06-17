@@ -41,6 +41,10 @@ class Trainer:
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
         self.gradient_clipper = gradient_clipper
 
+    @staticmethod
+    def _get_num_train_steps_done(micro_batch_id: int, gradient_acc_steps: int) -> int:
+        return (micro_batch_id + 1) // gradient_acc_steps
+
     def _train_batch(
         self,
         batch: DatasetBatch,
@@ -49,7 +53,6 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-        num_train_steps_done: int,
     ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
@@ -60,10 +63,15 @@ class Trainer:
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            num_train_steps_done += 1
-            return True, num_train_steps_done, loss, gradient_norm_score
+            step_performed = True
         else:
-            return False, num_train_steps_done, loss, None
+            step_performed = False
+            gradient_norm_score = None
+
+        num_train_steps_done = Trainer._get_num_train_steps_done(
+            micro_batch_id=micro_batch_id, gradient_acc_steps=self.gradient_acc_steps
+        )
+        return step_performed, num_train_steps_done, loss, gradient_norm_score
 
     def train(
         self,
@@ -92,7 +100,9 @@ class Trainer:
         gradient_norm_scores = []
 
         # run evaluation callback and checkpointing callback before the first optimizer step
-        num_train_steps_done = 0
+        num_train_steps_done = Trainer._get_num_train_steps_done(
+            micro_batch_id=train_loader.fast_forward_batch_id - 1, gradient_acc_steps=self.gradient_acc_steps
+        )
         evaluation_callback(num_train_steps_done=num_train_steps_done)
         checkpointing_callback(num_train_steps_done=num_train_steps_done)
 
@@ -111,7 +121,6 @@ class Trainer:
                 scheduler=scheduler,
                 loss_fun=loss_fun,
                 micro_batch_id=micro_batch_id,
-                num_train_steps_done=num_train_steps_done,
             )
             forward_backward_time_recorder.stop()
 
