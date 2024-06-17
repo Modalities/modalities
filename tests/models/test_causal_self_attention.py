@@ -34,6 +34,7 @@ def _get_random_attention_layer(n_head_q, n_head_kv, n_embd, attention_impl, att
     return self_attention_layer
 
 
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 @pytest.mark.parametrize(
     "n_head_q, n_head_kv, n_embd",
     [
@@ -159,6 +160,7 @@ def test_forward_pass_shapes(seq_length, n_head_q, n_head_kv, head_dim, attentio
     assert out.shape == (batch_size, seq_length, n_head_q, head_dim)
 
 
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 @pytest.mark.parametrize(
     "n_head_q, n_head_kv, n_embd, attention_impl_1, attention_impl_2, verbose",
     [
