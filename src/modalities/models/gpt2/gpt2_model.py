@@ -332,11 +332,12 @@ class GPT2Block(nn.Module):
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
+        self.attention_config = attention_config
         self.attn = CausalSelfAttention(
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
             n_embd=n_embd,
-            attention_config=attention_config,
+            attention_config=self.attention_config,
             bias=bias,
             dropout=dropout,
             block_size=block_size,
