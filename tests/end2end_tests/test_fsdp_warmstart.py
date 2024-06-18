@@ -56,56 +56,81 @@ class TestWarmstart:
         return [message.payload.losses[loss_key].item() for message in messages]
 
     def test_warm_start(self):
+        # We want to verify that the training continues after starting from checkpoint (i.e, warm start)
+        # exactly the same way, as if we trained it from scratch.
+        # To do so, we have two confings. The first config trains a model for 8 steps and
+        # saves multiple intermediary checkpoints.
+        # The second config starts from the 4th step and trains the model for 4 more steps.
+        # We compare the loss values of the two models after 4 steps and expect them to be the same.
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
-            gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-            gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+            gpt2_8_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
+            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path)
 
             # adopt the checkpoint path
             checkpoint_path = temp_dir  # "/raid/s3/opengptx/max_lue/modalities/data/checkpoints/test"
-            experiment_id_1 = "0"
-            gpt2_two_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+            experiment_id_0 = "0"
+            gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_two_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+            gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "experiment_id"
-            ] = experiment_id_1
-            gpt2_two_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_two_steps_config_dict["settings"]["experiment_id"] = experiment_id_1
-            loss_values_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
+            ] = experiment_id_0
+            gpt2_8_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
+            gpt2_8_steps_config_dict["settings"]["experiment_id"] = experiment_id_0
+            loss_values_experiment_0_path = checkpoint_path + "/experiment_0_loss_scores.txt"
 
             # adopt dataset path
-            gpt2_two_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
+            gpt2_8_steps_config_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
             # config for one step model
-            gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-            gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
+            gpt2_warm_start_after_4_steps_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
+            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(gpt2_warm_start_after_4_steps_config_file_path)
 
             # adopt the checkpoint path
-            experiment_id_2 = "1"
-            gpt2_warm_start_from_step_1_dict["wrapped_model"]["config"]["checkpoint_path"] = (
+            experiment_id_1 = "1"
+            gpt2_warm_start_after_4_steps_dict["wrapped_model"]["config"]["checkpoint_path"] = (
                 checkpoint_path + "/0/eid_0-model-num_steps_4-num_tokens_2048.bin"
             )
-            gpt2_warm_start_from_step_1_dict["optimizer"]["config"]["checkpoint_path"] = (
+            gpt2_warm_start_after_4_steps_dict["optimizer"]["config"]["checkpoint_path"] = (
                 checkpoint_path + "/0/eid_0-optimizer-num_steps_4-num_tokens_2048.bin"
             )
-            gpt2_warm_start_from_step_1_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+            gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_warm_start_from_step_1_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+            gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "experiment_id"
-            ] = experiment_id_2
-            gpt2_warm_start_from_step_1_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_warm_start_from_step_1_dict["settings"]["experiment_id"] = experiment_id_2
-            loss_values_2_path = checkpoint_path + "/experiment_2_loss_scores.txt"
+            ] = experiment_id_1
+            gpt2_warm_start_after_4_steps_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
+            gpt2_warm_start_after_4_steps_dict["settings"]["experiment_id"] = experiment_id_1
+            loss_values_experiment_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
 
             # adopt dataset path
-            gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = (
+            gpt2_warm_start_after_4_steps_dict["train_dataset"]["config"]["raw_data_path"] = (
                 working_dir / "lorem_ipsum.pbin"
             )
 
-            main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
+            main_obj_0 = Main(gpt2_8_steps_config_dict, gpt2_8_steps_config_file_path)
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+                main_obj_0.add_custom_component(
+                    component_key="results_subscriber",
+                    variant_key="save_all",
+                    custom_component=SaveAllResultSubscriber,
+                    custom_config=SaveAllResultSubscriberConfig,
+                )
+                components_0 = main_obj_0.build_components(components_model_type=TrainingComponentsInstantiationModel)
+                main_obj_0.run(components_0)
+
+                # we collect the loss values from rank 0 and store them in the temporary experiment folder
+                if dist.get_rank() == 0:
+                    messages_0: List[Message[EvaluationResultBatch]] = components_0.evaluation_subscriber.message_list
+                    loss_scores_0 = TestWarmstart.get_loss_scores(messages_0, "CLMCrossEntropyLoss average")
+                    with open(loss_values_experiment_0_path, "w") as f:
+                        json.dump(loss_scores_0, f)
+
+                main_obj_1 = Main(gpt2_warm_start_after_4_steps_dict, gpt2_warm_start_after_4_steps_config_file_path)
+
                 main_obj_1.add_custom_component(
                     component_key="results_subscriber",
                     variant_key="save_all",
@@ -115,46 +140,26 @@ class TestWarmstart:
                 components_1 = main_obj_1.build_components(components_model_type=TrainingComponentsInstantiationModel)
                 main_obj_1.run(components_1)
 
-                # we collect the loss values from rank 0 and store them in the temporary experiment folder
-                rank_1 = dist.get_rank()
-                if rank_1 == 0:
-                    messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
-                    loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "CLMCrossEntropyLoss average")
-                    with open(loss_values_1_path, "w") as f:
-                        json.dump(loss_scores_1, f)
-
-                main_obj_2 = Main(gpt2_warm_start_from_step_1_dict, gpt2_warm_start_from_step_1_config_file_path)
-
-                main_obj_2.add_custom_component(
-                    component_key="results_subscriber",
-                    variant_key="save_all",
-                    custom_component=SaveAllResultSubscriber,
-                    custom_config=SaveAllResultSubscriberConfig,
-                )
-                components_2 = main_obj_2.build_components(components_model_type=TrainingComponentsInstantiationModel)
-                main_obj_2.run(components_2)
-
                 # we collect the loss values from rank 0 for the warmstart model
                 # and store them in the temporary experiment folder
-                rank_2 = dist.get_rank()
-                if rank_2 == 0:
-                    messages_2: List[Message[EvaluationResultBatch]] = components_2.evaluation_subscriber.message_list
-                    loss_scores_2 = TestWarmstart.get_loss_scores(messages_2, "CLMCrossEntropyLoss average")
-                    with open(loss_values_2_path, "w") as f:
-                        json.dump(loss_scores_2, f)
+                if dist.get_rank() == 0:
+                    messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
+                    loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "CLMCrossEntropyLoss average")
+                    with open(loss_values_experiment_1_path, "w") as f:
+                        json.dump(loss_scores_1, f)
 
                     # read the losses from disc
                     # note that the temporary directory is only correct for the rank 0.
                     # rank 1 has a different one and we don't store anything in there
-                    with open(loss_values_1_path, "r") as f:
-                        loaded_loss_values_1 = json.load(f)
+                    with open(loss_values_experiment_0_path, "r") as f:
+                        loaded_loss_values_0 = json.load(f)
 
-                    with open(loss_values_2_path, "r") as f:
-                        loaded_loss_values_2 = json.load(f)
+                    with open(loss_values_experiment_1_path, "r") as f:
+                        loaded_loss_values_1 = json.load(f)
 
                     # we check if the losses for the model from scratch
                     # and the warm start model have the same loss values
-                    assert loaded_loss_values_1[4:] == pytest.approx(loaded_loss_values_2, abs=1e-16)
+                    assert loaded_loss_values_0[4:] == pytest.approx(loaded_loss_values_1, abs=1e-16)
 
     def test_warmstart_dataloader(self):
         # non-skipped config
