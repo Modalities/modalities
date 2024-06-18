@@ -4,6 +4,7 @@ import multiprocessing
 import os
 import pickle
 import warnings
+from io import BufferedWriter
 from pathlib import Path
 from typing import Callable, Iterator, List, Optional, Tuple
 
@@ -84,6 +85,7 @@ class PackedDataGenerator:
         assert self._total_num_of_tokens == 0, f"This {self.__name__} was already used and is exhausted. Use another!"
         dst_path = self._default_destination_path(destination_path=dst_path)
 
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
         if dst_path.exists():
             raise ValueError(f"file already exists at destination path '{dst_path}'.")
 
@@ -132,6 +134,23 @@ class PackedDataGenerator:
 
     def _writer_thread(self, dst_path: Path) -> Callable:
         def writer():
+            # writes a batch received from the processed_samples_queue to the destination file
+            def _write_batch(
+                batch: List[Tuple[int, bytes]], prev_line_id: int, curr_offset: int, index_list: List, f: BufferedWriter
+            ) -> Tuple[int, int]:
+                # write the tokens for each document
+                for line_id, tokens_as_bytes in batch:
+                    if prev_line_id + 1 != line_id:
+                        raise ValueError(
+                            f"Line IDs are not consecutive. Expected {prev_line_id + 1}, but got {line_id}"
+                        )
+                    f.write(tokens_as_bytes)
+                    segment_length = len(tokens_as_bytes)
+                    index_list.append((curr_offset, segment_length))
+                    curr_offset += segment_length
+                    prev_line_id = line_id
+                return prev_line_id, curr_offset
+
             index_list = []
             with dst_path.open("wb") as f:
                 # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
@@ -146,14 +165,16 @@ class PackedDataGenerator:
 
                 # write data section (tokens)
                 pbar = tqdm(total=len(self._reader), desc="Processed batches")
+                prev_line_id = -1
+                batch_dict = {}
                 for batch in self._generator_for_tokens_to_get_written():
-                    # write the tokens for each document
-                    for tokens_as_bytes in batch:
-                        f.write(tokens_as_bytes)
-                        segment_length = len(tokens_as_bytes)
-                        index_list.append((curr_offset, segment_length))
-                        curr_offset += segment_length
-                    pbar.update(len(batch))
+                    line_id = batch[0][0]
+                    batch_dict[line_id] = batch
+
+                    while prev_line_id + 1 in batch_dict:
+                        batch = batch_dict.pop(prev_line_id + 1)
+                        prev_line_id, curr_offset = _write_batch(batch, prev_line_id, curr_offset, index_list, f)
+                        pbar.update(len(batch))
                 # write index
                 f.write(pickle.dumps(index_list))
 
@@ -195,7 +216,7 @@ class PackedDataGenerator:
                 batch_processed = []
                 for line_id, line in batch:
                     processed_line = self._process_line(line, process_id)
-                    batch_processed.append(processed_line)
+                    batch_processed.append((line_id, processed_line))
                 self.processed_samples_queue.put(batch_processed)
             except EmptySampleError:
                 warnings.warn(

@@ -1,6 +1,6 @@
+import json
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
@@ -39,18 +39,22 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
 
 
-def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
-    block_size = 5
+def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
+    # In this test, we create a packed dataset from a long jsonl file
+    # and iterate over the packed dataset to check if the tokenization is correct.
+    # We do so by manually tokenizing the jsonl file and comparing the tokenized
+    # output with the packed dataset
+    block_size = 20
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_data_path.raw_data_path,
+        src_path=indexed_dummy_data_path_long.raw_data_path,
         tokenizer=wrapped_gpt2_tokenizer,
-        number_of_processes=2,
+        number_of_processes=5,
         eod_token="<|endoftext|>",
-        index_path=indexed_dummy_data_path.index_path,
+        index_path=indexed_dummy_data_path_long.index_path,
         jq_pattern=".text",
-        processing_batch_size=2,
-        raw_samples_queue_size=2,
-        processed_samples_queue_size=2,
+        processing_batch_size=5,
+        raw_samples_queue_size=3,
+        processed_samples_queue_size=3,
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
@@ -59,16 +63,32 @@ def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
         default_packed_dataset_path, block_size=block_size, sample_key="input_ids"
     )
 
-    start_of_jsonl_content = "0 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
-    tokenized_start_of_jsonl_content = wrapped_gpt2_tokenizer.tokenize(start_of_jsonl_content)
-    packed_dataset_iterator = iter(packed_dataset)
-    np.testing.assert_equal(tokenized_start_of_jsonl_content[:block_size], next(packed_dataset_iterator)["input_ids"])
-    np.testing.assert_equal(
-        tokenized_start_of_jsonl_content[block_size : 2 * block_size], next(packed_dataset_iterator)["input_ids"]
-    )
-    assert len(packed_dataset._embedded_stream_data.index_base) == 12
+    # read in the raw jsonl files for manual tokenization
+    with open(indexed_dummy_data_path_long.raw_data_path) as f:
+        jsonl_list = [json.loads(line)["text"] for line in f]
+
+    jsonl_tokenized = [wrapped_gpt2_tokenizer.tokenize(v) for v in jsonl_list]
+    eod_token_id = wrapped_gpt2_tokenizer.get_token_id("<|endoftext|>")
+    # we flatten the list of tokenized documents and add the eod token at the end of each document
+    jsonl_tokenized_flat = [token_id for doc in jsonl_tokenized for token_id in doc + [eod_token_id]]
+    # we make sure that the length of the flattened tokenized jsonl file is a multiple of the block size
+    # as the packed dataset also cuts off partially packed samples at the end.
+    jsonl_tokenized_flat = jsonl_tokenized_flat[: len(jsonl_tokenized_flat) // block_size * block_size]
+
+    # flatten the tokens from the packed dataset
+    packed_dataset_tokens_flat = [j for i in iter(packed_dataset) for j in i["input_ids"].tolist()]
+
+    # compare the flattened tokens from the packed dataset with the manually tokenized jsonl file
+    assert packed_dataset_tokens_flat == jsonl_tokenized_flat
+
+    # make sure that each packed sample in the packed dataset has a length of block_size
+    for sample in iter(packed_dataset):
+        assert len(sample["input_ids"]) == block_size
+
+    assert len(packed_dataset._embedded_stream_data.index_base) == 500
 
     # check validity of index section in packed dataset
+    # we make sure that the offset is calculated correctly based on the length of the entry and the previous index
     for idx, (offset, entry_length) in enumerate(packed_dataset._embedded_stream_data.index_base[:-1]):
         assert offset + entry_length == packed_dataset._embedded_stream_data.index_base[idx + 1][0]
 

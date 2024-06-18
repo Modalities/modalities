@@ -75,10 +75,27 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 
 
 @pytest.fixture
+def dummy_data_path_long(tmpdir) -> DataPathCollection:
+    source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum_long.jsonl")
+    dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
+    dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
+    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
+    index_path.unlink(missing_ok=True)
+    return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
+
+
+@pytest.fixture
 def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
     index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
+
+
+@pytest.fixture
+def indexed_dummy_data_path_long(dummy_data_path_long) -> DataPathCollection:
+    index_generator = IndexGenerator(dummy_data_path_long.raw_data_path)
+    index_generator.create_index(dummy_data_path_long.index_path)
+    return dummy_data_path_long
 
 
 @pytest.fixture
