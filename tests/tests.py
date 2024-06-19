@@ -11,11 +11,11 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
     Run tests on cpu, single gpu and multiple gpus
 
     Examples:
-    modalities test:                           run CPU tests + single-GPU tests on GPU 0 + multi-GPU tests on GPUs 0/1
-    modalities test --devices 4,5:             run CPU tests + single-GPU tests on GPU 4 + multi-GPU tests on GPUs 4/5
-    modalities test --cpu:                     run CPU tests
-    modalities test --single-gpu --devices 3:  run CPU tests + single-GPU tests on GPU 3
-    modalities test --multi-gpu --devices 3,4: run multi-GPU tests on GPUs 3/4
+    python tests/tests.py: run CPU tests + single-GPU tests on GPU 0 + multi-GPU tests on GPUs 0/1
+    python tests/tests.py --devices 4,5: same as above but using devices 4/5
+    python tests/tests.py --cpu: run CPU tests
+    python tests/tests.py --single-gpu --devices 3: run CPU tests + single-GPU tests on GPU 3
+    python tests/tests.py --multi-gpu --devices 3,4: run multi-GPU tests on GPUs 3/4
     """
     # parse input
     if not cpu and not single_gpu and not multi_gpu:  # run all tests
