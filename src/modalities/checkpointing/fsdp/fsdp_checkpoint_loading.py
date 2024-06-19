@@ -58,7 +58,8 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
         )
         return fsdp_model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, wrapped_model: FSDP, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
+        # NOTE: model must be FSDP-wrapped model!
         # load optimizer
         full_optimizer_state_dict = None
         if self.global_rank == 0:
@@ -67,7 +68,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
         # distribute the optimizer state dict from rank 0 to all the other ranks
         sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-            full_optim_state_dict=full_optimizer_state_dict, model=wrapped_model, group=None
+            full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
         )
         optimizer.load_state_dict(sharded_optimizer_state_dict)
 

@@ -30,10 +30,9 @@ class DataloaderFactory:
             pin_memory (bool): Boolean flag for pinning memory
             shuffle (bool): Boolean flag for shuffling the dataset
             skip_num_batches (Optional[int], optional): Defines the number of batches to skip.
-              NOTE: The checkpoints are indexed with training steps (number of backward passes).
-              The number of seen lcoal batches must not be confused with the number of micro steps
-              which is the number of forward passes
-              (i.e, local num seen batches = num train steps * gradient accumulation steps).
+              NOTE: The checkpoints are indexed with training steps (i.e., number of optimizer steps).
+              skip_num_batches must not be confused with the number of optimizer steps!
+              skip_num_batches = num optimizer steps * gradient accumulation steps
               Defaults to 0.
 
         Returns:
