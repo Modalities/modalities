@@ -24,10 +24,10 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
+    "flash-attn",
 ]
 
 [project.optional-dependencies]
-gpu = ["flash-attn"]
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov"]
 install_helper = ["ninja"]
