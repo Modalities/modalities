@@ -41,7 +41,9 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
 
     # run cpu / single-gpu tests
     if cpu or single_gpu:
-        command_unit_tests = f"CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} pytest"
+        command_unit_tests = (
+            f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} python -m pytest"
+        )
 
         print("\n=== RUN CPU & SINGLE-GPU TESTS ===" if single_gpu else "\n=== RUN CPU TESTS ===")
         print(command_unit_tests)
