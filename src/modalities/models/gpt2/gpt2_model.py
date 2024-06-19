@@ -1,4 +1,5 @@
 import math
+
 from copy import deepcopy
 from enum import Enum
 from functools import partial
@@ -6,13 +7,14 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import xformers.ops as xops
 from flash_attn import flash_attn_func
 from pydantic import BaseModel, Field, model_validator, validator
 
+from torch.nn import functional as F
+
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import NNModel
+from modalities.models.model import NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -106,7 +108,7 @@ class QueryKeyValueTransformType(Enum):
 
 class ActivationType(str, Enum):
     GELU = "gelu"
-    FUSED_SWIGLU = "fused_swiglu"
+    SWIGLU = "swiglu"
 
 
 class AttentionConfig(BaseModel):
@@ -293,7 +295,6 @@ class TransformerMLP(nn.Module):
         x = self.dropout(x)
         return x
 
-
 class GPT2Block(nn.Module):
     def __init__(
         self,
@@ -323,9 +324,8 @@ class GPT2Block(nn.Module):
         )
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation_type == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        elif activation_type == ActivationType.SWIGLU:
+            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
 
