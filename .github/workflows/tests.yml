@@ -20,6 +20,9 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Comment out dependencies that require GPU
+      run: |
+        sed -i 's/"flash-attn"/#"flash-attn"/g' pyproject.toml
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip

@@ -7,7 +7,11 @@ from typing import Annotated, Dict, List, Tuple
 import torch
 import torch.nn as nn
 import xformers.ops as xops
-from flash_attn import flash_attn_func
+
+try:
+    from flash_attn import flash_attn_func
+except ModuleNotFoundError:
+    flash_attn_func = None
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
@@ -317,6 +321,11 @@ class CausalSelfAttention(nn.Module):
             )  # (B, nh_q, T, hd)
             y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.DAO_FLASH:
+            # Due to the lack of GPUs in github actions and the requirement of those in the flash-attn library,
+            # we have to check if the library is installed and raise an error if not.
+            # Note, that the library is not required for the CPU-only tests.
+            if flash_attn_func is None:
+                raise NotImplementedError("ERROR! Dao Flash Attention is not installed.")
             # the next three lines are only needed for flash-attn from Daio Lab
             q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
             k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
