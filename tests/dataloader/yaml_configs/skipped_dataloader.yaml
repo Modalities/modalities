@@ -31,7 +31,7 @@ skip_num_batches:
   config:
     num_ranks: ${settings.cuda_env.world_size}
     global_num_tokens: ${settings.training.global_num_seen_tokens}
-    context_size: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
 
 train_dataloader:
   component_key: data_loader

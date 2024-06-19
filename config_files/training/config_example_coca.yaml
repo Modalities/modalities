@@ -150,7 +150,7 @@ checkpoint_saving:
           config:
             num_ranks: ${settings.cuda_env.world_size}
             local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            context_size: ${settings.training.sequence_length}
+            sequence_length: ${settings.training.sequence_length}
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
@@ -269,7 +269,7 @@ batch_progress_subscriber:
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
-        context_size: ${settings.training.sequence_length}
+        sequence_length: ${settings.training.sequence_length}
     gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader

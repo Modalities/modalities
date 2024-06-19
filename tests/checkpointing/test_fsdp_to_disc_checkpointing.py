@@ -111,9 +111,9 @@ class TestFSDPToDiscCheckpointing:
     def _generate_batch(gpt2_model_config: Dict):
         # prepare input and targets
         data = torch.randint(
-            0,
-            gpt2_model_config["model"]["config"]["vocab_size"],
-            (8, gpt2_model_config["model"]["config"]["block_size"] + 1),
+            0,  # lowest token_id
+            gpt2_model_config["model"]["config"]["vocab_size"],  # highest token_id, i.e, vocab_size
+            (8, gpt2_model_config["model"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
         ).cuda()
         batch_input_ids_dict = {gpt2_model_config["model"]["config"]["sample_key"]: data[:, :-1]}
         batch_target_ids = data[:, 1:]
@@ -198,9 +198,9 @@ class TestFSDPToDiscCheckpointing:
         experiment_id = "0"
         num_train_steps_done = 1
 
-        context_size = gpt2_model_config_dict["model"]["config"]["block_size"]
+        sequence_length = gpt2_model_config_dict["model"]["config"]["sequence_length"]
         get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
-            num_ranks=2, local_micro_batch_size=4, context_size=context_size
+            num_ranks=2, local_micro_batch_size=4, sequence_length=sequence_length
         )
         checkpoint_saving = FSDPCheckpointSaving(
             checkpoint_path=temporary_checkpoint_folder_path,
