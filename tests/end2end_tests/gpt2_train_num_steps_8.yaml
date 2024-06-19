@@ -125,7 +125,7 @@ model:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    model_sequence_length: ${settings.training.sequence_length}
+    block_size: ${settings.training.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2

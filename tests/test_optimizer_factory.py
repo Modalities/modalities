@@ -72,7 +72,7 @@ def _load_coca() -> FSDP:
 
 # number of parameters for each optimizer group
 GPT2_LINEAR = 66130944
-GPT2_EMBEDDING = 768 * (50304 + 2048 - 1)  # n_embd * (vocab_size + block_size - 1)
+GPT2_EMBEDDING = 768 * (50304 + 2048)  # n_embd * (vocab_size + sequence_length)
 GPT2_LAYERNORM = 768 * 50  # n_embd * num_layer_norms
 COCA_ALL = 184502784
 
