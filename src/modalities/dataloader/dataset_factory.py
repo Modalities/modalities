@@ -40,7 +40,7 @@ class DatasetFactory:
     @staticmethod
     def get_mem_map_dataset(
         raw_data_path: Path,
-        block_size: int,
+        model_sequence_length: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
         index_path: Optional[Path] = None,
@@ -48,7 +48,7 @@ class DatasetFactory:
     ) -> MemMapDataset:
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
-            block_size=block_size,
+            block_size=model_sequence_length + 1,
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
@@ -58,18 +58,20 @@ class DatasetFactory:
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(
-        raw_data_path: Path, block_size: int, sample_key: str
+        raw_data_path: Path, model_sequence_length: int, sample_key: str
     ) -> PackedMemMapDatasetContinuous:
         dataset = PackedMemMapDatasetContinuous(
-            raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key
+            raw_data_path=raw_data_path, block_size=model_sequence_length + 1, sample_key=sample_key
         )
         return dataset
 
     @staticmethod
     def get_packed_mem_map_dataset_megatron(
-        raw_data_path: Path, block_size: int, sample_key: str
+        raw_data_path: Path, model_sequence_length: int, sample_key: str
     ) -> PackedMemMapDatasetMegatron:
-        dataset = PackedMemMapDatasetMegatron(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
+        dataset = PackedMemMapDatasetMegatron(
+            raw_data_path=raw_data_path, block_size=model_sequence_length + 1, sample_key=sample_key
+        )
         return dataset
 
     @staticmethod

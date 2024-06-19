@@ -452,8 +452,7 @@ class GPT2LLM(NNModel):
 
         # TODO: dependency injection
         if poe_type is PositionTypes.ABSOLUTE:
-            # source and target sequences are block_size -1 long, since target is the source shifted by 1
-            wpe = nn.Embedding(num_embeddings=block_size - 1, embedding_dim=n_embd)
+            wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
             # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
             # https://github.com/huggingface/accelerate/issues/807

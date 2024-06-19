@@ -251,7 +251,7 @@ class DistributedSamplerConfig(BaseModel):
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    model_sequence_length: Annotated[int, Field(strict=True, gt=0)]
     tokenizer: PydanticTokenizerIFType
     jq_pattern: str
     sample_key: str
@@ -259,7 +259,7 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    model_sequence_length: Annotated[int, Field(strict=True, gt=0)]
     sample_key: str
 
 
