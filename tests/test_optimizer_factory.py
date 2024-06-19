@@ -72,7 +72,7 @@ def _load_coca() -> FSDP:
 
 # number of parameters for each optimizer group
 GPT2_LINEAR = 66130944
-GPT2_EMBEDDING = 768 * (50304 + 2048)  # n_embd * (vocab_size + block_size)
+GPT2_EMBEDDING = 768 * (50304 + 2048 - 1)  # n_embd * (vocab_size + block_size - 1)
 GPT2_LAYERNORM = 768 * 50  # n_embd * num_layer_norms
 COCA_ALL = 184502784
 
@@ -117,5 +117,9 @@ def test_get_optimizer_groups(
                 p.numel() for group in optimizer_groups for p in group["params"] if group["weight_decay"] == 0
             )
 
-            assert test_num_decayed_parameters == num_decayed_parameters
-            assert test_num_nondecayed_parameters == num_nondecayed_parameters
+            assert (
+                test_num_decayed_parameters == num_decayed_parameters
+            ), f"#(decayed parameters) = {test_num_decayed_parameters} should be {num_decayed_parameters}"
+            assert (
+                test_num_nondecayed_parameters == num_nondecayed_parameters
+            ), f"#(non-decayed parameters) = {test_num_nondecayed_parameters} should be {num_nondecayed_parameters}"

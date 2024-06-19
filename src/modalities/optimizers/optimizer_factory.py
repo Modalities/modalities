@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import torch.nn as nn
@@ -40,7 +41,7 @@ class OptimizerFactory:
 
     @staticmethod
     def get_checkpointed_optimizer(
-        checkpoint_loading: CheckpointLoadingIF, checkpoint_path, wrapped_model: nn.Module, optimizer: Optimizer
+        checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, wrapped_model: nn.Module, optimizer: Optimizer
     ) -> Optimizer:
         wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint(
             file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model

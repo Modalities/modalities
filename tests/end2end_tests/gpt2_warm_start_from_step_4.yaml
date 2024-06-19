@@ -7,7 +7,7 @@ settings:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 4
     evaluation_interval_in_steps: 1
-    global_num_seen_tokens: 4
+    global_num_seen_tokens:  2048 # 4 steps * 256 tokens per step * 2 ranks
     do_apply_activation_checkpointing: false
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
@@ -42,7 +42,13 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_micro_steps: ${settings.training.global_num_seen_tokens}
+    skip_num_batches:
+      component_key: number_conversion
+      variant_key: local_num_batches_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        context_size: ${settings.training.sequence_length}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -93,6 +99,13 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            context_size: ${settings.training.sequence_length}        
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -112,7 +125,7 @@ wrapped_model:
     checkpoint_loading:
       instance_key: checkpoint_loading
       pass_type: BY_REFERENCE
-    checkpoint_path: tmp/checkpoints/0/eid_0-model-num_steps_4.bin
+    checkpoint_path: must_be_set_in_test_impl
 
 model:
   component_key: model
@@ -137,6 +150,7 @@ model:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+    attention_implementation: manual
     activation_type: gelu
     weight_init:
       mean: 0.0
@@ -171,7 +185,22 @@ scheduler:
       instance_key: optimizer
       pass_type: BY_REFERENCE
 
-optimizer:  
+optimizer:
+  component_key: optimizer
+  variant_key: checkpointed
+  config:
+    optimizer:
+      instance_key: optimizer_original
+      pass_type: BY_REFERENCE
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    checkpoint_loading:
+      instance_key: checkpoint_loading
+      pass_type: BY_REFERENCE
+    checkpoint_path: must_be_set_in_test_impl
+
+optimizer_original:  
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -179,6 +208,7 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
+    weight_decay_groups_excluded: ["embedding", "layernorm"]
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -198,6 +228,7 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
+    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
@@ -206,6 +237,7 @@ batch_progress_subscriber:
         local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
         context_size: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -216,13 +248,3 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: save_all
   config: {}
-
-# evaluation_subscriber:
-#   component_key: results_subscriber
-#   variant_key: wandb
-#   config:
-#     local_rank: ${settings.cuda_env.local_rank}
-#     project: modalities_lorem_ipsum
-#     mode: ONLINE
-#     experiment_id: ${settings.experiment_id}
-#     directory: "."
