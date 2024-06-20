@@ -1,4 +1,5 @@
 import os
+import pathlib
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,8 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.models.huggingface_adapters.mamba_hf_adapter import MambaHuggingFaceAdapterConfig, MambaHuggingFaceModelAdapter
+from modalities.models.huggingface_adapters.mamba_hf_adapter import MambaHuggingFaceAdapterConfig, \
+    MambaHuggingFaceModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -36,7 +38,9 @@ def component_factory():
 
 @pytest.fixture()
 def config_file_path():
-    return Path("configs_for_testing/mamba_config_test.yaml")
+    current_dir = pathlib.Path().resolve()
+    config_file_path = current_dir / Path("tests/checkpointing/configs_for_testing/mamba_config_test.yaml")
+    return config_file_path
 
 
 @pytest.fixture()
