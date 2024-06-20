@@ -87,8 +87,7 @@ class CoCaConfig(BaseModel):
     vision_encoder_config: Optional[VisionTransformerConfig] = None
     text_decoder_config: TextDecoderConfig
     n_pool_head: Annotated[int, Field(ge=1)]
-    n_vision_queries: Optional[Annotated[int, Field(ge=1)]]
-    n_audio_queries: Optional[Annotated[int, Field(ge=1)]]
+    n_queries: Optional[Annotated[int, Field(ge=1)]]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
 
@@ -118,8 +117,7 @@ class CoCa(NNModel):
         vision_encoder_config: Optional[VisionTransformerConfig],
         text_decoder_config: TextDecoderConfig,
         n_pool_head: int,
-        n_vision_queries: Optional[int],
-        n_audio_queries: Optional[int],
+        n_queries: Optional[int],
         bias_attn_pool: bool,
         epsilon_attn_pool: float,
         modality_encoder_config: VisionTransformerConfig | AudioTransformerConfig | AVConfig,
@@ -168,7 +166,7 @@ class CoCa(NNModel):
             self.vision_encoder, self.vision_queries, self.vision_attn_pool = self._init_modality(
                 VisionTransformer,
                 vision_encoder_config,
-                n_vision_queries,
+                n_queries,
             )
 
         self.audio_sample_key = None
@@ -177,7 +175,7 @@ class CoCa(NNModel):
             self.audio_encoder, self.audio_queries, self.audio_attn_pool = self._init_modality(
                 AudioTransformer,
                 audio_encoder_config,
-                n_audio_queries,
+                n_queries,
             )
 
         self.text_decoder = TextDecoder(
