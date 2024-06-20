@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import PydanticPytorchModuleType, load_app_config_dict
-from modalities.models.huggingface.huggingface_adapter import HuggingFaceAdapterConfig, HuggingFaceModel
+from modalities.models.huggingface_adapters.mamba_hf_adapter import MambaHuggingFaceAdapterConfig, MambaHuggingFaceModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -24,8 +24,8 @@ class CheckpointConversion:
 
     def convert_pytorch_to_hf_checkpoint(self):
         model = self._setup_model()
-        config = HuggingFaceAdapterConfig(config_dict=self.config_dict)
-        hf_model = HuggingFaceModel(config=config, model=model)
+        config = MambaHuggingFaceAdapterConfig(config_dict=self.config_dict)
+        hf_model = MambaHuggingFaceModelAdapter(config=config, model=model)
         hf_model.save_pretrained(self.output_hf_checkpoint_dir, safe_serialization=False)
         return hf_model
 

@@ -1,5 +1,5 @@
 import json
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import PosixPath
 from typing import Any, Dict, Optional, Tuple
@@ -15,22 +15,17 @@ from modalities.models.mamba.mamba_model import MambaLLM
 
 
 class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
-    model_type = "modalities"
-
     def __init__(self, config_dict=None, **kwargs):
         super().__init__(**kwargs)
         self.config_dict = config_dict
-
         if self.config_dict:
             self.convert_posixpath_to_str(self.config_dict)
 
     def to_json_string(self, use_diff: bool = True) -> str:
-
         if self.config_dict:
             json_dict = {"config": self.config_dict.copy(), "model_type": self.model_type}
         else:
             json_dict = {}
-
         return json.dumps(json_dict)
 
     def convert_posixpath_to_str(self, d):
@@ -46,19 +41,9 @@ class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
                 d[key] = [str(item) if isinstance(item, PosixPath) else item for item in value]
 
 
-class HuggingFaceModel(PreTrainedModel):
-    config_class = HuggingFaceAdapterConfig
-
-    def __init__(self, config: HuggingFaceAdapterConfig, model: Optional[nn.Module] = None):
+class HuggingFaceModelAdapter(PreTrainedModel):
+    def __init__(self, config):
         super().__init__(config)
-
-        if not model:
-            mamba_llm_config = self.convert_config_to_mamba_llm_config(config)
-            self.model: MambaLLM = MambaLLM(**mamba_llm_config)
-
-            self.config = self.convert_config_config_to_pydantic(mamba_llm_config)
-        else:
-            self.model = model
 
     def forward(
             self,
@@ -89,18 +74,9 @@ class HuggingFaceModel(PreTrainedModel):
             "attention_mask": attention_mask,
         }
 
-    def convert_config_to_mamba_llm_config(self, config):
-        config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"] = MambaBlockConfig(
-            **config.config["model"]["config"]["mixer_model_config"]["mamba_block_config"])
-        config.config["model"]["config"]["mixer_model_config"] = MixerModelConfig(
-            **config.config["model"]["config"]["mixer_model_config"])
 
-        return config.config["model"]["config"]
-
-    def convert_config_config_to_pydantic(self, config):
-
-        config["is_encoder_decoder"] = False
-        return HuggingFaceModelConfig(**config)
+class HuggingFaceModelAdapterConfig(ABC, BaseModel):
+    ...
 
 
 @dataclass
@@ -108,23 +84,3 @@ class ModalitiesModelOutput(ModelOutput):
     logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
-
-
-class HuggingFaceModelConfig(BaseModel):
-    d_model: int
-    n_layer: int
-    vocab_size: int
-    rms_norm: bool
-    residual_in_fp32: bool
-    fused_add_norm: bool
-    pad_vocab_size_multiple: int
-    tie_embeddings: bool
-    prediction_key: str
-    sample_key: str
-    seed: Optional[int]
-    dtype: Optional[str]
-    initializer_cfg: Dict
-    num_last_tokens: int
-    inference_params: Dict
-    mixer_model_config: MixerModelConfig
-    is_encoder_decoder: bool

@@ -10,7 +10,7 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.models.huggingface.huggingface_adapter import HuggingFaceAdapterConfig, HuggingFaceModel
+from modalities.models.huggingface_adapters.mamba_hf_adapter import MambaHuggingFaceAdapterConfig, MambaHuggingFaceModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -82,8 +82,8 @@ def hf_model(checkpoint_conversion):
 
 @pytest.fixture()
 def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, device):
-    AutoConfig.register("modalities", HuggingFaceAdapterConfig)
-    AutoModelForCausalLM.register(HuggingFaceAdapterConfig, HuggingFaceModel)
+    AutoConfig.register("modalities_mamba", MambaHuggingFaceAdapterConfig)
+    AutoModelForCausalLM.register(MambaHuggingFaceAdapterConfig, MambaHuggingFaceModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(checkpoint_conversion.output_hf_checkpoint_dir,
                                                                     torch_dtype=pytorch_model.lm_head.weight.dtype)
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
@@ -99,7 +99,7 @@ def test_tensor(device, size: int = 10):
 
 def test_hf_and_pytorch_models_are_the_same_after_init(hf_model, pytorch_model, checkpoint_conversion):
     assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
-    assert hf_model.__class__.__name__ == "HuggingFaceModel"
+    assert hf_model.__class__.__name__ == "MambaHuggingFaceModelAdapter"
     assert os.listdir(checkpoint_conversion.output_hf_checkpoint_dir)
 
 
