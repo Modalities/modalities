@@ -34,7 +34,7 @@ train_dataset:
   variant_key: packed_mem_map_dataset_continuous
   config:
     raw_data_path: ./data/mem_map/redpajama_v2_samples_512_train.pbin
-    model_sequence_length: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
@@ -73,7 +73,7 @@ val_dataset:
   variant_key: packed_mem_map_dataset_continuous
   config:
     raw_data_path: ./data/mem_map/redpajama_v2_samples_512_test.pbin
-    model_sequence_length: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 val_dataloader:

@@ -38,7 +38,7 @@ train_dataset:
   config:
     raw_data_path: ../../data/lorem_ipsum.jsonl
     index_path: ../../data/lorem_ipsum.idx
-    model_sequence_length: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
     jq_pattern: ".text"
     sample_key:  ${settings.referencing_keys.sample_key}
     tokenizer:
