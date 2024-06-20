@@ -173,8 +173,21 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
         # get number of total tokens in file
         total_tokens = self._embedded_stream_data.data_len // self._token_size_in_bytes
-        num_samples = total_tokens // self.block_size
-        return [(i * self.block_size * self._token_size_in_bytes, self.block_size) for i in range(num_samples)]
+        if total_tokens < self.block_size:
+            raise ValueError(
+                f"Block size ({self.block_size}) is larger than the"
+                "total number of tokens in the dataset ({total_tokens})."
+            )
+        if self.block_size < 2:
+            raise ValueError("Block size must be at least 2.")
+        # Given a fixed number of samples we can compute the total number of tokens as
+        # num_tokens = block_size + (block_size-1) * (num_samples-1)
+        # as the first sample always needs block_size many tokens and the following samples
+        # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
+        # of the subsequent sample).
+        num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
+        # given num_samples we calculate the starting index and length of each sample as tuple.
+        return [((i * self.block_size - i) * self._token_size_in_bytes, self.block_size) for i in range(num_samples)]
 
 
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):

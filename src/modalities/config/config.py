@@ -259,13 +259,13 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    model_sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    model_sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    block_size: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
