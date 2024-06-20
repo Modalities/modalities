@@ -231,8 +231,8 @@ model:
       bias: true
       activation: fused_swiglu
       epsilon: 1e-5
-    n_pool_head: 12
-    n_vision_queries: 256
+    n_pool_head: 16
+    n_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
     weight_init:
@@ -290,7 +290,7 @@ evaluation_subscriber:
   config:
     local_rank: ${settings.cuda_env.global_rank}
     project: modalities
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}

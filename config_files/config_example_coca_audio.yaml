@@ -48,7 +48,6 @@ train_dataset:
     block_size_text_decoder: 512
     freq_domain_mask_length: 30
     time_domain_mask_length: 100
-    
 
 val_dataset:
   component_key: dataset
@@ -192,13 +191,12 @@ model:
   variant_key: coca
   config:
     prediction_key: logits
-    modality_key: modality
-    modality_embd_prediction_key: modality_embeddings
+    audio_embd_prediction_key: modality_embeddings
     text_embd_prediction_key: text_embeddings
-    modality_cls_prediction_key: modality_cls
+    audio_cls_prediction_key: modality_cls
     text_cls_prediction_key: text_cls
     logit_scale_prediction_key: logit_scale
-    modality_encoder_config:
+    audio_encoder_config:
       sample_key: feats
       prediction_key: modality_embeddings
       block_size: 500
@@ -227,8 +225,7 @@ model:
       activation: fused_swiglu
       epsilon: 1e-5
     n_pool_head: 8
-    n_vision_queries: Null
-    n_audio_queries: 256
+    n_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
     weight_init:

@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Annotated, Dict, Tuple
+from typing import Annotated, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -16,11 +16,6 @@ from modalities.models.coca.text_decoder import TextDecoder
 from modalities.models.model import ActivationType, NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
-
-
-class AVConfig(BaseModel):
-    audio_transformer_config: AudioTransformerConfig
-    vision_transformer_config: VisionTransformerConfig
 
 
 class TextDecoderConfig(BaseModel):
@@ -81,17 +76,19 @@ class CoCaConfig(BaseModel):
     """
 
     prediction_key: str = "logits"
-    modality_key: str = "modality"
-    modality_embd_prediction_key: str
     text_embd_prediction_key: str
-    modality_cls_prediction_key: str
     text_cls_prediction_key: str
     logit_scale_prediction_key: str
-    modality_encoder_config: AudioTransformerConfig | VisionTransformerConfig | AVConfig
+    audio_embd_prediction_key: Optional[str] = None
+    vision_embd_prediction_key: Optional[str] = None
+    audio_cls_prediction_key: Optional[str] = None
+    vision_cls_prediction_key: Optional[str] = None
+    audio_encoder_config: Optional[AudioTransformerConfig] = None
+    vision_encoder_config: Optional[VisionTransformerConfig] = None
     text_decoder_config: TextDecoderConfig
     n_pool_head: Annotated[int, Field(ge=1)]
-    n_vision_queries: Annotated[int, Field(ge=1)] | None
-    n_audio_queries: Annotated[int, Field(ge=1)] | None
+    n_vision_queries: Optional[Annotated[int, Field(ge=1)]]
+    n_audio_queries: Optional[Annotated[int, Field(ge=1)]]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
 
@@ -110,15 +107,19 @@ class CoCa(NNModel):
     def __init__(
         self,
         prediction_key: str,
-        modality_key: str,
-        modality_embd_prediction_key: str,
         text_embd_prediction_key: str,
-        logit_scale_prediction_key: str,
-        modality_cls_prediction_key: str,
         text_cls_prediction_key: str,
-        n_vision_queries: int,
-        n_audio_queries: int,
+        logit_scale_prediction_key: str,
+        audio_embd_prediction_key: Optional[str],
+        vision_embd_prediction_key: Optional[str],
+        audio_cls_prediction_key: Optional[str],
+        vision_cls_prediction_key: Optional[str],
+        audio_encoder_config: Optional[AudioTransformerConfig],
+        vision_encoder_config: Optional[VisionTransformerConfig],
+        text_decoder_config: TextDecoderConfig,
         n_pool_head: int,
+        n_vision_queries: Optional[int],
+        n_audio_queries: Optional[int],
         bias_attn_pool: bool,
         epsilon_attn_pool: float,
         modality_encoder_config: VisionTransformerConfig | AudioTransformerConfig | AVConfig,
@@ -146,44 +147,36 @@ class CoCa(NNModel):
         """
         super().__init__()
 
-        self.AUDIO = 0
-        self.VISION = 1
-
         self.prediction_key = prediction_key
-        self.modality_key = modality_key
-        self.modality_embd_prediction_key = modality_embd_prediction_key
         self.text_embd_prediction_key = text_embd_prediction_key
         self.logit_scale_prediction_key = logit_scale_prediction_key
-
-        self.modality_cls_prediction_key = modality_cls_prediction_key
         self.text_cls_prediction_key = text_cls_prediction_key
+
+        self.audio_embd_prediction_key = audio_embd_prediction_key
+        self.vision_embd_prediction_key = vision_embd_prediction_key
+        self.audio_cls_prediction_key = audio_cls_prediction_key
+        self.vision_cls_prediction_key = vision_cls_prediction_key
 
         self.n_pool_head = n_pool_head
         self.bias_attn_pool = bias_attn_pool
         self.epsilon_attn_pool = epsilon_attn_pool
         self.text_decoder_config = text_decoder_config
 
-        if isinstance(modality_encoder_config, VisionTransformerConfig):
+        self.vision_sample_key = None
+        if vision_encoder_config is not None:
+            self.vision_sample_key = vision_encoder_config.sample_key
             self.vision_encoder, self.vision_queries, self.vision_attn_pool = self._init_modality(
                 VisionTransformer,
-                modality_encoder_config,
+                vision_encoder_config,
                 n_vision_queries,
             )
-        elif isinstance(modality_encoder_config, AudioTransformerConfig):
+
+        self.audio_sample_key = None
+        if audio_encoder_config is not None:
+            self.audio_sample_key = audio_encoder_config.sample_key
             self.audio_encoder, self.audio_queries, self.audio_attn_pool = self._init_modality(
                 AudioTransformer,
-                modality_encoder_config,
-                n_audio_queries,
-            )
-        else:
-            self.vision_encoder, self.vision_queries, self.vision_attn_pool = self._init_modality(
-                VisionTransformer,
-                modality_encoder_config.vision_transformer_config,
-                n_vision_queries,
-            )
-            self.audio_encoder, self.audio_queries, self.audio_attn_pool = self._init_modality(
-                AudioTransformer,
-                modality_encoder_config.audio_transformer_config,
+                audio_encoder_config,
                 n_audio_queries,
             )
 
@@ -257,18 +250,32 @@ class CoCa(NNModel):
         Returns:
             dict[str, torch.Tensor]: Output dictionary.
         """
-        if inputs[self.modality_key][0] == self.AUDIO:
-            modality_embd, modality_cls_token = self._forward_encode_audio(inputs)
-        if inputs[self.modality_key][0] == self.VISION:
-            modality_embd, modality_cls_token = self._forward_encode_vision(inputs)
+        output = {}
+        # TODO stack features from different modalities (ensure correct alignment with the text features)
+        modality_embd = None
+        if self.audio_sample_key is not None and self.audio_sample_key in inputs:
+            audio_embd, audio_cls_token = self._forward_encode_audio(inputs)
+            output[self.audio_cls_prediction_key] = audio_cls_token
+            modality_embd = audio_embd
+
+        elif self.vision_sample_key is not None and self.vision_sample_key in inputs:
+            vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
+            output[self.vision_cls_prediction_key] = audio_cls_token
+            modality_embd = vision_embd
+
+        else:
+            raise NotImplementedError("Parallel vision audio in the same batch is currently not supported!")
+
         text_embd, text_cls_token = self._forward_encode_text(inputs)
         logits = self._forward_decode(text_embd, modality_embd)
-        return {
-            self.prediction_key: logits,
-            self.modality_cls_prediction_key: modality_cls_token,
-            self.text_cls_prediction_key: text_cls_token,
-            self.logit_scale_prediction_key: self.logit_scale.exp(),
-        }
+        output.update(
+            {
+                self.prediction_key: logits,
+                self.text_cls_prediction_key: text_cls_token,
+                self.logit_scale_prediction_key: self.logit_scale.exp(),
+            }
+        )
+        return output
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -287,7 +294,7 @@ class CoCa(NNModel):
         return vision_embd, vision_cls_token
 
     def _forward_encode_audio(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        audio_embd = self.audio_encoder(inputs)[self.modality_embd_prediction_key]
+        audio_embd = self.audio_encoder(inputs)[self.audio_embd_prediction_key]
         queries = repeat(self.audio_queries, "n d -> b n d", b=audio_embd.shape[0])
         audio_embd = self.audio_attn_pool(queries, context=audio_embd)
         audio_embd, audio_cls_token = audio_embd[:, :-1, :], F.normalize(audio_embd[:, -1, :], dim=-1)
