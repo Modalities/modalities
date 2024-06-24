@@ -32,7 +32,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-            do_apply_activation_checkpointing: bool
+            activation_checkpointing_modules: Optional[List[str]]
             gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
             local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
             sequence_length: Annotated[int, Field(strict=True, ge=1)]
