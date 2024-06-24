@@ -136,3 +136,23 @@ class Aggregator(Generic[T]):
             post_processing_fun=postprocessing_fun,  # lambda t: t[0] / t[1],
         )
         return value
+
+def get_module_class_from_name(module, name):
+    """ From Accelerate source code 
+    (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
+    Gets a class from a module by its name.
+
+    Args:
+        module (`torch.nn.Module`): The module to get the class from.
+        name (`str`): The name of the class.
+    """
+    modules_children = list(module.children())
+    if module.__class__.__name__ == name:
+        return module.__class__
+    elif len(modules_children) == 0:
+        return
+    else:
+        for child_module in modules_children:
+            module_class = get_module_class_from_name(child_module, name)
+            if module_class is not None:
+                return module_class
