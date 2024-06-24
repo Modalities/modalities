@@ -69,24 +69,10 @@ def entry_point_generate_text(config_file_path: FilePath):
 
 @main.command(name="convert_pytorch_to_hf_checkpoint")
 @click.option(
-    "--checkpoint_dir",
+    "--config_file_path",
     type=click_pathlib.Path(exists=True),
     required=True,
     help="Load pytorch checkpoint from this directory.",
-)
-@click.option(
-    "--config_file_name",
-    type=str,
-    required=False,
-    default="model_config.yaml",
-    help="Name of the config file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
-)
-@click.option(
-    "--model_file_name",
-    type=str,
-    required=False,
-    default="model.bin",
-    help="Name of the model file for the input pytorch checkpoint, which must be located in checkpoint_dir.",
 )
 @click.option(
     "--output_hf_checkpoint_dir",
@@ -95,16 +81,9 @@ def entry_point_generate_text(config_file_path: FilePath):
     help="Converted hf checkpoint will be written to this directory.",
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
-        checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
+        config_file_path: Path, output_hf_checkpoint_dir: Path
 ):
-    _entry_point_convert_pytorch_to_hf_checkpoint(checkpoint_dir, config_file_name, model_file_name,
-                                                  output_hf_checkpoint_dir)
-
-
-def _entry_point_convert_pytorch_to_hf_checkpoint(
-        checkpoint_dir: Path, config_file_name: str, model_file_name: str, output_hf_checkpoint_dir: Path
-):
-    cp = CheckpointConversion(checkpoint_dir, config_file_name, model_file_name, output_hf_checkpoint_dir)
+    cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
     hf_model = cp.convert_pytorch_to_hf_checkpoint()
     return hf_model
 
