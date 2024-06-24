@@ -11,11 +11,10 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.models.huggingface_adapters.mamba_hf_adapter import MambaHuggingFaceAdapterConfig, \
-    MambaHuggingFaceModelAdapter
+from modalities.models.huggingface_adapters.hf_adapter import HFAdapter, HFAdapterConfig
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
-
+from tests.conftest import _ROOT_DIR
 
 @pytest.fixture()
 def set_env():
@@ -36,10 +35,14 @@ def component_factory():
     return component_factory
 
 
+@pytest.fixture(params=["gpt2_config_test.yaml", "mamba_config_test.yaml"])
+def config_file_name(request):
+    return request.param
+
+
 @pytest.fixture()
-def config_file_path():
-    current_dir = pathlib.Path().resolve()
-    config_file_path = current_dir / Path("tests/checkpointing/configs_for_testing/mamba_config_test.yaml")
+def config_file_path(config_file_name):
+    config_file_path = _ROOT_DIR / Path("tests/checkpointing/configs_for_testing/" + config_file_name)
     return config_file_path
 
 
@@ -86,8 +89,8 @@ def hf_model(checkpoint_conversion):
 
 @pytest.fixture()
 def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, device):
-    AutoConfig.register("modalities_mamba", MambaHuggingFaceAdapterConfig)
-    AutoModelForCausalLM.register(MambaHuggingFaceAdapterConfig, MambaHuggingFaceModelAdapter)
+    AutoConfig.register("modalities", HFAdapterConfig)
+    AutoModelForCausalLM.register(HFAdapterConfig, HFAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(checkpoint_conversion.output_hf_checkpoint_dir,
                                                                     torch_dtype=pytorch_model.lm_head.weight.dtype)
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
@@ -103,7 +106,6 @@ def test_tensor(device, size: int = 10):
 
 def test_hf_and_pytorch_models_are_the_same_after_init(hf_model, pytorch_model, checkpoint_conversion):
     assert hf_model.dtype == pytorch_model.lm_head.weight.dtype
-    assert hf_model.__class__.__name__ == "MambaHuggingFaceModelAdapter"
     assert os.listdir(checkpoint_conversion.output_hf_checkpoint_dir)
 
 

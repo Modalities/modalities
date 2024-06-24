@@ -1,5 +1,5 @@
 import json
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from pathlib import PosixPath
 from typing import Any, Dict, Optional, Tuple
@@ -10,20 +10,24 @@ from pydantic import BaseModel
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
-from modalities.models.mamba.mamba_config import MambaBlockConfig, MixerModelConfig
-from modalities.models.mamba.mamba_model import MambaLLM
+from modalities.config.component_factory import ComponentFactory
+from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.models.model import NNModel
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 
 
-class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
-    def __init__(self, config_dict=None, **kwargs):
+class HFAdapterConfig(PretrainedConfig):
+    model_type = "modalities"
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.config_dict = config_dict
-        if self.config_dict:
-            self.convert_posixpath_to_str(self.config_dict)
+        if self.config:
+            self.convert_posixpath_to_str(self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
-        if self.config_dict:
-            json_dict = {"config": self.config_dict.copy(), "model_type": self.model_type}
+        if self.config:
+            json_dict = {"config": self.config.copy(), "model_type": self.model_type}
         else:
             json_dict = {}
         return json.dumps(json_dict)
@@ -41,9 +45,27 @@ class HuggingFaceAdapterConfig(ABC, PretrainedConfig):
                 d[key] = [str(item) if isinstance(item, PosixPath) else item for item in value]
 
 
-class HuggingFaceModelAdapter(PreTrainedModel):
-    def __init__(self, config):
+class HFAdapter(PreTrainedModel):
+    config_class = HFAdapterConfig
+
+    def __init__(self, config: HFAdapterConfig, model: Optional[nn.Module] = None, *inputs, **kwargs):
         super().__init__(config)
+        if not model:
+            self.model: NNModel = self.get_model_from_config(config.config)
+        else:
+            self.model = model
+
+    def get_model_from_config(self, config: dict):
+        registry = Registry(COMPONENTS)
+        component_factory = ComponentFactory(registry=registry)
+
+        class ModelConfig(BaseModel):
+            model: PydanticPytorchModuleType
+
+        components = component_factory.build_components(
+            config_dict=config, components_model_type=ModelConfig
+        )
+        return components.model
 
     def forward(
             self,
@@ -73,11 +95,6 @@ class HuggingFaceModelAdapter(PreTrainedModel):
             "input_ids": input_ids,
             "attention_mask": attention_mask,
         }
-
-
-class HuggingFaceModelAdapterConfig(ABC, BaseModel):
-    ...
-
 
 @dataclass
 class ModalitiesModelOutput(ModelOutput):
