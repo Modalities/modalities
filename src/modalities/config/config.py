@@ -259,7 +259,7 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    sequence_length: Annotated[int, Field(strict=True, gt=1)]
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
     sample_key: str
 
 
