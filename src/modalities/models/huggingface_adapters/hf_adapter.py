@@ -5,15 +5,11 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from pydantic import BaseModel
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.models.model import NNModel
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
+from modalities.models.utils import get_model_from_config
 
 
 class HFAdapterConfig(PretrainedConfig):
@@ -50,19 +46,9 @@ class HFAdapter(PreTrainedModel):
     def __init__(self, config: HFAdapterConfig, model: Optional[nn.Module] = None, *inputs, **kwargs):
         super().__init__(config)
         if not model:
-            self.model: NNModel = self.get_model_from_config(config.config)
+            self.model: NNModel = get_model_from_config(config.config)
         else:
             self.model = model
-
-    def get_model_from_config(self, config: dict):
-        registry = Registry(COMPONENTS)
-        component_factory = ComponentFactory(registry=registry)
-
-        class ModelConfig(BaseModel):
-            model: PydanticPytorchModuleType
-
-        components = component_factory.build_components(config_dict=config, components_model_type=ModelConfig)
-        return components.model
 
     def forward(
         self,
