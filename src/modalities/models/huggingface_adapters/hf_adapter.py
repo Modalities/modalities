@@ -1,5 +1,4 @@
 import json
-from abc import ABC
 from dataclasses import dataclass
 from pathlib import PosixPath
 from typing import Any, Dict, Optional, Tuple
@@ -32,7 +31,7 @@ class HFAdapterConfig(PretrainedConfig):
             json_dict = {}
         return json.dumps(json_dict)
 
-    def convert_posixpath_to_str(self, d):
+    def convert_posixpath_to_str(self, d: dict):
         """
         Recursively iterate over the dictionary and convert PosixPath values to strings.
         """
@@ -62,18 +61,16 @@ class HFAdapter(PreTrainedModel):
         class ModelConfig(BaseModel):
             model: PydanticPytorchModuleType
 
-        components = component_factory.build_components(
-            config_dict=config, components_model_type=ModelConfig
-        )
+        components = component_factory.build_components(config_dict=config, components_model_type=ModelConfig)
         return components.model
 
     def forward(
-            self,
-            input_ids: torch.Tensor,
-            attention_mask: Optional[torch.Tensor] = None,
-            return_dict: Optional[bool] = False,
-            output_attentions: Optional[bool] = False,
-            output_hidden_states: Optional[bool] = False,
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        return_dict: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
     ):
         if output_attentions or output_hidden_states:
             raise NotImplementedError
@@ -85,7 +82,7 @@ class HFAdapter(PreTrainedModel):
             return model_forward_output[self.model.prediction_key]
 
     def prepare_inputs_for_generation(
-            self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
+        self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
     ) -> Dict[str, Any]:
         """
         Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the
@@ -95,6 +92,7 @@ class HFAdapter(PreTrainedModel):
             "input_ids": input_ids,
             "attention_mask": attention_mask,
         }
+
 
 @dataclass
 class ModalitiesModelOutput(ModelOutput):
