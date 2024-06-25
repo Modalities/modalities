@@ -25,5 +25,5 @@ def apply_activation_checkpointing_inplace(model: torch.nn.Module, activation_ch
     non_reentrant_wrapper = partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=False)
 
     apply_activation_checkpointing(
-        model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=is_module_to_apply_activation_checkpointing
+        model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=lambda submodule: is_module_to_apply_activation_checkpointing(submodule, activation_checkpointing_modules)
     )
