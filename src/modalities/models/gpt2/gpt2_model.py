@@ -517,7 +517,7 @@ class GPT2LLM(NNModel):
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
         device = input_ids.device
-        b, t = input_ids.size()  # batch size, sequence length
+        _, t = input_ids.size()  # batch size, sequence length
         assert (
             t <= self.sequence_length
         ), f"Cannot forward sequence of length {t}, block size is only {self.sequence_length}"
