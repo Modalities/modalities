@@ -130,10 +130,11 @@ contains the concatenated token ids for all documents.
 
 Index segment:
 ==============
-The index contains a tuple for each document with the format (byte_offset, segment_length),
-where the byte_offset specifies the byte position in the data segment for the start of the document and segment_length. 
-Therfore, the index segment would look like [(8, 100), (108, 302), (410, 803), ...]. The first sample starts at byte position 8 and
-has a length of 100 bytes. The second sample therefore starts at byte position 108 and has  a length of 284 bytes and so on.
+The index contains a tuple for each document with the format (byte_offset, segment_byte_length),
+where the byte_offset specifies the byte position in the data segment for the start of the document and segment_length
+specifies the byte length of the document. 
+Therfore, the index segment would look like [(0, 100), (100, 302), (410, 803), ...]. The first sample starts at byte position 0 and
+has a length of 100 bytes. The second sample therefore starts at byte position 100 and has  a length of 202 bytes and so on.
 ```
 
 We have implemented different packing strategies on top of the file format, each making sure that a batch is completely filled up with documents without any trailing padding in the sequences.
