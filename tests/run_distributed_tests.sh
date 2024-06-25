@@ -42,3 +42,6 @@ CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 torchrun --rdzv-endpoint localhost:29502 --nnod
 
 # test optimizer
 CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) test_optimizer_factory.py $COVERAGE
+
+# test initialization
+CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) test_initialization.py $COVERAGE
