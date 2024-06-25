@@ -37,7 +37,8 @@ def dummy_packed_data_path(tmpdir) -> Path:
     data += (len(tokens) * token_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="little")
     data += token_size_in_bytes.to_bytes(4, byteorder="little")
     data += b"".join([t.to_bytes(token_size_in_bytes, byteorder="little") for t in tokens])
-    index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
+    # NOTE: so far none of the implemented pytests use this index though!
+    index = [(0, 24), (24, 40), (64, 12), (76, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
     dummy_packed_data_path = Path(tmpdir, "dummy.pbin")
     dummy_packed_data_path.write_bytes(data)
