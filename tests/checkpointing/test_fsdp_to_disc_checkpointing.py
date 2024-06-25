@@ -112,7 +112,7 @@ class TestFSDPToDiscCheckpointing:
         # prepare input and targets
         data = torch.randint(
             0,  # lowest token_id
-            gpt2_model_config["model"]["config"]["vocab_size"],  # highest token_id, i.e, vocab_size
+            gpt2_model_config["model"]["config"]["vocab_size"],  # highest token_id + 1, i.e. vocab_size
             (8, gpt2_model_config["model"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
         ).cuda()
         batch_input_ids_dict = {gpt2_model_config["model"]["config"]["sample_key"]: data[:, :-1]}
