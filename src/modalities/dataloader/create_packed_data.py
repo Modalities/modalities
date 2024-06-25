@@ -161,7 +161,10 @@ class PackedDataGenerator:
                         EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little"
                     )
                 )
-                curr_offset = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
+                # The offset only applies to the data section, not the header
+                # When we load the file, we addtionally add the header size
+                # to the offset
+                curr_offset = 0
 
                 # write data section (tokens)
                 pbar = tqdm(total=len(self._reader), desc="Processed batches")
@@ -229,8 +232,7 @@ class PackedDataGenerator:
                 )
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
-        start_of_index_in_bytes = index_list[-1][0] + index_list[-1][1]
-        length_of_byte_encoded_data_section = start_of_index_in_bytes - EmbeddedStreamData.HEADER_SIZE_IN_BYTES
+        length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
         data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
             EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
         )
@@ -277,7 +279,9 @@ class EmbeddedStreamData:
             # get index
             f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
             pkl_encoded_index = f.read()
-            self.index_base = pickle.loads(pkl_encoded_index)
+            # contains the start offset and length of each segment
+            # as byte positions in the data section
+            self.index_base: List[Tuple[int, int]] = pickle.loads(pkl_encoded_index)
 
             # initialize memmapped data section
             self.data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))
