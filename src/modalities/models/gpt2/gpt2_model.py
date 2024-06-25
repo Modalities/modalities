@@ -520,7 +520,7 @@ class GPT2LLM(NNModel):
         _, t = input_ids.size()  # batch size, sequence length
         assert (
             t <= self.sequence_length
-        ), f"Cannot forward sequence of length {t}, block size is only {self.sequence_length}"
+        ), f"Cannot forward sequence of length {t}, the model's maximum input sequence length is only {self.sequence_length}"
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
