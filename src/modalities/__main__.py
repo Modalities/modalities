@@ -221,7 +221,7 @@ class Main:
         wrapped_model = components.wrapped_model
         logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
 
-        if components.settings.training.activation_checkpointing_modules:
+        if len(components.settings.training.activation_checkpointing_modules) > 0:
             apply_activation_checkpointing_inplace(
                 model=wrapped_model, 
                 activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
