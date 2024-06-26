@@ -20,7 +20,7 @@ model:
     activation_type: gelu
     weight_init:
       mean: 0.0
-      std: 0.02
+      std: WILL_BE_REPLACED
       type: WILL_BE_REPLACED
     attention_norm:
       component_key: layer_norm

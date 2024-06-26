@@ -1,9 +1,9 @@
+import math
 import os
 import re
 from pathlib import Path
 from typing import Dict, Optional
 
-import numpy as np
 import pytest
 import torch
 from pydantic import BaseModel
@@ -42,10 +42,11 @@ def get_gpt2_model_from_config(gpt2_model_config_dict: Dict) -> GPT2LLM:
     return model
 
 
-def _load_gpt2(initialization_type: str = "scaled") -> FSDP:
+def _load_gpt2(initialization_type: str, std: float | str) -> FSDP:
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config_dict["model"]["config"]["weight_init"]["type"] = initialization_type  # replace
+    config_dict["model"]["config"]["weight_init"]["std"] = std  # replace
     gpt2_model = get_gpt2_model_from_config(config_dict)
     gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         gpt2_model,
@@ -57,10 +58,11 @@ def _load_gpt2(initialization_type: str = "scaled") -> FSDP:
     return gpt2_wrapped_model
 
 
-def _load_coca(initialization_type: str = "scaled") -> FSDP:
+def _load_coca(initialization_type: str, std: float | str) -> FSDP:
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/coca_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config_dict["weight_init"]["type"] = initialization_type  # replace
+    config_dict["weight_init"]["std"] = std  # replace
     coca_config = CoCaConfig.model_validate(config_dict)
     coca_model = CoCa(**dict(coca_config))
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
@@ -71,6 +73,16 @@ def _load_coca(initialization_type: str = "scaled") -> FSDP:
         sharding_strategy=ShardingStrategy.NO_SHARD,
     )
     return coca_wrapped_model
+
+
+def _load_model(model_name: str, initialization: str = "scaled", std: float | str = 0.02) -> FSDP:
+    if model_name == "gpt2":
+        model = _load_gpt2(initialization_type=initialization, std=std)
+    elif model_name == "coca":
+        model = _load_coca(initialization_type=initialization, std=std)
+    else:
+        raise Exception(f"model = {model_name} not implemented.")
+    return model
 
 
 # REGEX EXPRESSIONS THAT DEFINE INITIALIZATION GROUPS
@@ -173,32 +185,38 @@ NR_PARAMETERS = {
 
 
 # THEORETICAL AVERAGES AND STANDARD DEVIATIONS
-def avg_theory(group: str) -> float:
+def get_avg_theory(group: str) -> float:
     if group == "weight-norm":
         return 1.0
     else:
         return 0.0
 
 
-def std_theory(group: str, initialization: str, model_name: str) -> float:
+def get_std_theory(group: str, initialization: str, model_name: str, std: float | str) -> float:
+    if std == "auto":
+        if model_name == "gpt2":
+            std = math.sqrt(2 / (5 * GPT2_HIDDEN_DIM))
+        else:
+            raise Exception(f"std_theory not implemented for model_name = {model_name} and std = auto")
+
     if group in ["weight-norm", "bias"]:
         return 0.0
     elif group == "weight-normal":
-        return 0.02
+        return std
     elif group == "weight-projection":
         if initialization == "plain":
-            return 0.02
+            return std
         elif initialization == "scaled":
             if model_name == "gpt2":
-                return 0.02 / np.sqrt(2 * GPT2_NLAYERS)
+                return std / math.sqrt(2 * GPT2_NLAYERS)
             elif model_name == "coca":
-                return 0.02 / np.sqrt(2 * COCA_NLAYERS)
+                return std / math.sqrt(2 * COCA_NLAYERS)
             else:
                 raise Exception(f"std_theory not implemented for model_name = {model_name}")
         else:
             raise Exception(f"std_theory not implemented for initialization = {initialization}")
     elif group == "embedding":
-        return 0.02
+        return std
     else:
         raise Exception(f"std_theory not implemented for group = {group}")
 
@@ -218,10 +236,7 @@ def test_nr_parameters_per_initialization_group(model_name):
     have the expected number of parameters
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        if model_name == "gpt2":
-            model = _load_gpt2()
-        elif model_name == "coca":
-            model = _load_coca()
+        model = _load_model(model_name)
         print(model)  # for debugging
 
         group_params = get_group_params(model, model_name)
@@ -248,43 +263,57 @@ def test_nr_parameters_per_initialization_group(model_name):
     reason="This test requires 1 GPU and a torchrun distributed environment.",
 )
 @pytest.mark.parametrize(
-    "model_name, initialization",
+    "model_name, initialization, std, success",
     [
-        ("gpt2", "plain"),
-        ("gpt2", "scaled"),
-        ("coca", "plain"),
-        ("coca", "scaled"),
+        # std = 0.02
+        ("gpt2", "plain", 0.02, True),
+        ("gpt2", "scaled", 0.02, True),
+        ("coca", "plain", 0.02, True),
+        ("coca", "scaled", 0.02, True),
+        # std = 'auto'
+        ("gpt2", "plain", "auto", True),
+        ("gpt2", "scaled", "auto", True),
+        ("coca", "plain", "auto", False),  # auto not implemented for coca
+        ("coca", "scaled", "auto", False),  # auto not implemented for coca
     ],
 )
-def test_statistical_distribution_for_each_initialization_group(model_name, initialization):
+def test_statistical_distribution_for_each_initialization_group(
+    model_name: str, initialization: str, std: float | str, success: bool
+):
     """
     verifies that, for a given model architectrue and a given initialization,
     the different model parameter initialization groups
     have the expected avg and std
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        if model_name == "gpt2":
-            model = _load_gpt2(initialization_type=initialization)
-        elif model_name == "coca":
-            model = _load_coca(initialization_type=initialization)
-        print(model)  # for debugging
+        if not success:
+            with pytest.raises(Exception):
+                model = _load_model(model_name, initialization, std)
+        else:
+            model = _load_model(model_name, initialization, std)
 
-        group_params = get_group_params(model, model_name)
+            print(model)  # for debugging
 
-        for group in INITIALIZATION_GROUPS:
-            # check mean and std for each group
-            if group != "other" and group_params[group] is not None:
-                avg = torch.mean(group_params[group])
-                std = torch.std(group_params[group])
-                avg_test = torch.tensor(avg_theory(group), device=avg.device, dtype=avg.dtype)
-                std_test = torch.tensor(
-                    std_theory(group, initialization, model_name), device=std.device, dtype=std.dtype
-                )
-                torch.testing.assert_close(
-                    avg, avg_test, msg=f"average for {model_name}/{group} = {avg} should be close to {avg_test}"
-                )
-                torch.testing.assert_close(
-                    std,
-                    std_test,
-                    msg=f"standard deviation for {model_name}/{group} = {std} should be close to {std_test}",
-                )
+            group_params = get_group_params(model, model_name)
+
+            for group in INITIALIZATION_GROUPS:
+                # check mean and std for each group
+                if group != "other" and group_params[group] is not None:
+                    avg_test = torch.mean(group_params[group])
+                    std_test = torch.std(group_params[group])
+                    avg_theory = torch.tensor(get_avg_theory(group), device=avg_test.device, dtype=avg_test.dtype)
+                    std_theory = torch.tensor(
+                        get_std_theory(group, initialization, model_name, std),
+                        device=std_test.device,
+                        dtype=std_test.dtype,
+                    )
+                    torch.testing.assert_close(
+                        avg_test,
+                        avg_theory,
+                        msg=f"average for {model_name}/{group} = {avg_test} should be close to {avg_theory}",
+                    )
+                    torch.testing.assert_close(
+                        std_test,
+                        std_theory,
+                        msg=f"standard deviation for {model_name}/{group} = {std_test} should be close to {std_theory}",
+                    )

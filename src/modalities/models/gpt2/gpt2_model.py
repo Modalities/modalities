@@ -490,7 +490,7 @@ class GPT2LLM(NNModel):
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
         # init all weights
-        self.initialize_weights(weight_init, number_of_layers=n_layer)
+        self.initialize_weights(weight_init, number_of_layers=n_layer, hidden_dim=n_embd)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]

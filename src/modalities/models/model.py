@@ -20,7 +20,7 @@ class ActivationType(str, Enum):
 
 class WeightInitializationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
-    std: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     type: str
 
 
@@ -50,7 +50,13 @@ class NNModel(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
-    def initialize_weights(self, weight_init, number_of_layers):
+    def initialize_weights(self, weight_init, number_of_layers: int, hidden_dim: Optional[int] = None):
+        # auto: choose std automatically
+        if weight_init.std == "auto":
+            assert hidden_dim is not None, "ERROR! weight_init.std = 'auto' not implemented"
+            weight_init.std = math.sqrt(2 / (5 * hidden_dim))
+
+        # initialize weights
         self.apply(partial(self._init_weights, weight_init=weight_init))
 
         if weight_init.type == "scaled":

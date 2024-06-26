@@ -125,7 +125,9 @@ class CoCa(NNModel):
 
         # init all weights
         self.initialize_weights(
-            weight_init, number_of_layers=text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text
+            weight_init,
+            number_of_layers=text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text,
+            hidden_dim=None,  # not well-defined as hidden_dim can be different for the text and multimodal decoder
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
