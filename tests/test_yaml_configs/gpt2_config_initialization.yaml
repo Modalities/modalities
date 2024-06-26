@@ -21,7 +21,7 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
-      type: scaled
+      type: WILL_BE_REPLACED
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm

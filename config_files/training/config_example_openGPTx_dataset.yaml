@@ -155,6 +155,7 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
+      type: scaled
 
 scheduler:
   type_hint: StepLR

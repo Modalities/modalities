@@ -218,6 +218,7 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
+      type: scaled
 
 scheduler:
   component_key: scheduler

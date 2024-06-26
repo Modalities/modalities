@@ -128,15 +128,19 @@ class CoCa(NNModel):
 
         # init all weights
         self.apply(partial(self._init_weights, weight_init=weight_init))
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(
-                    p,
-                    mean=weight_init.mean,
-                    std=weight_init.std
-                    / math.sqrt(2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)),
-                )
+
+        if weight_init.type == "scaled":
+            # apply special scaled init to the residual projections, per GPT-2 paper
+            for pn, p in self.named_parameters():
+                if pn.endswith("c_proj.weight"):
+                    torch.nn.init.normal_(
+                        p,
+                        mean=weight_init.mean,
+                        std=weight_init.std
+                        / math.sqrt(
+                            2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)
+                        ),
+                    )
 
     def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
         if isinstance(module, nn.Linear):

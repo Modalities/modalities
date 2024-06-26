@@ -42,4 +42,4 @@ epsilon_attn_pool: 1e-5
 weight_init:
   mean: 0.0
   std: 0.02
-  type: scaled
+  type: WILL_BE_REPLACED

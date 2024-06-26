@@ -42,9 +42,10 @@ def get_gpt2_model_from_config(gpt2_model_config_dict: Dict) -> GPT2LLM:
     return model
 
 
-def _load_gpt2() -> FSDP:
-    config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_optimizer.yaml")
+def _load_gpt2(initialization_type: str = "scaled") -> FSDP:
+    config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict["model"]["config"]["weight_init"]["type"] = initialization_type  # replace
     gpt2_model = get_gpt2_model_from_config(config_dict)
     gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         gpt2_model,
@@ -56,9 +57,10 @@ def _load_gpt2() -> FSDP:
     return gpt2_wrapped_model
 
 
-def _load_coca() -> FSDP:
-    config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config.yaml")
+def _load_coca(initialization_type: str = "scaled") -> FSDP:
+    config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/coca_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict["weight_init"]["type"] = initialization_type  # replace
     coca_config = CoCaConfig.model_validate(config_dict)
     coca_model = CoCa(**dict(coca_config))
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
@@ -74,7 +76,7 @@ def _load_coca() -> FSDP:
 # REGEX EXPRESSIONS THAT DEFINE INITIALIZATION GROUPS
 INITIALIZATION_GROUPS = ["embedding", "weight-normal", "weight-projection", "weight-norm", "bias", "other"]
 MAPPING_GPT2 = {
-    "embedding": [r"wte", r"wpe"],  # TODO
+    "embedding": [r"wte.weight$", r"wpe.weight$"],
     "weight-projection": [r"c_proj\.weight$"],
     "weight-norm": [r"norm\.weight$"],
     "weight-normal": [r"\.weight$"],
@@ -83,8 +85,8 @@ MAPPING_GPT2 = {
 }
 MAPPING_COCA = {
     "embedding": [],  # TODO
-    "weight-projection": [r"c_proj\.weight$"],
-    "weight-norm": [r"norm[12]\.weight$", r"ln_[1234f]\.weight$"],
+    "weight-projection": [r"c_proj\.weight$"],  # TODO
+    "weight-norm": [r"norm[12]\.weight$", r"ln_[1234f]\.weight$"],  # TODO
     "weight-normal": [r"\.weight$"],
     "other": [r"conv", r".*(?<!bias)$"],  # (contains conv) or (does not end with .bias)
     "bias": [r".bias$"],
@@ -201,6 +203,10 @@ def std_theory(group: str, initialization: str, model_name: str) -> float:
         raise Exception(f"std_theory not implemented for group = {group}")
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 1,
+    reason="This test requires 1 GPU and a torchrun distributed environment.",
+)
 @pytest.mark.parametrize(
     "model_name",
     [("gpt2"), ("coca")],
@@ -244,7 +250,9 @@ def test_nr_parameters_per_initialization_group(model_name):
 @pytest.mark.parametrize(
     "model_name, initialization",
     [
+        ("gpt2", "plain"),
         ("gpt2", "scaled"),
+        ("coca", "plain"),
         ("coca", "scaled"),
     ],
 )
@@ -256,9 +264,9 @@ def test_statistical_distribution_for_each_initialization_group(model_name, init
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if model_name == "gpt2":
-            model = _load_gpt2()
+            model = _load_gpt2(initialization_type=initialization)
         elif model_name == "coca":
-            model = _load_coca()
+            model = _load_coca(initialization_type=initialization)
         print(model)  # for debugging
 
         group_params = get_group_params(model, model_name)
