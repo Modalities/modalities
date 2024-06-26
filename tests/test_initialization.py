@@ -1,6 +1,7 @@
 import os
+import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import pytest
@@ -70,93 +71,145 @@ def _load_coca() -> FSDP:
     return coca_wrapped_model
 
 
-# architecture
+# REGEX EXPRESSIONS THAT DEFINE INITIALIZATION GROUPS
+INITIALIZATION_GROUPS = ["embedding", "weight-normal", "weight-projection", "weight-norm", "bias", "other"]
+MAPPING_GPT2 = {
+    "embedding": [r"wte", r"wpe"],  # TODO
+    "weight-projection": [r"c_proj\.weight$"],
+    "weight-norm": [r"norm\.weight$"],
+    "weight-normal": [r"\.weight$"],
+    "bias": [r"\.bias$"],
+    "other": [],
+}
+MAPPING_COCA = {
+    "embedding": [],  # TODO
+    "weight-projection": [r"c_proj\.weight$"],
+    "weight-norm": [r"norm[12]\.weight$", r"ln_[1234f]\.weight$"],
+    "weight-normal": [r"\.weight$"],
+    "other": [r"conv", r".*(?<!bias)$"],  # (contains conv) or (does not end with .bias)
+    "bias": [r".bias$"],
+}
+
+
+def get_group_params(model: FSDP, model_name: str) -> Dict[str, Optional[torch.Tensor]]:
+    """
+    divides all model parameters into initialization groups
+    """
+    if model_name == "gpt2":
+        mapping = MAPPING_GPT2
+    elif model_name == "coca":
+        mapping = MAPPING_COCA
+    else:
+        raise Exception(f"Model = {model_name} not implemented.")
+
+    params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+
+    group_params = {}
+    excluded_regex_expressions = []
+    for group_name, regex_expressions in mapping.items():
+        list_of_flattened_params = [
+            torch.flatten(parameter.detach())
+            for name, parameter in params.items()
+            if any([bool(re.search(regex_expression, name)) for regex_expression in regex_expressions])
+            and not any(
+                [
+                    bool(re.search(excluded_regex_expression, name))
+                    for excluded_regex_expression in excluded_regex_expressions
+                ]
+            )
+        ]
+        group_params[group_name] = torch.cat(list_of_flattened_params) if len(list_of_flattened_params) else None
+        excluded_regex_expressions.extend(regex_expressions)
+    return group_params
+
+
+# NUMBER OF PARAMETERS
 GPT2_NLAYERS = 12
 GPT2_FFN_HIDDEN = 2048
 GPT2_VOCAB_SIZE = 50304
 GPT2_SEQUENCE_LENGTH = 2048
 GPT2_HIDDEN_DIM = 768
-COCA_NLAYERS = 6 + 6  # text + multimodal
-
-# parameters
-AVG = {
-    "gpt2": {
-        "weight-normal": 0.0,
-        "weight-projection": 0.0,
-        "weight-norm": 1.0,
-        "bias": 0.0,
-    },
-    "coca": {
-        "weight-normal": 0.0,
-        "weight-projection": 0.0,
-        "weight-norm": 1.0,
-        "bias": 0.0,
-    },
-}
-STD = {
-    "gpt2": {
-        "weight-normal": 0.02,
-        "weight-projection": 0.02 / np.sqrt(2 * GPT2_NLAYERS),
-        "weight-norm": 0,
-        "bias": 0,
-    },
-    "coca": {
-        "weight-normal": 0.02,
-        "weight-projection": 0.02 / np.sqrt(2 * COCA_NLAYERS),
-        "weight-norm": 0,
-        "bias": 0,
-    },
-}
-
-# number of parameters for each parameter group
-ALL = {
-    "gpt2": 106374912,
-    "coca": 184502784,
-}
-GPT2_LINEAR_PROJECTION = (GPT2_HIDDEN_DIM**2 + GPT2_HIDDEN_DIM * GPT2_FFN_HIDDEN) * GPT2_NLAYERS  # 25952256
-GPT2_EMBEDDING = GPT2_HIDDEN_DIM * (GPT2_VOCAB_SIZE + GPT2_SEQUENCE_LENGTH)
-GPT2_NORM = GPT2_HIDDEN_DIM * (GPT2_NLAYERS * 2 + 1)  # second term = num_layer_norms = (12*2+1) = 25
+GPT2_ALL = 106374912
+GPT2_EMBEDDING = GPT2_HIDDEN_DIM * (
+    GPT2_VOCAB_SIZE + GPT2_SEQUENCE_LENGTH - 1
+)  # TODO: take away -1 once PR #158 is merged
+GPT2_WEIGHT_PROJECTION = (GPT2_HIDDEN_DIM**2 + GPT2_HIDDEN_DIM * GPT2_FFN_HIDDEN) * GPT2_NLAYERS  # 25952256
+GPT2_WEIGHT_NORM = GPT2_HIDDEN_DIM * (GPT2_NLAYERS * 2 + 1)  # second term = num_layer_norms = (12*2+1) = 25
 GPT2_BIAS = 89856
-GPT2_LINEAR_NO_PROJECTION = ALL["gpt2"] - GPT2_LINEAR_PROJECTION - GPT2_EMBEDDING - GPT2_NORM - GPT2_BIAS  # 40107264
+GPT2_OTHER = 0
+GPT2_WEIGHT_NORMAL = GPT2_ALL - GPT2_WEIGHT_PROJECTION - GPT2_EMBEDDING - GPT2_WEIGHT_NORM - GPT2_BIAS  # 40107264
+
+COCA_NLAYERS = 6 + 6  # text + multimodal
+COCA_ALL = 184502784
+COCA_EMBEDDING = 0  # TODO
+COCA_WEIGHT_PROJECTION = 14745600
+COCA_WEIGHT_NORM = 34560
+COCA_BIAS = 191232
+COCA_OTHER = 198912
+COCA_WEIGHT_NORMAL = 169332480
+
+NR_PARAMETERS = {
+    "gpt2": {
+        "all": GPT2_ALL,
+        "embedding": GPT2_EMBEDDING,
+        "weight-projection": GPT2_WEIGHT_PROJECTION,
+        "weight-norm": GPT2_WEIGHT_NORM,
+        "weight-normal": GPT2_WEIGHT_NORMAL,
+        "bias": GPT2_BIAS,
+        "other": GPT2_OTHER,
+    },
+    "coca": {
+        "all": COCA_ALL,
+        "embedding": COCA_EMBEDDING,
+        "weight-normal": COCA_WEIGHT_NORMAL,
+        "weight-projection": COCA_WEIGHT_PROJECTION,
+        "weight-norm": COCA_WEIGHT_NORM,
+        "bias": COCA_BIAS,
+        "other": COCA_OTHER,
+    },
+}
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 1,
-    reason="This test requires 1 GPU and a torchrun distributed environment.",
-)
+# THEORETICAL AVERAGES AND STANDARD DEVIATIONS
+def avg_theory(group: str) -> float:
+    if group == "weight-norm":
+        return 1.0
+    else:
+        return 0.0
+
+
+def std_theory(group: str, initialization: str, model_name: str) -> float:
+    if group in ["weight-norm", "bias"]:
+        return 0.0
+    elif group == "weight-normal":
+        return 0.02
+    elif group == "weight-projection":
+        if initialization == "plain":
+            return 0.02
+        elif initialization == "scaled":
+            if model_name == "gpt2":
+                return 0.02 / np.sqrt(2 * GPT2_NLAYERS)
+            elif model_name == "coca":
+                return 0.02 / np.sqrt(2 * COCA_NLAYERS)
+            else:
+                raise Exception(f"std_theory not implemented for model_name = {model_name}")
+        else:
+            raise Exception(f"std_theory not implemented for initialization = {initialization}")
+    elif group == "embedding":
+        return 0.02
+    else:
+        raise Exception(f"std_theory not implemented for group = {group}")
+
+
 @pytest.mark.parametrize(
-    "model_name, initialization, groups",
-    [
-        (
-            "gpt2",
-            "scaled",
-            {
-                "weight-normal": GPT2_LINEAR_NO_PROJECTION + GPT2_EMBEDDING,
-                "weight-projection": GPT2_LINEAR_PROJECTION,
-                "weight-norm": GPT2_NORM,
-                "bias": GPT2_BIAS,
-                "other": 0,
-            },
-        ),
-        (
-            "coca",
-            "scaled",
-            {
-                "weight-normal": 169332480,
-                "weight-projection": 14745600,
-                "weight-norm": 34560,
-                "bias": 191232,
-                "other": 198912,
-            },
-        ),
-    ],
+    "model_name",
+    [("gpt2"), ("coca")],
 )
-def test_initialization_groups(model_name, initialization, groups):
+def test_nr_parameters_per_initialization_group(model_name):
     """
-    verifies that, for a given model architectrue and a given initialization,
+    verifies that, for a given model architecture,
     the different model parameter initialization groups
-    - have the expected number of parameters
-    - have the expected mean and std
+    have the expected number of parameters
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if model_name == "gpt2":
@@ -165,81 +218,65 @@ def test_initialization_groups(model_name, initialization, groups):
             model = _load_coca()
         print(model)  # for debugging
 
-        params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
-        init = {}
-        if initialization == "scaled":
-            init["weight-normal"] = torch.cat(
-                [
-                    torch.flatten(parameter.detach())
-                    for name, parameter in params.items()
-                    if name.endswith(".weight")
-                    and not name.endswith("c_proj.weight")
-                    and not name.endswith("norm.weight")
-                    and not name.endswith("norm1.weight")
-                    and not name.endswith("norm2.weight")
-                    and not name.endswith("ln_1.weight")
-                    and not name.endswith("ln_2.weight")
-                    and not name.endswith("ln_3.weight")
-                    and not name.endswith("ln_4.weight")
-                    and not name.endswith("ln_f.weight")
-                ]
-            )
-            init["weight-projection"] = torch.cat(
-                [
-                    torch.flatten(parameter.detach())
-                    for name, parameter in params.items()
-                    if name.endswith("c_proj.weight")
-                ]
-            )
-            init["weight-norm"] = torch.cat(
-                [
-                    torch.flatten(parameter.detach())
-                    for name, parameter in params.items()
-                    if name.endswith("norm.weight")
-                    or name.endswith("norm1.weight")
-                    or name.endswith("norm2.weight")
-                    or name.endswith("ln_1.weight")
-                    or name.endswith("ln_2.weight")
-                    or name.endswith("ln_3.weight")
-                    or name.endswith("ln_4.weight")
-                    or name.endswith("ln_f.weight")
-                ]
-            )
-            init["bias"] = torch.cat(
-                [
-                    torch.flatten(parameter.detach())
-                    for name, parameter in params.items()
-                    if name.endswith(".bias") and "conv" not in name
-                ]
-            )
-            other = [
-                torch.flatten(parameter.detach())
-                for name, parameter in params.items()
-                if not name.endswith(".weight") and (not name.endswith(".bias") or "conv" in name)
-            ]
-            init["other"] = torch.cat(other) if len(other) else None
-            count_all = 0
-            for key in ["weight-normal", "weight-projection", "weight-norm", "bias", "other"]:
-                # check number of parameters in each group
-                len_init_key = len(init[key]) if init[key] is not None else 0
-                assert len_init_key == groups[key], f"len(init[{key}]) = {len_init_key} should be {groups[key]}"
-                count_all += len_init_key
+        group_params = get_group_params(model, model_name)
 
-                # check mean and std for each group
-                if key != "other":
-                    avg = torch.mean(init[key])
-                    std = torch.std(init[key])
-                    avg_test = torch.tensor(AVG[model_name][key], device=avg.device, dtype=avg.dtype)
-                    std_test = torch.tensor(STD[model_name][key], device=std.device, dtype=std.dtype)
-                    torch.testing.assert_close(
-                        avg, avg_test, msg=f"average for {key} = {avg} should be close to {avg_test}"
-                    )
-                    torch.testing.assert_close(
-                        std, std_test, msg=f"standard deviation for {key} = {std} should be close to {std_test}"
-                    )
+        nr_parameters_all = 0
+        for group in INITIALIZATION_GROUPS:
+            # check number of parameters in each group
+            nr_parameters_group = len(group_params[group]) if group_params[group] is not None else 0
+            assert nr_parameters_group == NR_PARAMETERS[model_name][group], (
+                f"nr_parameters for {model_name}/{group} = {nr_parameters_group} "
+                + f"should be {NR_PARAMETERS[model_name][group]}"
+            )
+            nr_parameters_all += nr_parameters_group
 
-            # check total number of parameters
-            assert count_all == ALL[model_name], f"total number of parameters = {count_all} should be {ALL[model_name]}"
+        # check total number of parameters
+        assert nr_parameters_all == NR_PARAMETERS[model_name]["all"], (
+            f"total number of parameters for {model_name} = {nr_parameters_all} "
+            + f"should be {NR_PARAMETERS[model_name]['all']}"
+        )
 
-        else:
-            raise Exception(f"Initialization = {initialization} not implemented.")
+
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 1,
+    reason="This test requires 1 GPU and a torchrun distributed environment.",
+)
+@pytest.mark.parametrize(
+    "model_name, initialization",
+    [
+        ("gpt2", "scaled"),
+        ("coca", "scaled"),
+    ],
+)
+def test_statistical_distribution_for_each_initialization_group(model_name, initialization):
+    """
+    verifies that, for a given model architectrue and a given initialization,
+    the different model parameter initialization groups
+    have the expected avg and std
+    """
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        if model_name == "gpt2":
+            model = _load_gpt2()
+        elif model_name == "coca":
+            model = _load_coca()
+        print(model)  # for debugging
+
+        group_params = get_group_params(model, model_name)
+
+        for group in INITIALIZATION_GROUPS:
+            # check mean and std for each group
+            if group != "other" and group_params[group] is not None:
+                avg = torch.mean(group_params[group])
+                std = torch.std(group_params[group])
+                avg_test = torch.tensor(avg_theory(group), device=avg.device, dtype=avg.dtype)
+                std_test = torch.tensor(
+                    std_theory(group, initialization, model_name), device=std.device, dtype=std.dtype
+                )
+                torch.testing.assert_close(
+                    avg, avg_test, msg=f"average for {model_name}/{group} = {avg} should be close to {avg_test}"
+                )
+                torch.testing.assert_close(
+                    std,
+                    std_test,
+                    msg=f"standard deviation for {model_name}/{group} = {std} should be close to {std_test}",
+                )
