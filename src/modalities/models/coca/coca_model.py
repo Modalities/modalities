@@ -1,5 +1,3 @@
-import math
-from functools import partial
 from typing import Annotated, Dict, Tuple
 
 import torch
@@ -10,8 +8,7 @@ from torch import nn
 from modalities.models.coca.attention_pooling import AttentionPooling
 from modalities.models.coca.multi_modal_decoder import MultiModalTextDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.gpt2.gpt2_model import ActivationType, WeightInitializationConfig
-from modalities.models.model import NNModel
+from modalities.models.model import ActivationType, NNModel, WeightInitializationConfig
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
 
@@ -127,28 +124,9 @@ class CoCa(NNModel):
         )
 
         # init all weights
-        self.apply(partial(self._init_weights, weight_init=weight_init))
-
-        if weight_init.type == "scaled":
-            # apply special scaled init to the residual projections, per GPT-2 paper
-            for pn, p in self.named_parameters():
-                if pn.endswith("c_proj.weight"):
-                    torch.nn.init.normal_(
-                        p,
-                        mean=weight_init.mean,
-                        std=weight_init.std
-                        / math.sqrt(
-                            2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)
-                        ),
-                    )
-
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
+        self.initialize_weights(
+            weight_init, number_of_layers=text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text
+        )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
