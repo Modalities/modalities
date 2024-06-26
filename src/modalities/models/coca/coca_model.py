@@ -124,6 +124,7 @@ class CoCa(NNModel):
         )
 
         # init all weights
+        assert weight_init.type in ["plain", "scaled"], f"ERROR! weight_init.type = {weight_init.type} not implemented."
         self.initialize_weights(
             weight_init,
             number_of_layers=text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text,

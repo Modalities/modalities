@@ -206,7 +206,7 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
     elif group == "weight-projection":
         if initialization == "plain":
             return std
-        elif initialization == "scaled":
+        elif initialization in ["scaled", "scaled_embed"]:
             if model_name == "gpt2":
                 return std / math.sqrt(2 * GPT2_NLAYERS)
             elif model_name == "coca":
@@ -216,7 +216,10 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
         else:
             raise Exception(f"std_theory not implemented for initialization = {initialization}")
     elif group == "embedding":
-        return std
+        if initialization == "scaled_embed":
+            return 0.4  # see https://arxiv.org/abs/2312.16903
+        else:
+            return std
     else:
         raise Exception(f"std_theory not implemented for group = {group}")
 
@@ -268,13 +271,17 @@ def test_nr_parameters_per_initialization_group(model_name):
         # std = 0.02
         ("gpt2", "plain", 0.02, True),
         ("gpt2", "scaled", 0.02, True),
+        ("gpt2", "scaled_embed", 0.02, True),
         ("coca", "plain", 0.02, True),
         ("coca", "scaled", 0.02, True),
+        ("coca", "scaled_embed", 0.02, False),  # scaled_embed not implemented for coca
         # std = 'auto'
         ("gpt2", "plain", "auto", True),
         ("gpt2", "scaled", "auto", True),
+        ("gpt2", "scaled_embed", "auto", True),
         ("coca", "plain", "auto", False),  # auto not implemented for coca
         ("coca", "scaled", "auto", False),  # auto not implemented for coca
+        ("coca", "scaled_embed", "auto", False),  # scaled_embed not implemented for coca
     ],
 )
 def test_statistical_distribution_for_each_initialization_group(
@@ -311,9 +318,13 @@ def test_statistical_distribution_for_each_initialization_group(
                         avg_test,
                         avg_theory,
                         msg=f"average for {model_name}/{group} = {avg_test} should be close to {avg_theory}",
+                        atol=2e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
+                        rtol=0,  # default value for torch.float32: 1.3e-6
                     )
                     torch.testing.assert_close(
                         std_test,
                         std_theory,
                         msg=f"standard deviation for {model_name}/{group} = {std_test} should be close to {std_theory}",
+                        atol=1e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
+                        rtol=0,  # default value for torch.float32: 1.3e-6
                     )
