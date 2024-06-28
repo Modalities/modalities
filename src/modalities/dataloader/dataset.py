@@ -158,18 +158,21 @@ class PackedMemMapDatasetBase(Dataset):
     def __getitem__(self, idx: int) -> BatchEncoding:
         self._check_if_inbounds(idx)
         # offset and length in bytes
-        offset, length_in_bytes = self._index[idx]
+        offset_in_bytes, length_in_bytes = self._index[idx]
         if length_in_bytes % self._token_size_in_bytes != 0:
             raise ValueError(
                 f"Length of the sample in bytes is not a multiple of {self._token_size_in_bytes}."
-                f"Offset in bytes: {offset}, Length in bytes: {length_in_bytes}"
+                f"Offset in bytes: {offset_in_bytes}, Length in bytes: {length_in_bytes}"
             )
         # numpy frombuffer takes the memmap object as the buffer
         # and indices the data section with the given offset (in bytes)
         # and length in indices of type self._token_dtype_on_disk
         num_tokens = length_in_bytes // self._token_size_in_bytes
         tokens = np.frombuffer(
-            buffer=self._embedded_stream_data.data, dtype=self._token_dtype_on_disk, count=num_tokens, offset=offset
+            buffer=self._embedded_stream_data.data,
+            dtype=self._token_dtype_on_disk,
+            count=num_tokens,
+            offset=offset_in_bytes,
         )
         # torch can't convert most uint-formats, therefore we infer regular int types
         tokens = tokens.astype(self._token_dtype_in_ram)
