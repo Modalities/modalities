@@ -162,7 +162,7 @@ class PackedDataGenerator:
                     )
                 )
                 # The offset only applies to the data section, not the header
-                # When we load the file, we addtionally add the header size
+                # When we load the file, we add the header size to the offset
                 # to the offset
                 curr_offset = 0
 
