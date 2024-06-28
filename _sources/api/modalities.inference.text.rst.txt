@@ -1,0 +1,29 @@
+modalities.inference.text package
+=================================
+
+Submodules
+----------
+
+modalities.inference.text.config module
+---------------------------------------
+
+.. automodule:: modalities.inference.text.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.inference.text.inference\_component module
+-----------------------------------------------------
+
+.. automodule:: modalities.inference.text.inference_component
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.inference.text
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,29 @@
+modalities.dataloader.open\_gptx\_dataset package
+=================================================
+
+Submodules
+----------
+
+modalities.dataloader.open\_gptx\_dataset.mmap\_dataset module
+--------------------------------------------------------------
+
+.. automodule:: modalities.dataloader.open_gptx_dataset.mmap_dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.dataloader.open\_gptx\_dataset.open\_gptx\_dataset module
+--------------------------------------------------------------------
+
+.. automodule:: modalities.dataloader.open_gptx_dataset.open_gptx_dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.dataloader.open_gptx_dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:

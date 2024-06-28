@@ -1,0 +1,37 @@
+modalities.logging\_broker.subscriber\_impl package
+===================================================
+
+Submodules
+----------
+
+modalities.logging\_broker.subscriber\_impl.batch\_progress\_subscriber module
+------------------------------------------------------------------------------
+
+.. automodule:: modalities.logging_broker.subscriber_impl.batch_progress_subscriber
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.logging\_broker.subscriber\_impl.results\_subscriber module
+----------------------------------------------------------------------
+
+.. automodule:: modalities.logging_broker.subscriber_impl.results_subscriber
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.logging\_broker.subscriber\_impl.subscriber\_factory module
+----------------------------------------------------------------------
+
+.. automodule:: modalities.logging_broker.subscriber_impl.subscriber_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.logging_broker.subscriber_impl
+   :members:
+   :undoc-members:
+   :show-inheritance:

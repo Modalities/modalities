@@ -1,0 +1,18 @@
+modalities.training package
+===========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.training.gradient_clipping
+
+Module contents
+---------------
+
+.. automodule:: modalities.training
+   :members:
+   :undoc-members:
+   :show-inheritance:
