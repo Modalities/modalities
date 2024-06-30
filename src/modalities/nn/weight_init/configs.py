@@ -2,6 +2,12 @@ from typing import Annotated, List, Optional
 
 from pydantic import BaseModel, Field, root_validator
 
+from modalities.nn.weight_init.weight_init_if import WeightInitializationIF
+
+
+class WeightInitializerWrapperConfig(BaseModel):
+    weight_initializers: List[WeightInitializationIF]
+
 
 class PlainWeightInitializationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
