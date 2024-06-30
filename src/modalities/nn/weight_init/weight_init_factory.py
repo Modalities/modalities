@@ -2,13 +2,19 @@ import math
 from typing import List, Optional
 
 from modalities.nn.weight_init.weight_init import (
-    ModulewiseNormaltInitialization,
+    ModulewiseNormalInitialization,
     NamedParameterwiseNormalInitialization,
     WeightInitializationIF,
+    WeightInitializerWrapper,
 )
 
 
 class WeightInitializationFactory:
+    @staticmethod
+    def get_weight_initializer_wrapper(weight_initializers: List[WeightInitializationIF]) -> WeightInitializationIF:
+        initializer_wrapper = WeightInitializerWrapper(weight_initializers)
+        return initializer_wrapper
+
     @staticmethod
     def get_plain_weight_initialization(
         mean: float, std: float | str, hidden_dim: Optional[int] = None
@@ -30,7 +36,7 @@ class WeightInitializationFactory:
 
             std = math.sqrt(2 / (5 * hidden_dim))
 
-        initialization = ModulewiseNormaltInitialization(mean=mean, std=std)
+        initialization = ModulewiseNormalInitialization(mean=mean, std=std)
         return initialization
 
     @staticmethod

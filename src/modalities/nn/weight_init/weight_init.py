@@ -1,25 +1,20 @@
-from abc import ABC, abstractmethod
 from typing import List
 
 import torch.nn as nn
 
+from modalities.nn.weight_init.weight_init_if import WeightInitializationIF
 
-class WeightInitializationIF(ABC):
-    @abstractmethod
+
+class WeightInitializerWrapper(WeightInitializationIF):
+    def __init__(self, weight_initializers: List[WeightInitializationIF]):
+        self.weight_initializers = weight_initializers
+
     def initialize_in_place(self, model: nn.Module):
-        raise NotImplementedError
+        for weight_initializer in self.weight_initializers:
+            weight_initializer.initialize_in_place(model)
 
 
-class WeightInitializer(WeightInitializationIF):
-    def __init__(self, initializers: List[WeightInitializationIF]):
-        self.initializers = initializers
-
-    def initialize_weights(self, model: nn.Module):
-        for initializer in self.initializers:
-            initializer.initialize_in_place(model)
-
-
-class ModulewiseNormaltInitialization(WeightInitializationIF):
+class ModulewiseNormalInitialization(WeightInitializationIF):
     def __init__(self, mean: float, std: float):
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
