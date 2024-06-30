@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: ./checkpoints/2024-04-29__13-04-54/eid_2024-04-29__13-04-54-model-num_steps_48.bin
+  model_path: ./checkpoints/2024-06-27__14-17-52/eid_2024-06-27__14-17-52-model-num_steps_48-num_tokens_393216.bin
   device: 0
   context_length: 1024
 
@@ -61,6 +61,7 @@ raw_model:
             n_embd: ${raw_model.config.n_embd}
             n_head: ${raw_model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+    attention_implementation: manual
     activation_type: gelu
     weight_init:
       mean: 0.0
