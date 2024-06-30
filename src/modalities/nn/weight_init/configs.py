@@ -1,24 +1,6 @@
-from enum import Enum
 from typing import Annotated, List, Optional
 
-import torch.nn as nn
 from pydantic import BaseModel, Field, root_validator
-
-
-class ActivationType(str, Enum):
-    GELU = "gelu"
-    FUSED_SWIGLU = "fused_swiglu"
-
-
-class ModuleTypes(Enum):
-    linear: nn.Linear
-    embedding: nn.Embedding
-
-
-class ModuleTypeFilter(BaseModel):
-    module_type: ModuleTypes  # here we filter for the type of the model, e.g., nn.Linear
-    apply_to_bias: bool
-    apply_to_weights: bool
 
 
 class PlainWeightInitializationConfig(BaseModel):
@@ -35,7 +17,19 @@ class PlainWeightInitializationConfig(BaseModel):
         return values
 
 
-class ScaledWeightInitializationConfig(BaseModel):
+class NamedParameterwiseNormalInitializationConfig(BaseModel):
     mean: Annotated[float, Field(strict=True, ge=0.0)]
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
+    parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+
+
+class ScaledWeightInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    plain_std: Annotated[float, Field(strict=True, ge=0.0)]
+    number_of_layers: Annotated[int, Field(strict=True, gt=0)]
+    parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+
+
+class ScaledEmbedInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
     parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
