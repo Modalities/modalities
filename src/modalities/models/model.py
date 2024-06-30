@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from enum import Enum
 from typing import Dict, List, Optional
 
 import torch
@@ -7,6 +8,11 @@ import torch.nn as nn
 from modalities.batch import DatasetBatch, InferenceResultBatch
 
 WeightDecayGroups = Dict[str, List[str]]
+
+
+class ActivationType(str, Enum):
+    GELU = "gelu"
+    FUSED_SWIGLU = "fused_swiglu"
 
 
 class NNModel(nn.Module):

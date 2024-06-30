@@ -59,5 +59,5 @@ class ModelFactory:
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, weight_initializer: WeightInitializationIF) -> nn.Module:
-        weight_initializer.initialize_weights(model)
+        weight_initializer.initialize_in_place(model)
         return model

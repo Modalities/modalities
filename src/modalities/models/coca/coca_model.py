@@ -8,7 +8,7 @@ from torch import nn
 from modalities.models.coca.attention_pooling import AttentionPooling
 from modalities.models.coca.multi_modal_decoder import MultiModalTextDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.model import ActivationType, NNModel, WeightInitializationConfig
+from modalities.models.model import ActivationType, NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
 
@@ -42,7 +42,6 @@ class CoCaConfig(BaseModel):
     n_vision_queries: Annotated[int, Field(ge=1)]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
-    weight_init: WeightInitializationConfig
 
 
 class CoCa(NNModel):
@@ -68,7 +67,6 @@ class CoCa(NNModel):
         epsilon_attn_pool: float,
         vision_encoder_config: VisionTransformerConfig,
         text_decoder_config: TextDecoderConfig,
-        weight_init: WeightInitializationConfig,
     ) -> None:
         super().__init__()
         self.prediction_key = prediction_key
@@ -121,14 +119,6 @@ class CoCa(NNModel):
             bias=bias_attn_pool,
             epsilon=epsilon_attn_pool,
             attention_config=text_decoder_config.attention_config,
-        )
-
-        # init all weights
-        assert weight_init.type in ["plain", "scaled"], f"ERROR! weight_init.type = {weight_init.type} not implemented."
-        self.initialize_weights(
-            weight_init,
-            number_of_layers=text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text,
-            hidden_dim=None,  # not well-defined as hidden_dim can be different for the text and multimodal decoder
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
