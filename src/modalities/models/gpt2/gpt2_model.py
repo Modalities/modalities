@@ -148,7 +148,7 @@ class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
     poe_type: PositionTypes
-    block_size: Annotated[int, Field(strict=True, ge=1)]
+    sequence_length: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
         int, Field(strict=True, ge=1)
     ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
@@ -251,15 +251,15 @@ class CausalSelfAttention(nn.Module):
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size, block_size, embedding_dim = q.size()
+        batch_size, sequence_length, embedding_dim = q.size()
         # hidden dimension of single head
         # Note, that number of heads does not change the overall parameters of the networks
         # to scale up the network we either have to increase the embedding_dim or the number of layers
         n_head_dim = embedding_dim // n_head_q
 
-        q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
-        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, sequence_length, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
+        k = k.view(batch_size, sequence_length, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, sequence_length, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -419,7 +419,7 @@ class GPT2LLM(NNModel):
         sample_key: str,
         prediction_key: str,
         poe_type: PositionTypes,
-        block_size: int,
+        sequence_length: int,
         vocab_size: int,
         n_layer: int,
         n_head_q: int,
@@ -444,20 +444,19 @@ class GPT2LLM(NNModel):
         super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
-        self.block_size = block_size
+        self.sequence_length = sequence_length
         self.poe_type = poe_type
 
         assert vocab_size is not None
-        assert block_size is not None
+        assert sequence_length is not None
 
         # TODO: dependency injection
         if poe_type is PositionTypes.ABSOLUTE:
-            # source and target sequences are block_size -1 long, since target is the source shifted by 1
-            wpe = nn.Embedding(num_embeddings=block_size - 1, embedding_dim=n_embd)
+            wpe = nn.Embedding(num_embeddings=sequence_length, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
             # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
             # https://github.com/huggingface/accelerate/issues/807
-            # wpe = nn.Embedding.from_pretrained(torch.zeros(block_size, n_embd))
+            # wpe = nn.Embedding.from_pretrained(torch.zeros(sequence_length, n_embd))
             wpe = nn.Identity()
         else:
             raise TypeError(f"{poe_type} not supported")
@@ -518,8 +517,10 @@ class GPT2LLM(NNModel):
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
         device = input_ids.device
-        b, t = input_ids.size()  # batch size, sequence length
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
+        _, t = input_ids.size()  # batch size, sequence length
+        assert (
+            t <= self.sequence_length
+        ), f"Cannot forward sequence of length {t}, the model's maximum input sequence length is only {self.sequence_length}"
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)

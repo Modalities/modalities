@@ -245,7 +245,7 @@ batch_progress_subscriber:
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
-        context_size: ${settings.training.sequence_length}
+        sequence_length: ${settings.training.sequence_length}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE

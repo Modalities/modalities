@@ -32,7 +32,7 @@ train_dataset:
   variant_key: packed_mem_map_dataset_continuous
   config:
     raw_data_path: ./data/lorem_ipsum.pbin
-    block_size: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
@@ -156,7 +156,7 @@ checkpoint_saving:
           config:
             num_ranks: ${settings.cuda_env.world_size}
             local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            context_size: ${settings.training.sequence_length} 
+            sequence_length: ${settings.training.sequence_length} 
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -184,7 +184,7 @@ model:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    block_size: ${settings.training.sequence_length}
+    sequence_length: ${settings.training.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
@@ -277,7 +277,7 @@ batch_progress_subscriber:
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
-        context_size: ${settings.training.sequence_length}
+        sequence_length: ${settings.training.sequence_length}
     gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader

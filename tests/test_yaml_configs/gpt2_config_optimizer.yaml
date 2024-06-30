@@ -5,7 +5,7 @@ model:
     sample_key: "input_ids"
     poe_type: ABSOLUTE
     prediction_key: "logits"
-    block_size: 2048
+    sequence_length: 2048
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
     n_head_q: 12

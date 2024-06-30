@@ -45,7 +45,7 @@ def test_delete_checkpoint(tmpdir):
     model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_steps_101-num_tokens_4848.bin"
     model_path.write_text(CONTENT)
     get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
-        num_ranks=2, local_micro_batch_size=4, context_size=6
+        num_ranks=2, local_micro_batch_size=4, sequence_length=6
     )
     checkpoint_saving = FSDPCheckpointSaving(
         checkpoint_path=directory,
