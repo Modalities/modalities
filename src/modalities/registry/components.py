@@ -67,6 +67,14 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.weight_init.configs import (
+    NamedParameterwiseNormalInitializationConfig,
+    PlainWeightInitializationConfig,
+    ScaledEmbedInitializationConfig,
+    ScaledWeightInitializationConfig,
+    WeightInitializerWrapperConfig,
+)
+from modalities.nn.weight_init.weight_init_factory import WeightInitializationFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -107,6 +115,37 @@ COMPONENTS = [
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # weight initializers
+    ComponentEntity(
+        "weight_initialization",
+        "wrapper",
+        WeightInitializationFactory.get_weight_initializer_wrapper,
+        WeightInitializerWrapperConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "plain",
+        WeightInitializationFactory.get_plain_weight_initialization,
+        PlainWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "named_parameterwise_normal",
+        WeightInitializationFactory.get_named_parameterwise_normal_initialization,
+        NamedParameterwiseNormalInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "scaled_weight",
+        WeightInitializationFactory.get_scaled_weight_initialization,
+        ScaledWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "scaled_embed",
+        WeightInitializationFactory.get_scaled_embed_initialization,
+        ScaledEmbedInitializationConfig,
+    ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
