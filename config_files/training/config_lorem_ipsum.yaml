@@ -178,7 +178,31 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-model:
+model: 
+  component_key: model
+  variant_key: weight_iniitalized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    weight_initializer:
+      component_key: weight_initializer
+      variant_key: wrapper
+      config:
+        - component_key: weight_initializer
+          variant_key: plain
+          config:
+            mean: 0.0
+            std: 0.02
+        - component_key: weight_initializer
+          variant_key: scaled_weight
+          config:
+            mean: 0.0
+            std: 0.02
+            number_of_layers: ${model_raw.config.n_layer}
+            parameter_name_suffixes: ["c_proj.weight"]
+
+model_raw:
   component_key: model
   variant_key: gpt2
   config:
