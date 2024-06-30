@@ -35,7 +35,9 @@ class ModulewiseNormalInitialization(WeightInitializationIF):
         elif isinstance(module, nn.Embedding):
             nn.init.normal_(module.weight, mean=self.mean, std=self.std)
         else:
-            raise NotImplementedError(f"ERROR! Initialization of {module.__class__} not implemented")
+            pass
+            # TODO need to check if we want raise an exception here
+            # raise NotImplementedError(f"ERROR! Initialization of {module.__class__} not implemented")
 
     def initialize_in_place(self, model: nn.Module):
         model.apply(self._init_weights_impl)
