@@ -1,12 +1,12 @@
 from typing import Annotated, List, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 
-from modalities.nn.weight_init.weight_init_if import WeightInitializationIF
+from modalities.config.pydanctic_if_types import PydanticWeightInitializationIFType
 
 
 class WeightInitializerWrapperConfig(BaseModel):
-    weight_initializers: List[WeightInitializationIF]
+    weight_initializers: List[PydanticWeightInitializationIFType]
 
 
 class PlainWeightInitializationConfig(BaseModel):
@@ -14,13 +14,11 @@ class PlainWeightInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[int] = None
 
-    @root_validator
-    def check_std_and_hidden_dim(cls, values):
-        std = values.get("std")
-        hidden_dim = values.get("hidden_dim")
-        if std == "auto" and hidden_dim is None:
+    @model_validator(mode="after")
+    def check_std_and_hidden_dim(self):
+        if self.std == "auto" and self.hidden_dim is None:
             raise ValueError("hidden_dim must be specified when std is 'auto'")
-        return values
+        return self
 
 
 class NamedParameterwiseNormalInitializationConfig(BaseModel):
