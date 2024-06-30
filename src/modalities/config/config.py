@@ -231,7 +231,7 @@ class FSDPWrappedModelConfig(BaseModel):
 
 class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
-    weight_initalizer: PydanticWeightInitializationIFType
+    weight_initializer: PydanticWeightInitializationIFType
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
