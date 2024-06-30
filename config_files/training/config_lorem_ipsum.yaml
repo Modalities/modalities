@@ -180,27 +180,28 @@ wrapped_model:
 
 model: 
   component_key: model
-  variant_key: weight_iniitalized
+  variant_key: weight_initialized
   config:
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
     weight_initializer:
-      component_key: weight_initializer
+      component_key: weight_initialization
       variant_key: wrapper
       config:
-        - component_key: weight_initializer
-          variant_key: plain
-          config:
-            mean: 0.0
-            std: 0.02
-        - component_key: weight_initializer
-          variant_key: scaled_weight
-          config:
-            mean: 0.0
-            std: 0.02
-            number_of_layers: ${model_raw.config.n_layer}
-            parameter_name_suffixes: ["c_proj.weight"]
+        weight_initializers:
+          - component_key: weight_initialization
+            variant_key: plain
+            config:
+              mean: 0.0
+              std: 0.02
+          - component_key: weight_initialization
+            variant_key: scaled_weight
+            config:
+              mean: 0.0
+              plain_std: 0.02
+              number_of_layers: ${model_raw.config.n_layer}
+              parameter_name_suffixes: ["c_proj.weight"]
 
 model_raw:
   component_key: model
@@ -222,8 +223,8 @@ model_raw:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
-            n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #it has to be head_q here
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     attention_implementation: manual
     activation_type: gelu
@@ -235,21 +236,21 @@ model_raw:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
     ffn_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
 
