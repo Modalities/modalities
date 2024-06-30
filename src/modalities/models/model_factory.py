@@ -8,6 +8,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.nn.weight_init.weight_init_if import WeightInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.util import compute_number_of_trainable_parameters
@@ -55,3 +56,8 @@ class ModelFactory:
         )
 
         return fsdp_model
+
+    @staticmethod
+    def get_weight_initalized_model(model: nn.Module, weight_initializer: WeightInitializationIF) -> nn.Module:
+        weight_initializer.initialize_weights(model)
+        return model

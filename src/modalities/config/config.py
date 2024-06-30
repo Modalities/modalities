@@ -22,6 +22,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticPytorchModuleType,
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
+    PydanticWeightInitializationIFType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
@@ -226,6 +227,11 @@ class FSDPWrappedModelConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class WeightInitializedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    weight_initalizer: PydanticWeightInitializationIFType
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

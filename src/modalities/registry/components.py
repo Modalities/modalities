@@ -48,6 +48,7 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
@@ -114,6 +115,9 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity(
+        "model", "weight_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # weight initializers
     ComponentEntity(
