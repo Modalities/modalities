@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import json
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from tqdm import tqdm
-from transformers import BatchEncoding
+from transformers import BatchEncoding, PreTrainedTokenizer
 
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
@@ -18,10 +19,9 @@ from .create_packed_data import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):
-    def __init__(self, raw_data_path: Path, block_size: int, sample_key: str):
+    def __init__(self, raw_data_path: Path, block_size: int):
         self.raw_data_path = raw_data_path
         self.block_size = block_size
-        self.sample_key = sample_key
 
     def _check_if_inbounds(self, idx: int):
         if not 0 <= idx < len(self):
@@ -139,9 +139,10 @@ class PackedMemMapDatasetBase(Dataset):
                            TODO: If this setting should support multi-modal features using separately encoded inputs,
                             this needs to get replaced with a list of sample keys!
         """
-        super().__init__(raw_data_path=raw_data_path, block_size=block_size, sample_key=sample_key)
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size)
         self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
         self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
+        self.sample_key = sample_key
         try:
             self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
             self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
@@ -207,3 +208,126 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class TransformOperation(Enum):
+    TOKENIZE = "tokenize"
+    PASS_THROUGH = "pass_through"
+
+
+class SampleTransform(BaseModel):
+    json_indexation_pattern: List[str]
+    new_key: Optional[str] = None
+    transform_operation: TransformOperation = TransformOperation.TOKENIZE
+
+    @validator("json_indexation_pattern", pre=True, each_item=False)
+    def _check_at_least_one_item(cls, v):
+        if not v:
+            raise ValueError("json_indexation_pattern must contain at least one item")
+        return v
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.new_key is None and self.json_indexation_pattern:
+            self.new_key = self.json_indexation_pattern[-1]
+
+
+class SFTMemMapDataset(Dataset):
+    def __init__(
+        self,
+        raw_data_path: Path,
+        block_size: int,
+        tokenizer: PreTrainedTokenizer,
+        sample_transforms: List[SampleTransform],
+        index_path: Optional[Path] = None,
+    ):
+        super().__init__(raw_data_path=raw_data_path, block_size=block_size)
+
+        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
+        self.tokenizer = tokenizer
+        self.indexation_pattern_to_sample_transforms = {}
+        for sample_transform in sample_transforms:
+            if sample_transform.json_indexation_pattern not in self.indexation_pattern_to_sample_transforms:
+                self.indexation_pattern_to_sample_transforms[sample_transform.json_indexation_pattern] = []
+            self.indexation_pattern_to_sample_transforms[sample_transform.json_indexation_pattern].append(
+                sample_transform
+            )
+
+    def __len__(self) -> int:
+        return len(self.reader)
+
+    def __getitem__(self, idx: int) -> BatchEncoding:
+        self._check_if_inbounds(idx)
+        item = json.loads(self.reader[idx])
+        # conversations -> * -> value -> tokenize value
+        self._transform_json_dict(
+            element=item,
+            current_path=[],
+            indexation_pattern_to_sample_transforms=self.indexation_pattern_to_sample_transforms,
+        )
+        return item
+
+    def _transform_json_dict(
+        self,
+        element: Dict | List | str,
+        current_path: List[str],
+        indexation_pattern_to_sample_transforms: Dict[str, List[SampleTransform]],
+    ):
+        def run_transform(
+            current_path: List[str],
+            element: str,
+            indexation_pattern_to_sample_transforms: Dict[str, List[SampleTransform]],
+        ):
+            current_pattern_string = ".".join(current_path)
+            transformed_element = {}
+            if current_pattern_string in indexation_pattern_to_sample_transforms:
+                sample_transforms = indexation_pattern_to_sample_transforms[current_pattern_string]
+                for sample_transform in sample_transforms:
+                    if sample_transform.transform_operation == TransformOperation.TOKENIZE:
+                        tokens = self.tokenizer(
+                            element,
+                            max_length=self.block_size,
+                            padding="max_length",
+                            truncation=True,
+                        )
+                        transformed_element[sample_transform.new_key] = tokens
+                    elif sample_transform.transform_operation == TransformOperation.PASS_THROUGH:
+                        transformed_element[sample_transform.new_key] = element
+            return transformed_element
+
+        if isinstance(element, dict):
+            transformed_elements_list = []
+
+            for key, sub_element in element.items():
+                if not isinstance(element, dict) or not isinstance(element, list):
+                    transformed_sub_element: Dict = run_transform(
+                        current_path=current_path + [key],
+                        element=sub_element,
+                        indexation_pattern_to_sample_transforms=indexation_pattern_to_sample_transforms,
+                    )
+                else:
+                    transformed_sub_element = self._transform_json_dict(
+                        sub_element, current_path + [key], indexation_pattern_to_sample_transforms
+                    )
+                transformed_elements_list.append(transformed_sub_element)
+
+            transformed_elements_dict = {k: v for d in transformed_elements_list for k, v in d.items()}
+            return transformed_elements_dict
+
+        elif isinstance(element, list):
+            transformed_elements_list = []
+            for sub_element in element:
+                # Note that, we don't execute run_transform here, as we only tokenize the values
+                # of dictionaries and not of lists.
+                # If this is required, there is still the possibility to add this functionality.
+                transformed_sub_element = self._transform_json_dict(
+                    sub_element, current_path + ["*"], indexation_pattern_to_sample_transforms
+                )
+                transformed_elements_list.append(transformed_sub_element)
+
+            # In this case, we have a nested list and therfore no key to construct a dictionary from
+            if current_path[-1] == "*":
+                return transformed_elements_list
+            # In this case, we don't have a nested list and can construct a dictionary from the list
+            else:
+                return {current_path[-1]: transformed_elements_list}

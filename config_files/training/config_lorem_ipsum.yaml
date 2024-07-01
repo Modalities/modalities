@@ -2,7 +2,7 @@ settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
-    sample_key: input_ids
+    sample_key: tokenized_input
     target_key: target_ids
   training:
     global_training_log_interval_in_steps: 8
@@ -20,6 +20,12 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
+tokenizer:
+  component_key: tokenizer
+  variant_key: gpt2_tokenizer_fast
+  config:
+    tokenizer_file: data/tokenizer/tokenizer_gpt2.json
+
 collate_fn:  
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
@@ -31,8 +37,20 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum.pbin
+    raw_data_path: data/lorem_ipsum_instruct_multi_turn.jsonl
+    index_path: data/lorem_ipsum_instruct_multi_turn.idx
     block_size: ${settings.training.sequence_length}
+    tokenization_jq_patterns: 
+      ${settings.referencing_keys.sample_key}: .conversations
+    pass_through_jq_patterns:
+      raw_text:  .conversations
+
+    # tokenization_jq_patterns: 
+    #   - new_key: input_ids # ${settings.referencing_keys.sample_key}
+    #     jq_pattern: .text
+    # pass_through_jq_patterns:
+    #   - new_key: raw_text
+    #     jq_pattern: .text
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
