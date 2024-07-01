@@ -1,6 +1,9 @@
 import math
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
+from pydantic import BaseModel, Field, model_validator
+
+from modalities.config.pydanctic_if_types import PydanticWeightInitializationIFType
 from modalities.nn.weight_init.weight_init import (
     ModulewiseNormalInitialization,
     NamedParameterwiseNormalInitialization,
@@ -9,14 +12,48 @@ from modalities.nn.weight_init.weight_init import (
 )
 
 
-class WeightInitializationFactory:
+class WeightInitializerWrapperConfig(BaseModel):
+    weight_initializers: List[PydanticWeightInitializationIFType]
+
+
+class PlainWeightInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
+    hidden_dim: Optional[int] = None
+
+    @model_validator(mode="after")
+    def check_std_and_hidden_dim(self):
+        if self.std == "auto" and self.hidden_dim is None:
+            raise ValueError("hidden_dim must be specified when std is 'auto'")
+        return self
+
+
+class NamedParameterwiseNormalInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
+    parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+
+
+class ScaledWeightInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    plain_std: Annotated[float, Field(strict=True, ge=0.0)]
+    num_layers: Annotated[int, Field(strict=True, gt=0)]
+    parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+
+
+class ScaledEmbedInitializationConfig(BaseModel):
+    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+
+
+class LowLevelInitializationFactory:
     @staticmethod
     def get_weight_initializer_wrapper(weight_initializers: List[WeightInitializationIF]) -> WeightInitializationIF:
         initializer_wrapper = WeightInitializerWrapper(weight_initializers)
         return initializer_wrapper
 
     @staticmethod
-    def get_plain_weight_initialization(
+    def get_plain_initialization(
         mean: float, std: float | str, hidden_dim: Optional[int] = None
     ) -> WeightInitializationIF:
         """Initializes the weights of a model by sampling from a normal distribution.
@@ -40,17 +77,8 @@ class WeightInitializationFactory:
         return initialization
 
     @staticmethod
-    def get_named_parameterwise_normal_initialization(
-        mean: float, std: float, parameter_name_suffixes: List[str]
-    ) -> WeightInitializationIF:
-        initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=std, parameter_name_suffixes=parameter_name_suffixes
-        )
-        return initialization
-
-    @staticmethod
-    def get_scaled_weight_initialization(
-        mean: float, plain_std: float, number_of_layers: int, parameter_name_suffixes: List[str]
+    def get_scaled_initialization(
+        mean: float, plain_std: float, num_layers: int, parameter_name_suffixes: List[str]
     ) -> WeightInitializationIF:
         """Implementation of scaled weight initialization.
         For the scaled initialization of the residual projections (i.e., c_proj), as per the GPT-2 paper,
@@ -59,26 +87,24 @@ class WeightInitializationFactory:
         Args:
             mean (float): Mean of the normal distribution
             plain_std (float): Standard deviation of the normal distribution used to initialize the other weights
-            number_of_layers (int): Number of layers in the model which we use to downscale plain_std with
+            num_layers (int): Number of layers in the model which we use to downscale plain_std with
             parameter_name_suffixes (List[str]): List of parameter name suffixes to which the initialization
                 should be applied
 
         Returns:
             WeightInitializationIF: Weight initialization object
         """
-        scaled_std = plain_std / math.sqrt(2 * number_of_layers)
+        scaled_std = plain_std / math.sqrt(2 * num_layers)
 
         initialization = NamedParameterwiseNormalInitialization(
             mean=mean, std=scaled_std, parameter_name_suffixes=parameter_name_suffixes
         )
         return initialization
 
-    def get_scaled_embed_initialization(
-        self, mean: float, parameter_name_suffixes: List[str] = None
-    ) -> WeightInitializationIF:
+    @staticmethod
+    def get_scaled_embed_initialization(mean: float, parameter_name_suffixes: List[str]) -> WeightInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
-        For the GPT-2 implementation we need to set parameter_name_suffixes to ["wte.weight", "wpe.weight"].
-        We fix the standard deviation to 0.4.
+        We fix the standard deviation to sqrt(0.4).
 
         Args:
             mean (float): Mean of the normal distribution
@@ -88,9 +114,7 @@ class WeightInitializationFactory:
         Returns:
             WeightInitializationIF: Weight initialization object
         """
-        if parameter_name_suffixes is None:
-            parameter_name_suffixes = ["wte.weight", "wpe.weight"]
-        std = 0.4
+        std = math.sqrt(0.4)
         initialization = NamedParameterwiseNormalInitialization(
             mean=mean, std=std, parameter_name_suffixes=parameter_name_suffixes
         )
