@@ -217,7 +217,7 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
             raise Exception(f"std_theory not implemented for initialization = {initialization}")
     elif group == "embedding":
         if initialization == "scaled_embed":
-            return 0.4  # see https://arxiv.org/abs/2312.16903
+            return math.sqrt(0.4)  # see https://arxiv.org/abs/2312.16903
         else:
             return std
     else:
