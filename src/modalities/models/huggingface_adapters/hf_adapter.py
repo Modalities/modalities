@@ -4,7 +4,6 @@ from pathlib import PosixPath
 from typing import Any, Dict, Optional, Tuple
 
 import torch
-import torch.nn as nn
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
@@ -12,13 +11,16 @@ from modalities.models.model import NNModel
 from modalities.models.utils import get_model_from_config
 
 
-class HFAdapterConfig(PretrainedConfig):
+class HFModelAdapterConfig(PretrainedConfig):
     model_type = "modalities"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # self.config is added by the super class via kwargs
+        assert self.config, "config is not set"
+        # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
         if self.config:
-            self.convert_posixpath_to_str(self.config)
+            self._convert_posixpath_to_str(self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
         if self.config:
@@ -27,7 +29,7 @@ class HFAdapterConfig(PretrainedConfig):
             json_dict = {}
         return json.dumps(json_dict)
 
-    def convert_posixpath_to_str(self, d: dict):
+    def _convert_posixpath_to_str(self, d: dict):
         """
         Recursively iterate over the dictionary and convert PosixPath values to strings.
         """
@@ -35,20 +37,24 @@ class HFAdapterConfig(PretrainedConfig):
             if isinstance(value, PosixPath):
                 d[key] = str(value)
             elif isinstance(value, dict):
-                self.convert_posixpath_to_str(value)
+                self._convert_posixpath_to_str(value)
             elif isinstance(value, list):
-                d[key] = [str(item) if isinstance(item, PosixPath) else item for item in value]
+                for item in value:
+                    if isinstance(item, PosixPath):
+                        d[key] = str(item)
+                    elif isinstance(item, dict):
+                        self._convert_posixpath_to_str(item)
+                    else:
+                        d[key] = item
 
 
-class HFAdapter(PreTrainedModel):
-    config_class = HFAdapterConfig
+class HFModelAdapter(PreTrainedModel):
+    config_class = HFModelAdapterConfig
 
-    def __init__(self, config: HFAdapterConfig, model: Optional[nn.Module] = None, *inputs, **kwargs):
-        super().__init__(config)
-        if not model:
-            self.model: NNModel = get_model_from_config(config.config)
-        else:
-            self.model = model
+    def __init__(self, config: HFModelAdapterConfig, *inputs, **kwargs):
+        super().__init__(config, *inputs, **kwargs)
+        self.model: NNModel = get_model_from_config(config.config, model_type="checkpointed_model")
+        assert hasattr(self.model, "prediction_key"), "Missing entry model.prediction_key in config"
 
     def forward(
         self,

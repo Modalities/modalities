@@ -29,6 +29,7 @@ from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -82,7 +83,7 @@ def entry_point_generate_text(config_file_path: FilePath):
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
         config_file_path: Path, output_hf_checkpoint_dir: Path
-):
+) -> HFModelAdapter:
     cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
     hf_model = cp.convert_pytorch_to_hf_checkpoint()
     return hf_model
@@ -260,11 +261,11 @@ class Main:
         print("done")
 
     def get_logging_publishers(
-            self,
-            progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
-            results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
-            global_rank: int,
-            local_rank: int,
+        self,
+        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
+        results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
+        global_rank: int,
+        local_rank: int,
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](

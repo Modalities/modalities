@@ -1,14 +1,8 @@
-import logging
+
 from pathlib import Path
 
-from pydantic import BaseModel
-
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import PydanticPytorchModuleType, load_app_config_dict
-from modalities.models.huggingface_adapters.hf_adapter import HFAdapterConfig, HFAdapter
-from modalities.models.model import NNModel
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
+from modalities.config.config import load_app_config_dict
+from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapterConfig, HFModelAdapter
 
 
 class CheckpointConversion:
@@ -23,23 +17,9 @@ class CheckpointConversion:
             raise ValueError(f"Could not find {config_file_path}")
 
         self.config_dict = load_app_config_dict(config_file_path)
-        logging.info(f"Config\n{self.config_dict}") # todo remove this?
 
-    def convert_pytorch_to_hf_checkpoint(self) -> HFAdapter:
-        model = self._setup_model()
-        config = HFAdapterConfig(config=self.config_dict)
-        hf_model = HFAdapter(config=config, model=model)
+    def convert_pytorch_to_hf_checkpoint(self) -> HFModelAdapter:
+        config = HFModelAdapterConfig(config=self.config_dict)
+        hf_model = HFModelAdapter(config=config)
         hf_model.save_pretrained(self.output_hf_checkpoint_dir, safe_serialization=False)
         return hf_model
-
-    def _setup_model(self) -> NNModel:
-        registry = Registry(COMPONENTS)
-        component_factory = ComponentFactory(registry=registry)
-
-        class CheckpointComponentsInstantiationModel(BaseModel):
-            checkpointed_model: PydanticPytorchModuleType
-
-        components = component_factory.build_components(
-            config_dict=self.config_dict, components_model_type=CheckpointComponentsInstantiationModel
-        )
-        return components.checkpointed_model
