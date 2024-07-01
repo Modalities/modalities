@@ -21,6 +21,7 @@ class SupportWeightInitModels(Enum):
 
 INITIALIZATION_GROUPS = {
     SupportWeightInitModels.gpt2: {
+        # as per https://arxiv.org/abs/2312.16903
         WeightInitTypes.scaled: ["c_proj.weight"],
         WeightInitTypes.scaled_embed: ["wte.weight", "wpe.weight"],
     },
