@@ -187,21 +187,14 @@ model:
       pass_type: BY_REFERENCE
     weight_initializer:
       component_key: weight_initialization
-      variant_key: wrapper
+      variant_key: composed
       config:
-        weight_initializers:
-          - component_key: weight_initialization
-            variant_key: plain
-            config:
-              mean: 0.0
-              std: 0.02
-          - component_key: weight_initialization
-            variant_key: scaled_weight
-            config:
-              mean: 0.0
-              plain_std: 0.02
-              number_of_layers: ${model_raw.config.n_layer}
-              parameter_name_suffixes: ["c_proj.weight"]
+        model_type: gpt2
+        weight_init_type: scaled_embed
+        mean: 0.0
+        plain_std: 0.02
+        hidden_dim: ${model_raw.config.n_embd}
+        num_layers: ${model_raw.config.n_layer}
 
 model_raw:
   component_key: model
@@ -228,10 +221,6 @@ model_raw:
             seq_length_dim: -2
     attention_implementation: manual
     activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
