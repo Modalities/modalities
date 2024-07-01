@@ -159,3 +159,4 @@ pyenv*
 noteboks/*
 
 tests/tmp/*
+*torch_compile_debug*

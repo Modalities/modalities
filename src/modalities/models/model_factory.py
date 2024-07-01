@@ -29,10 +29,16 @@ class ModelFactory:
         block_names: List[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
+        compile: bool,
+        compile_debug: bool,
     ) -> FSDP:
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
+
+        if compile:
+            options = {"trace.enabled": True} if compile_debug else {}
+            model = torch.compile(model, options=options)
 
         # model is on CPU before input to FSDP
         fsdp_model = FSDP(
@@ -42,5 +48,6 @@ class ModelFactory:
             sharding_strategy=sharding_strategy,
             device_id=torch.cuda.current_device(),
             sync_module_states=sync_module_states,
+            use_orig_params=True,
         )
         return fsdp_model
