@@ -70,7 +70,7 @@ class LowLevelInitializationFactory:
         if std == "auto":
             if hidden_dim is None:
                 raise ValueError("ERROR! weight_init.std = auto not implemented")
-
+            # as per  https://arxiv.org/abs/2312.16903
             std = math.sqrt(2 / (5 * hidden_dim))
 
         initialization = ModulewiseNormalInitialization(mean=mean, std=std)
