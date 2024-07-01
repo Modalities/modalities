@@ -62,7 +62,7 @@ from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
-from modalities.models.huggingface.huggingface_models import (
+from modalities.models.huggingface.huggingface_model import (
     HuggingFacePretrainedModel,
     HuggingFacePretrainedModelConfig,
 )
