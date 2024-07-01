@@ -17,7 +17,7 @@ class WeightInitializerWrapperConfig(BaseModel):
 
 
 class PlainWeightInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[int] = None
 
@@ -29,20 +29,20 @@ class PlainWeightInitializationConfig(BaseModel):
 
 
 class NamedParameterwiseNormalInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
 class ScaledWeightInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    mean: float
     plain_std: Annotated[float, Field(strict=True, ge=0.0)]
     num_layers: Annotated[int, Field(strict=True, gt=0)]
     parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
 class ScaledEmbedInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    mean: float
     parameter_name_suffixes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 

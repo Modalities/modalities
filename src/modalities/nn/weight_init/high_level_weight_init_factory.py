@@ -35,7 +35,7 @@ class ComposedWeightInitializationConfig(BaseModel):
     model_type: SupportWeightInitModels
     weight_init_type: WeightInitTypes
 
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
+    mean: float
     plain_std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
