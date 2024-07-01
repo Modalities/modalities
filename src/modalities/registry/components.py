@@ -68,14 +68,17 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
-from modalities.nn.weight_init.configs import (
-    NamedParameterwiseNormalInitializationConfig,
+from modalities.nn.weight_init.high_level_weight_init_factory import (
+    ComposedWeightInitializationConfig,
+    HighLevelWeightInitializationFactory,
+)
+from modalities.nn.weight_init.low_level_weight_init_factory import (
+    LowLevelInitializationFactory,
     PlainWeightInitializationConfig,
     ScaledEmbedInitializationConfig,
     ScaledWeightInitializationConfig,
     WeightInitializerWrapperConfig,
 )
-from modalities.nn.weight_init.weight_init_factory import WeightInitializationFactory
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -122,32 +125,32 @@ COMPONENTS = [
     # weight initializers
     ComponentEntity(
         "weight_initialization",
+        "composed",
+        HighLevelWeightInitializationFactory.get_composed_weight_init,
+        ComposedWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
         "wrapper",
-        WeightInitializationFactory.get_weight_initializer_wrapper,
+        LowLevelInitializationFactory.get_weight_initializer_wrapper,
         WeightInitializerWrapperConfig,
     ),
     ComponentEntity(
         "weight_initialization",
         "plain",
-        WeightInitializationFactory.get_plain_weight_initialization,
+        LowLevelInitializationFactory.get_plain_initialization,
         PlainWeightInitializationConfig,
     ),
     ComponentEntity(
         "weight_initialization",
-        "named_parameterwise_normal",
-        WeightInitializationFactory.get_named_parameterwise_normal_initialization,
-        NamedParameterwiseNormalInitializationConfig,
-    ),
-    ComponentEntity(
-        "weight_initialization",
         "scaled_weight",
-        WeightInitializationFactory.get_scaled_weight_initialization,
+        LowLevelInitializationFactory.get_scaled_initialization,
         ScaledWeightInitializationConfig,
     ),
     ComponentEntity(
         "weight_initialization",
         "scaled_embed",
-        WeightInitializationFactory.get_scaled_embed_initialization,
+        LowLevelInitializationFactory.get_scaled_embed_initialization,
         ScaledEmbedInitializationConfig,
     ),
     # losses
