@@ -180,13 +180,13 @@ wrapped_model:
 
 model: 
   component_key: model
-  variant_key: weight_initialized
+  variant_key: model_initialized
   config:
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
-    weight_initializer:
-      component_key: weight_initialization
+    model_initializer:
+      component_key: model_initialization
       variant_key: composed
       config:
         model_type: gpt2

@@ -17,12 +17,12 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
-    PydanticWeightInitializationIFType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
@@ -231,7 +231,7 @@ class FSDPWrappedModelConfig(BaseModel):
 
 class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
-    weight_initializer: PydanticWeightInitializationIFType
+    model_initializer: PydanticModelInitializationIFType
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

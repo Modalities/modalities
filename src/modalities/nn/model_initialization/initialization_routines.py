@@ -1,9 +1,12 @@
 import math
+import re
 from typing import Annotated, List, Optional
 
+import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator
 
-from modalities.nn.weight_init.weight_init import NamedParameterwiseNormalInitialization, WeightInitializationIF
+from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
+from modalities.nn.model_initialization.parameter_name_filters import RegexFilter
 
 
 class PlainInitializationConfig(BaseModel):
@@ -31,7 +34,25 @@ class ScaledEmbedInitializationConfig(BaseModel):
     parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
-class LowLevelInitializationFactory:
+class NamedParameterwiseNormalInitialization(ModelInitializationIF):
+    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter):
+        self.mean = mean
+        self.std = std
+        self.parameter_name_regexes = parameter_name_regexes
+
+    def initialize_in_place(self, model: nn.Module):
+        for parameter_name, p in model.named_parameters():
+            weight_regexes = self.parameter_name_regexes.weights
+            for weight_regex in weight_regexes:
+                if re.fullmatch(weight_regex, parameter_name):
+                    nn.init.normal_(p, mean=self.mean, std=self.std)
+            bias_regexes = self.parameter_name_regexes.biases
+            for bias_regex in bias_regexes:
+                if re.fullmatch(bias_regex, parameter_name):
+                    nn.init.zeros_(p)
+
+
+class InitializationRoutines:
     @staticmethod
     def get_plain_initialization(
         mean: float, std: float | str, parameter_name_regexes: List[str], hidden_dim: Optional[int] = None
@@ -61,7 +82,7 @@ class LowLevelInitializationFactory:
     @staticmethod
     def get_scaled_initialization(
         mean: float, std: float, num_layers: int, parameter_name_regexes: List[str]
-    ) -> WeightInitializationIF:
+    ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization.
 
         Args:
@@ -82,7 +103,7 @@ class LowLevelInitializationFactory:
         return initialization
 
     @staticmethod
-    def get_scaled_embed_initialization(mean: float, parameter_name_regexes: List[str]) -> WeightInitializationIF:
+    def get_scaled_embed_initialization(mean: float, parameter_name_regexes: List[str]) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
 

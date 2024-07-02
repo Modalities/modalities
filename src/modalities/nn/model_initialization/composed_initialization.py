@@ -1,23 +1,24 @@
 from typing import List, Optional
 
+import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Annotated
 
-from modalities.config.pydanctic_if_types import PydanticWeightInitializationIFType
-from modalities.nn.weight_init.low_level_weight_init_factory import LowLevelInitializationFactory
-from modalities.nn.weight_init.parameter_name_regex_filters import (
+from modalities.config.pydanctic_if_types import PydanticModelInitializationIFType
+from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
+from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
+from modalities.nn.model_initialization.parameter_name_filters import (
     NAMED_PARAMETER_INIT_GROUPS,
     SupportWeightInitModels,
     WeightInitTypes,
 )
-from modalities.nn.weight_init.weight_init import WeightInitializationIF, WeightInitializerWrapper
 
 
-class WeightInitializerWrapperConfig(BaseModel):
-    weight_initializers: List[PydanticWeightInitializationIFType]
+class ModelInitializerWrapperConfig(BaseModel):
+    model_initializers: List[PydanticModelInitializationIFType]
 
 
-class ComposedWeightInitializationConfig(BaseModel):
+class ComposedModelInitializationConfig(BaseModel):
     model_type: SupportWeightInitModels
     weight_init_type: WeightInitTypes
 
@@ -64,21 +65,30 @@ class ComposedWeightInitializationConfig(BaseModel):
         return self
 
 
-class HighLevelWeightInitializationFactory:
+class ModelInitializerWrapper(ModelInitializationIF):
+    def __init__(self, model_initializers: List[ModelInitializationIF]):
+        self.model_initializers = model_initializers
+
+    def initialize_in_place(self, model: nn.Module):
+        for model_initializer in self.model_initializers:
+            model_initializer.initialize_in_place(model)
+
+
+class ComposedInitializationRoutines:
     @staticmethod
-    def get_weight_initializer_wrapper(weight_initializers: List[WeightInitializationIF]) -> WeightInitializationIF:
-        initializer_wrapper = WeightInitializerWrapper(weight_initializers)
+    def get_model_initializer_wrapper(model_initializers: List[ModelInitializationIF]) -> ModelInitializationIF:
+        initializer_wrapper = ModelInitializerWrapper(model_initializers)
         return initializer_wrapper
 
     @staticmethod
-    def get_composed_weight_init(
+    def get_composed_model_initializer(
         model_type: SupportWeightInitModels,
         weight_init_type: WeightInitTypes,
         mean: float,
         std: float | str,
         hidden_dim: Optional[int] = None,
         num_layers: int = None,
-    ) -> WeightInitializationIF:
+    ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
         also scaled is being performed before scaled_embed and after plain.
@@ -94,39 +104,39 @@ class HighLevelWeightInitializationFactory:
                 Defaults to None.
 
         Returns:
-            WeightInitializationIF: The Weight Initializer performing the initialization as specified.
+            ModelInitializationIF: The Weight Initializer performing the initialization as specified.
         """
-        weight_initializers = []
+        model_initializers = []
 
         # plain
         plain_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.PLAIN]
-        plain_init = LowLevelInitializationFactory.get_plain_initialization(
+        plain_init = InitializationRoutines.get_plain_initialization(
             mean=mean, std=std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
         )
         working_std = plain_init.std
-        weight_initializers.append(plain_init)
+        model_initializers.append(plain_init)
 
         if weight_init_type in [WeightInitTypes.SCALED, WeightInitTypes.SCALED_EMBED]:
             # scaled
             scaled_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED]
-            scaled_init = LowLevelInitializationFactory.get_scaled_initialization(
+            scaled_init = InitializationRoutines.get_scaled_initialization(
                 mean=mean,
                 std=working_std,
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
             )
-            weight_initializers.append(scaled_init)
+            model_initializers.append(scaled_init)
 
         if weight_init_type == WeightInitTypes.SCALED_EMBED:
             # scaled embed
             scaled_embed_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED_EMBED]
-            scaled_embed_init = LowLevelInitializationFactory.get_scaled_embed_initialization(
+            scaled_embed_init = InitializationRoutines.get_scaled_embed_initialization(
                 mean=mean, parameter_name_regexes=scaled_embed_parameter_name_regexes
             )
-            weight_initializers.append(scaled_embed_init)
+            model_initializers.append(scaled_embed_init)
 
         # composition of multiple weight initializers
-        init_wrapper = HighLevelWeightInitializationFactory.get_weight_initializer_wrapper(
-            weight_initializers=weight_initializers
+        init_wrapper = ComposedInitializationRoutines.get_model_initializer_wrapper(
+            model_initializers=model_initializers
         )
         return init_wrapper
