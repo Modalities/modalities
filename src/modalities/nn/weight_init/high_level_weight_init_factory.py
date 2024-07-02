@@ -22,15 +22,15 @@ class ComposedWeightInitializationConfig(BaseModel):
     weight_init_type: WeightInitTypes
 
     mean: float
-    plain_std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
+    std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
 
     @model_validator(mode="after")
     def _check_values(self):
         # in case of the plain initialization with "auto", we need to specify the hidden_dim
-        if self.plain_std == "auto" and self.hidden_dim is None:
-            raise ValueError("hidden_dim must be specified when plain_std is 'auto'")
+        if self.std == "auto" and self.hidden_dim is None:
+            raise ValueError("hidden_dim must be specified when std is 'auto'")
 
         # in case of plain initialization the number of layers is not rquired
         if self.weight_init_type == WeightInitTypes.PLAIN and self.num_layers is not None:
@@ -75,7 +75,7 @@ class HighLevelWeightInitializationFactory:
         model_type: SupportWeightInitModels,
         weight_init_type: WeightInitTypes,
         mean: float,
-        plain_std: float | str,
+        std: float | str,
         hidden_dim: Optional[int] = None,
         num_layers: int = None,
     ) -> WeightInitializationIF:
@@ -87,7 +87,7 @@ class HighLevelWeightInitializationFactory:
             model_type (SupportWeightInitModels): Model type enum referencing the model (e.g., "gpt2")
             weight_init_type (WeightInitTypes): The initialization method we want to perform.
             mean (float): Mean of the normal distribution
-            plain_std (float | str): Standard deviation of the plain normal distribution
+            std (float | str): Standard deviation of the plain normal distribution
             hidden_dim (Optional[int], optional): Hidden dimension size of the model (required for plain if std="auto").
                 Defaults to None.
             num_layers (int, optional): Number of layers in the model (required for scaled and scaled_embed only).
@@ -101,7 +101,7 @@ class HighLevelWeightInitializationFactory:
         # plain
         plain_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.PLAIN]
         plain_init = LowLevelInitializationFactory.get_plain_initialization(
-            mean=mean, std=plain_std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
+            mean=mean, std=std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
         )
         weight_initializers.append(plain_init)
 
@@ -110,7 +110,7 @@ class HighLevelWeightInitializationFactory:
             scaled_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED]
             scaled_init = LowLevelInitializationFactory.get_scaled_initialization(
                 mean=mean,
-                plain_std=plain_std,
+                std=std,
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
             )

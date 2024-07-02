@@ -27,7 +27,7 @@ class NamedParameterwiseNormalInitializationConfig(BaseModel):
 
 class ScaledWeightInitializationConfig(BaseModel):
     mean: float
-    plain_std: Annotated[float, Field(strict=True, ge=0.0)]
+    std: Annotated[float, Field(strict=True, ge=0.0)]
     num_layers: Annotated[int, Field(strict=True, gt=0)]
     parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
@@ -66,21 +66,21 @@ class LowLevelInitializationFactory:
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, plain_std: float, num_layers: int, parameter_name_regexes: List[str]
+        mean: float, std: float, num_layers: int, parameter_name_regexes: List[str]
     ) -> WeightInitializationIF:
         """Implementation of scaled weight initialization.
 
         Args:
             mean (float): Mean of the normal distribution
-            plain_std (float): Standard deviation of the normal distribution used to initialize the other weights
-            num_layers (int): Number of layers in the model which we use to downscale plain_std with
+            std (float): Standard deviation of the normal distribution used to initialize the other weights
+            num_layers (int): Number of layers in the model which we use to downscale std with
             parameter_name_regexes (List[str]): List of parameter name regexes to which the initialization
                 should be applied
 
         Returns:
             WeightInitializationIF: Weight initialization object
         """
-        scaled_std = plain_std / math.sqrt(2 * num_layers)
+        scaled_std = std / math.sqrt(2 * num_layers)
 
         initialization = NamedParameterwiseNormalInitialization(
             mean=mean, std=scaled_std, parameter_name_regexes=parameter_name_regexes
