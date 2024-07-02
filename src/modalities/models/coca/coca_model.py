@@ -258,7 +258,7 @@ class CoCa(NNModel):
 
         elif self.vision_sample_key is not None and self.vision_sample_key in inputs:
             vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
-            output[self.vision_cls_prediction_key] = audio_cls_token
+            output[self.vision_cls_prediction_key] = vision_cls_token
             modality_embd = vision_embd
 
         else:
