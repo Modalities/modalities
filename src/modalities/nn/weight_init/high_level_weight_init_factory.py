@@ -28,11 +28,11 @@ class ComposedWeightInitializationConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_values(self):
-        # in case of the plain initialization with "auto", we need to specify the hidden_dim
+        # in case of initialization with "auto", we need to specify the hidden_dim
         if self.std == "auto" and self.hidden_dim is None:
             raise ValueError("hidden_dim must be specified when std is 'auto'")
 
-        # in case of plain initialization the number of layers is not rquired
+        # in case of plain initialization the number of layers is not required
         if self.weight_init_type == WeightInitTypes.PLAIN and self.num_layers is not None:
             raise ValueError("num_layers must not be specified when weight_init_type is plain")
 
@@ -103,6 +103,7 @@ class HighLevelWeightInitializationFactory:
         plain_init = LowLevelInitializationFactory.get_plain_initialization(
             mean=mean, std=std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
         )
+        working_std = plain_init.std
         weight_initializers.append(plain_init)
 
         if weight_init_type in [WeightInitTypes.SCALED, WeightInitTypes.SCALED_EMBED]:
@@ -110,7 +111,7 @@ class HighLevelWeightInitializationFactory:
             scaled_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED]
             scaled_init = LowLevelInitializationFactory.get_scaled_initialization(
                 mean=mean,
-                std=std,
+                std=working_std,
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
             )

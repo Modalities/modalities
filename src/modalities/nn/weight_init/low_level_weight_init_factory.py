@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 from modalities.nn.weight_init.weight_init import NamedParameterwiseNormalInitialization, WeightInitializationIF
 
 
-class PlainWeightInitializationConfig(BaseModel):
+class PlainInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
@@ -21,11 +21,11 @@ class PlainWeightInitializationConfig(BaseModel):
 
 class NamedParameterwiseNormalInitializationConfig(BaseModel):
     mean: float
-    std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
+    std: Annotated[float, Field(strict=True, ge=0.0)]
     parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
-class ScaledWeightInitializationConfig(BaseModel):
+class ScaledInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)]
     num_layers: Annotated[int, Field(strict=True, gt=0)]
@@ -41,7 +41,7 @@ class LowLevelInitializationFactory:
     @staticmethod
     def get_plain_initialization(
         mean: float, std: float | str, parameter_name_regexes: List[str], hidden_dim: Optional[int] = None
-    ) -> WeightInitializationIF:
+    ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
         For other layer types, the initialization must be subclassed and extended

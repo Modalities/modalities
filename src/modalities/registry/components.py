@@ -75,9 +75,9 @@ from modalities.nn.weight_init.high_level_weight_init_factory import (
 )
 from modalities.nn.weight_init.low_level_weight_init_factory import (
     LowLevelInitializationFactory,
-    PlainWeightInitializationConfig,
+    PlainInitializationConfig,
     ScaledEmbedInitializationConfig,
-    ScaledWeightInitializationConfig,
+    ScaledInitializationConfig,
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -139,13 +139,13 @@ COMPONENTS = [
         "weight_initialization",
         "plain",
         LowLevelInitializationFactory.get_plain_initialization,
-        PlainWeightInitializationConfig,
+        PlainInitializationConfig,
     ),
     ComponentEntity(
         "weight_initialization",
         "scaled_weight",
         LowLevelInitializationFactory.get_scaled_initialization,
-        ScaledWeightInitializationConfig,
+        ScaledInitializationConfig,
     ),
     ComponentEntity(
         "weight_initialization",
