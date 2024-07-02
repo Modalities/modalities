@@ -68,7 +68,7 @@ NAMED_PARAMETER_INIT_GROUPS = {
         ),
     },
     SupportWeightInitModels.COCA: {
-        WeightInitTypes.PLAIN: RegexFilter(weights=[], biases=[]),
+        WeightInitTypes.PLAIN: RegexFilter(weights=[r".*\.weight"], biases=[r".*\.bias"]),
         WeightInitTypes.SCALED: RegexFilter(weights=[], biases=[]),
         WeightInitTypes.SCALED_EMBED: RegexFilter(weights=[], biases=[]),
     },
