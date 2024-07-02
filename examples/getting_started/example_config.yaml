@@ -131,7 +131,7 @@ checkpoint_saving:
           config:
             num_ranks: ${settings.cuda_env.world_size}
             local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            context_size: ${settings.training.sequence_length}        
+            sequence_length: ${settings.training.sequence_length}        
 
 # resolving class types via different enums sucks...
 loss_fn:
