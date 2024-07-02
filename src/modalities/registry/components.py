@@ -48,6 +48,7 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
@@ -67,6 +68,17 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.weight_init.high_level_weight_init_factory import (
+    ComposedWeightInitializationConfig,
+    HighLevelWeightInitializationFactory,
+)
+from modalities.nn.weight_init.low_level_weight_init_factory import (
+    LowLevelInitializationFactory,
+    PlainWeightInitializationConfig,
+    ScaledEmbedInitializationConfig,
+    ScaledWeightInitializationConfig,
+    WeightInitializerWrapperConfig,
+)
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -106,7 +118,41 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity(
+        "model", "weight_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # weight initializers
+    ComponentEntity(
+        "weight_initialization",
+        "composed",
+        HighLevelWeightInitializationFactory.get_composed_weight_init,
+        ComposedWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "wrapper",
+        LowLevelInitializationFactory.get_weight_initializer_wrapper,
+        WeightInitializerWrapperConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "plain",
+        LowLevelInitializationFactory.get_plain_initialization,
+        PlainWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "scaled_weight",
+        LowLevelInitializationFactory.get_scaled_initialization,
+        ScaledWeightInitializationConfig,
+    ),
+    ComponentEntity(
+        "weight_initialization",
+        "scaled_embed",
+        LowLevelInitializationFactory.get_scaled_embed_initialization,
+        ScaledEmbedInitializationConfig,
+    ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers

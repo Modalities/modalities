@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import ActivationType, NNModel, WeightInitializationConfig
+from modalities.models.model import ActivationType, NNModel
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -154,7 +154,6 @@ class GPT2LLMConfig(BaseModel):
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
-    weight_init: WeightInitializationConfig
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -419,7 +418,6 @@ class GPT2LLM(NNModel):
         bias: bool,
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
-        weight_init: WeightInitializationConfig,
         attention_config: AttentionConfig,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
@@ -488,9 +486,6 @@ class GPT2LLM(NNModel):
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
-
-        # init all weights
-        self.initialize_weights(weight_init, number_of_layers=n_layer, hidden_dim=n_embd)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
