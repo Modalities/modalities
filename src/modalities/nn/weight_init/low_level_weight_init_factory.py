@@ -19,12 +19,6 @@ class PlainInitializationConfig(BaseModel):
         return self
 
 
-class NamedParameterwiseNormalInitializationConfig(BaseModel):
-    mean: float
-    std: Annotated[float, Field(strict=True, ge=0.0)]
-    parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
-
-
 class ScaledInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)]
