@@ -1,3 +1,4 @@
+import warnings
 from typing import List
 
 import torch.nn as nn
@@ -35,9 +36,18 @@ class ModulewiseNormalInitialization(WeightInitializationIF):
         elif isinstance(module, nn.Embedding):
             nn.init.normal_(module.weight, mean=self.mean, std=self.std)
         else:
-            pass
-            # TODO need to check if we want raise an exception here
-            # raise NotImplementedError(f"ERROR! Initialization of {module.__class__} not implemented")
+            warnings.warn(
+                f"Module {module.__class__} is not of type nn.Linear or nn.Embedding. "
+                "Looking for weight and bias attributes to initialize."
+            )
+            if hasattr(module, "weight") and module.weight is not None:
+                nn.init.normal_(module.weight, mean=self.mean, std=self.std)
+
+            if hasattr(module, "bias") and module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+            if not hasattr(module, "weight") and not hasattr(module, "bias"):
+                raise NotImplementedError(f"ERROR! Initialization of {module.__class__} not implemented")
 
     def initialize_in_place(self, model: nn.Module):
         model.apply(self._init_weights_impl)
