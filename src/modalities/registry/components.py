@@ -71,13 +71,6 @@ from modalities.models.model_factory import ModelFactory
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
-    ModelInitializerWrapperConfig,
-)
-from modalities.nn.model_initialization.initialization_routines import (
-    InitializationRoutines,
-    PlainInitializationConfig,
-    ScaledEmbedInitializationConfig,
-    ScaledInitializationConfig,
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
@@ -128,30 +121,6 @@ COMPONENTS = [
         "composed",
         ComposedInitializationRoutines.get_composed_model_initializer,
         ComposedModelInitializationConfig,
-    ),
-    ComponentEntity(
-        "model_initialization",
-        "wrapper",
-        ComposedInitializationRoutines.get_model_initializer_wrapper,
-        ModelInitializerWrapperConfig,
-    ),
-    ComponentEntity(
-        "model_initialization",
-        "plain",
-        InitializationRoutines.get_plain_initialization,
-        PlainInitializationConfig,
-    ),
-    ComponentEntity(
-        "model_initialization",
-        "scaled",
-        InitializationRoutines.get_scaled_initialization,
-        ScaledInitializationConfig,
-    ),
-    ComponentEntity(
-        "model_initialization",
-        "scaled_embed",
-        InitializationRoutines.get_scaled_embed_initialization,
-        ScaledEmbedInitializationConfig,
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
