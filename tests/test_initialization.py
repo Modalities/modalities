@@ -290,7 +290,7 @@ def test_nr_parameters_per_initialization_group(model_name):
         ("gpt2", "plain", 0.02, True),
         ("gpt2", "scaled", 0.02, True),
         ("gpt2", "scaled_embed", 0.02, True),
-        # ("coca", "plain", 0.02, True),  # TODO: needs to be fixed!
+        ("coca", "plain", 0.02, True),
         ("coca", "scaled", 0.02, False),  # scaled not implemented for coca
         ("coca", "scaled_embed", 0.02, False),  # scaled_embed not implemented for coca
         # std = 'auto'
