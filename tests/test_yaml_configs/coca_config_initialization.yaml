@@ -200,10 +200,10 @@ model_raw:
       prediction_key: vision_embeddings
       img_size: 224
       n_classes: Null # Disable vision transformer head
-      n_layer: 12
+      n_layer: 6
       attention_config:
         attention_engine_type: default_attention
-      n_head: 12
+      n_head: 8
       n_embd: 768
       dropout: 0.0
       patch_size: 16
@@ -216,8 +216,8 @@ model_raw:
       prediction_key: ${loss_fn.config.prediction_key}
       block_size: 1024
       vocab_size: 50304
-      n_layer_text: 12
-      n_layer_multimodal_text: 12
+      n_layer_text: 6
+      n_layer_multimodal_text: 6
       attention_config:
         attention_engine_type: default_attention
       n_head: 12
