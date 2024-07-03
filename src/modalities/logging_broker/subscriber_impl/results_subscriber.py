@@ -18,9 +18,6 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
 
-    def log_to_config(self, key:str, value:str):
-        pass
-
 class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def __init__(self, num_ranks: int) -> None:
         super().__init__()

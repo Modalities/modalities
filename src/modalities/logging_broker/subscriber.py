@@ -12,3 +12,7 @@ class MessageSubscriberIF(ABC, Generic[T]):
     @abstractmethod
     def consume_message(self, message: Message[T]):
         raise NotImplementedError
+    
+    @abstractmethod
+    def log_to_config(self, key:str, value:str):
+        raise NotImplementedError
