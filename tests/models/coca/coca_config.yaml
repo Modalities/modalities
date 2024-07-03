@@ -39,7 +39,3 @@ n_pool_head: 8
 n_vision_queries: 256
 bias_attn_pool: False
 epsilon_attn_pool: 1e-5
-weight_init:
-  mean: 0.0
-  std: 0.02
-  type: scaled

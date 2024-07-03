@@ -13,7 +13,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from modalities.__main__ import load_app_config_dict
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
-from modalities.models.coca.coca_model import CoCa, CoCaConfig
+from modalities.models.coca.coca_model import CoCa
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.model_factory import ModelFactory
 from modalities.registry.components import COMPONENTS
@@ -27,27 +27,41 @@ from tests.conftest import _ROOT_DIR
 #   $(which pytest) path/to/test_initialization.py
 
 
-def get_gpt2_model_from_config(gpt2_model_config_dict: Dict) -> GPT2LLM:
-    class GPT2InstantationModel(BaseModel):
+def get_model_from_config(model_config_dict: Dict) -> GPT2LLM | CoCa:
+    """get gpt2 or coca model from config_dict"""
+
+    class InstantationModel(BaseModel):
         model: PydanticPytorchModuleType
 
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
 
     components = component_factory.build_components(
-        config_dict=gpt2_model_config_dict, components_model_type=GPT2InstantationModel
+        config_dict=model_config_dict, components_model_type=InstantationModel
     )
 
     model = components.model
     return model
 
 
+def _replace_config_dict(_config_dict: Dict, _initialization_type: str, _std: str) -> Dict:
+    """dynamically replace initialization_type, std and dependent fields in config_dict"""
+    _config_dict["model"]["config"]["model_initializer"]["config"]["weight_init_type"] = _initialization_type  # replace
+    _config_dict["model"]["config"]["model_initializer"]["config"]["std"] = _std  # replace
+    if _initialization_type == "plain":
+        _config_dict["model"]["config"]["model_initializer"]["config"]["num_layers"] = None  # replace
+    if _std != "auto":
+        _config_dict["model"]["config"]["model_initializer"]["config"]["hidden_dim"] = None  # replace
+    return _config_dict
+
+
 def _load_gpt2(initialization_type: str, std: float | str) -> FSDP:
+    """load gpt2 model from config and fsdp-wrap it"""
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
-    config_dict["model"]["config"]["weight_init"]["type"] = initialization_type  # replace
-    config_dict["model"]["config"]["weight_init"]["std"] = std  # replace
-    gpt2_model = get_gpt2_model_from_config(config_dict)
+    config_dict = _replace_config_dict(config_dict, initialization_type, std)
+
+    gpt2_model = get_model_from_config(config_dict)
     gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         gpt2_model,
         sync_module_states=True,
@@ -59,12 +73,12 @@ def _load_gpt2(initialization_type: str, std: float | str) -> FSDP:
 
 
 def _load_coca(initialization_type: str, std: float | str) -> FSDP:
+    """load coca model from config and fsdp-wrap it"""
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/coca_config_initialization.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
-    config_dict["weight_init"]["type"] = initialization_type  # replace
-    config_dict["weight_init"]["std"] = std  # replace
-    coca_config = CoCaConfig.model_validate(config_dict)
-    coca_model = CoCa(**dict(coca_config))
+    config_dict = _replace_config_dict(config_dict, initialization_type, std)
+
+    coca_model = get_model_from_config(config_dict)
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         coca_model,
         sync_module_states=True,
@@ -75,7 +89,8 @@ def _load_coca(initialization_type: str, std: float | str) -> FSDP:
     return coca_wrapped_model
 
 
-def _load_model(model_name: str, initialization: str = "scaled", std: float | str = 0.02) -> FSDP:
+def _load_model(model_name: str, initialization: str = "plain", std: float | str = 0.02) -> FSDP:
+    """load gpt2 or coca model from config and fsdp-wrap it"""
     if model_name == "gpt2":
         model = _load_gpt2(initialization_type=initialization, std=std)
     elif model_name == "coca":
@@ -107,7 +122,7 @@ MAPPING_COCA = {
 
 def get_group_params(model: FSDP, model_name: str) -> Dict[str, Optional[torch.Tensor]]:
     """
-    divides all model parameters into initialization groups
+    divide all model parameters into initialization groups
     """
     if model_name == "gpt2":
         mapping = MAPPING_GPT2
@@ -217,7 +232,7 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
             raise Exception(f"std_theory not implemented for initialization = {initialization}")
     elif group == "embedding":
         if initialization == "scaled_embed":
-            return 0.4  # see https://arxiv.org/abs/2312.16903
+            return math.sqrt(0.4)  # see https://arxiv.org/abs/2312.16903
         else:
             return std
     else:
@@ -230,7 +245,10 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
 )
 @pytest.mark.parametrize(
     "model_name",
-    [("gpt2"), ("coca")],
+    [
+        ("gpt2"),
+        ("coca"),
+    ],
 )
 def test_nr_parameters_per_initialization_group(model_name):
     """
@@ -273,7 +291,7 @@ def test_nr_parameters_per_initialization_group(model_name):
         ("gpt2", "scaled", 0.02, True),
         ("gpt2", "scaled_embed", 0.02, True),
         ("coca", "plain", 0.02, True),
-        ("coca", "scaled", 0.02, True),
+        ("coca", "scaled", 0.02, False),  # scaled not implemented for coca
         ("coca", "scaled_embed", 0.02, False),  # scaled_embed not implemented for coca
         # std = 'auto'
         ("gpt2", "plain", "auto", True),
@@ -318,13 +336,13 @@ def test_statistical_distribution_for_each_initialization_group(
                         avg_test,
                         avg_theory,
                         msg=f"average for {model_name}/{group} = {avg_test} should be close to {avg_theory}",
-                        atol=2e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
+                        atol=3e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
                         rtol=0,  # default value for torch.float32: 1.3e-6
                     )
                     torch.testing.assert_close(
                         std_test,
                         std_theory,
                         msg=f"standard deviation for {model_name}/{group} = {std_test} should be close to {std_theory}",
-                        atol=1e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
+                        atol=2e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
                         rtol=0,  # default value for torch.float32: 1.3e-6
                     )

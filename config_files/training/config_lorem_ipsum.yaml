@@ -178,7 +178,24 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-model:
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled_embed
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
   component_key: model
   variant_key: gpt2
   config:
@@ -198,34 +215,30 @@ model:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
-            n_embd: ${model.config.n_embd}
-            n_head: ${model.config.n_head_q} #it has to be head_q here
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     attention_implementation: manual
     activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
     ffn_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
-        ndim: ${model.config.n_embd}
+        ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
 

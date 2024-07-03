@@ -48,6 +48,7 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
@@ -67,6 +68,10 @@ from modalities.models.huggingface.huggingface_models import (
     HuggingFacePretrainedModelConfig,
 )
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.model_initialization.composed_initialization import (
+    ComposedInitializationRoutines,
+    ComposedModelInitializationConfig,
+)
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -106,7 +111,17 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity(
+        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # weight initializers
+    ComponentEntity(
+        "model_initialization",
+        "composed",
+        ComposedInitializationRoutines.get_composed_model_initializer,
+        ComposedModelInitializationConfig,
+    ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
