@@ -17,8 +17,12 @@ class PlainInitializationConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_std_and_hidden_dim(self):
+        # in case of initialization with "auto", we need to specify the hidden_dim
         if self.std == "auto" and self.hidden_dim is None:
             raise ValueError("hidden_dim must be specified when std is 'auto'")
+        # in case of initialization with float std, we must not specify the hidden_dim
+        if isinstance(self.std, float) and self.hidden_dim is not None:
+            raise ValueError("hidden_dim must not be specified when std is a float value")
         return self
 
 

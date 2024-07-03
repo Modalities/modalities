@@ -193,7 +193,6 @@ model:
         weight_init_type: scaled_embed
         mean: 0.0
         std: 0.02
-        hidden_dim: ${model_raw.config.n_embd}
         num_layers: ${model_raw.config.n_layer}
 
 model_raw:
