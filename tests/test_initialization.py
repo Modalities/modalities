@@ -247,7 +247,7 @@ def get_std_theory(group: str, initialization: str, model_name: str, std: float 
     "model_name",
     [
         ("gpt2"),
-        # ("coca"),  # TODO: needs to be fixed!
+        ("coca"),
     ],
 )
 def test_nr_parameters_per_initialization_group(model_name):
