@@ -219,7 +219,9 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+        num_params = compute_number_of_trainable_parameters(wrapped_model)
+        components.evaluation_subscriber.log_to_config("No. Parameters", num_params)
+        logging.info(f"Training model with {num_params} parameters.")
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:
             apply_activation_checkpointing_inplace(

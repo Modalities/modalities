@@ -18,6 +18,8 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
 
+    def log_to_config(self, key:str, value:str):
+        pass
 
 class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def __init__(self, num_ranks: int) -> None:
@@ -63,9 +65,12 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         with open(config_file_path, 'r', encoding='utf-8') as file:
             config = yaml.safe_load(file)
-        run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config)
+        self.run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config)
 
-        run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
+        self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
+
+    def log_to_config(self, key:str, value:str):
+        self.run.config[key] = value
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
