@@ -220,7 +220,7 @@ class Main:
         )
         wrapped_model = components.wrapped_model
         num_params = compute_number_of_trainable_parameters(wrapped_model)
-        components.evaluation_subscriber.log_to_config("No. Parameters", num_params)
+        components.evaluation_subscriber.consume_key_value("No. Parameters", num_params)
         logging.info(f"Training model with {num_params} parameters.")
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:

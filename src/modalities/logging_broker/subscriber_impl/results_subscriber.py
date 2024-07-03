@@ -18,9 +18,6 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
 
-    def log_to_config(self, key: str, value: str):
-        pass
-
 class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def __init__(self, num_ranks: int) -> None:
         super().__init__()
@@ -69,7 +66,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def log_to_config(self, key:str, value:str):
+    def consume_key_value(self, key:str, value:str):
         self.run.config[key] = value
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
