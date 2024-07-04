@@ -7,8 +7,9 @@ import torch
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
+from modalities.exceptions import ConfigError
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config
+from modalities.models.utils import get_model_from_config, ModelTypeEnum
 
 
 class HFModelAdapterConfig(PretrainedConfig):
@@ -17,10 +18,10 @@ class HFModelAdapterConfig(PretrainedConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # self.config is added by the super class via kwargs
-        assert self.config, "config is not set"
+        if self.config is None:
+            raise ConfigError("Config is not passed in HFModelAdapterConfig")
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
-        if self.config:
-            self._convert_posixpath_to_str(self.config)
+        self._convert_posixpath_to_str(self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
         if self.config:
@@ -53,7 +54,7 @@ class HFModelAdapter(PreTrainedModel):
 
     def __init__(self, config: HFModelAdapterConfig, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
-        self.model: NNModel = get_model_from_config(config.config, model_type="checkpointed_model")
+        self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
         assert hasattr(self.model, "prediction_key"), "Missing entry model.prediction_key in config"
 
     def forward(
@@ -69,12 +70,13 @@ class HFModelAdapter(PreTrainedModel):
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
         if return_dict:
-            return ModalitiesModelOutput(**model_forward_output)
-        else:
             return model_forward_output[self.model.prediction_key]
+        else:
+            return ModalitiesModelOutput(**model_forward_output)
+
 
     def prepare_inputs_for_generation(
-        self, input_ids: torch.LongTensor, attention_mask=None, **kwargs
+        self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
     ) -> Dict[str, Any]:
         """
         Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the

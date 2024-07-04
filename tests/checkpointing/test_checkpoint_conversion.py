@@ -10,7 +10,7 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config
+from modalities.models.utils import get_model_from_config, ModelTypeEnum
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from tests.conftest import _ROOT_DIR
@@ -48,12 +48,12 @@ def config_file_path(config_file_name) -> Path:
 
 @pytest.fixture()
 def config_dict(config_file_path) -> dict:
-    return load_app_config_dict(config_file_path)
+    return load_app_config_dict(config_file_path=config_file_path)
 
 
 @pytest.fixture()
 def initialized_model(set_env, config_dict) -> NNModel:
-    return get_model_from_config(config=config_dict, model_type="model")
+    return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.MODEL)
 
 
 @pytest.fixture()
@@ -66,13 +66,15 @@ def checkpoint_conversion(tmp_path, initialized_model, config_file_path) -> Chec
         config_file_path=config_file_path,
         output_hf_checkpoint_dir=output_hf_checkpoint_dir,
     )
+
+    # Adding the checkpoint path in tmp folder to the config dict
     checkpoint_conversion.config_dict["checkpointed_model"]["config"]["checkpoint_path"] = model_file_path
     return checkpoint_conversion
 
 
 @pytest.fixture()
 def pytorch_model(checkpoint_conversion) -> NNModel:
-    return get_model_from_config(config=checkpoint_conversion.config_dict, model_type="checkpointed_model")
+    return get_model_from_config(config=checkpoint_conversion.config_dict, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
 
 
 @pytest.fixture()
@@ -82,13 +84,44 @@ def hf_model(checkpoint_conversion) -> NNModel:
 
 @pytest.fixture()
 def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, hf_model, device) -> NNModel:
-    AutoConfig.register("modalities", HFModelAdapterConfig)
-    AutoModelForCausalLM.register(HFModelAdapterConfig, HFModelAdapter)
+    AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
+    AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
-        checkpoint_conversion.output_hf_checkpoint_dir, torch_dtype=pytorch_model.lm_head.weight.dtype
+        pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir, torch_dtype=pytorch_model.lm_head.weight.dtype
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
     return hf_model_from_checkpoint
+
+
+@pytest.fixture()
+def test_tensor(device: str, size: int = 10):
+    test_tensor = torch.randint(size, size=(5, size))
+    test_tensor = test_tensor.to(device)
+    return test_tensor
+
+
+def test_models_before_and_after_conversion_produce_same_output(
+    device,
+    pytorch_model,
+    hf_model,
+    hf_model_from_checkpoint,
+    test_tensor,
+):
+    pytorch_model = put_model_to_eval_mode(model=pytorch_model, device=device)
+    hf_model = put_model_to_eval_mode(model=hf_model, device=device)
+
+    output_pytorch_model = pytorch_model.forward(inputs={"input_ids": test_tensor})["logits"]
+    output_hf_model = hf_model.forward(input_ids=test_tensor, return_dict=True)
+    output_hf_model_from_checkpoint = hf_model_from_checkpoint.forward(input_ids=test_tensor, return_dict=True)
+
+    assert (output_hf_model == output_pytorch_model).all()
+    assert (output_hf_model == output_hf_model_from_checkpoint).all()
+
+
+def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
+    model.eval()
+    model = model.to(device)
+    return model
 
 
 def test_models_before_and_after_conversion_are_equal(

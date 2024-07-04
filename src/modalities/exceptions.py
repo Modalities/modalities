@@ -16,3 +16,7 @@ class RunningEnvError(Exception):
 
 class TimeRecorderStateError(Exception):
     pass
+
+
+class ConfigError(Exception):
+    pass
