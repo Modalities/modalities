@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from pathlib import Path, PosixPath
 
 import pytest
 import torch
@@ -87,7 +87,8 @@ def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, hf_model, dev
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
-        pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir, torch_dtype=pytorch_model.lm_head.weight.dtype
+        pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
+        torch_dtype=pytorch_model.lm_head.weight.dtype
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
     return hf_model_from_checkpoint
@@ -132,3 +133,34 @@ def test_models_before_and_after_conversion_are_equal(
     for p1, p2, p3 in zip(hf_model.parameters(), pytorch_model.parameters(), hf_model_from_checkpoint.parameters()):
         assert torch.equal(p1, p2)
         assert torch.equal(p1, p3)
+
+
+def test_convert_posixpath_to_str(checkpoint_conversion):
+    config = HFModelAdapterConfig(config=checkpoint_conversion.config_dict)
+    config_to_adapt = config.config
+
+    # Testing whether a dict and list containing different elements (also a Posix path) are successfully adjusted.
+    # We add a list of dict containing a str, PosixPath and int to the dict
+    config_to_adapt['checkpointed_model']['config']['checkpoint_path'] = [
+        {"str1": 'dummy_string1', "path1": Path("src\\modalities\\test"), "int1": 15, },
+        {"dict2": ['dummy_string2', 20, Path("src\\modalities\\test1")]}
+    ]
+    data_to_test_before_formatting = config_to_adapt['checkpointed_model']['config']['checkpoint_path']
+    assert isinstance(data_to_test_before_formatting[0]['str1'], str)
+    assert isinstance(data_to_test_before_formatting[0]['path1'], PosixPath)
+    assert isinstance(data_to_test_before_formatting[0]['int1'], int)
+
+    assert isinstance(data_to_test_before_formatting[1]['dict2'][0], str)
+    assert isinstance(data_to_test_before_formatting[1]['dict2'][1], int)
+    assert isinstance(data_to_test_before_formatting[1]['dict2'][2], PosixPath)
+
+    formatted_config = config.convert_posixpath_to_str(data_to_be_formatted=config_to_adapt)
+    data_to_test_after_formatting = formatted_config['checkpointed_model']['config']['checkpoint_path']
+    # Checking whether only the PosixPath element is converted to str and rest are intact.
+    assert isinstance(data_to_test_after_formatting[0]['str1'], str)
+    assert isinstance(data_to_test_after_formatting[0]['path1'], str)  # Posix converted to str
+    assert isinstance(data_to_test_after_formatting[0]['int1'], int)
+
+    assert isinstance(data_to_test_after_formatting[1]['dict2'][0], str)
+    assert isinstance(data_to_test_after_formatting[1]['dict2'][1], int)
+    assert isinstance(data_to_test_after_formatting[1]['dict2'][2], str)  # Posix converted to str

@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import PosixPath
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union, List
 
 import torch
 from transformers import PreTrainedModel, PretrainedConfig
@@ -21,7 +21,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         if self.config is None:
             raise ConfigError("Config is not passed in HFModelAdapterConfig")
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
-        self._convert_posixpath_to_str(self.config)
+        self.convert_posixpath_to_str(data_to_be_formatted=self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
         if self.config:
@@ -30,23 +30,20 @@ class HFModelAdapterConfig(PretrainedConfig):
             json_dict = {}
         return json.dumps(json_dict)
 
-    def _convert_posixpath_to_str(self, d: dict):
+    def convert_posixpath_to_str(self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]) -> Union[
+        Dict[str, Any], List[Any], PosixPath, Any]:
         """
-        Recursively iterate over the dictionary and convert PosixPath values to strings.
+        Recursively iterate and convert PosixPath values to strings.
         """
-        for key, value in d.items():
-            if isinstance(value, PosixPath):
-                d[key] = str(value)
-            elif isinstance(value, dict):
-                self._convert_posixpath_to_str(value)
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, PosixPath):
-                        d[key] = str(item)
-                    elif isinstance(item, dict):
-                        self._convert_posixpath_to_str(item)
-                    else:
-                        d[key] = item
+        if isinstance(data_to_be_formatted, dict):
+            for key, value in data_to_be_formatted.items():
+                data_to_be_formatted[key] = self.convert_posixpath_to_str(data_to_be_formatted=value)
+        elif isinstance(data_to_be_formatted, list):
+            for i in range(len(data_to_be_formatted)):
+                data_to_be_formatted[i] = self.convert_posixpath_to_str(data_to_be_formatted=data_to_be_formatted[i])
+        elif isinstance(data_to_be_formatted, PosixPath):
+            return str(data_to_be_formatted)
+        return data_to_be_formatted
 
 
 class HFModelAdapter(PreTrainedModel):
@@ -73,7 +70,6 @@ class HFModelAdapter(PreTrainedModel):
             return model_forward_output[self.model.prediction_key]
         else:
             return ModalitiesModelOutput(**model_forward_output)
-
 
     def prepare_inputs_for_generation(
         self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
