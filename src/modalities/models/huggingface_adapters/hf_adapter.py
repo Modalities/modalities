@@ -21,7 +21,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         if self.config is None:
             raise ConfigError("Config is not passed in HFModelAdapterConfig")
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
-        self.convert_posixpath_to_str(data_to_be_formatted=self.config)
+        self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
         if self.config:
@@ -30,17 +30,17 @@ class HFModelAdapterConfig(PretrainedConfig):
             json_dict = {}
         return json.dumps(json_dict)
 
-    def convert_posixpath_to_str(self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]) -> Union[
+    def _convert_posixpath_to_str(self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]) -> Union[
         Dict[str, Any], List[Any], PosixPath, Any]:
         """
         Recursively iterate and convert PosixPath values to strings.
         """
         if isinstance(data_to_be_formatted, dict):
             for key, value in data_to_be_formatted.items():
-                data_to_be_formatted[key] = self.convert_posixpath_to_str(data_to_be_formatted=value)
+                data_to_be_formatted[key] = self._convert_posixpath_to_str(data_to_be_formatted=value)
         elif isinstance(data_to_be_formatted, list):
             for i in range(len(data_to_be_formatted)):
-                data_to_be_formatted[i] = self.convert_posixpath_to_str(data_to_be_formatted=data_to_be_formatted[i])
+                data_to_be_formatted[i] = self._convert_posixpath_to_str(data_to_be_formatted=data_to_be_formatted[i])
         elif isinstance(data_to_be_formatted, PosixPath):
             return str(data_to_be_formatted)
         return data_to_be_formatted
@@ -86,6 +86,6 @@ class HFModelAdapter(PreTrainedModel):
 
 @dataclass
 class ModalitiesModelOutput(ModelOutput):
-    logits: torch.FloatTensor = None
+    logits: Optional[torch.FloatTensor] = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None

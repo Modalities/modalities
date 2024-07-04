@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 from modalities.config.config import load_app_config_dict

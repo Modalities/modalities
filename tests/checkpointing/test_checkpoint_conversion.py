@@ -41,23 +41,23 @@ def config_file_name(request) -> str:
 
 
 @pytest.fixture()
-def config_file_path(config_file_name) -> Path:
+def config_file_path(config_file_name: str) -> Path:
     config_file_path = _ROOT_DIR / Path("tests/checkpointing/configs_for_testing/" + config_file_name)
     return config_file_path
 
 
 @pytest.fixture()
-def config_dict(config_file_path) -> dict:
+def config_dict(config_file_path: Path) -> dict:
     return load_app_config_dict(config_file_path=config_file_path)
 
 
 @pytest.fixture()
-def initialized_model(set_env, config_dict) -> NNModel:
+def initialized_model(set_env, config_dict: dict) -> NNModel:
     return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.MODEL)
 
 
 @pytest.fixture()
-def checkpoint_conversion(tmp_path, initialized_model, config_file_path) -> CheckpointConversion:
+def checkpoint_conversion(tmp_path: Path, initialized_model: NNModel, config_file_path: Path) -> CheckpointConversion:
     model_file_path = tmp_path / "pytorch_model.bin"
     torch.save(initialized_model.state_dict(), model_file_path)
 
@@ -73,17 +73,19 @@ def checkpoint_conversion(tmp_path, initialized_model, config_file_path) -> Chec
 
 
 @pytest.fixture()
-def pytorch_model(checkpoint_conversion) -> NNModel:
+def pytorch_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
     return get_model_from_config(config=checkpoint_conversion.config_dict, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
 
 
 @pytest.fixture()
-def hf_model(checkpoint_conversion) -> NNModel:
+def hf_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
     return checkpoint_conversion.convert_pytorch_to_hf_checkpoint()
 
 
 @pytest.fixture()
-def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, hf_model, device) -> NNModel:
+def hf_model_from_checkpoint(
+        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, hf_model: NNModel,
+        device: str) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
@@ -95,18 +97,18 @@ def hf_model_from_checkpoint(checkpoint_conversion, pytorch_model, hf_model, dev
 
 
 @pytest.fixture()
-def test_tensor(device: str, size: int = 10):
+def test_tensor(device: str, size: int = 10) -> torch.Tensor:
     test_tensor = torch.randint(size, size=(5, size))
     test_tensor = test_tensor.to(device)
     return test_tensor
 
 
 def test_models_before_and_after_conversion_produce_same_output(
-    device,
-    pytorch_model,
-    hf_model,
-    hf_model_from_checkpoint,
-    test_tensor,
+        device: str,
+        pytorch_model: NNModel,
+        hf_model: NNModel,
+        hf_model_from_checkpoint: NNModel,
+        test_tensor: torch.Tensor,
 ):
     pytorch_model = put_model_to_eval_mode(model=pytorch_model, device=device)
     hf_model = put_model_to_eval_mode(model=hf_model, device=device)
@@ -126,16 +128,16 @@ def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
 
 
 def test_models_before_and_after_conversion_are_equal(
-    pytorch_model,
-    hf_model,
-    hf_model_from_checkpoint,
+        pytorch_model: NNModel,
+        hf_model: NNModel,
+        hf_model_from_checkpoint: NNModel,
 ):
     for p1, p2, p3 in zip(hf_model.parameters(), pytorch_model.parameters(), hf_model_from_checkpoint.parameters()):
         assert torch.equal(p1, p2)
         assert torch.equal(p1, p3)
 
 
-def test_convert_posixpath_to_str(checkpoint_conversion):
+def test_convert_posixpath_to_str(checkpoint_conversion: CheckpointConversion):
     config = HFModelAdapterConfig(config=checkpoint_conversion.config_dict)
     config_to_adapt = config.config
 
@@ -154,7 +156,7 @@ def test_convert_posixpath_to_str(checkpoint_conversion):
     assert isinstance(data_to_test_before_formatting[1]['dict2'][1], int)
     assert isinstance(data_to_test_before_formatting[1]['dict2'][2], PosixPath)
 
-    formatted_config = config.convert_posixpath_to_str(data_to_be_formatted=config_to_adapt)
+    formatted_config = config._convert_posixpath_to_str(data_to_be_formatted=config_to_adapt)
     data_to_test_after_formatting = formatted_config['checkpointed_model']['config']['checkpoint_path']
     # Checking whether only the PosixPath element is converted to str and rest are intact.
     assert isinstance(data_to_test_after_formatting[0]['str1'], str)
