@@ -30,8 +30,9 @@ class HFModelAdapterConfig(PretrainedConfig):
             json_dict = {}
         return json.dumps(json_dict)
 
-    def _convert_posixpath_to_str(self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]) -> Union[
-        Dict[str, Any], List[Any], PosixPath, Any]:
+    def _convert_posixpath_to_str(
+            self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
+    ) -> Union[Dict[str, Any], List[Any], PosixPath, Any]:
         """
         Recursively iterate and convert PosixPath values to strings.
         """

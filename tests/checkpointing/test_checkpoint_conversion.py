@@ -84,8 +84,8 @@ def hf_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
 
 @pytest.fixture()
 def hf_model_from_checkpoint(
-        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, hf_model: NNModel,
-        device: str) -> NNModel:
+        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str
+) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
@@ -104,11 +104,11 @@ def test_tensor(device: str, size: int = 10) -> torch.Tensor:
 
 
 def test_models_before_and_after_conversion_produce_same_output(
-        device: str,
-        pytorch_model: NNModel,
-        hf_model: NNModel,
-        hf_model_from_checkpoint: NNModel,
-        test_tensor: torch.Tensor,
+    device: str,
+    pytorch_model: NNModel,
+    hf_model: NNModel,
+    hf_model_from_checkpoint: NNModel,
+    test_tensor: torch.Tensor,
 ):
     pytorch_model = put_model_to_eval_mode(model=pytorch_model, device=device)
     hf_model = put_model_to_eval_mode(model=hf_model, device=device)
@@ -128,9 +128,9 @@ def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
 
 
 def test_models_before_and_after_conversion_are_equal(
-        pytorch_model: NNModel,
-        hf_model: NNModel,
-        hf_model_from_checkpoint: NNModel,
+    pytorch_model: NNModel,
+    hf_model: NNModel,
+    hf_model_from_checkpoint: NNModel,
 ):
     for p1, p2, p3 in zip(hf_model.parameters(), pytorch_model.parameters(), hf_model_from_checkpoint.parameters()):
         assert torch.equal(p1, p2)
