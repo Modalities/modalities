@@ -65,9 +65,9 @@ class HFModelAdapter(PreTrainedModel):
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
         if return_dict:
-            return model_forward_output[self.prediction_key]
-        else:
             return ModalitiesModelOutput(**model_forward_output)
+        else:
+            return model_forward_output[self.prediction_key]
 
     def prepare_inputs_for_generation(
         self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
