@@ -24,10 +24,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
-        if self.config:
-            json_dict = {"config": self.config.copy(), "model_type": self.model_type}
-        else:
-            json_dict = {}
+        json_dict = {"config": self.config.copy(), "model_type": self.model_type}
         return json.dumps(json_dict)
 
     def _convert_posixpath_to_str(
