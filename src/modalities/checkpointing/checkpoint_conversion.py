@@ -17,8 +17,8 @@ class CheckpointConversion:
 
         self.config_dict = load_app_config_dict(config_file_path)
 
-    def convert_pytorch_to_hf_checkpoint(self) -> HFModelAdapter:
+    def convert_pytorch_to_hf_checkpoint(self, prediction_key) -> HFModelAdapter:
         config = HFModelAdapterConfig(config=self.config_dict)
-        hf_model = HFModelAdapter(config=config)
+        hf_model = HFModelAdapter(config=config, prediction_key=prediction_key)
         hf_model.save_pretrained(self.output_hf_checkpoint_dir, safe_serialization=False)
         return hf_model

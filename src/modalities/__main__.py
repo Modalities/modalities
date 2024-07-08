@@ -82,10 +82,10 @@ def entry_point_generate_text(config_file_path: FilePath):
     help="Converted hf checkpoint will be written to this directory.",
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
-        config_file_path: Path, output_hf_checkpoint_dir: Path
+        config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
 ) -> HFModelAdapter:
     cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
-    hf_model = cp.convert_pytorch_to_hf_checkpoint()
+    hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
     return hf_model
 
 
