@@ -209,12 +209,15 @@ class VisionTransformer(nn.Module):
             self.time_embd = nn.Parameter(torch.randn(num_video_frames, 1, n_embd))  # [T,1,d]
             if add_cls_token:
                 n_latents += 1  # to count for a video level cls token
+                self.block_size -= 1
             self.latents = nn.Parameter(torch.randn(n_latents, n_embd))  # [R,d]
             self.rearrange = Rearrange("b T S D -> b (T S) D")
         else:
             self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
 
-        self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)  # [S D]
+        self.positional_embedding_fn = nn.Embedding(
+            num_embeddings=self.block_size, embedding_dim=n_embd
+        )  # [S D] #TODO: this needs to be adjusted for video with cls_token
         block_classes = {"Video": PerceiverTransformerBlock, "Image": VisionTransformerBlock}
 
         self.blocks = nn.ModuleList(
