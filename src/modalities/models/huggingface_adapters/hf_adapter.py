@@ -51,7 +51,6 @@ class HFModelAdapter(PreTrainedModel):
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
         self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
-        assert hasattr(self.model, "prediction_key"), "Missing entry model.prediction_key in config"
 
     def forward(
         self,

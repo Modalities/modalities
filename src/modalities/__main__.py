@@ -81,6 +81,12 @@ def entry_point_generate_text(config_file_path: FilePath):
     required=True,
     help="Converted hf checkpoint will be written to this directory.",
 )
+@click.option(
+    "--prediction_key",
+    type=str,
+    required=True,
+    help="The key in the models output, where one can find the logits.",
+)
 def entry_point_convert_pytorch_to_hf_checkpoint(
         config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
 ) -> HFModelAdapter:

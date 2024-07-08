@@ -6,7 +6,7 @@ from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapterConf
 
 
 @pytest.fixture()
-def hf_model_adapter_config():
+def hf_model_adapter_config() -> HFModelAdapterConfig:
     return HFModelAdapterConfig(config={})
 
 
