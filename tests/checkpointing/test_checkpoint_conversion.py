@@ -78,19 +78,23 @@ def pytorch_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
 
 
 @pytest.fixture()
-def hf_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
-    return checkpoint_conversion.convert_pytorch_to_hf_checkpoint()
+def hf_model(checkpoint_conversion: CheckpointConversion, prediction_key: str) -> NNModel:
+    return checkpoint_conversion.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
 
+@pytest.fixture()
+def prediction_key() -> str:
+    return "logits"
 
 @pytest.fixture()
 def hf_model_from_checkpoint(
-        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str
+        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
 ) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
-        torch_dtype=pytorch_model.lm_head.weight.dtype
+        torch_dtype=pytorch_model.lm_head.weight.dtype,
+        prediction_key=prediction_key
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
     return hf_model_from_checkpoint

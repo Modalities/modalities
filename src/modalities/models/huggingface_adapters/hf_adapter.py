@@ -47,8 +47,9 @@ class HFModelAdapterConfig(PretrainedConfig):
 class HFModelAdapter(PreTrainedModel):
     config_class = HFModelAdapterConfig
 
-    def __init__(self, config: HFModelAdapterConfig, *inputs, **kwargs):
+    def __init__(self, config: HFModelAdapterConfig, prediction_key: str, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
+        self.prediction_key = prediction_key
         self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
         assert hasattr(self.model, "prediction_key"), "Missing entry model.prediction_key in config"
 
@@ -65,7 +66,7 @@ class HFModelAdapter(PreTrainedModel):
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
         if return_dict:
-            return model_forward_output[self.model.prediction_key]
+            return model_forward_output[self.prediction_key]
         else:
             return ModalitiesModelOutput(**model_forward_output)
 
