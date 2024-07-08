@@ -48,8 +48,7 @@ def main() -> None:
     help="Path to a file with the YAML config file.",
 )
 def entry_point_run_modalities(config_file_path: Path):
-    config_dict = load_app_config_dict(config_file_path)
-    main_obj = Main(config_dict, config_file_path)
+    main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -160,8 +159,8 @@ def entry_point_merge_packed_data(src_paths, target_path):
 
 
 class Main:
-    def __init__(self, config_dict: Dict, config_path: Path) -> None:
-        self.config_dict = config_dict
+    def __init__(self, config_path: Path) -> None:
+        self.config_dict = load_app_config_dict(config_path)
         self.config_path = config_path
 
         self.registry = Registry(COMPONENTS)
@@ -220,7 +219,7 @@ class Main:
         )
         wrapped_model = components.wrapped_model
         num_params = compute_number_of_trainable_parameters(wrapped_model)
-        components.evaluation_subscriber.consume_key_value("No. Parameters", num_params)
+        components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:
