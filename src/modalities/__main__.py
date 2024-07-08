@@ -73,13 +73,13 @@ def entry_point_generate_text(config_file_path: FilePath):
     "--config_file_path",
     type=click_pathlib.Path(exists=True),
     required=True,
-    help="Load pytorch checkpoint from this directory.",
+    help="Load PyTorch checkpoint from this directory.",
 )
 @click.option(
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
     required=True,
-    help="Converted hf checkpoint will be written to this directory.",
+    help="Converted HF checkpoint will be written to this directory.",
 )
 @click.option(
     "--prediction_key",

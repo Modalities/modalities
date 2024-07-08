@@ -10,7 +10,7 @@ def hf_model_adapter_config() -> HFModelAdapterConfig:
     return HFModelAdapterConfig(config={})
 
 
-def test___convert_posixpath_to_str(hf_model_adapter_config: HFModelAdapterConfig):
+def test_convert_posixpath_to_str(hf_model_adapter_config: HFModelAdapterConfig):
     test_data_to_be_formatted = {
         "key1": Path("test/path/1"),
         "key2": [

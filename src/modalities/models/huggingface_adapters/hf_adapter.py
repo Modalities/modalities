@@ -19,7 +19,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         super().__init__(**kwargs)
         # self.config is added by the super class via kwargs
         if self.config is None:
-            raise ConfigError("Config is not passed in HFModelAdapterConfig")
+            raise ConfigError("Config is not passed in HFModelAdapterConfig.")
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
         self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
@@ -63,6 +63,7 @@ class HFModelAdapter(PreTrainedModel):
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
     ):
+        # These parameters are required by HuggingFace. We do not use them and hence don't implement them.
         if output_attentions or output_hidden_states:
             raise NotImplementedError
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
