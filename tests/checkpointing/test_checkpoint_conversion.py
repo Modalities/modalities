@@ -118,8 +118,8 @@ def test_models_before_and_after_conversion_produce_same_output(
     hf_model = put_model_to_eval_mode(model=hf_model, device=device)
 
     output_pytorch_model = pytorch_model.forward(inputs={"input_ids": test_tensor})["logits"]
-    output_hf_model = hf_model.forward(input_ids=test_tensor, return_dict=True)
-    output_hf_model_from_checkpoint = hf_model_from_checkpoint.forward(input_ids=test_tensor, return_dict=True)
+    output_hf_model = hf_model.forward(input_ids=test_tensor, return_dict=False)
+    output_hf_model_from_checkpoint = hf_model_from_checkpoint.forward(input_ids=test_tensor, return_dict=False)
 
     assert (output_hf_model == output_pytorch_model).all()
     assert (output_hf_model == output_hf_model_from_checkpoint).all()

@@ -47,10 +47,13 @@ class HFModelAdapterConfig(PretrainedConfig):
 class HFModelAdapter(PreTrainedModel):
     config_class = HFModelAdapterConfig
 
-    def __init__(self, config: HFModelAdapterConfig, prediction_key: str, *inputs, **kwargs):
+    def __init__(self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
-        self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
+        if load_checkpoint:
+            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
+        else:
+            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.MODEL)
 
     def forward(
         self,
