@@ -9,7 +9,7 @@ settings:
     checkpointing_interval_in_steps: 128 
     evaluation_interval_in_steps: 64
     global_num_seen_tokens: 0
-    do_apply_activation_checkpointing: false
+    activation_checkpointing_modules: []
     gradient_acc_steps: 1
     local_train_micro_batch_size: 16
     sequence_length: 2048

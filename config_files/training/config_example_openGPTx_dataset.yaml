@@ -151,7 +151,7 @@ model:
     n_embd: 768
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    activation: fused_swiglu
+    activation: swiglu
     weight_init:
       mean: 0.0
       std: 0.02

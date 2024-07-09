@@ -236,9 +236,10 @@ class WeightInitializedModelConfig(BaseModel):
 
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
-    max_length: Annotated[int, Field(strict=True, ge=0)]
+    max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
+    special_tokens: Optional[Dict[str, str]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):

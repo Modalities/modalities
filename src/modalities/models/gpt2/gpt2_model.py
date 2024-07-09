@@ -5,17 +5,17 @@ from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import xformers.ops as xops
 
 try:
     from flash_attn import flash_attn_func
 except ModuleNotFoundError:
     flash_attn_func = None
+
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import ActivationType, NNModel
+from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -389,9 +389,8 @@ class GPT2Block(nn.Module):
         )
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation_type == ActivationType.FUSED_SWIGLU:
-            hidden_dim = 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
-            self.mlp = xops.SwiGLU(n_embd, hidden_dim, n_embd, bias=False)
+        elif activation_type == ActivationType.SWIGLU:
+            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
 
@@ -422,13 +421,14 @@ class GPT2LLM(NNModel):
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
+        seed: int = None,
     ):
         weight_decay_groups = {
             "linear": [".attn", ".mlp"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        super().__init__(weight_decay_groups=weight_decay_groups)
+        super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.sequence_length = sequence_length
@@ -490,9 +490,8 @@ class GPT2LLM(NNModel):
         input_ids = inputs[self.sample_key]
         device = input_ids.device
         _, t = input_ids.size()  # batch size, sequence length
-        assert (
-            t <= self.sequence_length
-        ), f"Cannot forward sequence of length {t}, the model's maximum input sequence length is only {self.sequence_length}"
+        assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
+        f"input sequence length is only {self.sequence_length}"
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)

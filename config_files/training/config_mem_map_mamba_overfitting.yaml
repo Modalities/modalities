@@ -1,25 +1,32 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
-  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
     prediction_key: logits
   training:
-    training_log_interval_in_steps: 32
-    checkpointing_interval_in_steps: 8192
-    evaluation_interval_in_steps: 1024
-    global_num_seen_tokens: 0
+    global_training_log_interval_in_steps: 10
+    global_checkpointing_interval_in_steps: 1000 
+    global_evaluation_interval_in_steps: 64
+    global_num_seen_steps: 0
     activation_checkpointing_modules: []
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 16
+    local_train_micro_batch_size: 4
     sequence_length: 2048
+    gradient_clipping:
+      mode: p2_norm
+      threshold: 1.0
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpointing_path: data/checkpoints
+
+cuda_env:
+  local_rank: ${cuda_env:LOCAL_RANK}
+  global_rank: ${cuda_env:RANK}
+  world_size: ${cuda_env:WORLD_SIZE}
 
 collate_fn:  
   component_key: collate_fn
@@ -32,7 +39,15 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_default_DE_num_docs_1050391/redpyjama_v2_sample_1050391.pbin
+    raw_data_path: /raid/s3/opengptx/user/richard-rutmann/projects/Modalities/modalities/data/data_overfitting/data_overfitting_en.pbin
+    block_size: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/user/richard-rutmann/projects/Modalities/modalities/data/data_overfitting/data_overfitting_en.pbin
     block_size: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -41,15 +56,15 @@ train_dataloader:
   variant_key: repeating_data_loader
   config:
     reshuffle_after_epoch: false
-    num_epochs: 100
-    dataloader:
+    num_epochs: 1 # 100 epochs
+    dataloader:   
       component_key: data_loader
       variant_key: default
       config:
         num_workers: 2
         pin_memory: true
         shuffle: false
-        dataloader_tag: "train"
+        dataloader_tag: train
         dataset:
           instance_key: train_dataset
           pass_type: BY_REFERENCE
@@ -73,14 +88,6 @@ train_dataloader:
           instance_key: collate_fn
           pass_type: BY_REFERENCE
 
-val_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_continuous
-  config:
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpyjama_v2_default_DE_num_docs_1024/redpyjama_v2_default_DE_num_docs_1024.pbin
-    block_size: ${settings.training.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
-
 val_dataloader:
   component_key: data_loader
   variant_key: default
@@ -88,7 +95,7 @@ val_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: "val"
+    dataloader_tag: val
     dataset:
       instance_key: val_dataset
       pass_type: BY_REFERENCE
@@ -116,22 +123,26 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
 
-checkpoint_saving:
-  component_key: checkpoint_saving
+
+checkpointing:
+  component_key: checkpointing
   variant_key: default
   config:
-    checkpoint_saving_strategy:
-      component_key: checkpoint_saving_strategy
+    checkpointing_strategy:
+      component_key: checkpointing_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
         k: -1   # -1 to save all checkpoints
-    checkpoint_saving_execution:
-      component_key: checkpoint_saving_execution
-      variant_key: fsdp
+    checkpointing_execution:
+      component_key: checkpointing_execution
+      variant_key: fsdp_to_disc_checkpointing
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id} 
+        mixed_precision_settings: BF_16
+        sharding_strategy: FULL_SHARD
+        block_names: [ MambaBlock ]
 
 wrapped_model:
   component_key: model
@@ -143,57 +154,44 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    block_names: [MambaBlock]
 
 model:
   component_key: model
-  variant_key: gpt2
+  variant_key: mamba
   config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    poe_type: ABSOLUTE
-    block_size: ${settings.training.sequence_length}
+    d_model: 768
+    n_layer: 24
+    vocab_size: 50257
+    rms_norm: true
+    residual_in_fp32: true
+    fused_add_norm: true
+    pad_vocab_size_multiple: 8
+    tie_embeddings: true
     prediction_key: ${settings.referencing_keys.prediction_key}
-    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 12
-    n_head_q: 12
-    n_head_kv: 12
-    ffn_hidden: 2048
-    n_embd: 768
-    dropout: 0.0
-    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
-    attention_config:
-      qkv_transforms: []
-        # - type_hint: RotaryTransform
-        #   config:
-        #     n_embd: ${model.config.n_embd}
-        #     n_head: ${model.config.n_head_q} #it has to be head_q here
-        #     seq_length_dim: -2
-    activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+    sample_key: ${settings.referencing_keys.sample_key}
+    seed: null
+    dtype: null
+    initializer_cfg: {}
+    num_last_tokens: 0
+    inference_params: {}
+    mixer_model_config:
+      norm_epsilon: 1e-5
+      device: null
+      mamba_block_config:
+        d_state: 16
+        d_conv: 4
+        expand: 2
+        dt_rank: auto
+        dt_min: 0.001
+        dt_max: 0.1
+        dt_init: random
+        dt_scale: 1.0
+        dt_init_floor: 1e-4
+        conv_bias: true
+        bias: false
+        use_fast_path: true
+
 
 loss_fn:
   component_key: loss
@@ -207,7 +205,7 @@ optimizer:
   variant_key: adam_w
   config:
     lr: 0.0001
-    betas: [0.9, 0.999]
+    betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
     wrapped_model: 
@@ -222,17 +220,6 @@ scheduler:
       instance_key: optimizer
       pass_type: BY_REFERENCE
 
-gradient_clipper:
-  component_key: gradient_clipper
-  variant_key: fsdp
-  config:
-    wrapped_model:
-      instance_key: wrapped_model
-      pass_type: BY_REFERENCE
-    norm_type: P2_NORM
-    max_norm: 1.0
-    
-
 
 batch_progress_subscriber:
   component_key: progress_subscriber
@@ -240,14 +227,7 @@ batch_progress_subscriber:
   config:
     local_rank: ${settings.cuda_env.local_rank}
     world_size: ${settings.cuda_env.world_size}
-    global_num_seen_steps:
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training.global_num_seen_tokens}
-        sequence_length: ${settings.training.sequence_length}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -265,4 +245,3 @@ evaluation_subscriber:
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
-    config_file_path: ${settings.config_file_path}

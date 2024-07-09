@@ -15,4 +15,4 @@ tokenizer:
   config:
     tokenizer_model_file: /workspaces/modalities/data/tokenizer/sp_bpe_en/bpe_tokenizer.model
     padding: false
-    max_length: 2048
+    truncation: false

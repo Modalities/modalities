@@ -58,7 +58,7 @@ tokenizer:
   config:
     pretrained_model_name_or_path: tokenizer
     padding: false
-    max_length: 512
+    truncation: false
 ```
 
 ### Step 1: Create Index

@@ -8,9 +8,8 @@ settings:
     training_log_interval_in_steps: 2
     checkpointing_interval_in_steps: 2
     evaluation_interval_in_steps: 2
-    global_num_training_samples: 12
     global_num_seen_tokens: 0
-    do_apply_activation_checkpointing: true
+    activation_checkpointing_modules: []
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
     sequence_length: 256
@@ -225,7 +224,7 @@ model_raw:
       n_embd: 768
       dropout: 0.0
       bias: true
-      activation: fused_swiglu
+      activation: swiglu
       epsilon: 1e-5
     n_pool_head: 8
     n_vision_queries: 256

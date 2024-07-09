@@ -1,17 +1,19 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
     prediction_key: logits
   training:
-    callback_interval_in_samples: 2048
+    callback_interval_in_samples: 32768
     global_num_training_samples: 2048
     global_num_seen_samples: 0
     activation_checkpointing_modules: []
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 1
+    local_train_micro_batch_size: 16
     sequence_length: 4096
+    gradient_clipping:
+      mode: NONE
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -20,7 +22,7 @@ settings:
     checkpointing_path: data/checkpoints
 
 
-collate_fn:  
+collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
@@ -30,8 +32,8 @@ collate_fn:
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1050391.pbin
+  config:
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpyjama_v2_default_DE_num_docs_1024/redpyjama_v2_default_DE_num_docs_1024.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -51,7 +53,7 @@ train_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -69,8 +71,8 @@ train_dataloader:
 val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_megatron
-  config: 
-    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpajama_v2_gpt2_tokenized_num_samples_1024.pbin
+  config:
+    raw_data_path: /raid/s3/opengptx/max_lue/modalities/data/sample_datasets/redpajama_v2/mem_map/redpyjama_v2_default_DE_num_docs_1024/redpyjama_v2_default_DE_num_docs_1024.pbin
     block_size: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
 
@@ -90,7 +92,7 @@ val_dataloader:
       variant_key: default
       config:
         batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: false
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -105,7 +107,9 @@ val_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-eval_dataloaders: [val_dataloader]
+eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
 
 checkpointing:
   component_key: checkpointing
@@ -122,23 +126,25 @@ checkpointing:
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
-        experiment_id: ${settings.experiment_id} 
+        experiment_id: ${settings.experiment_id}
         mixed_precision_settings: BF_16
         sharding_strategy: FULL_SHARD
-        block_names: [LlamaDecoderLayer]
-
+        block_names: [ MambaBlock ]
 
 model:
   component_key: model
-  variant_key: huggingface_pretrained_model
+  variant_key: mamba
   config:
-    model_type: AutoModelForCausalLM
-    model_name: epfl-llm/meditron-7b
-    sample_key: ${settings.referencing_keys.sample_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
-    huggingface_prediction_subscription_key: ${settings.referencing_keys.prediction_key}
-    kwargs: 
-      cache_dir: /raid/s3/opengptx/max_lue/hf_cache/
+    d_model: 16
+    n_layer: 2
+    vocab_size: 50257
+    rms_norm: True
+    ssm_cfg: {}
+    residual_in_fp32: True
+    fused_add_norm: True
+    pad_vocab_size_multiple: 8
+    tie_embeddings: True
+    prediction_key: logits
 
 wrapped_model:
   component_key: model
@@ -150,7 +156,21 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [LlamaDecoderLayer]
+    block_names: [ MambaBlock ]
+
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 64
+    pct_start: 0.01
+    anneal_strategy: cos
 
 loss_fn:
   component_key: loss
@@ -159,29 +179,17 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
-# scheduler:
-#   type_hint: StepLR
-#   config:
-#     step_size: 1
-#     gamma: 0.1
-
-optimizer:  
+optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
-    wrapped_model: 
-      instance_key: wrapped_model
-      pass_type: BY_REFERENCE
-
-gradient_clipper:
-  component_key: gradient_clipper
-  variant_key: fsdp_logging_only
-  config:
+    betas: [ 0.9, 0.95 ]
+    eps: 1e-8
+    weight_decay: 1e-1
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
-    norm_type: P2_NORM
 
 batch_progress_subscriber:
   component_key: progress_subscriber
@@ -193,15 +201,17 @@ batch_progress_subscriber:
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
-    eval_dataloaders: []
+    eval_dataloaders:
+      - instance_key: val_dataloader
+        pass_type: BY_REFERENCE
 
-    
+
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
     local_rank: ${settings.cuda_env.local_rank}
     project: modalities
-    mode: OFFLINE
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."

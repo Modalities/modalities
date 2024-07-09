@@ -9,7 +9,7 @@ settings:
     checkpointing_interval_in_steps: 4
     evaluation_interval_in_steps: 2
     global_num_seen_tokens: 0
-    do_apply_activation_checkpointing: false
+    activation_checkpointing_modules: [GPT2Block]
     gradient_acc_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 256

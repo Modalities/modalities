@@ -94,4 +94,4 @@ tokenizer:
   config:
     pretrained_model_name_or_path: /raid/s3/opengptx/max_lue/modalities/data/tokenizer/hf_gpt2
     padding: false
-    max_length: ${settings.context_length}
+    truncation: false
