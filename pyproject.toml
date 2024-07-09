@@ -37,7 +37,7 @@ install_helper = ["ninja"]
 modalities = "modalities.__main__:main"
 
 [build-system]
-requires = ["setuptools >= 61.0.0"]
+requires = ["setuptools >= 61.0.0", "packaging"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
