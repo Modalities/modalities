@@ -156,7 +156,7 @@ checkpoint_saving:
           config:
             num_ranks: ${settings.cuda_env.world_size}
             local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            sequence_length: ${settings.training.sequence_length}        
+            sequence_length: ${settings.training.sequence_length} 
 
 # resolving class types via different enums sucks...
 loss_fn:
@@ -284,7 +284,6 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens

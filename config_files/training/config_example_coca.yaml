@@ -273,7 +273,6 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
