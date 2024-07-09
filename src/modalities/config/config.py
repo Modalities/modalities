@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -226,6 +227,11 @@ class FSDPWrappedModelConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class WeightInitializedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    model_initializer: PydanticModelInitializationIFType
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

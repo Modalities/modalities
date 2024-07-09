@@ -1,7 +1,6 @@
 import math
 from copy import deepcopy
 from enum import Enum
-from functools import partial
 from typing import Annotated, Dict, List, Tuple
 
 import torch
@@ -16,7 +15,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import NNModel
+from modalities.models.model import ActivationType, NNModel
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -108,11 +107,6 @@ class QueryKeyValueTransformType(Enum):
     RotaryTransform = RotaryTransform
 
 
-class ActivationType(str, Enum):
-    GELU = "gelu"
-    FUSED_SWIGLU = "fused_swiglu"
-
-
 class AttentionImplementation(str, Enum):
     MANUAL = "manual"
     PYTORCH_FLASH = "pytorch_flash"
@@ -139,11 +133,6 @@ class AttentionConfig(BaseModel):
     qkv_transforms: List[QueryKeyValueTransformConfig]
 
 
-class WeightInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
-    std: Annotated[float, Field(strict=True, ge=0.0)]
-
-
 class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
@@ -165,7 +154,6 @@ class GPT2LLMConfig(BaseModel):
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
-    weight_init: WeightInitializationConfig
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -430,7 +418,6 @@ class GPT2LLM(NNModel):
         bias: bool,
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
-        weight_init: WeightInitializationConfig,
         attention_config: AttentionConfig,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
@@ -498,21 +485,6 @@ class GPT2LLM(NNModel):
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
-
-        # init all weights
-        self.apply(partial(self._init_weights, weight_init=weight_init))
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
-
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]

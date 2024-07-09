@@ -42,7 +42,7 @@ train_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 4
+    num_samples: 64
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
@@ -55,7 +55,7 @@ val_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 4
+    num_samples: 32
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
@@ -170,7 +170,23 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [TransformerBlock, VisionTransformerBlock]
 
-model:
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: coca
+        weight_init_type: plain
+        mean: 0.0
+        std: 0.02
+
+model_raw:
   component_key: model
   variant_key: coca
   config:
@@ -215,9 +231,6 @@ model:
     n_vision_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
-    weight_init:
-      mean: 0.0
-      std: 0.02
 
 scheduler:
   component_key: scheduler
@@ -229,7 +242,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4
+    total_steps: 64
     pct_start: 0.01
     anneal_strategy: cos
 

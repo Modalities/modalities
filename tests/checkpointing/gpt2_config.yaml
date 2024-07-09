@@ -1,5 +1,3 @@
-
-
 model:
   component_key: model
   variant_key: gpt2
@@ -28,6 +26,7 @@ model:
     weight_init:
       mean: 0.0
       std: 0.02
+      type: scaled
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
