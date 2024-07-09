@@ -73,7 +73,7 @@ def entry_point_generate_text(config_file_path: FilePath):
     "--config_file_path",
     type=click_pathlib.Path(exists=True),
     required=True,
-    help="Load pytorch checkpoint from this directory.",
+    help="Path to config of model checkpoint.",
 )
 @click.option(
     "--output_hf_checkpoint_dir",
@@ -92,6 +92,7 @@ def entry_point_convert_pytorch_to_hf_checkpoint(
 ) -> HFModelAdapter:
     cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
     hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
+    print(f"Model was successfully converted and saved to {output_hf_checkpoint_dir}")
     return hf_model
 
 

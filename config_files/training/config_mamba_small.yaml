@@ -7,8 +7,8 @@ settings:
     prediction_key: logits
   training:
     global_training_log_interval_in_steps: 8
-    global_checkpointing_interval_in_steps: 3
-    global_evaluation_interval_in_steps: 2
+    global_checkpointing_interval_in_steps: 6
+    global_evaluation_interval_in_steps: 8
     global_num_seen_steps: 0
     do_apply_activation_checkpointing: true
     gradient_acc_steps: 1
@@ -249,7 +249,6 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    world_size: ${settings.cuda_env.world_size}
     global_num_seen_steps: ${settings.training.global_num_seen_steps}
     train_dataloader:
       instance_key: train_dataloader
