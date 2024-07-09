@@ -20,3 +20,7 @@ class TimeRecorderStateError(Exception):
 
 class OptimizerError(Exception):
     pass
+
+
+class ConfigError(Exception):
+    pass
