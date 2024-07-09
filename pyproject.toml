@@ -26,6 +26,7 @@ dependencies = [
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
     "mamba-ssm",
     "causal-conv1d>=1.2.0",
+    "packaging"
 ]
 
 [project.optional-dependencies]
