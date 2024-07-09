@@ -1,3 +1,5 @@
+from typing import Dict
+
 from pydantic import BaseModel
 from enum import Enum
 
@@ -10,7 +12,7 @@ class ModelTypeEnum(Enum):
     MODEL = "model"
     CHECKPOINTED_MODEL = "checkpointed_model"
     
-def get_model_from_config(config: dict, model_type: ModelTypeEnum):
+def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
 

@@ -79,7 +79,7 @@ def entry_point_generate_text(config_file_path: FilePath):
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
     required=True,
-    help="Converted hf checkpoint will be written to this directory.",
+    help="Converted HF checkpoint will be written to this directory.",
 )
 @click.option(
     "--prediction_key",
