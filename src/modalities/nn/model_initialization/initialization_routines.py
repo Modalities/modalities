@@ -45,12 +45,12 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
         self.parameter_name_regexes = parameter_name_regexes
 
     def initialize_in_place(self, model: nn.Module):
+        weight_regexes = self.parameter_name_regexes.weights
+        bias_regexes = self.parameter_name_regexes.biases
         for parameter_name, p in model.named_parameters():
-            weight_regexes = self.parameter_name_regexes.weights
             for weight_regex in weight_regexes:
                 if re.fullmatch(weight_regex, parameter_name):
                     nn.init.normal_(p, mean=self.mean, std=self.std)
-            bias_regexes = self.parameter_name_regexes.biases
             for bias_regex in bias_regexes:
                 if re.fullmatch(bias_regex, parameter_name):
                     nn.init.zeros_(p)
@@ -67,7 +67,8 @@ class InitializationRoutines:
 
         Args:
             mean (float): mean of the normal distribution
-            std (float): standard deviation of the normal distribution
+            std (float): standard deviation of the normal distribution. If set to "auto", appropiate
+                value selected as per plain initialization described in https://arxiv.org/abs/2312.16903
             hidden_dim (Optional[int], optional): hidden dimension of the attention layer. Defaults to None.
         """
 
@@ -87,7 +88,7 @@ class InitializationRoutines:
     def get_scaled_initialization(
         mean: float, std: float, num_layers: int, parameter_name_regexes: List[str]
     ) -> ModelInitializationIF:
-        """Implementation of scaled weight initialization.
+        """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
         Args:
             mean (float): Mean of the normal distribution
@@ -99,6 +100,7 @@ class InitializationRoutines:
         Returns:
             WeightInitializationIF: Weight initialization object
         """
+        # see https://arxiv.org/abs/2312.16903
         scaled_std = std / math.sqrt(2 * num_layers)
 
         initialization = NamedParameterwiseNormalInitialization(
