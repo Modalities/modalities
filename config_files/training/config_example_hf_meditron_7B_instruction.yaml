@@ -8,7 +8,7 @@ settings:
     callback_interval_in_samples: 2048
     global_num_training_samples: 2048
     global_num_seen_samples: 0
-    do_apply_activation_checkpointing: true
+    activation_checkpointing_modules: []
     gradient_acc_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 4096

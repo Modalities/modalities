@@ -10,7 +10,7 @@ settings:
     global_evaluation_interval_in_steps: 2
     global_num_training_samples: 12
     global_num_seen_steps: 0
-    do_apply_activation_checkpointing: true
+    activation_checkpointing_modules: []
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
     sequence_length: 256
