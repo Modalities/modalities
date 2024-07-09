@@ -202,7 +202,7 @@ settings:
     prediction_key: logits
   model_path: ./checkpoints/<checkpoint_name>.bin
   device: 0
-  context_length: 512
+  sequence_length: 512
 
 [..]
 ````

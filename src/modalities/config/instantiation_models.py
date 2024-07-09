@@ -78,7 +78,7 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
 class TextGenerationInstantiationModel(BaseModel):
     class TextGenerationSettings(BaseModel):
         model_path: FilePath
-        context_length: int
+        sequence_length: int
         device: PydanticPytorchDeviceType
         referencing_keys: Dict[str, str]
 

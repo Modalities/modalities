@@ -4,7 +4,7 @@ settings:
     prediction_key: logits
   model_path: ./checkpoints/2024-06-27__14-17-52/eid_2024-06-27__14-17-52-model-num_steps_48-num_tokens_393216.bin
   device: 0
-  context_length: 1024
+  sequence_length: 1024
 
 text_inference_component:
   component_key: inference_component
@@ -17,7 +17,7 @@ text_inference_component:
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
-    context_length: ${settings.context_length}
+    sequence_length: ${settings.sequence_length}
     eod_token: <|endoftext|>
     prompt_template: "{prompt_input}" # "<instruction> Du bist Moody, ein LLM welches Menschen helfen soll. user: {prompt_input}"
     temperature: 1
@@ -44,7 +44,7 @@ raw_model:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    sequence_length: ${settings.context_length}
+    sequence_length: ${settings.sequence_length}
     prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
