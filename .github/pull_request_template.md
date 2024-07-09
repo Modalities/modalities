@@ -1,7 +1,16 @@
 # What does this PR do?
 
-Add your description here, e.g. "This PR fixes issue #.. by .."
+This PR ..
 
+## General Changes
+* ..
 
-## Before submitting
-- [ ] I have fixed all failing tests (`python tests/tests.py`)
+## Breaking Changes
+* .. 
+
+## Checklist before submitting final PR
+- [ ] My PR is minimal and addresses one issue in isolation
+- [ ] I have merged the latest version of the target branch into this feature branch
+- [ ] I have reviewed my own code w.r.t. correct implementation, missing type hints, proper documentation, etc.
+- [ ] I have run a sample config for model training
+- [ ] I have checked that all tests run through (`python tests/tests.py`)
