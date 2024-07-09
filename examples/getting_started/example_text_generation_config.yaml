@@ -38,6 +38,23 @@ checkpointed_model:
       pass_type: BY_REFERENCE
     checkpoint_path: ${settings.model_path}
 
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
 raw_model:
   component_key: model
   variant_key: gpt2
@@ -63,10 +80,6 @@ raw_model:
             seq_length_dim: -2
     attention_implementation: manual
     activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm

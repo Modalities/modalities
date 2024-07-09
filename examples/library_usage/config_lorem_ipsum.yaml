@@ -184,7 +184,24 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-model:
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
   component_key: model
   variant_key: gpt2
   config:
@@ -199,13 +216,9 @@ model:
     n_embd: 128
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention_type: default_attention # pytorch_flash_attention
+    attention_implementation: manual
     activation: gelu
     epsilon: 1e-5
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
 
 optimizer:  
   component_key: optimizer

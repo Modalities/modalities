@@ -62,10 +62,6 @@ raw_model:
             n_head: ${raw_model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
     activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
-      type: scaled
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm
