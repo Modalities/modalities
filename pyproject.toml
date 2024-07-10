@@ -26,19 +26,18 @@ dependencies = [
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
     "mamba-ssm",
     "causal-conv1d>=1.2.0",
-    "packaging"
 ]
 
 [project.optional-dependencies]
 linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov", "packaging"]
+tests = ["pytest", "pytest-cov"]
 install_helper = ["ninja"]
 
 [project.scripts]
 modalities = "modalities.__main__:main"
 
 [build-system]
-requires = ["setuptools >= 61.0.0", "packaging"]
+requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]

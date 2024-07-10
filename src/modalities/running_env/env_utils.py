@@ -3,7 +3,10 @@ import os
 import torch
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
-from pkg_resources import packaging
+
+# TODO find a solution for github actions
+# to install this as a dependency
+# from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
 
 from modalities.config.lookup_enum import LookupEnum
@@ -19,7 +22,9 @@ def has_bfloat_support():
         torch.version.cuda
         and torch.cuda.is_available()
         and torch.cuda.is_bf16_supported()
-        and packaging.version.parse(torch.version.cuda).release >= (11, 0)
+        # TODO find a solution for github actions
+        # to install this as a dependency
+        # and packaging.version.parse(torch.version.cuda).release >= (11, 0)
         and dist.is_nccl_available()
         and nccl.version() >= (2, 10)
     )
@@ -51,7 +56,7 @@ bfSixteen_working = MixedPrecision(
 megatron_strategy = MixedPrecision(
     param_dtype=torch.bfloat16,
     reduce_dtype=torch.float32,
-    #buffer_dtype=torch.bfloat16,
+    # buffer_dtype=torch.bfloat16,
 )
 
 fpThirtytwo = MixedPrecision(
@@ -61,6 +66,7 @@ fpThirtytwo = MixedPrecision(
 )
 
 no_mixed_precision = None
+
 
 class MixedPrecisionSettings(LookupEnum):
     FP_16 = fpSixteen
