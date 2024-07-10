@@ -160,9 +160,11 @@ GPT2_SEQUENCE_LENGTH = 2048
 GPT2_HIDDEN_DIM = 768
 GPT2_ALL = 106374912
 GPT2_EMBEDDING = GPT2_HIDDEN_DIM * (
-    GPT2_VOCAB_SIZE + GPT2_SEQUENCE_LENGTH - 1
-)  # TODO: take away -1 once PR #158 is merged
-GPT2_WEIGHT_PROJECTION = (GPT2_HIDDEN_DIM**2 + GPT2_HIDDEN_DIM * GPT2_FFN_HIDDEN) * GPT2_NLAYERS  # 25952256
+    GPT2_VOCAB_SIZE + GPT2_SEQUENCE_LENGTH
+)  # parameters for token embeddings and positional embeddings
+GPT2_WEIGHT_PROJECTION = (
+    GPT2_HIDDEN_DIM * GPT2_HIDDEN_DIM + GPT2_HIDDEN_DIM * GPT2_FFN_HIDDEN
+) * GPT2_NLAYERS  # 25952256
 GPT2_WEIGHT_NORM = GPT2_HIDDEN_DIM * (GPT2_NLAYERS * 2 + 1)  # second term = num_layer_norms = (12*2+1) = 25
 GPT2_BIAS = 89856
 GPT2_OTHER = 0
@@ -269,6 +271,7 @@ def test_nr_parameters_per_initialization_group(model_name):
             assert nr_parameters_group == NR_PARAMETERS[model_name][group], (
                 f"nr_parameters for {model_name}/{group} = {nr_parameters_group} "
                 + f"should be {NR_PARAMETERS[model_name][group]}"
+                + f"Actual - Expected: {nr_parameters_group - NR_PARAMETERS[model_name][group]}"
             )
             nr_parameters_all += nr_parameters_group
 

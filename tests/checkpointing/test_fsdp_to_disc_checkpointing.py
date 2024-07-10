@@ -112,10 +112,10 @@ class TestFSDPToDiscCheckpointing:
         # prepare input and targets
         data = torch.randint(
             0,  # lowest token_id
-            gpt2_model_config["model"]["config"]["vocab_size"],  # highest token_id + 1, i.e. vocab_size
-            (8, gpt2_model_config["model"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
+            gpt2_model_config["model_raw"]["config"]["vocab_size"],  # highest token_id + 1, i.e. vocab_size
+            (8, gpt2_model_config["model_raw"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
         ).cuda()
-        batch_input_ids_dict = {gpt2_model_config["model"]["config"]["sample_key"]: data[:, :-1]}
+        batch_input_ids_dict = {gpt2_model_config["model_raw"]["config"]["sample_key"]: data[:, :-1]}
         batch_target_ids = data[:, 1:]
         batch_target_ids = batch_target_ids.contiguous()
         return batch_input_ids_dict, batch_target_ids
@@ -134,7 +134,9 @@ class TestFSDPToDiscCheckpointing:
         optimizer.zero_grad()
 
         # forward pass
-        predictions = model.forward(inputs=batch_input_ids_dict)[gpt2_model_config["model"]["config"]["prediction_key"]]
+        predictions = model.forward(inputs=batch_input_ids_dict)[
+            gpt2_model_config["model_raw"]["config"]["prediction_key"]
+        ]
         predictions = predictions.contiguous()
         # backward pass
         loss = ce_loss(predictions.view(-1, predictions.size(-1)), batch_target_ids.view(-1))
@@ -198,7 +200,7 @@ class TestFSDPToDiscCheckpointing:
         experiment_id = "0"
         num_train_steps_done = 1
 
-        sequence_length = gpt2_model_config_dict["model"]["config"]["sequence_length"]
+        sequence_length = gpt2_model_config_dict["model_raw"]["config"]["sequence_length"]
         get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
             num_ranks=2, local_micro_batch_size=4, sequence_length=sequence_length
         )
