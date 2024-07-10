@@ -190,7 +190,7 @@ model:
       variant_key: composed
       config:
         model_type: gpt2
-        weight_init_type: scaled_embed
+        weight_init_type: scaled
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
