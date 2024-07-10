@@ -1,33 +1,84 @@
+import json
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
-from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, PackedMemMapDatasetMegatron
+from modalities.dataloader.dataset import (
+    PackedMemMapDatasetBase,
+    PackedMemMapDatasetContinuous,
+    PackedMemMapDatasetMegatron,
+)
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
 def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, expected_length):
-    ds = PackedMemMapDatasetMegatron(dummy_packed_data_path, block_size, sample_key="input_ids")
+    ds = PackedMemMapDatasetMegatron(
+        raw_data_path=dummy_packed_data_path, block_size=block_size, sample_key="input_ids"
+    )
     assert len(ds) == expected_length
 
 
 @pytest.mark.parametrize(
     "block_size, expected_length, expected_output",
     [
-        (1, 20, [[i] for i in range(20)]),
-        (2, 10, [[2 * i, 2 * i + 1] for i in range(10)]),
-        (3, 6, [[3 * i, 3 * i + 1, 3 * i + 2] for i in range(6)]),
-        (10, 2, [list(range(10)), list(range(10, 20))]),
-        (6, 3, [list(range(i * 6, i * 6 + 6)) for i in range(3)]),
+        (
+            2,
+            19,
+            [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [4, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [8, 9],
+                [9, 10],
+                [10, 11],
+                [11, 12],
+                [12, 13],
+                [13, 14],
+                [14, 15],
+                [15, 16],
+                [16, 17],
+                [17, 18],
+                [18, 19],
+            ],
+        ),
+        (
+            3,
+            9,
+            [
+                [0, 1, 2],
+                [2, 3, 4],
+                [4, 5, 6],
+                [6, 7, 8],
+                [8, 9, 10],
+                [10, 11, 12],
+                [12, 13, 14],
+                [14, 15, 16],
+                [16, 17, 18],
+            ],
+        ),
+        (10, 2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]),
+        (6, 3, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11, 12, 13, 14, 15]]),
         (20, 1, [list(range(20))]),
-        (25, 0, []),
+        (21, 0, ValueError),
+        (1, 0, ValueError),
     ],
 )
 def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
-    ds = PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size, sample_key="input_ids")
+    try:
+        ds = PackedMemMapDatasetContinuous(
+            raw_data_path=dummy_packed_data_path, block_size=block_size, sample_key="input_ids"
+        )
+    except ValueError:
+        assert expected_output == ValueError
+        return
+
     assert len(ds) == expected_length
     retrieved_input_ids = [list(packed_samples["input_ids"]) for packed_samples in ds]
     assert retrieved_input_ids == expected_output
@@ -39,18 +90,22 @@ def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
         PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
 
 
-def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
-    block_size = 5
+def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
+    # In this test, we create a packed dataset from a long jsonl file
+    # and iterate over the packed dataset to check if the tokenization is correct.
+    # We do so by manually tokenizing the jsonl file and comparing the tokenized
+    # output with the packed dataset
+    block_size = 20
     packed_generator = PackedDataGenerator(
-        src_path=indexed_dummy_data_path.raw_data_path,
+        src_path=indexed_dummy_data_path_long.raw_data_path,
         tokenizer=wrapped_gpt2_tokenizer,
-        number_of_processes=2,
+        number_of_processes=5,
         eod_token="<|endoftext|>",
-        index_path=indexed_dummy_data_path.index_path,
+        index_path=indexed_dummy_data_path_long.index_path,
         jq_pattern=".text",
-        processing_batch_size=2,
-        raw_samples_queue_size=2,
-        processed_samples_queue_size=2,
+        processing_batch_size=5,
+        raw_samples_queue_size=3,
+        processed_samples_queue_size=3,
     )
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
@@ -59,16 +114,45 @@ def test_create_packed_dataset(indexed_dummy_data_path, wrapped_gpt2_tokenizer):
         default_packed_dataset_path, block_size=block_size, sample_key="input_ids"
     )
 
-    start_of_jsonl_content = "0 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
-    tokenized_start_of_jsonl_content = wrapped_gpt2_tokenizer.tokenize(start_of_jsonl_content)
-    packed_dataset_iterator = iter(packed_dataset)
-    np.testing.assert_equal(tokenized_start_of_jsonl_content[:block_size], next(packed_dataset_iterator)["input_ids"])
-    np.testing.assert_equal(
-        tokenized_start_of_jsonl_content[block_size : 2 * block_size], next(packed_dataset_iterator)["input_ids"]
-    )
-    assert len(packed_dataset._embedded_stream_data.index_base) == 12
+    # read in the raw jsonl files for manual tokenization
+    with open(indexed_dummy_data_path_long.raw_data_path) as f:
+        jsonl_list = [json.loads(line)["text"] for line in f]
+
+    jsonl_tokenized = [wrapped_gpt2_tokenizer.tokenize(v) for v in jsonl_list]
+    eod_token_id = wrapped_gpt2_tokenizer.get_token_id("<|endoftext|>")
+    # we flatten the list of tokenized documents and add the eod token at the end of each document
+    jsonl_tokenized_flat = [token_id for doc in jsonl_tokenized for token_id in doc + [eod_token_id]]
+
+    # we calculate the number of samples in the jsonl file given the block size
+    # the formula takes into account that that from the second sample onwards the
+    # last token (i.e., last target token) is reused as the first input token from the next sample
+    num_samples = (len(jsonl_tokenized_flat) - block_size) // (block_size - 1) + 1
+    # the first sample has a length of block_size and the subsequent one of block_size-1
+    num_tokens = block_size + (block_size - 1) * (num_samples - 1)
+    jsonl_tokenized_flat = jsonl_tokenized_flat[:num_tokens]
+
+    # flatten the tokens from the packed dataset to reproduce the tokenized jsonl file
+    packed_dataset_tokens_flat = []
+    for block_id, block in enumerate(iter(packed_dataset)):
+        if block_id > 0:
+            # we remove the first token from each block as it is a
+            # reused token from the previous block
+            tokens = block["input_ids"].tolist()[1:]
+            packed_dataset_tokens_flat += tokens
+        else:
+            packed_dataset_tokens_flat += block["input_ids"].tolist()
+
+    # compare the flattened tokens from the packed dataset with the manually tokenized jsonl file
+    assert packed_dataset_tokens_flat == jsonl_tokenized_flat
+
+    # make sure that each packed sample in the packed dataset has a length of block_size
+    for sample in iter(packed_dataset):
+        assert len(sample["input_ids"]) == block_size
+
+    assert len(packed_dataset._embedded_stream_data.index_base) == 500
 
     # check validity of index section in packed dataset
+    # we make sure that the offset is calculated correctly based on the length of the entry and the previous index
     for idx, (offset, entry_length) in enumerate(packed_dataset._embedded_stream_data.index_base[:-1]):
         assert offset + entry_length == packed_dataset._embedded_stream_data.index_base[idx + 1][0]
 
@@ -91,9 +175,23 @@ def test_join_packed_datasets(dummy_packed_data_path, tmpdir):
     original_datasets = [
         PackedMemMapDatasetContinuous(p, block_size=2, sample_key="whatever") for p in packed_data_clones
     ]
-    assert [v for batch in loaded_dataset for v in batch["whatever"]] == [
-        v for ds in original_datasets for batch in ds for v in batch["whatever"]
-    ]
+
+    original_datasets_concatenated = []
+    for ds_id, ds in enumerate(original_datasets):
+        for batch_id, batch in enumerate(ds):
+            if ds_id > 0 and batch_id == 0:
+                # we add the batch that was missing from the transition from one dataset to the next
+                # NOTE: this test only works with block_size=2!
+                original_datasets_concatenated += [
+                    original_datasets_concatenated[-1],
+                    batch["whatever"].flatten().tolist()[0],
+                ]
+
+            original_datasets_concatenated += batch["whatever"].flatten().tolist()
+
+            print([batch["whatever"].tolist()])
+    loaded_dataset_flattened = [v for batch in loaded_dataset for v in batch["whatever"]]
+    assert loaded_dataset_flattened == original_datasets_concatenated
 
 
 @pytest.mark.parametrize("token_size_in_bytes", [1, 2, 4])
@@ -112,3 +210,34 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
     collator = GPT2LLMCollateFn(sample_key=sample_key, target_key="abc")
     for batch in zip(ds, ds):
         collator(list(batch))
+
+
+def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
+    # In this test, we create a packed dataset from a long jsonl file
+    # and iterate over the packed dataset to check if the tokenization is correct.
+    # We do so by manually tokenizing the jsonl file and comparing the tokenized
+    # output with the packed dataset
+    packed_generator = PackedDataGenerator(
+        src_path=indexed_dummy_data_path_long.raw_data_path,
+        tokenizer=wrapped_gpt2_tokenizer,
+        number_of_processes=5,
+        eod_token="<|endoftext|>",
+        index_path=indexed_dummy_data_path_long.index_path,
+        jq_pattern=".text",
+        processing_batch_size=5,
+        raw_samples_queue_size=3,
+        processed_samples_queue_size=3,
+    )
+    default_packed_dataset_path = packed_generator._default_destination_path()
+    assert not default_packed_dataset_path.is_file()
+    packed_generator.run()
+    packed_dataset = PackedMemMapDatasetBase(default_packed_dataset_path, sample_key="input_ids")
+    # read in the raw jsonl files for manual tokenization
+    with open(indexed_dummy_data_path_long.raw_data_path) as f:
+        jsonl_list = [json.loads(line)["text"] for line in f]
+
+    eod_token_id = wrapped_gpt2_tokenizer.get_token_id("<|endoftext|>")
+    jsonl_tokenized = [wrapped_gpt2_tokenizer.tokenize(v) + [eod_token_id] for v in jsonl_list]
+
+    for sample, original_sample in zip(packed_dataset, jsonl_tokenized):
+        assert sample["input_ids"].tolist() == original_sample

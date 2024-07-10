@@ -17,6 +17,7 @@ from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
+from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
@@ -61,3 +62,4 @@ PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPa
 PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(torch.device)]
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
+PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThirdPartyTypeIF(ModelInitializationIF)]

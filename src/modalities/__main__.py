@@ -88,7 +88,7 @@ def entry_point_generate_text(config_file_path: FilePath):
     help="The key in the models output, where one can find the logits.",
 )
 def entry_point_convert_pytorch_to_hf_checkpoint(
-        config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
+    config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
 ) -> HFModelAdapter:
     cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
     hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
@@ -226,12 +226,19 @@ class Main:
         )
 
         # Trainer
+        global_num_tokens_per_train_step = (
+            components.settings.training.local_train_micro_batch_size
+            * components.settings.training.sequence_length
+            * components.settings.training.gradient_acc_steps
+            * components.settings.cuda_env.world_size
+        )
         trainer = Trainer(
             local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
             gradient_clipper=components.gradient_clipper,
+            global_num_tokens_per_train_step=global_num_tokens_per_train_step,
         )
 
         # Evaluator
@@ -253,9 +260,9 @@ class Main:
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:
             apply_activation_checkpointing_inplace(
-                model=wrapped_model, 
+                model=wrapped_model,
                 activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
-                )
+            )
 
         gym.run(
             train_data_loader=components.train_dataloader,
@@ -264,9 +271,9 @@ class Main:
             model=wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,
-            global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
-            global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
-            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
+            checkpointing_interval_in_steps=components.settings.training.checkpointing_interval_in_steps,
+            evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
+            training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
         print("done")
 

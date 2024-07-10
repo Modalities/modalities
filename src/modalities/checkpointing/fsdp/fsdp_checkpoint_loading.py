@@ -26,18 +26,8 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
-        # NOTE: The model and optimizer need to be sharded after calling this function!
-
-        # model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        # optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        # with FSDP.state_dict_type(
-        #     module=model,
-        #     state_dict_type=StateDictType.FULL_STATE_DICT,
-        #     state_dict_config=model_save_policy,
-        #     optim_state_dict_config=optim_save_policy,
-        # ):
-        # we only load the model and optimizer on a single rank. The calling function must then
-        # distribute the optimizer state and model parmeters to the other ranks.
+        # After loading the model to CPU RAM, the model is wrapped with FSDP and sharded
+        # across the ranks according to the sharding strategy.
 
         # load model
         if self.global_rank == 0:
@@ -57,7 +47,8 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
         )
         return fsdp_model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, wrapped_model: FSDP, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
+        # NOTE: model must be FSDP-wrapped model!
         # load optimizer
         full_optimizer_state_dict = None
         if self.global_rank == 0:
@@ -66,7 +57,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
         # distribute the optimizer state dict from rank 0 to all the other ranks
         sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-            full_optim_state_dict=full_optimizer_state_dict, model=wrapped_model, group=None
+            full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
         )
         optimizer.load_state_dict(sharded_optimizer_state_dict)
 

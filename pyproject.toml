@@ -1,9 +1,11 @@
 [project]
 name = "modalities"
 version = "0.1.0"
-requires-python = ">=3.8,<3.12"
+requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
 dependencies = [
+    "packaging",
+    "numpy<2.0",
     "torch>=2.0",
     "tqdm",
     "pyyaml",
@@ -19,7 +21,6 @@ dependencies = [
     "jq",
     "class_resolver",
     "wandb",
-    "packaging",
     "einops>=0.7.0",
     "mamba-ssm",
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`

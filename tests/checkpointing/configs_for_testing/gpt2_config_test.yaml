@@ -4,7 +4,7 @@ model:
   config:
     sample_key: input_ids
     poe_type: NOPE
-    block_size: 256
+    sequence_length: 256
     prediction_key: logits
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 12
@@ -21,10 +21,8 @@ model:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+    attention_implementation: manual
     activation_type: gelu
-    weight_init:
-      mean: 0.0
-      std: 0.02
     attention_norm:
       component_key: layer_norm
       variant_key: rms_norm

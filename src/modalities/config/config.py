@@ -1,17 +1,10 @@
 import os
 from pathlib import Path
-from typing import Annotated, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
-from pydantic import (
-    BaseModel,
-    Field,
-    FilePath,
-    PositiveInt,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
@@ -24,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -116,6 +110,7 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
+    get_num_tokens_from_num_steps_callable: Callable[[int], int]
 
 
 class CheckpointSavingConfig(BaseModel):
@@ -129,6 +124,7 @@ class AdamOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
+    weight_decay_groups_excluded: List[str]
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -137,6 +133,7 @@ class AdamWOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
+    weight_decay_groups_excluded: List[str]
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -153,9 +150,7 @@ class StepLRSchedulerConfig(BaseModel):
 
 class OneCycleLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
-    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[
-        Annotated[float, Field(strict=True, gt=0.0)]
-    ]
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
     total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
@@ -176,12 +171,8 @@ class OneCycleLRSchedulerConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
-        if self.total_steps is None and (
-            self.epochs is None or self.steps_per_epoch is None
-        ):
-            raise ValueError(
-                "Please define total_steps or (epochs and steps_per_epoch)."
-            )
+        if self.total_steps is None and (self.epochs is None or self.steps_per_epoch is None):
+            raise ValueError("Please define total_steps or (epochs and steps_per_epoch).")
         return self
 
 
@@ -238,6 +229,11 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class WeightInitializedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    model_initializer: PydanticModelInitializationIFType
+
+
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
@@ -256,12 +252,13 @@ class DistributedSamplerConfig(BaseModel):
     shuffle: bool
     dataset: PydanticDatasetIFType
     seed: Optional[int] = 0
+    drop_last: Literal[True] = True
 
 
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=1)]
     tokenizer: PydanticTokenizerIFType
     jq_pattern: str
     sample_key: str
@@ -269,13 +266,13 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    block_size: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
@@ -315,7 +312,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_steps: Optional[int] = 0
+    skip_num_batches: Optional[int] = 0
 
 
 class RepeatingDataLoaderConfig(BaseModel):
@@ -330,11 +327,10 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(
-        default_factory=list
-    )
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
     local_rank: int
+    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):
@@ -358,11 +354,7 @@ class RichResultSubscriberConfig(BaseModel):
 def load_app_config_dict(config_file_path: Path) -> Dict:
     def cuda_env_resolver_fun(var_name: str) -> int:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
-        return (
-            int(os.getenv(var_name))
-            if var_name in int_env_variable_names
-            else os.getenv(var_name)
-        )
+        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
     def modalities_env_resolver_fun(var_name: str) -> int:
         if var_name == "experiment_id":
@@ -375,9 +367,7 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver(
-        "modalities_env", modalities_env_resolver_fun, replace=True
-    )
+    OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
