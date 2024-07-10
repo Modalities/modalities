@@ -31,9 +31,8 @@ NAMED_PARAMETER_INIT_GROUPS = {
                 # attention projection weights
                 r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.weight",
                 # hidden feed forward in attention block
-                r"transformer\.h\.\d+\.mlp\.w\w+\.weight",  # fused SwiGLU
+                r"transformer\.h\.\w+\.mlp\.(W|V|W_2)\.weight",  # SwiGLU
                 r"transformer\.h\.\w+\.mlp\.(c_fc|c_proj)\.weight",  # gelu
-                # TODO add SwiGLU reimplementation!
                 # embedding weights
                 r"transformer\.wte\.weight",
                 r"transformer\.wpe\.weight",
@@ -43,7 +42,7 @@ NAMED_PARAMETER_INIT_GROUPS = {
             biases=[
                 # NOTE: some bias terms might not be present due to user configuration
                 r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.bias",
-                r"transformer\.h\.\d+\.mlp\.w\w+\.bias",
+                r"transformer\.h\.\w+\.mlp\.(W|V|W_2)\.bias",  # SwiGLU
                 r"transformer\.h\.\w+\.mlp\.(c_fc|c_proj)\.bias",  # gelu
                 r"lm_head\.bias",
             ],
@@ -54,9 +53,7 @@ NAMED_PARAMETER_INIT_GROUPS = {
         WeightInitTypes.SCALED: RegexFilter(
             weights=[
                 r"transformer\.h\.\d+\.attn\.c_proj\.weight",
-                r"transformer\.h\.\w+\.mlp\.w3\.weight",  # Fused SwiGLU
-                r"transformer\.h\.\w+\.mlp\.c_proj\.weight",  # gelu
-                # TODO add SwiGLU reimplementation!
+                r"transformer\.h\.\w+\.mlp\.W_2.weight" r"transformer\.h\.\w+\.mlp\.c_proj\.weight",  # SwiGLU  # gelu
             ]
         ),
         WeightInitTypes.SCALED_EMBED: RegexFilter(

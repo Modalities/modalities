@@ -40,18 +40,18 @@ class SwiGLU(nn.Module):
 
         hidden_dim = SwiGLU._get_hidden_dim(n_embd)
 
-        self.c_fc = nn.Linear(
+        self.W = nn.Linear(
             in_features=n_embd,
             out_features=hidden_dim,
             bias=bias,
         )
         self.silu = nn.SiLU()
-        self.c_proj = nn.Linear(
+        self.V = nn.Linear(
             in_features=n_embd,
             out_features=hidden_dim,
             bias=bias,
         )
-        self.out_proj = nn.Linear(
+        self.W_2 = nn.Linear(
             in_features=hidden_dim,
             out_features=n_embd,
             bias=bias,
@@ -68,7 +68,7 @@ class SwiGLU(nn.Module):
         return 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.out_proj(self.silu(self.c_fc(x)) * self.c_proj(x))
+        return self.W_2(self.silu(self.W(x)) * self.V(x))
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
