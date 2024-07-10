@@ -26,19 +26,8 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         # Loads the checkpoint as full state dicts into the model and optimizer on rank 0.
-        # After loading the model to CPU RAM, the model is wraped with FSDP and sharded
+        # After loading the model to CPU RAM, the model is wrapped with FSDP and sharded
         # across the ranks according to the sharding strategy.
-
-        # model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        # optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        # with FSDP.state_dict_type(
-        #     module=model,
-        #     state_dict_type=StateDictType.FULL_STATE_DICT,
-        #     state_dict_config=model_save_policy,
-        #     optim_state_dict_config=optim_save_policy,
-        # ):
-        # we only load the model and optimizer on a single rank. The calling function must then
-        # distribute the optimizer state and model parmeters to the other ranks.
 
         # load model
         if self.global_rank == 0:

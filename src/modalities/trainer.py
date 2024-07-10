@@ -147,7 +147,6 @@ class Trainer:
             )
             # Check if model performance should be logged
             if num_train_steps_done % training_log_interval_in_steps == 0 and step_performed:
-                print("call training log")
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -208,7 +207,6 @@ class Trainer:
 
                 cumulated_losses = self._reset_tracked_losses()
             if step_performed:
-                print("call evaluation and checkpointing callback")
                 evaluation_callback(num_train_steps_done=num_train_steps_done)
                 checkpointing_callback(num_train_steps_done=num_train_steps_done)
             # we start the time recoder here again to also capture the time spend loading
