@@ -1,9 +1,11 @@
+import hashlib
 import time
 import warnings
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from types import TracebackType
-from typing import Callable, Dict, Generic, Type, TypeVar
+from typing import Callable, Dict, Generic, Optional, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -36,12 +38,14 @@ def get_callback_interval_in_batches_per_rank(
     return num_local_train_micro_batches_ret
 
 
-def get_date_of_run():
-    """create date and time for file save uniqueness
-    example: 2022-05-07__14-31-22'
+def get_experiment_id_of_run(config_file_path: Path, hash_length: Optional[int] = 8) -> str:
+    """create experiment ID including the date and time for file save uniqueness
+    example: 2022-05-07__14-31-22_fdh1xaj2'
     """
+    hash = hashlib.sha256(str(config_file_path).encode()).hexdigest()[:hash_length]
     date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-    return date_of_run
+    experiment_id = f"{date_of_run}_{hash}"
+    return experiment_id
 
 
 def format_metrics_to_gb(item):
@@ -137,8 +141,9 @@ class Aggregator(Generic[T]):
         )
         return value
 
-def get_module_class_from_name(module: torch.nn.Module, name:str) -> Type[torch.nn.Module] | None:
-    """ From Accelerate source code 
+
+def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch.nn.Module] | None:
+    """From Accelerate source code
     (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
     Gets a class from a module by its name.
 
