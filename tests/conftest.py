@@ -37,7 +37,8 @@ def dummy_packed_data_path(tmpdir) -> Path:
     data += (len(tokens) * token_size_in_bytes).to_bytes(header_size_in_bytes, byteorder="little")
     data += token_size_in_bytes.to_bytes(4, byteorder="little")
     data += b"".join([t.to_bytes(token_size_in_bytes, byteorder="little") for t in tokens])
-    index = [(4, 24), (28, 40), (68, 12), (80, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
+    # NOTE: so far none of the implemented pytests use this index though!
+    index = [(0, 24), (24, 40), (64, 12), (76, 4)]  # [(index,len), ...] -> in 4 bytes #lengths: 6,10,3,1
     data += pickle.dumps(index)
     dummy_packed_data_path = Path(tmpdir, "dummy.pbin")
     dummy_packed_data_path.write_bytes(data)
@@ -75,10 +76,27 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
 
 
 @pytest.fixture
+def dummy_data_path_long(tmpdir) -> DataPathCollection:
+    source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum_long.jsonl")
+    dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
+    dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
+    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
+    index_path.unlink(missing_ok=True)
+    return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
+
+
+@pytest.fixture
 def indexed_dummy_data_path(dummy_data_path) -> DataPathCollection:
     index_generator = IndexGenerator(dummy_data_path.raw_data_path)
     index_generator.create_index(dummy_data_path.index_path)
     return dummy_data_path
+
+
+@pytest.fixture
+def indexed_dummy_data_path_long(dummy_data_path_long) -> DataPathCollection:
+    index_generator = IndexGenerator(dummy_data_path_long.raw_data_path)
+    index_generator.create_index(dummy_data_path_long.index_path)
+    return dummy_data_path_long
 
 
 @pytest.fixture
@@ -168,6 +186,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
         gradient_clipper=gradient_clipper_mock,
+        global_num_tokens_per_train_step=1,
     )
 
 

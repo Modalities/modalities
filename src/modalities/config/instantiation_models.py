@@ -29,9 +29,9 @@ class CudaEnvSettings(BaseModel):
 class TrainingComponentsInstantiationModel(BaseModel):
     class TrainingSettings(BaseModel):
         class Training(BaseModel):
-            global_training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-            global_checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
-            global_evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
+            evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
             gradient_acc_steps: Annotated[int, Field(strict=True, ge=1)]
             local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
@@ -78,7 +78,7 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
 class TextGenerationInstantiationModel(BaseModel):
     class TextGenerationSettings(BaseModel):
         model_path: FilePath
-        context_length: int
+        sequence_length: int
         device: PydanticPytorchDeviceType
         referencing_keys: Dict[str, str]
 

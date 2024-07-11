@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, Type
+from typing import Tuple, Type
 
 import click
 import click_pathlib
@@ -12,6 +12,7 @@ from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
+from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
@@ -28,6 +29,7 @@ from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
+from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -63,6 +65,34 @@ def entry_point_run_modalities(config_file_path: Path):
 )
 def entry_point_generate_text(config_file_path: FilePath):
     generate_text(config_file_path)
+
+
+@main.command(name="convert_pytorch_to_hf_checkpoint")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to config of model checkpoint.",
+)
+@click.option(
+    "--output_hf_checkpoint_dir",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Converted HF checkpoint will be written to this directory.",
+)
+@click.option(
+    "--prediction_key",
+    type=str,
+    required=True,
+    help="The key in the models output, where one can find the logits.",
+)
+def entry_point_convert_pytorch_to_hf_checkpoint(
+    config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
+) -> HFModelAdapter:
+    cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
+    hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
+    print(f"Model was successfully converted and saved to {output_hf_checkpoint_dir}")
+    return hf_model
 
 
 @main.group(name="data")
@@ -195,12 +225,19 @@ class Main:
         )
 
         # Trainer
+        global_num_tokens_per_train_step = (
+            components.settings.training.local_train_micro_batch_size
+            * components.settings.training.sequence_length
+            * components.settings.training.gradient_acc_steps
+            * components.settings.cuda_env.world_size
+        )
         trainer = Trainer(
             local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
             gradient_clipper=components.gradient_clipper,
+            global_num_tokens_per_train_step=global_num_tokens_per_train_step,
         )
 
         # Evaluator
@@ -224,9 +261,9 @@ class Main:
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:
             apply_activation_checkpointing_inplace(
-                model=wrapped_model, 
+                model=wrapped_model,
                 activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
-                )
+            )
 
         gym.run(
             train_data_loader=components.train_dataloader,
@@ -235,9 +272,9 @@ class Main:
             model=wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,
-            global_checkpointing_interval_in_steps=components.settings.training.global_checkpointing_interval_in_steps,
-            global_evaluation_interval_in_steps=components.settings.training.global_evaluation_interval_in_steps,
-            global_training_log_interval_in_steps=components.settings.training.global_training_log_interval_in_steps,
+            checkpointing_interval_in_steps=components.settings.training.checkpointing_interval_in_steps,
+            evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
+            training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
         print("done")
 

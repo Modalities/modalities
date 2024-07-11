@@ -29,21 +29,21 @@ class CheckpointSaving:
 
     def save_checkpoint(
         self,
-        train_step_id: int,
+        num_train_steps_done: int,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
         checkpointing_instruction = self.checkpoint_saving_strategy.get_checkpoint_instruction(
-            train_step_id=train_step_id,
+            num_train_steps_done=num_train_steps_done,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
 
         self.checkpoint_saving_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
-            train_step_id=train_step_id,
+            num_train_steps_done=num_train_steps_done,
             model=model,
             optimizer=optimizer,
         )

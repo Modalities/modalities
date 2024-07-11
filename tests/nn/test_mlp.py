@@ -30,13 +30,13 @@ def test_SwiGLU_forward():
     output_tensor = mlp(input_tensor)
     assert output_tensor.shape == (1, 1, n_embd)
 
-    c_fc = nn.Linear(in_features=n_embd, out_features=hidden_dim, bias=bias)
-    c_proj = nn.Linear(in_features=n_embd, out_features=hidden_dim, bias=bias)
-    out_proj = nn.Linear(in_features=hidden_dim, out_features=n_embd, bias=bias)
+    W = nn.Linear(in_features=n_embd, out_features=hidden_dim, bias=bias)
+    V = nn.Linear(in_features=n_embd, out_features=hidden_dim, bias=bias)
+    W_2 = nn.Linear(in_features=hidden_dim, out_features=n_embd, bias=bias)
     silu = nn.SiLU()
-    mlp.c_fc = c_fc
-    mlp.c_proj = c_proj
-    mlp.out_proj = out_proj
+    mlp.W = W
+    mlp.V = V
+    mlp.W_2 = W_2
 
     output_tensor = mlp(input_tensor)
-    assert torch.all(output_tensor == out_proj(silu(c_fc(input_tensor)) * c_proj(input_tensor)))
+    assert torch.all(output_tensor == W_2(silu(W(input_tensor)) * V(input_tensor)))

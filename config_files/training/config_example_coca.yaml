@@ -5,11 +5,10 @@ settings:
     sample_key: input_ids
     target_key: target_ids
   training:
-    global_training_log_interval_in_steps: 2
-    global_checkpointing_interval_in_steps: 2
-    global_evaluation_interval_in_steps: 2
-    global_num_training_samples: 12
-    global_num_seen_steps: 0
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 2
+    evaluation_interval_in_steps: 2
+    global_num_seen_tokens: 0
     activation_checkpointing_modules: []
     gradient_acc_steps: 1
     local_train_micro_batch_size: 3
@@ -42,7 +41,7 @@ train_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 4
+    num_samples: 64
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
@@ -55,7 +54,7 @@ val_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 4
+    num_samples: 32
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
@@ -144,7 +143,13 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            sequence_length: ${settings.training.sequence_length}
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
@@ -164,7 +169,23 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [TransformerBlock, VisionTransformerBlock]
 
-model:
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: coca
+        weight_init_type: plain
+        mean: 0.0
+        std: 0.02
+
+model_raw:
   component_key: model
   variant_key: coca
   config:
@@ -209,9 +230,6 @@ model:
     n_vision_queries: 256
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
-    weight_init:
-      mean: 0.0
-      std: 0.02
 
 scheduler:
   component_key: scheduler
@@ -223,7 +241,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 4
+    total_steps: 64
     pct_start: 0.01
     anneal_strategy: cos
 
@@ -235,6 +253,7 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
+    weight_decay_groups_excluded: []
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -254,7 +273,15 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     local_rank: ${settings.cuda_env.local_rank}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    global_num_seen_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        sequence_length: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE

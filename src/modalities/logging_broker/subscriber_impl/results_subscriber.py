@@ -1,12 +1,11 @@
 from pathlib import Path
 
 import rich
-import torch
-import wandb
+import yaml
 from rich.console import Group
 from rich.panel import Panel
-import yaml
 
+import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
@@ -17,6 +16,7 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
+
 
 class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def __init__(self, num_ranks: int) -> None:
@@ -35,7 +35,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
             for metric_key, metric_values in eval_result.metrics.items()
         }
 
-        num_samples = (eval_result.train_step_id + 1) * self.num_ranks
+        num_samples = eval_result.num_train_steps_done * self.num_ranks
         group_content = [f"[yellow]Iteration #{num_samples}:"]
         if losses:
             group_content.append("\nLosses:")
@@ -60,13 +60,15 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
     ) -> None:
         super().__init__()
 
-        with open(config_file_path, 'r', encoding='utf-8') as file:
+        with open(config_file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
-        self.run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config)
+        self.run = wandb.init(
+            project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config
+        )
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def consume_key_value(self, key:str, value:str):
+    def consume_key_value(self, key: str, value: str):
         self.run.config[key] = value
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
@@ -83,17 +85,17 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         }
         # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
         wandb.log(
-            data=losses, step=eval_result.train_step_id + 1
+            data=losses, step=eval_result.num_train_steps_done
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         wandb.log(
-            data=metrics, step=eval_result.train_step_id + 1
+            data=metrics, step=eval_result.num_train_steps_done
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         throughput_metrics = {
             f"{eval_result.dataloader_tag} {metric_key}": metric_values
             for metric_key, metric_values in eval_result.throughput_metrics.items()
         }
 
-        wandb.log(data=throughput_metrics, step=eval_result.train_step_id + 1)
+        wandb.log(data=throughput_metrics, step=eval_result.num_train_steps_done)
 
         # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
         # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})

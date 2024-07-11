@@ -1,20 +1,21 @@
 import math
-
 from copy import deepcopy
 from enum import Enum
-from functools import partial
 from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-from flash_attn import flash_attn_func
-from pydantic import BaseModel, Field, model_validator, validator
 
-from torch.nn import functional as F
+try:
+    from flash_attn import flash_attn_func
+except ModuleNotFoundError:
+    flash_attn_func = None
+
+from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import NNModel, SwiGLU
+from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
@@ -106,9 +107,10 @@ class QueryKeyValueTransformType(Enum):
     RotaryTransform = RotaryTransform
 
 
-class ActivationType(str, Enum):
-    GELU = "gelu"
-    SWIGLU = "swiglu"
+class AttentionImplementation(str, Enum):
+    MANUAL = "manual"
+    PYTORCH_FLASH = "pytorch_flash"
+    DAO_FLASH = "dao_flash"
 
 
 class AttentionConfig(BaseModel):
@@ -131,16 +133,11 @@ class AttentionConfig(BaseModel):
     qkv_transforms: List[QueryKeyValueTransformConfig]
 
 
-class WeightInitializationConfig(BaseModel):
-    mean: Annotated[float, Field(strict=True, ge=0.0)]
-    std: Annotated[float, Field(strict=True, ge=0.0)]
-
-
 class GPT2LLMConfig(BaseModel):
     sample_key: str
     prediction_key: str
     poe_type: PositionTypes
-    block_size: Annotated[int, Field(strict=True, ge=1)]
+    sequence_length: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
         int, Field(strict=True, ge=1)
     ]  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
@@ -152,11 +149,11 @@ class GPT2LLMConfig(BaseModel):
     dropout: Annotated[float, Field(strict=True, ge=0.0)]
     bias: bool  # True: bias in Linears like GPT-2. False: a bit better and faster
     attention_config: AttentionConfig
+    attention_implementation: AttentionImplementation
     activation_type: ActivationType
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
-    weight_init: WeightInitializationConfig
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -182,15 +179,16 @@ class CausalSelfAttention(nn.Module):
         n_head_kv: int,
         n_embd: int,
         attention_config: AttentionConfig,
+        attention_impl: AttentionImplementation,
         bias: bool,
         dropout: float,
-        block_size: int,
     ):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
         assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
 
         self.n_rep = n_head_q // n_head_kv
+        self.attention_impl = attention_impl
 
         # query, key, value projections (separate)
         self.q_attn = nn.Linear(
@@ -241,12 +239,15 @@ class CausalSelfAttention(nn.Module):
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size, block_size, embedding_dim = q.size()
+        batch_size, sequence_length, embedding_dim = q.size()
+        # hidden dimension of single head
+        # Note, that number of heads does not change the overall parameters of the networks
+        # to scale up the network we either have to increase the embedding_dim or the number of layers
         n_head_dim = embedding_dim // n_head_q
 
-        q = q.view(batch_size, block_size, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
-        k = k.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
-        v = v.view(batch_size, block_size, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        q = q.view(batch_size, sequence_length, n_head_q, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_q, T, hd)
+        k = k.view(batch_size, sequence_length, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
+        v = v.view(batch_size, sequence_length, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
             q, k, v = transform(q, k, v)
@@ -254,20 +255,83 @@ class CausalSelfAttention(nn.Module):
         return q, k, v
 
     @staticmethod
-    def execute_flash_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
-        # the next three lines are only needed for flash-attn from Daio Lab
-        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-        return flash_attn_func(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+    def _repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+        """
+        Source code adopted from
+        https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
+        Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
+        """
+        B, nh_kv, T, hs = x.shape
+        if n_rep == 1:
+            return x
+        return x[:, :, None, :, :].expand(B, nh_kv, n_rep, T, hs).reshape(B, nh_kv * n_rep, T, hs)
+
+    @classmethod
+    def repeat_kv_heads(cls, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
+        # repeat k/v heads if self.n_rep > 1
+        n_head_q = q.shape[1]
+        n_head_kv = k.shape[1]
+        if n_head_q != n_head_kv:
+            n_rep = n_head_q // n_head_kv
+            k = cls._repeat_kv(k, n_rep)  # (B, nh_q, T, hs)
+            v = cls._repeat_kv(v, n_rep)  # (B, nh_q, T, hs)
+        return k, v
+
+    @classmethod
+    def execute_attention(
+        cls,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        dropout: float,
+        attention_impl: AttentionImplementation,
+    ) -> torch.Tensor:
+        if attention_impl == AttentionImplementation.MANUAL:
+            k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
+            y = manual_scaled_dot_product_attention(
+                query=q,
+                key=k,
+                value=v,
+                attn_mask=None,
+                dropout_p=dropout,
+                is_causal=True,
+            )  # (B, nh_q, T, hd)
+            y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
+            k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
+            y = torch.nn.functional.scaled_dot_product_attention(
+                query=q,
+                key=k,
+                value=v,
+                attn_mask=None,
+                dropout_p=dropout,
+                is_causal=True,
+            )  # (B, nh_q, T, hd)
+            y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        elif attention_impl == AttentionImplementation.DAO_FLASH:
+            # Due to the lack of GPUs in github actions and the requirement of those in the flash-attn library,
+            # we have to check if the library is installed and raise an error if not.
+            # Note, that the library is not required for the CPU-only tests.
+            if flash_attn_func is None:
+                raise NotImplementedError("ERROR! Dao Flash Attention is not installed.")
+            # the next three lines are only needed for flash-attn from Daio Lab
+            q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+            k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+            v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+            y = flash_attn_func(
+                q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
+            )  # (B, T, nh_q, hd)
+        else:
+            raise NotImplementedError(f"Attention implementation {attention_impl} not supported")
+        return y  # (B, T, nh_q, hd)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
-        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd / n_rep), v: (B, T, n_embd / n_rep)
+        q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd // n_rep), v: (B, T, n_embd // n_rep)
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        y = CausalSelfAttention.execute_flash_attention(q, k, v, self.dropout)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
@@ -295,6 +359,7 @@ class TransformerMLP(nn.Module):
         x = self.dropout(x)
         return x
 
+
 class GPT2Block(nn.Module):
     def __init__(
         self,
@@ -303,9 +368,9 @@ class GPT2Block(nn.Module):
         n_head_q: int,
         n_head_kv: int,
         activation_type: ActivationType,
+        attention_impl: AttentionImplementation,
         attention_config: AttentionConfig,
         dropout: float,
-        block_size: int,
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
@@ -318,9 +383,9 @@ class GPT2Block(nn.Module):
             n_head_kv=n_head_kv,
             n_embd=n_embd,
             attention_config=attention_config,
+            attention_impl=attention_impl,
             bias=bias,
             dropout=dropout,
-            block_size=block_size,
         )
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
@@ -330,10 +395,8 @@ class GPT2Block(nn.Module):
             raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.attention_norm(x)
-        x = x + self.attn(x)
-        x = self.ffn_norm(x)
-        x = x + self.mlp(x)
+        x = x + self.attn(self.attention_norm(x))
+        x = x + self.mlp(self.ffn_norm(x))
         return x
 
 
@@ -343,7 +406,7 @@ class GPT2LLM(NNModel):
         sample_key: str,
         prediction_key: str,
         poe_type: PositionTypes,
-        block_size: int,
+        sequence_length: int,
         vocab_size: int,
         n_layer: int,
         n_head_q: int,
@@ -353,29 +416,34 @@ class GPT2LLM(NNModel):
         dropout: float,
         bias: bool,
         activation_type: ActivationType,
-        weight_init: WeightInitializationConfig,
+        attention_implementation: AttentionImplementation,
         attention_config: AttentionConfig,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
         seed: int = None,
     ):
-        super().__init__(seed=seed)
+        weight_decay_groups = {
+            "linear": [".attn", ".mlp"],
+            "embedding": [".wte", ".wpe"],
+            "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
+        }
+        super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
-        self.block_size = block_size
+        self.sequence_length = sequence_length
         self.poe_type = poe_type
 
         assert vocab_size is not None
-        assert block_size is not None
+        assert sequence_length is not None
 
         # TODO: dependency injection
         if poe_type is PositionTypes.ABSOLUTE:
-            wpe = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embd)
+            wpe = nn.Embedding(num_embeddings=sequence_length, embedding_dim=n_embd)
         elif poe_type is PositionTypes.NOPE:
             # Using a pre-trained layer, requires to define a separate FSDP unit for the frozen layer c.f.
             # https://github.com/huggingface/accelerate/issues/807
-            # wpe = nn.Embedding.from_pretrained(torch.zeros(block_size, n_embd))
+            # wpe = nn.Embedding.from_pretrained(torch.zeros(sequence_length, n_embd))
             wpe = nn.Identity()
         else:
             raise TypeError(f"{poe_type} not supported")
@@ -398,9 +466,9 @@ class GPT2LLM(NNModel):
                             n_head_q=n_head_q,
                             n_head_kv=n_head_kv,
                             activation_type=activation_type,
+                            attention_impl=attention_implementation,
                             attention_config=attention_config,
                             dropout=dropout,
-                            block_size=block_size,
                             ffn_hidden=ffn_hidden,
                             attention_norm=deepcopy(attention_norm),
                             ffn_norm=deepcopy(ffn_norm),
@@ -408,7 +476,7 @@ class GPT2LLM(NNModel):
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=lm_head_norm,
+                lm_head_norm=lm_head_norm,
             )
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
@@ -418,32 +486,18 @@ class GPT2LLM(NNModel):
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
-        # init all weights
-        self.apply(partial(self._init_weights, weight_init=weight_init))
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=weight_init.mean, std=weight_init.std / math.sqrt(2 * n_layer))
-
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
         device = input_ids.device
-        b, t = input_ids.size()
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
+        _, t = input_ids.size()  # batch size, sequence length
+        assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
+        f"input sequence length is only {self.sequence_length}"
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
 
         if self.poe_type is PositionTypes.ABSOLUTE:
+            pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
             pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
             tok_emb = tok_emb + pos_emb
 
@@ -452,9 +506,38 @@ class GPT2LLM(NNModel):
 
         for block in self.transformer.h:
             x = block(x)
-        x = self.transformer.ln_f(x)
+        x = self.transformer.lm_head_norm(x)
         logits = self.lm_head(x)
         return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.forward_impl(inputs)
+
+
+def manual_scaled_dot_product_attention(
+    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
+) -> torch.Tensor:
+    """
+    taken from https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+    """
+    L, S = query.size(-2), key.size(-2)
+    scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
+    attn_bias = torch.zeros(
+        L, S, dtype=query.dtype, device=query.device
+    )  # device added (not part of the original code)
+    if is_causal:
+        assert attn_mask is None
+        temp_mask = torch.ones(L, S, dtype=torch.bool, device=query.device).tril(diagonal=0)  # device added
+        attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
+        attn_bias.to(query.dtype)
+
+    if attn_mask is not None:
+        if attn_mask.dtype == torch.bool:
+            attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
+        else:
+            attn_bias += attn_mask
+    attn_weight = query @ key.transpose(-2, -1) * scale_factor
+    attn_weight += attn_bias
+    attn_weight = torch.softmax(attn_weight, dim=-1)
+    attn_weight = torch.dropout(attn_weight, dropout_p, train=True)
+    return attn_weight @ value

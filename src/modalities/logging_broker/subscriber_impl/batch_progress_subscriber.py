@@ -17,6 +17,7 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     def consume_dict(self, key: str, value: str):
         pass
 
+
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     """A subscriber object for the RichProgress observable."""
 
@@ -86,11 +87,11 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             task_id = self.train_split_task_ids[batch_progress.dataloader_tag]
             self.train_splits_progress.update(
                 task_id=task_id,
-                completed=batch_progress.step_id + 1,
+                completed=batch_progress.num_steps_done,
             )
         else:
             task_id = self.eval_split_task_ids[batch_progress.dataloader_tag]
             self.eval_splits_progress.update(
                 task_id=task_id,
-                completed=batch_progress.step_id + 1,
+                completed=batch_progress.num_steps_done,
             )
