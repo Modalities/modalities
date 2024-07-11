@@ -38,6 +38,10 @@ def test__init_weights(linear_layer, embedding_layer, n_layer):
     assert (embedding_layer_weights_before != embedding_layer_weights_after).any()
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_mamba_llm_forward(mamba_llm, batch_size, sequence_length, vocab_size, prediction_key):
     mamba_llm = mamba_llm.to("cuda")
     x = torch.randint(size=(batch_size, sequence_length), high=vocab_size).to("cuda")

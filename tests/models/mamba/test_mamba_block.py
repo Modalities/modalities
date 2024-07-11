@@ -69,6 +69,10 @@ def test_step(conv_state, ssm_state, mamba_block, hidden_states):
     assert (computed_ssm_state != ssm_state).any()
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_allocate_inference_cache(mamba_block, batch_size, sequence_length, conv_state, ssm_state):
     device = "cuda"
     mamba_block.to(device)
