@@ -1,3 +1,5 @@
+import hashlib
+from pathlib import Path
 import time
 import uuid
 import warnings
@@ -37,13 +39,13 @@ def get_callback_interval_in_batches_per_rank(
     return num_local_train_micro_batches_ret
 
 
-def get_experiment_id_of_run(hash_length: Optional[int] = 8):
+def get_experiment_id_of_run(config_file_path: Path, hash_length: Optional[int] = 8) -> str:
     """create experiment ID including the date and time for file save uniqueness
     example: 2022-05-07__14-31-22_fdh1xaj2'
     """
-    random_uuid = uuid.uuid4().hex[:hash_length]
+    hash = hashlib.sha256(str(config_file_path).encode()).hexdigest()[:hash_length]
     date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-    experiment_id = f"{date_of_run}_{random_uuid}"
+    experiment_id = f"{date_of_run}_{hash}"
     return experiment_id 
 
 
