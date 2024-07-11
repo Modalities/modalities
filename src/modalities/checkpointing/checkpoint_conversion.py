@@ -1,11 +1,10 @@
 from pathlib import Path
 
 from modalities.config.config import load_app_config_dict
-from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapterConfig, HFModelAdapter
+from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 
 
 class CheckpointConversion:
-
     def __init__(
         self,
         config_file_path: Path,

@@ -35,9 +35,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         # also see here for the truncation and padding options and their effects:
         # https://huggingface.co/docs/transformers/pad_truncation#padding-and-truncation
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=pretrained_model_name_or_path
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=pretrained_model_name_or_path)
         if special_tokens is not None:
             # TODO check if we always want to set
             # replace_additional_special_tokens=False

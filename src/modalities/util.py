@@ -137,8 +137,9 @@ class Aggregator(Generic[T]):
         )
         return value
 
-def get_module_class_from_name(module: torch.nn.Module, name:str) -> Type[torch.nn.Module] | None:
-    """ From Accelerate source code 
+
+def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch.nn.Module] | None:
+    """From Accelerate source code
     (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
     Gets a class from a module by its name.
 
