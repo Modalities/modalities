@@ -1,10 +1,15 @@
+import os
+
 import pytest
 import torch
 
 from modalities.models.mamba.mamba_model import _init_weights, create_block
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_mixer_model_forward(batch_size, sequence_length, vocab_size, mixer_model, d_model):
     x = torch.randint(size=(batch_size, sequence_length), high=vocab_size).to("cuda")
     mixer_model = mixer_model.to("cuda")
@@ -13,7 +18,10 @@ def test_mixer_model_forward(batch_size, sequence_length, vocab_size, mixer_mode
     assert y.shape != x.shape
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_mixer_model_allocate_inference_cache(batch_size, sequence_length, mixer_model, n_layer):
     mixer_model = mixer_model.to("cuda")
     computed_inference_cache = mixer_model.allocate_inference_cache(batch_size, sequence_length)
@@ -30,6 +38,10 @@ def test__init_weights(linear_layer, embedding_layer, n_layer):
     assert (embedding_layer_weights_before != embedding_layer_weights_after).any()
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_mamba_llm_forward(mamba_llm, batch_size, sequence_length, vocab_size, prediction_key):
     mamba_llm = mamba_llm.to("cuda")
     x = torch.randint(size=(batch_size, sequence_length), high=vocab_size).to("cuda")

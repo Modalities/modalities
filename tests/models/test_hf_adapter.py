@@ -1,5 +1,5 @@
-
 from pathlib import Path
+
 import pytest
 
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapterConfig
@@ -29,4 +29,3 @@ def test_convert_posixpath_to_str(hf_model_adapter_config: HFModelAdapterConfig)
     }
     result = hf_model_adapter_config._convert_posixpath_to_str(test_data_to_be_formatted)
     assert result == expected_result
-    

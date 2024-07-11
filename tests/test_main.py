@@ -12,8 +12,8 @@ def test_e2e_training_run_wout_ckpt(monkeypatch, dummy_config, dummy_config_path
     # patch in env variables
     monkeypatch.setenv("MASTER_ADDR", "localhost")
     monkeypatch.setenv("MASTER_PORT", "9948")
-    
-    main = Main( dummy_config_path)
+
+    main = Main(dummy_config_path)
     main.config_dict = dummy_config
 
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):

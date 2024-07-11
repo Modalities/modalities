@@ -1,15 +1,15 @@
 import json
 from dataclasses import dataclass
 from pathlib import PosixPath
-from typing import Any, Dict, Optional, Tuple, Union, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
-from transformers import PreTrainedModel, PretrainedConfig
+from transformers import PretrainedConfig, PreTrainedModel
 from transformers.utils import ModelOutput
 
 from modalities.exceptions import ConfigError
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config, ModelTypeEnum
+from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
 
 class HFModelAdapterConfig(PretrainedConfig):
@@ -28,7 +28,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         return json.dumps(json_dict)
 
     def _convert_posixpath_to_str(
-            self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
+        self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
     ) -> Union[Dict[str, Any], List[Any], PosixPath, Any]:
         """
         Recursively iterate and convert PosixPath values to strings.
@@ -47,7 +47,9 @@ class HFModelAdapterConfig(PretrainedConfig):
 class HFModelAdapter(PreTrainedModel):
     config_class = HFModelAdapterConfig
 
-    def __init__(self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs):
+    def __init__(
+        self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
+    ):
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
         if load_checkpoint:

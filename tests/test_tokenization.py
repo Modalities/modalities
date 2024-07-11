@@ -2,11 +2,7 @@ import numpy as np
 import pytest
 
 from modalities.config.config import PreTrainedHFTokenizerConfig
-from modalities.tokenization.tokenizer_wrapper import (
-    PreTrainedHFTokenizer,
-    PreTrainedSPTokenizer,
-    TokenizerWrapper,
-)
+from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer, TokenizerWrapper
 
 
 def _assert_tokenization(tokenizer: TokenizerWrapper):
@@ -19,10 +15,11 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
     "text,tokenizer_config,expected_length,expected_num_padding_tokens",
     [
         # Test cases 1: Sequence is shorter than max_length, i.e., len(text) < max_length
-        # If padding="max_length", we want a sequence to be padded to the max_length, irrespective of the truncation flag
-        # and only if max_length is specified.
+        # If padding="max_length", we want a sequence to be padded to the max_length,
+        # irrespective of the truncation flag and only if max_length is specified.
         # If max_length is not specified, we pad to the max model input length (i.e., 1024 for the gpt2 model).
-        # NOTE: "AAAAAAAA" is a single token for the gpt2 tokenizer, there is no "A" sequence longer than that in the vocabulary.
+        # NOTE: "AAAAAAAA" is a single token for the gpt2 tokenizer, there is
+        # no "A" sequence longer than that in the vocabulary.
         (
             "AAAAAAAA" * 6,
             PreTrainedHFTokenizerConfig(
@@ -123,7 +120,8 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
             0,
         ),
         # Test cases 2: Sequence is longer than max_length, i.e., len(text) > max_length
-        # If truncation=True and len(text)<model max length, we want a sequence to be truncated to the max_length, irrespective of the padding flag.
+        # If truncation=True and len(text)<model max length, we want a sequence
+        # to be truncated to the max_length, irrespective of the padding flag.
         (
             "AAAAAAAA" * 15,
             PreTrainedHFTokenizerConfig(
@@ -172,7 +170,8 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
             15,
             0,
         ),
-        # If truncation=False and len(text)<model max length, we want a sequence to be unmodified, irrespective of the padding flag.
+        # If truncation=False and len(text)<model max length,
+        # we want a sequence to be unmodified, irrespective of the padding flag.
         (
             "AAAAAAAA" * 15,
             PreTrainedHFTokenizerConfig(
@@ -306,9 +305,7 @@ def test_hf_tokenize(
     assert len(token_ids) == expected_length
 
     # check number of non-padding tokens (token_id = 43488 corresponds to "AAAAAAAA")
-    assert sum(np.array(token_ids) == 43488) == (
-        expected_length - expected_num_padding_tokens
-    )
+    assert sum(np.array(token_ids) == 43488) == (expected_length - expected_num_padding_tokens)
 
     # check number of padding tokens
     assert sum(np.array(token_ids) == 50257) == expected_num_padding_tokens
