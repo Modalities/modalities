@@ -1,10 +1,14 @@
 import pytest
 import torch
-
+import os
 from modalities.models.mamba.utils.generation import InferenceParams
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
+
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_mamba_block_forward(batch_size, sequence_length, d_model, d_state, d_conv, expand, mamba_block):
     x = torch.randn(batch_size, sequence_length, d_model).to("cuda")
     mamba_block = mamba_block.to("cuda")
@@ -12,7 +16,11 @@ def test_mamba_block_forward(batch_size, sequence_length, d_model, d_state, d_co
     assert y.shape == x.shape
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
+
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_block_forward(hidden_states, block):
     block = block.to("cuda")
     hidden_states = hidden_states.to("cuda")
@@ -38,7 +46,11 @@ def test_get_states_from_cache(
     assert (ssm_state == computed_ssm_state).all()
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="We need cuda to run Mamba.")
+
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_step(conv_state, ssm_state, mamba_block, hidden_states):
     device = "cuda"
     mamba_block = mamba_block.to(device)
