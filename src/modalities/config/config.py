@@ -26,7 +26,7 @@ from modalities.config.pydanctic_if_types import (
 )
 from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import get_date_of_run, parse_enum_by_name
+from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -358,7 +358,7 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 
     def modalities_env_resolver_fun(var_name: str) -> int:
         if var_name == "experiment_id":
-            return get_date_of_run()
+            return get_experiment_id_of_run()
         if var_name == "config_file_path":
             return config_file_path
 
