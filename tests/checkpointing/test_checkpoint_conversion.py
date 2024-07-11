@@ -1,16 +1,16 @@
 import os
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import pytest
 import torch
-from transformers import AutoModelForCausalLM, AutoConfig
+from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config, ModelTypeEnum
+from modalities.models.utils import ModelTypeEnum, get_model_from_config
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from tests.conftest import _ROOT_DIR
@@ -81,20 +81,22 @@ def pytorch_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
 def hf_model(checkpoint_conversion: CheckpointConversion, prediction_key: str) -> NNModel:
     return checkpoint_conversion.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
 
+
 @pytest.fixture()
 def prediction_key() -> str:
     return "logits"
 
+
 @pytest.fixture()
 def hf_model_from_checkpoint(
-        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
+    checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
 ) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
         torch_dtype=pytorch_model.lm_head.weight.dtype,
-        prediction_key=prediction_key
+        prediction_key=prediction_key,
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
     return hf_model_from_checkpoint
