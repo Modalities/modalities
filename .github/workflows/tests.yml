@@ -27,6 +27,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m install packaging
+        python -m install torch==2.3.1
         python -m install mamba-ssm
         pip install -e .[tests]
     - name: Run tests
