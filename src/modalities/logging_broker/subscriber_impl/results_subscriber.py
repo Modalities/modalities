@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import rich
+import yaml
 from rich.console import Group
 from rich.panel import Panel
 
@@ -59,9 +60,16 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
     ) -> None:
         super().__init__()
 
-        run = wandb.init(project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory)
+        with open(config_file_path, "r", encoding="utf-8") as file:
+            config = yaml.safe_load(file)
+        self.run = wandb.init(
+            project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config
+        )
 
-        run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
+        self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
+
+    def consume_key_value(self, key: str, value: str):
+        self.run.config[key] = value
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
