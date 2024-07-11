@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
 dependencies = [
+    "mamba-ssm",
     "numpy<2.0",
     "torch>=2.0",
     "tqdm",
@@ -21,9 +22,7 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
-    "mamba-ssm",
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
-    "mamba-ssm",
     "causal-conv1d>=1.2.0",
 ]
 
