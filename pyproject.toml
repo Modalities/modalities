@@ -6,6 +6,7 @@ description = "Modalities, a python framework for distributed and reproducible f
 dependencies = [
     "numpy<2.0",
     "torch>=2.3",
+    "packaging",
     "tqdm",
     "pyyaml",
     "transformers",
