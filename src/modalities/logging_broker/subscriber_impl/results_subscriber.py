@@ -1,11 +1,12 @@
 from pathlib import Path
+from typing import Any, Dict
 
 import rich
-import wandb
 import yaml
 from rich.console import Group
 from rich.panel import Panel
 
+import wandb
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
@@ -15,6 +16,9 @@ from modalities.logging_broker.subscriber import MessageSubscriberIF
 class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
+        pass
+
+    def consume_dict(self, mesasge_dict: Dict[str, Any]):
         pass
 
 
@@ -46,6 +50,9 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         if losses or metrics:
             rich.print(Panel(Group(*group_content)))
 
+    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+        raise NotImplementedError
+
 
 class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber object for the WandBEvaluationResult observable."""
@@ -68,8 +75,9 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def consume_key_value(self, key: str, value: str):
-        self.run.config[key] = value
+    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+        for k, v in mesasge_dict.items():
+            self.run.config[k] = v
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
