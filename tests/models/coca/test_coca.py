@@ -61,7 +61,7 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
 
     main = Main(dummy_config_path)
     main.config_dict = config_dict
-    
+
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)

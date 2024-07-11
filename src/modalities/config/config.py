@@ -1,5 +1,5 @@
-from functools import partial
 import os
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
@@ -370,7 +370,9 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver("modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True)
+    OmegaConf.register_new_resolver(
+        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+    )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
