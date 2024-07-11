@@ -1,8 +1,9 @@
+import os
+
 import pytest
 import torch
-import os
-from modalities.models.mamba.utils.generation import InferenceParams
 
+from modalities.models.mamba.utils.generation import InferenceParams
 
 
 @pytest.mark.skipif(
@@ -14,7 +15,6 @@ def test_mamba_block_forward(batch_size, sequence_length, d_model, d_state, d_co
     mamba_block = mamba_block.to("cuda")
     y = mamba_block(x)
     assert y.shape == x.shape
-
 
 
 @pytest.mark.skipif(
@@ -44,7 +44,6 @@ def test_get_states_from_cache(
     computed_conv_state, computed_ssm_state = mamba_block._get_states_from_cache(inference_params, batch_size)
     assert (conv_state == computed_conv_state).all()
     assert (ssm_state == computed_ssm_state).all()
-
 
 
 @pytest.mark.skipif(

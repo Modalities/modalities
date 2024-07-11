@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import torch
 
@@ -14,7 +16,6 @@ def test_mixer_model_forward(batch_size, sequence_length, vocab_size, mixer_mode
     y = mixer_model(x)
     assert y.shape == (batch_size, sequence_length, d_model)
     assert y.shape != x.shape
-
 
 
 @pytest.mark.skipif(

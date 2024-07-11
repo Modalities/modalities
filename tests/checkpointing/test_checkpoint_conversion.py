@@ -55,6 +55,7 @@ def config_dict(config_file_path: Path) -> dict:
 def initialized_model(set_env, config_dict: dict) -> NNModel:
     return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.MODEL)
 
+
 @pytest.mark.skipif(
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
@@ -110,6 +111,7 @@ def test_tensor(device: str, size: int = 10) -> torch.Tensor:
     test_tensor = torch.randint(size, size=(5, size))
     test_tensor = test_tensor.to(device)
     return test_tensor
+
 
 @pytest.mark.skipif(
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
