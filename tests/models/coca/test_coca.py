@@ -59,7 +59,9 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     # Disable checkpointing
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 0
 
-    main = Main(config_dict, dummy_config_path)
+    main = Main(dummy_config_path)
+    main.config_dict = config_dict
+    
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)
