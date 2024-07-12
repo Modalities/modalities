@@ -42,7 +42,7 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: "train"
+    dataloader_tag: train
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -264,7 +264,7 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
-    weight_decay_groups_excluded: ["embedding", "layernorm"]
+    weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
