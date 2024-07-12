@@ -341,7 +341,7 @@ class VideoTransform(Transform):
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
-        self.temporal_transform = RandomTemporalCrop(num_frames=16)
+        self.temporal_transform = RandomTemporalCrop(num_frames=num_frames)
 
     def __call__(self, video):
         video = video[0]
