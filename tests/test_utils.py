@@ -68,5 +68,4 @@ def test_get_total_number_of_trainable_parameters():
     torch.distributed.all_reduce = mock_all_reduce
     torch.Tensor.cuda = mock_cuda
 
-    # Call the function and check the result
     assert get_total_number_of_trainable_parameters(fsdp_model) == expected_params
