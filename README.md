@@ -1,16 +1,18 @@
 <h1 style="text-align:center;">Modalities</h1>
 
 <div align="center">
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <a href="https://pytorch.org/">
+    <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
   <a href="https://coveralls.io/github/Modalities/modalities">
     <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg" alt="Coverage Status">
   </a>
-  <a href="https://pytorch.org/">
-    <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
+ <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
   </a>
 </div>
+
 
 
 
