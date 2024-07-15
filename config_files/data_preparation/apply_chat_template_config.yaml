@@ -1,17 +1,32 @@
 settings:
   src_path: data/lorem_ipsum_sft.jsonl
-  dst_path: data/lorem_ipsum_sft.pbin
-  index_path: data/lorem_ipsum_sft.idx
-  num_cpus: ${node_env:num_cpus}
+  dst_path: data/lorem_ipsum_sft_converted.jsonl
 
 
-special_tokens:
-    b_assistant_token: <i>
-    e_assistant_token: </i>
-    eod_token: <|endoftext|>
+# Note: the b_assistant_token, e_assistant_token and eod_token is required to be part of the chat tempalte for proper loss masking!
+# Note: messages is data-driven by the input JSONL file under ${settings.src_path}
+chat_template: |
+{% data['system_instruction'] %}
+{% for message in messages %}
+{{message['role']:}} 
+{% if message['role'] == data['assistant_role'] %}
+{{data['special_tokens']['b_assistant_token']}}
+{% endif %}
+{{ message['content'] + '\n'}}
+{% if message['role'] == data['assistant_role'] %}
+{{data['special_tokens']['e_assistant_token']}}
+{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}
+{{message['role']:}} 
+{% endif %}
+{{ eod_token + '\n' }}
 
-message_construction: 
-  - system instruction
-  - conversations
-
+chat_template_data:
   assistant_role: gpt
+  system_instruction: "Be a helpful assistant and provide a response to the user's message."
+  add_generation_prompt: False
+  special_tokens:
+      b_assistant_token: <i>
+      e_assistant_token: </i>
+      eod_token: <|endoftext|>
