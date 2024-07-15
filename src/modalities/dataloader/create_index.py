@@ -25,7 +25,9 @@ class IndexGenerator:
         self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
         with self.src_file.open(mode="r") as fin:
+            # Move the cursor to the end of the file
             fin.seek(0, os.SEEK_END)
+            # Get number of characters in the file
             self._total_num_chars = fin.tell()
         self.num_chunks = self._total_num_chars // self.chunksize
         self._queue_of_raw_lines = queue.Queue()

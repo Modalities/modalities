@@ -16,3 +16,11 @@ class RunningEnvError(Exception):
 
 class TimeRecorderStateError(Exception):
     pass
+
+
+class OptimizerError(Exception):
+    pass
+
+
+class ConfigError(Exception):
+    pass

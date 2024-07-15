@@ -97,6 +97,7 @@ celerybeat-schedule
 # Environments
 .env
 .venv
+modalities_env/
 env/
 venv/
 ENV/
@@ -152,6 +153,7 @@ tags
 
 checkpoints
 data
+data-temp/
 docs/source/generated
 docs/source/api
 pyenv*

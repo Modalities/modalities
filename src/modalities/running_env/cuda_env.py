@@ -21,5 +21,8 @@ class CudaEnv:
         return self
 
     def __exit__(self, type, value, traceback):
-        dist.barrier()
+        # TODO and NOTE:
+        # when we call barrier here and one of the ranks fails, we get stuck here.
+        # In the future, we should probably add a timeout here and handle the case when one of the ranks fails.
+        # dist.barrier()
         dist.destroy_process_group()

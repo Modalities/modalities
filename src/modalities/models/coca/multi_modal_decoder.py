@@ -2,11 +2,10 @@ from functools import partial
 from typing import Dict
 
 import torch
-import xformers.ops as xops
 from torch import nn
 
 from modalities.models.gpt2.gpt2_model import ActivationType
-from modalities.models.model import NNModel
+from modalities.models.model import NNModel, SwiGLU
 from modalities.nn.attention import AttentionConfig, AttentionType, MultiHeadAttention
 from modalities.nn.mlp import MLP
 
@@ -32,8 +31,8 @@ class TransformerBlock(nn.Module):
 
         if activation == ActivationType.GELU:
             mlp = partial(MLP, in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
-        elif activation == ActivationType.FUSED_SWIGLU:
-            mlp = partial(xops.SwiGLU, in_features=n_embd, hidden_features=ffn_hidden, bias=bias)
+        elif activation == ActivationType.SWIGLU:
+            mlp = partial(SwiGLU, n_embd=n_embd, bias=bias)
         else:
             raise NotImplementedError(f"activation type {activation} not implemented")
 

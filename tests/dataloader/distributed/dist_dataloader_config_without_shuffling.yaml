@@ -12,7 +12,7 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_steps: 0
+    skip_num_batches: 0
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE

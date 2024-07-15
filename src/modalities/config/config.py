@@ -1,6 +1,7 @@
 import os
+from functools import partial
 from pathlib import Path
-from typing import Annotated, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
@@ -17,6 +18,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticLLMDataLoaderIFType,
+    PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
@@ -25,7 +27,7 @@ from modalities.config.pydanctic_if_types import (
 )
 from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import get_date_of_run, parse_enum_by_name
+from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -109,6 +111,7 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
+    get_num_tokens_from_num_steps_callable: Callable[[int], int]
 
 
 class CheckpointSavingConfig(BaseModel):
@@ -122,6 +125,7 @@ class AdamOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
+    weight_decay_groups_excluded: List[str]
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -130,6 +134,7 @@ class AdamWOptimizerConfig(BaseModel):
     betas: Tuple[float, float]
     eps: float
     weight_decay: float
+    weight_decay_groups_excluded: List[str]
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -225,11 +230,17 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class WeightInitializedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    model_initializer: PydanticModelInitializationIFType
+
+
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
-    max_length: Annotated[int, Field(strict=True, ge=0)]
+    max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
+    special_tokens: Optional[Dict[str, str]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
@@ -242,12 +253,13 @@ class DistributedSamplerConfig(BaseModel):
     shuffle: bool
     dataset: PydanticDatasetIFType
     seed: Optional[int] = 0
+    drop_last: Literal[True] = True
 
 
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=1)]
     tokenizer: PydanticTokenizerIFType
     tokenization_jq_patterns: Dict[str, str]
     pass_through_jq_patterns: Optional[Dict[str, str]] = None
@@ -256,13 +268,13 @@ class MemMapDatasetConfig(BaseModel):
 
 class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
     raw_data_path: Path
-    block_size: Annotated[int, Field(strict=True, gt=0)]
+    block_size: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
 
 
@@ -302,7 +314,7 @@ class LLMDataLoaderConfig(BaseModel):
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
     shuffle: bool
-    skip_num_steps: Optional[int] = 0
+    skip_num_batches: Optional[int] = 0
 
 
 class RepeatingDataLoaderConfig(BaseModel):
@@ -320,6 +332,7 @@ class RichProgressSubscriberConfig(BaseModel):
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
     local_rank: int
+    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):
@@ -345,18 +358,22 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str) -> int:
+    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
         if var_name == "experiment_id":
-            return get_date_of_run()
-        if var_name == "config_file_path":
+            return get_experiment_id_of_run(config_file_path=config_file_path)
+        elif var_name == "config_file_path":
             return config_file_path
+        else:
+            raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
     def node_env_resolver_fun(var_name: str) -> int:
         if var_name == "num_cpus":
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
+    OmegaConf.register_new_resolver(
+        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+    )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)

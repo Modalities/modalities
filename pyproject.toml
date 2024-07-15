@@ -1,25 +1,24 @@
 [project]
 name = "modalities"
 version = "0.1.0"
-requires-python = ">=3.8,<3.12"
+requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
 dependencies = [
-    "torch>=2.0",
+    "numpy<2.0",
+    "torch>=2.3",
+    "packaging",
     "tqdm",
     "pyyaml",
     "transformers",
     "datasets",
     "protobuf",
     "SentencePiece",
-    "accelerate",
     "rich",
-    "xformers",
     "omegaconf",
     "pydantic",
     "click",
     "click_pathlib",
     "jq",
-    "xformers",
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
@@ -45,6 +44,7 @@ line-length = 120
 [tool.isort]
 profile = "black"
 line_length = 120
+src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 120
