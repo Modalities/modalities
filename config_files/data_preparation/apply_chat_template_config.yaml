@@ -1,0 +1,17 @@
+settings:
+  src_path: data/lorem_ipsum_sft.jsonl
+  dst_path: data/lorem_ipsum_sft.pbin
+  index_path: data/lorem_ipsum_sft.idx
+  num_cpus: ${node_env:num_cpus}
+
+
+special_tokens:
+    b_assistant_token: <i>
+    e_assistant_token: </i>
+    eod_token: <|endoftext|>
+
+message_construction: 
+  - system instruction
+  - conversations
+
+  assistant_role: gpt
