@@ -34,7 +34,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters
 
 
 @click.group()
@@ -255,7 +255,7 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        num_params = compute_number_of_trainable_parameters(wrapped_model)
+        num_params = get_total_number_of_trainable_parameters(wrapped_model)
         components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
