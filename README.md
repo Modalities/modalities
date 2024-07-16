@@ -1,6 +1,6 @@
-<h1 align="center">
-  Modalities
-</h1>
+<p align="center">
+  <img src="docs/source/banner.jpg" height="200">
+</p>
 
 
 <div align="center">
