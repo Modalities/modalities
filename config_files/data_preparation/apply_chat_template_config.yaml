@@ -22,6 +22,7 @@ jinja2_chat_templates:
     {{ turn.value + '\n'}}
     {% if turn.from == chat_template_data.assistant_role %}
     {{ chat_template_data.special_tokens.e_include_to_loss_token }}
+    {{ chat_template_data.special_tokens.e_assistant_token }}
     {% endif %}
     {% endfor %}
     {{ chat_template_data.special_tokens.eod_token }}
@@ -34,4 +35,5 @@ chat_template_data:
   special_tokens:
       b_include_to_loss_token: <i>
       e_include_to_loss_token: </i>
+      e_assistant_token: </a>
       eod_token: <|endoftext|>
