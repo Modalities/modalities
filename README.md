@@ -1,11 +1,22 @@
-# Modalities
+<h1 style="text-align:center;">Modalities</h1>
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT')
-[![Coverage Status](https://coveralls.io/repos/github/Modalities/modalities/badge.svg)](https://coveralls.io/github/Modalities/modalities)
+<div align="center">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <a href="https://pytorch.org/">
+    <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
+  </a>
+  <a href="https://coveralls.io/github/Modalities/modalities">
+    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg" alt="Coverage Status">
+  </a>
+ <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  </a>
+</div>
 
 
 
-# Getting started
+
+# Getting Started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
 Also, see our Wiki and API reference documentation: https://modalities.github.io/modalities/
 
