@@ -24,9 +24,12 @@ def apply_chat_template(config_file_path: Path):
     config = SFTConfig(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
     chat_template_key = config.settings.chat_template_key
-    chat_templates = get_chat_templates(config.jinja2_chat_template_files)
+    chat_templates = get_chat_templates(config.jinja2_chat_templates)
 
     with open(config.settings.dst_path, "w") as output_file:
+        # similar to an index file, put general information about the dataset into the first line of the JSONL
+        json.dump(config.chat_template_data, output_file)
+        output_file.write("\n")
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
             conversation = map_roles(conversation, config.instruction_data_transformation.role_mapping)
@@ -43,12 +46,11 @@ def apply_chat_template(config_file_path: Path):
             output_file.write("\n")
 
 
-def get_chat_templates(jinja2_chat_template_files: Dict[str, str]) -> Dict[str, Template]:
+def get_chat_templates(jinja2_chat_templates: Dict[str, str]) -> Dict[str, Template]:
     chat_templates = {}
-    for key, file_path in jinja2_chat_template_files.items():
-        with Path(file_path).open() as file:
-            chat_template = "".join(["".join(line.rsplit("\n", 1)) for line in file.readlines()])
-            chat_templates[key] = _compile_jinja_template(chat_template)
+    for key, template_string in jinja2_chat_templates.items():
+        chat_template = template_string.replace("}\n{", "}{")
+        chat_templates[key] = _compile_jinja_template(chat_template)
     return chat_templates
 
 

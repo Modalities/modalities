@@ -18,5 +18,5 @@ class InstructionDataTransformation(BaseModel):
 class SFTConfig(BaseModel):
     settings: Settings
     instruction_data_transformation: InstructionDataTransformation
-    jinja2_chat_template_files: Dict[str, FilePath]
+    jinja2_chat_templates: Dict[str, str]
     chat_template_data: Dict[str, Any]
