@@ -22,10 +22,17 @@ settings:
 
 collate_fn:  
   component_key: collate_fn
-  variant_key: gpt_2_llm_collator
+  variant_key: mask_loss_collator_wrapper
   config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    target_key: ${settings.referencing_keys.target_key}
+    collate_fn:  
+      component_key: collate_fn
+      variant_key: gpt_2_llm_collator
+      config:
+        sample_key: ${settings.referencing_keys.sample_key}
+        target_key: ${settings.referencing_keys.target_key}
+    target_keys_to_mask:
+      - ${settings.referencing_keys.target_key}
+    loss_ignore_index: -100
 
 train_dataset:
   component_key: dataset
