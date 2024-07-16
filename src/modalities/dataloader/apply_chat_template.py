@@ -31,7 +31,7 @@ def apply_chat_template(config_file_path: Path):
             conversation = entry[config.settings.conversations_key]
             conversation = map_roles(conversation, config.instruction_data_transformation.role_mapping)
             if chat_template_key in entry:
-                chat_template = chat_templates[chat_template_key]
+                chat_template = chat_templates[entry[chat_template_key]]
             else:
                 chat_template = chat_templates["default"]
 
