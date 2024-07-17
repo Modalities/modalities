@@ -8,7 +8,7 @@ import torch.distributed as dist
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
@@ -29,9 +29,8 @@ def test_resumable_dataloader_without_shuffling():
     # Given a sequence of [0, 1, 2, 3, 4, 5, 6, 7, 8] we want each of the two processes
     # to receive [[0, 2], [4, 6]] and [[1, 3], [5, 7]], respectively.
     config_file_path = working_dir / "dist_dataloader_config_without_shuffling.yaml"
-    config_dict = load_app_config_dict(config_file_path)
 
-    main = Main(config_dict, config_file_path)
+    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         main.add_custom_component(
             component_key="dataset",
@@ -75,9 +74,8 @@ def test_resumable_dataloader_with_shuffling_without_skipping():
     # to receive two batches of size two without overlap, e.g., [[2, 0], [5, 6]] and [[7, 3], [4, 1]], respectively.
 
     config_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
-    config_dict = load_app_config_dict(config_file_path)
 
-    main = Main(config_dict, config_file_path)
+    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         main.add_custom_component(
             component_key="dataset",
@@ -122,15 +120,13 @@ def test_resumable_dataloader_with_shuffling_and_skipped_batches():
     # to receive one batch of size two without overlap, e.g., [[5, 6]] and [[4, 1]], respectively.
 
     config_shuffled_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
-    config_shuffled_dict = load_app_config_dict(config_shuffled_file_path)
-    main_shuffled = Main(config_shuffled_dict, config_shuffled_file_path)
+    main_shuffled = Main(config_shuffled_file_path)
 
     config_shuffled_and_skipped_file_path = (
         working_dir / "dist_dataloader_config_with_shuffling_and_skipped_batches.yaml"
     )
 
-    config_shuffled_and_skipped_dict = load_app_config_dict(config_shuffled_and_skipped_file_path)
-    main_shuffled_and_skipped = Main(config_shuffled_and_skipped_dict, config_shuffled_and_skipped_file_path)
+    main_shuffled_and_skipped = Main(config_shuffled_and_skipped_file_path)
 
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         main_shuffled.add_custom_component(
