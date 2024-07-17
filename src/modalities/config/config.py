@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
@@ -26,7 +27,7 @@ from modalities.config.pydanctic_if_types import (
 )
 from modalities.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import get_date_of_run, parse_enum_by_name
+from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -330,7 +331,7 @@ class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
-    local_rank: int
+    global_rank: int
     gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
@@ -339,7 +340,7 @@ class DummyResultSubscriberConfig(BaseModel):
 
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):
-    local_rank: int
+    global_rank: int
     project: str
     experiment_id: str
     mode: WandbMode
@@ -349,7 +350,7 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
-    local_rank: int
+    global_rank: int
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
@@ -357,18 +358,22 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str) -> int:
+    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
         if var_name == "experiment_id":
-            return get_date_of_run()
-        if var_name == "config_file_path":
+            return get_experiment_id_of_run(config_file_path=config_file_path)
+        elif var_name == "config_file_path":
             return config_file_path
+        else:
+            raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
     def node_env_resolver_fun(var_name: str) -> int:
         if var_name == "num_cpus":
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver("modalities_env", modalities_env_resolver_fun, replace=True)
+    OmegaConf.register_new_resolver(
+        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+    )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)

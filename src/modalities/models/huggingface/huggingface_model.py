@@ -8,7 +8,6 @@ from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokeniz
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
 
-
 # Huggingface Model dependencies
 #
 # ModuleUtilsMixin

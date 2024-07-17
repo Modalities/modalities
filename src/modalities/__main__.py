@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, Type
+from typing import Tuple, Type
 
 import click
 import click_pathlib
@@ -34,7 +34,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters
 
 
 @click.group()
@@ -50,8 +50,7 @@ def main() -> None:
     help="Path to a file with the YAML config file.",
 )
 def entry_point_run_modalities(config_file_path: Path):
-    config_dict = load_app_config_dict(config_file_path)
-    main_obj = Main(config_dict, config_file_path)
+    main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -190,8 +189,8 @@ def entry_point_merge_packed_data(src_paths, target_path):
 
 
 class Main:
-    def __init__(self, config_dict: Dict, config_path: Path) -> None:
-        self.config_dict = config_dict
+    def __init__(self, config_path: Path) -> None:
+        self.config_dict = load_app_config_dict(config_path)
         self.config_path = config_path
 
         self.registry = Registry(COMPONENTS)
@@ -233,7 +232,7 @@ class Main:
             * components.settings.cuda_env.world_size
         )
         trainer = Trainer(
-            local_rank=components.settings.cuda_env.local_rank,
+            global_rank=components.settings.cuda_env.global_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
@@ -243,7 +242,6 @@ class Main:
 
         # Evaluator
         evaluator = Evaluator(
-            local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
         )
@@ -256,7 +254,9 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        logging.info(f"Training model with {compute_number_of_trainable_parameters(wrapped_model)} parameters.")
+        num_params = get_total_number_of_trainable_parameters(wrapped_model)
+        components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
+        logging.info(f"Training model with {num_params} parameters.")
 
         if len(components.settings.training.activation_checkpointing_modules) > 0:
             apply_activation_checkpointing_inplace(

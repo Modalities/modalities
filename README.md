@@ -1,15 +1,29 @@
-# Modalities
-
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT')
-[![Coverage Status](https://coveralls.io/repos/github/Modalities/modalities/badge.svg)](https://coveralls.io/github/Modalities/modalities)
-
+<p align="center">
+  <img src="docs/source/banner.jpg">
+</p>
 
 
-# Getting started
+<div align="center">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <a href="https://pytorch.org/">
+    <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
+  </a>
+  <a href="https://coveralls.io/github/Modalities/modalities">
+    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg" alt="Coverage Status">
+  </a>
+ <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  </a>
+</div>
+
+
+
+
+## Getting Started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
 Also, see our Wiki and API reference documentation: https://modalities.github.io/modalities/
 
-# Installation
+## Installation
 
 Create conda environment and activate it via 
 ```
@@ -27,7 +41,7 @@ If you want to contribute, have a look at `CONTRIBUTING.md`.
 
 
 
-# Usage
+## Usage
 For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/modalities/__main__.py run --config_file_path config_files/config.yaml`.
 
 Or, if you are a VsCode user, add this to your `launch.json`:
@@ -58,10 +72,10 @@ Or, if you are a VsCode user, add this to your `launch.json`:
         }
 ```
 
-# Supported Features
+## Supported Features
 In the following, we list the already implemented, planned and in-progress features w.r.t. to improving downstream performance, throughput, multi-modality, and alignment. 
 
-## Throughput Features
+### Throughput Features
 
 | Name                                  | Status           | Description                                                                                                       |
 |---------------------------------------|------------------|-------------------------------------------------------------------------------------------------------------------|
@@ -77,7 +91,7 @@ In the following, we list the already implemented, planned and in-progress featu
 
 
 
-## Downstream Performance Features
+### Downstream Performance Features
 
 | Name                           | Status           | Description                                                                                                       |
 |--------------------------------|------------------|-------------------------------------------------------------------------------------------------------------------|
@@ -150,7 +164,7 @@ in our `pyproject.toml`, we can start only main with `modalities` (which does no
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
 
-# Contributing
+## Contributing
 
 Modalities welcomes your contributions! Please check out our
 [contributing](CONTRIBUTING.md) guidelines regarding the details on formatting, testing,

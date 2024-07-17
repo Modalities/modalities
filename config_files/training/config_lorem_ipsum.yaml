@@ -42,8 +42,7 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: "train"
-    gradient_acc_steps: ${settings.training.gradient_acc_steps}
+    dataloader_tag: train
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -265,7 +264,7 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
-    weight_decay_groups_excluded: ["embedding", "layernorm"]
+    weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -284,7 +283,7 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
@@ -305,7 +304,7 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
     mode: ONLINE
     experiment_id: ${settings.experiment_id}

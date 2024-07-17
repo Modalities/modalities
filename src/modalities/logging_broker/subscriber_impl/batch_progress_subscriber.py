@@ -14,6 +14,9 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     def consume_message(self, message: Message[BatchProgressUpdate]):
         pass
 
+    def consume_dict(self, key: str, value: str):
+        pass
+
 
 class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     """A subscriber object for the RichProgress observable."""

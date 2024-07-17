@@ -27,14 +27,14 @@ class ThroughputAggregationKeys(Enum):
 class Trainer:
     def __init__(
         self,
-        local_rank: int,
+        global_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
-        self.local_rank = local_rank
+        self.global_rank = global_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
@@ -89,7 +89,7 @@ class Trainer:
 
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch
@@ -141,10 +141,6 @@ class Trainer:
                 num_train_steps_done=num_train_steps_done,
                 dataloader_tag=train_loader.dataloader_tag,
             )
-            print(
-                f"num_train_steps_done: {num_train_steps_done}, micro_batch_id: {micro_batch_id}",
-                f" (micro_batch_id +1) % GAS: {(micro_batch_id +1) % self.gradient_acc_steps}",
-            )
             # Check if model performance should be logged
             if num_train_steps_done % training_log_interval_in_steps == 0 and step_performed:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
@@ -175,15 +171,15 @@ class Trainer:
                     reduced_losses[1],
                 )
                 losses = {
-                    f"{loss_fun.tag} average": train_loss_avg,
-                    f"{loss_fun.tag} last step": train_loss_last_batch,
+                    "train loss avg": train_loss_avg,
+                    "train loss last": train_loss_last_batch,
                 }
 
                 consumed_tokens = torch.Tensor([num_train_steps_done * self.global_num_tokens_per_train_step])
                 metrics = {
-                    "consumed_tokens": consumed_tokens,
-                    "grad_norm_avg": torch.mean(torch.Tensor(gradient_norm_scores)),
-                    "grad_norm_last_batch": gradient_norm_scores[-1],
+                    "consumed tokens": consumed_tokens,
+                    "grad norm avg": torch.mean(torch.Tensor(gradient_norm_scores)),
+                    "grad norm last": torch.tensor(gradient_norm_scores[-1]),
                 }
                 gradient_norm_scores = []
 
@@ -192,13 +188,14 @@ class Trainer:
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
-                        "training_synced_num_samples_per_second": synced_num_samples_per_second,
-                        "lr_mean": torch.tensor(scheduler.get_last_lr()).mean(),
-                        "lr_first": torch.tensor(scheduler.get_last_lr())[0],
+                        "train samples/s": synced_num_samples_per_second,
+                        "lr mean": torch.tensor(scheduler.get_last_lr()).mean(),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=num_train_steps_done,
                 )
+                if self.global_rank == 0:
+                    print(training_metrics)
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,
@@ -218,7 +215,7 @@ class Trainer:
         # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
         cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device("cuda"))
         else:
             cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
         return cumulated_loss_and_gradient_norm

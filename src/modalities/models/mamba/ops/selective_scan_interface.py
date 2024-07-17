@@ -7,12 +7,12 @@ from torch.cuda.amp import custom_bwd, custom_fwd
 
 try:
     import causal_conv1d_cuda
+    import selective_scan_cuda
     from causal_conv1d import causal_conv1d_fn
 except ImportError:
     causal_conv1d_fn = None
     causal_conv1d_cuda = None
-
-import selective_scan_cuda
+    selective_scan_cuda = None
 
 
 class SelectiveScanFn(torch.autograd.Function):

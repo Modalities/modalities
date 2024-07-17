@@ -9,7 +9,7 @@ from torch.optim import Adam, AdamW, Optimizer
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_local_number_of_trainable_parameters
 
 OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
 
@@ -166,7 +166,7 @@ def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: Opti
     checks that the number of parameters in the optimizer groups
     sum up to the total number of model parameters as expected
     """
-    num_params_check = compute_number_of_trainable_parameters(model)
+    num_params_check = get_local_number_of_trainable_parameters(model)
     num_params = sum(p.numel() for optimizer_group in optimizer_groups for p in optimizer_group["params"])
     if num_params != num_params_check:
         raise OptimizerError(

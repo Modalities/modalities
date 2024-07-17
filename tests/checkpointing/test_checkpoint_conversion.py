@@ -1,16 +1,16 @@
 import os
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import pytest
 import torch
-from transformers import AutoModelForCausalLM, AutoConfig
+from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config, ModelTypeEnum
+from modalities.models.utils import ModelTypeEnum, get_model_from_config
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from tests.conftest import _ROOT_DIR
@@ -56,6 +56,10 @@ def initialized_model(set_env, config_dict: dict) -> NNModel:
     return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.MODEL)
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 @pytest.fixture()
 def checkpoint_conversion(tmp_path: Path, initialized_model: NNModel, config_file_path: Path) -> CheckpointConversion:
     model_file_path = tmp_path / "pytorch_model.bin"
@@ -81,20 +85,22 @@ def pytorch_model(checkpoint_conversion: CheckpointConversion) -> NNModel:
 def hf_model(checkpoint_conversion: CheckpointConversion, prediction_key: str) -> NNModel:
     return checkpoint_conversion.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
 
+
 @pytest.fixture()
 def prediction_key() -> str:
     return "logits"
 
+
 @pytest.fixture()
 def hf_model_from_checkpoint(
-        checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
+    checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
 ) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
         torch_dtype=pytorch_model.lm_head.weight.dtype,
-        prediction_key=prediction_key
+        prediction_key=prediction_key,
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
     return hf_model_from_checkpoint
@@ -107,6 +113,10 @@ def test_tensor(device: str, size: int = 10) -> torch.Tensor:
     return test_tensor
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_models_before_and_after_conversion_produce_same_output(
     device: str,
     pytorch_model: NNModel,
@@ -131,6 +141,10 @@ def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
     return model
 
 
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+)
 def test_models_before_and_after_conversion_are_equal(
     pytorch_model: NNModel,
     hf_model: NNModel,
