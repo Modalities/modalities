@@ -232,7 +232,7 @@ class Main:
             * components.settings.cuda_env.world_size
         )
         trainer = Trainer(
-            local_rank=components.settings.cuda_env.local_rank,
+            global_rank=components.settings.cuda_env.global_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
@@ -242,7 +242,6 @@ class Main:
 
         # Evaluator
         evaluator = Evaluator(
-            local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
         )
