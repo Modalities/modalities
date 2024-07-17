@@ -111,7 +111,8 @@ class TestWarmstart:
                 working_dir / "lorem_ipsum.pbin"
             )
 
-            main_obj_0 = Main(gpt2_8_steps_config_dict, gpt2_8_steps_config_file_path)
+            main_obj_0 = Main(gpt2_8_steps_config_file_path)
+            main_obj_0.config_dict = gpt2_8_steps_config_dict
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
                 main_obj_0.add_custom_component(
                     component_key="results_subscriber",
@@ -129,7 +130,8 @@ class TestWarmstart:
                     with open(loss_values_experiment_0_path, "w") as f:
                         json.dump(loss_scores_0, f)
 
-                main_obj_1 = Main(gpt2_warm_start_after_4_steps_dict, gpt2_warm_start_after_4_steps_config_file_path)
+                main_obj_1 = Main(gpt2_warm_start_after_4_steps_config_file_path)
+                main_obj_1.config_dict = gpt2_warm_start_after_4_steps_dict
 
                 main_obj_1.add_custom_component(
                     component_key="results_subscriber",
@@ -174,8 +176,11 @@ class TestWarmstart:
         # adopt dataset path
         gpt2_warm_start_from_step_1_dict["train_dataset"]["config"]["raw_data_path"] = working_dir / "lorem_ipsum.pbin"
 
-        main_obj_1 = Main(gpt2_two_steps_config_dict, gpt2_two_steps_config_file_path)
-        main_obj_2 = Main(gpt2_warm_start_from_step_1_dict, gpt2_warm_start_from_step_1_config_file_path)
+        main_obj_1 = Main(gpt2_two_steps_config_file_path)
+        main_obj_1.config_dict = gpt2_two_steps_config_dict
+
+        main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
+        main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
 
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
             main_obj_1.add_custom_component(
