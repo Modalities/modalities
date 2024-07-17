@@ -1,8 +1,9 @@
 import math
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
+import pytest
 import torch
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
@@ -11,7 +12,9 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
+from modalities.dataloader.dataset import SequenceDataset
 from modalities.dataloader.samplers import ResumableBatchSampler
+from modalities.models.gpt2.collator import CollateFnIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -223,3 +226,56 @@ def test_skipped_and_distributed_dataloader_from_config():
     for batch_1, batch_2 in zip(batches_rank_0, batches_rank_1):
         assert ~(batch_1.samples["input_ids"] == batch_2.samples["input_ids"]).all()
         assert ~(batch_1.targets["target_ids"] == batch_2.targets["target_ids"]).all()
+
+
+@pytest.mark.parametrize(
+    "global_rank",
+    [0, 1],
+)
+def test_dataloader_with_fixed_num_batches(global_rank):
+    class DataloaderTestModel(BaseModel):
+        train_dataloader: PydanticLLMDataLoaderIFType
+        fixed_num_batches: int
+
+    class IdentityCollateFn(CollateFnIF):
+        def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> List[Dict[str, torch.Tensor]]:
+            return batch
+
+    root_dir = Path(__file__).parents[0]
+
+    config_path = root_dir / "yaml_configs/dataloader_with_fixed_num_batches.yaml"
+    # we inject a prebuilt dataset and collate_fn, as well as, the global rank constant from outside
+    dataset = SequenceDataset(list(range(1000)))
+    config_dict = load_app_config_dict(config_path)
+    config_dict["settings"]["cuda_env"]["global_rank"] = global_rank
+    config_dict["train_dataloader"]["config"]["batch_sampler"]["config"]["sampler"]["config"]["rank"] = global_rank
+    config_dict["train_dataset"] = dataset
+    config_dict["collate_fn"] = IdentityCollateFn()
+
+    # build the remaining components
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
+    components: DataloaderTestModel = component_factory.build_components(
+        config_dict=config_dict, components_model_type=DataloaderTestModel
+    )
+    dataloader = components.train_dataloader
+
+    # calculate the fixed_num_batches and
+    # compare it with the one calculated during the component build and the dataloader length
+    cfg = config_dict["settings"]["training"]
+    world_size = config_dict["settings"]["cuda_env"]["world_size"]
+    calculated_fixed_num_batches = cfg["global_num_train_tokens"] // cfg["sequence_length"] // world_size
+    assert calculated_fixed_num_batches == components.fixed_num_batches
+    assert len(dataloader) == calculated_fixed_num_batches
+
+    # We make sure that the dataloader outputs the correct batches as follows:
+    # The dataset contains 1000 samples (NOTE that we neglected squence_length and made each sample an integer value)
+    # we calculated 16 batches above per rank and have 2 ranks in total.
+    # Therefore the dataloader for rank 0 returns 16 ordered batches of batch_size 2.
+    # The batches are ordered and not shuffled as per YAML configuration.
+    # We expect the following output:
+    # [[0, 2], [4, 6], [8, 10], ..., [56, 58], [60, 62]]  (global_rank=0)
+    # [[1, 3], [5, 7], [9, 11], ..., [57, 59], [61, 63]]  (global_rank=1)
+    calculated_dataloader_content = np.array(list(range(global_rank, 64 + global_rank, 2))).reshape(-1, 2).tolist()
+    actual_dataloader_content = [i for i in dataloader]
+    assert calculated_dataloader_content == actual_dataloader_content
