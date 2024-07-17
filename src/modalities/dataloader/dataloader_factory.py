@@ -37,7 +37,9 @@ class DataloaderFactory:
               skip_num_batches = num optimizer steps * gradient accumulation steps
               Defaults to 0.
             fixed_num_batches: (int, optional): Fixed length of the dataloader by cutting off subsequent batches.
-                Make sure that the dataloader has at least fixed_num_batches. Defaults to None.
+                Note that these are NOT the global number of batches, but the amount of batches that an
+                individual rank sees. Make sure that the dataloader has at least fixed_num_batches.
+                Defaults to None.
 
         Returns:
             LLMDataLoader: Instance of LLMDataLoader
