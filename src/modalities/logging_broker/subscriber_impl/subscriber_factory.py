@@ -20,10 +20,10 @@ class ProgressSubscriberFactory:
         train_dataloader: LLMDataLoader,
         eval_dataloaders: List[LLMDataLoader],
         global_num_seen_steps: int,
-        local_rank: int,
+        global_rank: int,
         gradient_acc_steps: int,
     ) -> RichProgressSubscriber:
-        if local_rank == 0:
+        if global_rank == 0:
             train_split_num_steps = {
                 # first element describes the total number of steps
                 # and the second element describes the number of steps already completed
@@ -47,8 +47,8 @@ class ProgressSubscriberFactory:
 
 class ResultsSubscriberFactory:
     @staticmethod
-    def get_rich_result_subscriber(num_ranks: int, local_rank: int) -> RichResultSubscriber:
-        if local_rank == 0:
+    def get_rich_result_subscriber(num_ranks: int, global_rank: int) -> RichResultSubscriber:
+        if global_rank == 0:
             return RichResultSubscriber(num_ranks)
         else:
             return ResultsSubscriberFactory.get_dummy_result_subscriber()
@@ -59,14 +59,14 @@ class ResultsSubscriberFactory:
 
     @staticmethod
     def get_wandb_result_subscriber(
-        local_rank: int,
+        global_rank: int,
         project: str,
         experiment_id: str,
         mode: WandbMode,
         config_file_path: Path,
         directory: Path = None,
     ) -> WandBEvaluationResultSubscriber:
-        if local_rank == 0 and (mode != WandbMode.DISABLED):
+        if global_rank == 0 and (mode != WandbMode.DISABLED):
             result_subscriber = WandBEvaluationResultSubscriber(
                 project, experiment_id, mode, directory, config_file_path
             )
