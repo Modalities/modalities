@@ -1,22 +1,15 @@
 import json
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
 import jsonlines
+import yaml
 from jinja2 import Template
 from packaging import version
 
 from modalities.config.config import load_app_config_dict
 from modalities.config.sft_config import SFTConfig
-
-# TODO copy and adapt: src.modalities.dataloader.dataset.MemMapDataset
-# -> it reads lerge JSONL files, jq-pattern filters and tokenizes
-# -> select what to tokenize and what to loss-mask (we dont need to have the b_assistant_token)
-
-# Max idea: select what to tokenize and what to loss-mask (we dont need to have the b_assistant_token) then
-# have a collate function which applies the chat template
-# after collate the input could be too large; packing is more difficult.
-#   --> collate is after batching; packing would introduce dynamic batch size
 
 
 def apply_chat_template(config_file_path: Path):
@@ -26,10 +19,11 @@ def apply_chat_template(config_file_path: Path):
     chat_template_key = config.settings.chat_template_key
     chat_templates = get_chat_templates(config.jinja2_chat_templates)
 
-    with open(config.settings.dst_path, "w") as output_file:
-        # similar to an index file, put general information about the dataset into the first line of the JSONL
-        json.dump(config.chat_template_data, output_file)
-        output_file.write("\n")
+    dst_path = Path(config.settings.dst_path)
+    uuid_str = str(uuid.uuid4())
+    store_config_file_with_uuid(config, dst_path, uuid_str)
+    dst_path_with_uuid = dst_path.with_suffix(f".{uuid_str}" + "".join(dst_path.suffixes))
+    with dst_path_with_uuid.open("w") as output_file:
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
             conversation = map_roles(conversation, config.instruction_data_transformation.role_mapping)
@@ -44,6 +38,12 @@ def apply_chat_template(config_file_path: Path):
             entry["chat"] = chat
             json.dump(entry, output_file)
             output_file.write("\n")
+
+
+def store_config_file_with_uuid(config: SFTConfig, dst_path: Path, uuid_str: str) -> None:
+    config_yaml_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
+    with config_yaml_path.open("w") as config_file:
+        yaml.dump(config.model_dump(), config_file)
 
 
 def get_chat_templates(jinja2_chat_templates: Dict[str, str]) -> Dict[str, Template]:
