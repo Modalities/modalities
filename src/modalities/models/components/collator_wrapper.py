@@ -53,9 +53,6 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
     def _mask_target(
         self, target: torch.Tensor, b_mask_token_id: int, e_mask_token_id: int, loss_ignore_index: int
     ) -> torch.Tensor:
-        # FIXME replace debug target
-        debug_target = [5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1]
-        target = torch.Tensor([debug_target, debug_target])
         assert b_mask_token_id != e_mask_token_id, "b_mask_token_id and e_mask_token_id must be different!"
         assert b_mask_token_id in target, "b_mask_token_id not found in target"
         assert e_mask_token_id in target, "e_mask_token_id not found in target"
@@ -66,5 +63,4 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         mask = mask.roll(shifts=1, dims=-1)
         mask[:, 0] = 0
         new_target = torch.where(mask > 0, target, loss_ignore_index)
-        # TODO write test for this
         return new_target
