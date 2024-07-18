@@ -27,14 +27,14 @@ class ThroughputAggregationKeys(Enum):
 class Trainer:
     def __init__(
         self,
-        local_rank: int,
+        global_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
-        self.local_rank = local_rank
+        self.global_rank = global_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
@@ -89,7 +89,7 @@ class Trainer:
 
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch
@@ -194,7 +194,7 @@ class Trainer:
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=num_train_steps_done,
                 )
-                if self.local_rank == 0:
+                if self.global_rank == 0:
                     print(training_metrics)
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
@@ -215,7 +215,7 @@ class Trainer:
         # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
         cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
-            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device(self.local_rank))
+            cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device("cuda"))
         else:
             cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to("cpu")
         return cumulated_loss_and_gradient_norm

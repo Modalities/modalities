@@ -330,7 +330,7 @@ class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
-    local_rank: int
+    global_rank: int
     gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
@@ -339,7 +339,7 @@ class DummyResultSubscriberConfig(BaseModel):
 
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):
-    local_rank: int
+    global_rank: int
     project: str
     experiment_id: str
     mode: WandbMode
@@ -349,7 +349,7 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
-    local_rank: int
+    global_rank: int
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:

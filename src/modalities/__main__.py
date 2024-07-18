@@ -35,7 +35,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters
 
 config_file_path_option = click.option(
     "--config_file_path",
@@ -234,7 +234,7 @@ class Main:
             * components.settings.cuda_env.world_size
         )
         trainer = Trainer(
-            local_rank=components.settings.cuda_env.local_rank,
+            global_rank=components.settings.cuda_env.global_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.training.gradient_acc_steps,
@@ -244,7 +244,6 @@ class Main:
 
         # Evaluator
         evaluator = Evaluator(
-            local_rank=components.settings.cuda_env.local_rank,
             batch_progress_publisher=batch_processed_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
         )
@@ -257,7 +256,7 @@ class Main:
             num_ranks=components.settings.cuda_env.world_size,
         )
         wrapped_model = components.wrapped_model
-        num_params = compute_number_of_trainable_parameters(wrapped_model)
+        num_params = get_total_number_of_trainable_parameters(wrapped_model)
         components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
