@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import jq
 import numpy as np
@@ -72,18 +71,6 @@ class DummyDataset(Dataset):
                 raise NotImplementedError(f"DummyDataset does not support type { s.sample_type}")
             sample[s.sample_key] = data
         return sample
-
-
-class SequenceDataset(Dataset):
-    def __init__(self, sequence: Sequence):
-        super().__init__(raw_data_path=None, sample_key=None)
-        self.sequence = sequence
-
-    def __len__(self) -> int:
-        return len(self.sequence)
-
-    def __getitem__(self, idx: int) -> Any:
-        return self.sequence[idx]
 
 
 class MemMapDataset(Dataset):
