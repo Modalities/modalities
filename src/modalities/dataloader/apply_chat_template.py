@@ -1,10 +1,10 @@
 import json
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
 import jsonlines
-import yaml
 from jinja2 import Template
 from packaging import version
 
@@ -21,7 +21,7 @@ def apply_chat_template(config_file_path: Path):
 
     dst_path = Path(config.settings.dst_path)
     uuid_str = str(uuid.uuid4())
-    store_config_file_with_uuid(config, dst_path, uuid_str)
+    store_config_file_with_uuid(config_file_path, dst_path, uuid_str)
     dst_path_with_uuid = dst_path.with_suffix(f".{uuid_str}" + "".join(dst_path.suffixes))
     with dst_path_with_uuid.open("w") as output_file:
         for entry in instruction_data:
@@ -40,10 +40,9 @@ def apply_chat_template(config_file_path: Path):
             output_file.write("\n")
 
 
-def store_config_file_with_uuid(config: SFTConfig, dst_path: Path, uuid_str: str) -> None:
-    config_yaml_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
-    with config_yaml_path.open("w") as config_file:
-        yaml.dump(config.model_dump(), config_file)
+def store_config_file_with_uuid(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
+    out_config_file_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
+    shutil.copyfile(config_file_path, out_config_file_path)
 
 
 def get_chat_templates(jinja2_chat_templates: Dict[str, str]) -> Dict[str, Template]:
