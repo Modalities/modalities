@@ -14,7 +14,7 @@ class TextInferenceComponentConfig(BaseModel):
     model: PydanticPytorchModuleType
     tokenizer: PydanticTokenizerIFType
     prompt_template: str
-    context_length: int
+    sequence_length: int
     temperature: Optional[float] = 1.0
     eod_token: Optional[str] = "<eod>"
     device: PydanticPytorchDeviceType

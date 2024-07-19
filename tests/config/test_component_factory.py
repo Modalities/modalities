@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
@@ -109,3 +110,68 @@ def test_single_component(config_file_path: Path, component_factory: ComponentFa
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "custom_comp_1" in components
+
+
+class TestComponentFactory:
+    @pytest.fixture
+    def component_factory(self):
+        # Create a ComponentFactory instance with a dummy registry
+        return ComponentFactory(registry=None)
+
+    def test_assert_valid_config_keys_with_valid_keys(self, component_factory):
+        # Define a dummy component config type
+        class DummyConfig(BaseModel):
+            required_key: str
+            optional_key: str = "default"
+
+        # Create a valid config dictionary
+        config_dict = {
+            "required_key": "value",
+            "optional_key": "value",
+        }
+
+        # Call the _assert_valid_config_keys method
+        component_factory._assert_valid_config_keys(
+            component_key="dummy",
+            variant_key="default",
+            config_dict=config_dict,
+            component_config_type=DummyConfig,
+        )
+
+        # No exception should be raised
+
+    def test_assert_valid_config_keys_with_invalid_keys(self, component_factory):
+        # Define a dummy component config type
+        class DummyConfig(BaseModel):
+            required_key: str
+            optional_key: str = "default"
+
+        # Create an invalid config dictionary with an extra key
+        config_dict = {
+            "required_key": "value",
+            "optional_key": "value",
+            "extra_key": "value",
+        }
+
+        # Call the _assert_valid_config_keys method and expect a ValueError
+        with pytest.raises(ValueError):
+            component_factory._assert_valid_config_keys(
+                component_key="dummy",
+                variant_key="default",
+                config_dict=config_dict,
+                component_config_type=DummyConfig,
+            )
+
+        # Create a valid config dictionary
+        valid_config_dict = {
+            "required_key": "value",
+            "optional_key": "value",
+        }
+
+        # Call the _assert_valid_config_keys method and expect no exception
+        component_factory._assert_valid_config_keys(
+            component_key="dummy",
+            variant_key="default",
+            config_dict=valid_config_dict,
+            component_config_type=DummyConfig,
+        )

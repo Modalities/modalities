@@ -17,11 +17,9 @@ from modalities.util import Aggregator, TimeRecorder
 class Evaluator:
     def __init__(
         self,
-        local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
     ) -> None:
-        self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
 
@@ -41,19 +39,19 @@ class Evaluator:
         model: nn.Module,
         data_loaders: List[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-        train_step_id: int,
+        num_train_steps_done: int,
     ) -> Dict[str, EvaluationResultBatch]:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         for data_loader in data_loaders:
             cumulated_loss = torch.zeros(3).to(device)
 
             Evaluator._publish_progress(
                 batch_progress_publisher=self.batch_progress_publisher,
-                eval_step_id=0,  # Reset progress bar
+                num_eval_steps_done=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
             thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -72,7 +70,7 @@ class Evaluator:
 
                     Evaluator._publish_progress(
                         batch_progress_publisher=self.batch_progress_publisher,
-                        eval_step_id=batch_id,
+                        num_eval_steps_done=batch_id + 1,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
             # TODO: insert reducer from outside so Evaluator is independent of FSDP
@@ -97,7 +95,7 @@ class Evaluator:
                 # TODO: hardcoded metric key
                 throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
                 dataloader_tag=data_loader.dataloader_tag,
-                train_step_id=train_step_id,
+                num_train_steps_done=num_train_steps_done,
             )
             Evaluator._publish_evaluation_result(
                 evaluation_result_publisher=self.evaluation_result_publisher,
@@ -112,11 +110,11 @@ class Evaluator:
     @staticmethod
     def _publish_progress(
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
-        eval_step_id: int,
+        num_eval_steps_done: int,
         dataloader_tag: str,
     ):
         payload = BatchProgressUpdate(
-            step_id=eval_step_id,
+            num_steps_done=num_eval_steps_done,
             experiment_status=ExperimentStatus.EVALUATION,
             dataloader_tag=dataloader_tag,
         )
