@@ -1,6 +1,7 @@
 import math
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 import pytest
@@ -12,11 +13,23 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
-from modalities.dataloader.dataset import SequenceDataset
+from modalities.dataloader.dataset import Dataset
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+
+
+class SequenceDataset(Dataset):
+    def __init__(self, sequence: Sequence):
+        super().__init__(raw_data_path=None, sample_key=None)
+        self.sequence = sequence
+
+    def __len__(self) -> int:
+        return len(self.sequence)
+
+    def __getitem__(self, idx: int) -> Any:
+        return self.sequence[idx]
 
 
 def test_resumable_dataloader():
