@@ -314,6 +314,7 @@ class LLMDataLoaderConfig(BaseModel):
     pin_memory: bool
     shuffle: bool
     skip_num_batches: Optional[int] = 0
+    fixed_num_batches: Optional[int] = None
 
 
 class RepeatingDataLoaderConfig(BaseModel):
