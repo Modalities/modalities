@@ -34,8 +34,9 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         self.collate_fn = collate_fn
         self.target_keys_to_mask = target_keys_to_mask
         self.loss_ignore_index = loss_ignore_index
-        self.b_mask_token_id = tokenizer.get_token_id(special_tokens.b_include_to_loss_token)
-        self.e_mask_token_id = tokenizer.get_token_id(special_tokens.e_include_to_loss_token)
+        self.tokenizer = tokenizer
+        self.b_mask_token_id = self.tokenizer.get_token_id(special_tokens.b_include_to_loss_token)
+        self.e_mask_token_id = self.tokenizer.get_token_id(special_tokens.e_include_to_loss_token)
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
         dataset_batch = self.collate_fn(batch)

@@ -17,12 +17,12 @@ jinja2_chat_templates:
     {% for turn in conversation %}
     {{ turn.from + ': ' }}
     {% if turn.from == chat_template_data.assistant_role %}
-    {{ chat_template_data.special_tokens.b_include_to_loss_token }}
+    {{ chat_template_data.special_tokens.b_include_to_loss_token + " "}}
     {% endif %}
     {{ turn.value + '\n'}}
     {% if turn.from == chat_template_data.assistant_role %}
-    {{ chat_template_data.special_tokens.e_include_to_loss_token }}
-    {{ chat_template_data.special_tokens.e_assistant_token }}
+    {{ " " + chat_template_data.special_tokens.e_include_to_loss_token + " "}}
+    {{ chat_template_data.special_tokens.e_assistant_token + " "}}
     {% endif %}
     {% endfor %}
     {{ chat_template_data.special_tokens.eod_token }}
@@ -33,7 +33,7 @@ chat_template_data:
   assistant_role: Assistant
   system_instruction: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages."
   special_tokens:
-      b_include_to_loss_token: <i>
-      e_include_to_loss_token: </i>
-      e_assistant_token: </a>
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
+      e_assistant_token: °
       eod_token: <|endoftext|>

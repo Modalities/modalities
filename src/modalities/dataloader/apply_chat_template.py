@@ -1,6 +1,6 @@
+import hashlib
 import json
 import shutil
-import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
@@ -20,9 +20,10 @@ def apply_chat_template(config_file_path: Path):
     chat_templates = get_chat_templates(config.jinja2_chat_templates)
 
     dst_path = Path(config.settings.dst_path)
-    uuid_str = str(uuid.uuid4())
-    store_config_file_with_uuid(config_file_path, dst_path, uuid_str)
-    dst_path_with_uuid = dst_path.with_suffix(f".{uuid_str}" + "".join(dst_path.suffixes))
+    # similar to github only use the first 7 characters of the hash for readability
+    hash_str = hash_sum_file_sha256(config_file_path)[:7]
+    store_config_file_with_hash(config_file_path, dst_path, hash_str)
+    dst_path_with_uuid = dst_path.with_suffix(f".{hash_str}" + "".join(dst_path.suffixes))
     with dst_path_with_uuid.open("w") as output_file:
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
@@ -40,7 +41,17 @@ def apply_chat_template(config_file_path: Path):
             output_file.write("\n")
 
 
-def store_config_file_with_uuid(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
+def hash_sum_file_sha256(file_path: Path) -> str:
+    hash = hashlib.sha256()
+    bytes = bytearray(128 * 1024)
+    mem_view = memoryview(bytes)
+    with file_path.open("rb", buffering=0) as f:
+        while n := f.readinto(mem_view):
+            hash.update(mem_view[:n])
+    return hash.hexdigest()
+
+
+def store_config_file_with_hash(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
     out_config_file_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
     shutil.copyfile(config_file_path, out_config_file_path)
 

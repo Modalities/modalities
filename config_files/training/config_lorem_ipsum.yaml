@@ -36,12 +36,15 @@ collate_fn:
     special_tokens:
       b_include_to_loss_token: <i>
       e_include_to_loss_token: </i>
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
 
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum.pbin
+    raw_data_path: ./data/lorem_ipsum_sft_converted_more_data.64a5f855-7b1b-496c-82fd-747d5044d496.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -252,6 +255,14 @@ model_raw:
         bias: true
         epsilon: 1e-5
 
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    padding: false
+    truncation: false
+
 scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
@@ -316,7 +327,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
