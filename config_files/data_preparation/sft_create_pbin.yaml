@@ -1,0 +1,19 @@
+settings:
+  src_path: ./data/lorem_ipsum_sft_converted.510fe89.jsonl
+  dst_path: ./data/lorem_ipsum_sft_converted.510fe89.pbin
+  index_path: ./data/lorem_ipsum_sft_converted.510fe89.idx
+  jq_pattern: .chat
+  num_cpus: 2
+  eod_token: <|endoftext|>
+  processing_batch_size: 1000
+  raw_samples_queue_size: 300
+  processed_samples_queue_size: 300
+
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: ./data/tokenizer/hf_gpt2
+    padding: false
+    truncation: false

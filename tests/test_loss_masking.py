@@ -43,22 +43,22 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
         (
             [
                 {"sample": torch.Tensor([5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1])},
-                {"sample": torch.Tensor([5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1])},
+                {"sample": torch.Tensor([5, 5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5])},
             ],
             # the expected batch is shifted and masked for loss computation!
             DatasetBatch(
                 targets={
                     "target": torch.Tensor(
                         [
+                            # expected case (due to the target shift it does not begin with [-100, -100, -100, 5])
                             [-100, -100, 5, 5, 1, -100, -100, 5, 1, -100, 1, -100, -100, 1],
-                            [-100, -100, 5, 5, 1, -100, -100, 5, 1, -100, 1, -100, -100, 1],
+                            # # case: dataset splits samples so that we need to keep the first tokens for the loss
+                            [5, 1, -100, -100, 5, 5, 5, 1, -100, -100, -100, -100, -100, -100],
                         ]
                     )
                 },
                 samples={
-                    "sample": torch.Tensor(
-                        [[5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0], [5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0]]
-                    )
+                    # not needed for the test
                 },
             ),
         )

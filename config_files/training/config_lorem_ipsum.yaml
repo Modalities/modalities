@@ -34,8 +34,8 @@ collate_fn:
       - ${settings.referencing_keys.target_key}
     loss_ignore_index: -100
     special_tokens:
-      b_include_to_loss_token: <i>
-      e_include_to_loss_token: </i>
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum_sft_converted_more_data.64a5f855-7b1b-496c-82fd-747d5044d496.pbin
+    raw_data_path: ./data/lorem_ipsum_sft_converted.510fe89.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
