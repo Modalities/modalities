@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import List
 
@@ -67,8 +68,12 @@ class ResultsSubscriberFactory:
         directory: Path = None,
     ) -> WandBEvaluationResultSubscriber:
         if global_rank == 0 and (mode != WandbMode.DISABLED):
+            # we store cache, data and offline runs under directory
+            absolute_dir = directory.absolute()
+            os.environ["WANDB_CACHE_DIR"] = str(absolute_dir)
+            os.environ["WANDB_DIR"] = str(absolute_dir)
             result_subscriber = WandBEvaluationResultSubscriber(
-                project, experiment_id, mode, directory, config_file_path
+                project, experiment_id, mode, absolute_dir, config_file_path
             )
         else:
             result_subscriber = ResultsSubscriberFactory.get_dummy_result_subscriber()
