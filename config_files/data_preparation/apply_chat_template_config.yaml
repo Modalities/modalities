@@ -18,6 +18,8 @@ jinja2_chat_templates:
     {{ turn.from + ':' }}
     {% if turn.from == chat_template_data.assistant_role %}
     {{ chat_template_data.special_tokens.b_include_to_loss_token}}
+    {% else %}
+    {{ " " }}
     {% endif %}
     {{ turn.value + '\n'}}
     {% if turn.from == chat_template_data.assistant_role %}

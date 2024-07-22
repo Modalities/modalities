@@ -31,7 +31,7 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
         collate_fn=GPT2LLMCollateFn(sample_key="sample", target_key="target"),
         target_keys_to_mask=["target"],
         loss_ignore_index=-100,
-        special_tokens=MaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
+        mask_tokens=MaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
         tokenizer=dummy_tokenizer,
     )
 
@@ -42,7 +42,14 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
     [
         (
             [
+                # the collate_fn will shift the sample and target:
+                # shifted sample:           [5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0]
+                # shifted target:           [5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1]
+                # masked shifted target:    [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100]
                 {"sample": torch.Tensor([5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1])},
+                # shifted sample:           [5, 5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5]
+                # shifted target:           [5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5]
+                # masked shifted target:    [5, -100, -100, -100, 5, 5, 5, -100, -100, -100, -100, -100, -100, -100]
                 {"sample": torch.Tensor([5, 5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5])},
             ],
             # the expected batch is shifted and masked for loss computation!
@@ -50,10 +57,10 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
                 targets={
                     "target": torch.Tensor(
                         [
-                            # expected case (due to the target shift it does not begin with [-100, -100, -100, 5])
-                            [-100, -100, 5, 5, 1, -100, -100, 5, 1, -100, 1, -100, -100, 1],
-                            # # case: dataset splits samples so that we need to keep the first tokens for the loss
-                            [5, 1, -100, -100, 5, 5, 5, 1, -100, -100, -100, -100, -100, -100],
+                            # expected case
+                            [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100],
+                            # case: if dataset splits the assisstant role across batches, Keep those tokens at the front
+                            [5, -100, -100, -100, 5, 5, 5, -100, -100, -100, -100, -100, -100, -100],
                         ]
                     )
                 },

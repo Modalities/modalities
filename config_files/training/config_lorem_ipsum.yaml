@@ -33,7 +33,7 @@ collate_fn:
     target_keys_to_mask:
       - ${settings.referencing_keys.target_key}
     loss_ignore_index: -100
-    special_tokens:
+    mask_tokens:
       b_include_to_loss_token: ^
       e_include_to_loss_token: $
     tokenizer:
