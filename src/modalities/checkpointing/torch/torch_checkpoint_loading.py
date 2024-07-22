@@ -8,7 +8,7 @@ from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.config.config import PrecisionEnum
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_local_number_of_trainable_parameters
 
 
 class TorchCheckpointLoading(CheckpointLoadingIF):
@@ -46,7 +46,7 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         # set the model to the correct device and precision
         # model = model.to(self.precision.value)
         print(
-            f"Model loaded with {compute_number_of_trainable_parameters(model)} trainable parameters from {file_path}"
+            f"Model loaded with {get_local_number_of_trainable_parameters(model)} trainable parameters from {file_path}"
         )
         return model
 

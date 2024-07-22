@@ -181,7 +181,7 @@ def progress_publisher_mock():
 @pytest.fixture(scope="function")
 def trainer(progress_publisher_mock, gradient_clipper_mock):
     return Trainer(
-        local_rank=int(os.getenv("LOCAL_RANK")),
+        global_rank=int(os.getenv("RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,

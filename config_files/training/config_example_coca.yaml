@@ -272,7 +272,7 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
@@ -293,7 +293,7 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     project: modalities
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}

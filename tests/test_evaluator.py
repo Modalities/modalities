@@ -1,4 +1,3 @@
-import os
 from unittest.mock import call
 
 import torch
@@ -26,7 +25,6 @@ def test_evaluate_cpu(
     llm_data_loader_mock.batch_size = batch_size
 
     evaluator = Evaluator(
-        local_rank=int(os.getenv("LOCAL_RANK")),
         batch_progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
