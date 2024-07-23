@@ -22,29 +22,16 @@ settings:
 
 collate_fn:  
   component_key: collate_fn
-  variant_key: mask_loss_collator_wrapper
+  variant_key: gpt_2_llm_collator
   config:
-    collate_fn:  
-      component_key: collate_fn
-      variant_key: gpt_2_llm_collator
-      config:
-        sample_key: ${settings.referencing_keys.sample_key}
-        target_key: ${settings.referencing_keys.target_key}
-    target_keys_to_mask:
-      - ${settings.referencing_keys.target_key}
-    loss_ignore_index: -100
-    mask_tokens:
-      b_include_to_loss_token: ^
-      e_include_to_loss_token: $
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
 
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
+    raw_data_path: ./data/lorem_ipsum.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -255,14 +242,6 @@ model_raw:
         bias: true
         epsilon: 1e-5
 
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
-    padding: false
-    truncation: false
-
 scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
@@ -327,7 +306,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: OFFLINE
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
