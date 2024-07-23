@@ -201,7 +201,8 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             # of the subsequent sample. Therfore, given a fixed number of samples we can compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
             # as the first sample always needs block_size many tokens and the following samples
-            # each need block_size-1 many tokens ().
+            # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
+            # of the subsequent sample for pre-training data).
             num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
             # given num_samples we calculate the starting index and length of each sample as tuple.
             packing_index = [
