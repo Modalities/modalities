@@ -72,6 +72,9 @@ class ResultsSubscriberFactory:
             absolute_dir = directory.absolute()
             os.environ["WANDB_CACHE_DIR"] = str(absolute_dir)
             os.environ["WANDB_DIR"] = str(absolute_dir)
+            # see: https://github.com/wandb/wandb/issues/6792
+            os.environ["DATA_DIR"] = str(absolute_dir)
+            os.environ["ARTIFACT_DIR"] = str(absolute_dir)
             result_subscriber = WandBEvaluationResultSubscriber(
                 project, experiment_id, mode, absolute_dir, config_file_path
             )
