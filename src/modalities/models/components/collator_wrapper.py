@@ -34,7 +34,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         """Wraps the given collate_fn and masks the target keys if not within the given special mask tokens.
         Does not include both mask tokens into the loss. If you need a token to indicate the end of the assistant,
         use another special token for this!
-        Works also for the continouus dataset reading, as if the "end-include-to-loss" token is detected in the front,
+        Works also for the continuous dataset reading, as if the "end-include-to-loss" token is detected in the front,
         all tokens before are included to the loss.
 
         Throws a ValueError if the mask tokens are not found in the target or if the mask tokens are the same.
