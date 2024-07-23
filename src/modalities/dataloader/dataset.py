@@ -180,7 +180,7 @@ class PackedMemMapDatasetBase(Dataset):
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
-    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, reuse_last_target: bool):
+    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, reuse_last_target: bool = True):
         self.block_size = block_size
         self.reuse_last_target = reuse_last_target
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
