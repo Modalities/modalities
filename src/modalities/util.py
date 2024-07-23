@@ -10,6 +10,8 @@ from typing import Callable, Dict, Generic, Optional, Type, TypeVar
 import torch
 import torch.distributed as dist
 from pydantic import ValidationError
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
@@ -56,8 +58,16 @@ def format_metrics_to_gb(item):
     return metric_num
 
 
-def compute_number_of_trainable_parameters(model: torch.nn.Module):
+def get_local_number_of_trainable_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def get_total_number_of_trainable_parameters(model: FSDP) -> Number:
+    num_params = get_local_number_of_trainable_parameters(model)
+    num_params_tensor = torch.tensor(num_params).cuda()
+    dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
+    total_num_params = num_params_tensor.item()
+    return total_num_params
 
 
 class TimeRecorderStates(Enum):

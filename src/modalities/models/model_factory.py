@@ -11,7 +11,7 @@ from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
-from modalities.util import compute_number_of_trainable_parameters
+from modalities.util import get_local_number_of_trainable_parameters
 
 
 class ModelFactory:
@@ -34,7 +34,8 @@ class ModelFactory:
         sharding_strategy: ShardingStrategy,
     ) -> FSDP:
         print(
-            f"Unsharded number of parameters on rank {dist.get_rank()}: {compute_number_of_trainable_parameters(model)}"
+            f"Unsharded number of parameters on rank {dist.get_rank()}: "
+            f"{get_local_number_of_trainable_parameters(model)}"
         )
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
@@ -52,7 +53,7 @@ class ModelFactory:
         )
         print(
             f"Sharded number of parameters on rank {dist.get_rank()}:"
-            f"{compute_number_of_trainable_parameters(fsdp_model)}"
+            f"{get_local_number_of_trainable_parameters(fsdp_model)}"
         )
 
         return fsdp_model

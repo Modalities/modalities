@@ -74,7 +74,7 @@ class Gym:
         checkpoint_saving: CheckpointSaving,
         checkpointing_interval_in_steps: int,
     ):
-        if num_train_steps_done % checkpointing_interval_in_steps == 0:
+        if num_train_steps_done % checkpointing_interval_in_steps == 0 and num_train_steps_done > 0:
             checkpoint_saving.save_checkpoint(
                 num_train_steps_done=num_train_steps_done,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results

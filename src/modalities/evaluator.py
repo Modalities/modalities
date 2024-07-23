@@ -17,11 +17,9 @@ from modalities.util import Aggregator, TimeRecorder
 class Evaluator:
     def __init__(
         self,
-        local_rank: int,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
     ) -> None:
-        self.local_rank = local_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
 
@@ -46,7 +44,7 @@ class Evaluator:
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 
-        device = torch.device(self.local_rank if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         for data_loader in data_loaders:
             cumulated_loss = torch.zeros(3).to(device)
