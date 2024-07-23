@@ -47,20 +47,13 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
                 # shifted target:           [5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1]
                 # masked shifted target:    [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100]
                 {"sample": torch.Tensor([5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1])},
-                # shifted sample:           [5, 5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5]
-                # shifted target:           [5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5]
-                # masked shifted target:    [5, -100, -100, -100, 5, 5, 5, -100, -100, -100, -100, -100, -100, -100]
-                {"sample": torch.Tensor([5, 5, 1, 5, 0, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5])},
             ],
             # the expected batch is shifted and masked for loss computation!
             DatasetBatch(
                 targets={
                     "target": torch.Tensor(
                         [
-                            # expected case
                             [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100],
-                            # case: if dataset splits the assisstant role across batches, Keep those tokens at the front
-                            [5, -100, -100, -100, 5, 5, 5, -100, -100, -100, -100, -100, -100, -100],
                         ]
                     )
                 },
@@ -68,7 +61,7 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
                     # not needed for the test
                 },
             ),
-        )
+        ),
     ],
 )
 def test_loss_masking(loss_masking_config, batch, expected_batch):

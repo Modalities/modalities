@@ -45,6 +45,10 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         self.tokenizer = tokenizer
         self.b_mask_token_id = self.tokenizer.get_token_id(mask_tokens.b_include_to_loss_token)
         self.e_mask_token_id = self.tokenizer.get_token_id(mask_tokens.e_include_to_loss_token)
+        if self.b_mask_token_id == self.e_mask_token_id:
+            raise ValueError(
+                "b_mask_token_id and e_mask_token_id of the " + "LossMaskingCollateFnWrapper must be different!"
+            )
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
         dataset_batch = self.collate_fn(batch)
@@ -63,9 +67,6 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         self, target: torch.Tensor, b_mask_token_id: int, e_mask_token_id: int, loss_ignore_index: int
     ) -> torch.Tensor:
         error_msg = ""
-
-        if b_mask_token_id == e_mask_token_id:
-            error_msg += "b_mask_token_id and e_mask_token_id must be different! "
         if b_mask_token_id not in target:
             error_msg += "b_mask_token_id not found in target "
         if e_mask_token_id not in target:
@@ -88,11 +89,25 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         # in case -1 (end mask token indicator) is before 1 (begin mask token indicator) we need to
         # include the first tokens to the loss
         end_before_begin = torch.argmax(mask, dim=-1, keepdim=True) > torch.argmin(mask, dim=-1, keepdim=True)
-        mask[:, 0] = end_before_begin.squeeze()
+        if end_before_begin.any():
+            raise ValueError(
+                "end mask token indicator is before begin mask token indicator in the target. "
+                + "This is not supported by the LossMaskingCollateFnWrapper."
+                + "Make sure to use padding and truncation with the tokenizer for PackedMemMapDatasetContinuous"
+            )
+        # note: to enable splitted assistant answers uncomment:
+        # mask[:, 0] = end_before_begin.squeeze(-1)
 
         # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
         # this includes the 1, but due to the shift above, we exclude both!
         include_to_loss_mask = mask.cumsum(-1)
+
+        # TODO check that we have the mask with values between -1 and 1, otherwise the tokens would not be alternating
+        if (mask > 1).any() or (mask < -1).any():
+            raise ValueError(
+                "Masking tokens are not alternating in the target. "
+                + "This is not supported by the LossMaskingCollateFnWrapper."
+            )
 
         # apply mask: if mask is 1, keep the target, otherwise replace with loss_ignore_index
         new_target = torch.where(include_to_loss_mask.bool(), target, loss_ignore_index)

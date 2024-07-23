@@ -1,7 +1,7 @@
 settings:
-  src_path: ./data/lorem_ipsum_sft_converted.510fe89.jsonl
-  dst_path: ./data/lorem_ipsum_sft_converted.510fe89.pbin
-  index_path: ./data/lorem_ipsum_sft_converted.510fe89.idx
+  src_path: ./data/lorem_ipsum_sft_converted.aadd295.jsonl
+  dst_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
+  index_path: ./data/lorem_ipsum_sft_converted.aadd295.idx
   jq_pattern: .chat
   num_cpus: 2
   eod_token: <|endoftext|>

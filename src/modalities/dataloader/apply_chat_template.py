@@ -16,8 +16,7 @@ def apply_chat_template(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config = SFTConfig(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
-    chat_template_key = config.settings.chat_template_key
-    chat_templates = get_chat_templates(config.jinja2_chat_templates)
+    chat_template = get_chat_template(config.jinja2_chat_template)
 
     dst_path = Path(config.settings.dst_path)
     # similar to github only use the first 7 characters of the hash for readability
@@ -28,14 +27,7 @@ def apply_chat_template(config_file_path: Path):
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
             conversation = map_roles(conversation, config.instruction_data_transformation.role_mapping)
-            if chat_template_key in entry:
-                chat_template = chat_templates[entry[chat_template_key]]
-            else:
-                chat_template = chat_templates["default"]
-
             chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
-            if not all(special_token in chat for special_token in config.chat_template_data["special_tokens"].values()):
-                raise ValueError("Not all special tokens are present in the chat template!")
             entry["chat"] = chat
             json.dump(entry, output_file)
             output_file.write("\n")
@@ -56,12 +48,12 @@ def store_config_file_with_hash(config_file_path: Path, dst_path: Path, uuid_str
     shutil.copyfile(config_file_path, out_config_file_path)
 
 
-def get_chat_templates(jinja2_chat_templates: Dict[str, str]) -> Dict[str, Template]:
-    chat_templates = {}
-    for key, template_string in jinja2_chat_templates.items():
-        chat_template = template_string.replace("}\n{", "}{")
-        chat_templates[key] = _compile_jinja_template(chat_template)
-    return chat_templates
+def get_chat_template(jinja2_chat_template: str) -> Template:
+    # yaml adds a newline character when using the multiline "|" indicator. (with ">" it would add spaces instead)
+    # we need to remove those
+    chat_template = jinja2_chat_template.replace("}\n{", "}{")
+    compiled_chat_template = _compile_jinja_template(chat_template)
+    return compiled_chat_template
 
 
 def map_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
