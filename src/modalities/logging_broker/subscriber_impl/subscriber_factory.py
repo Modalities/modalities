@@ -68,17 +68,22 @@ class ResultsSubscriberFactory:
         directory: Path = None,
     ) -> WandBEvaluationResultSubscriber:
         if global_rank == 0 and (mode != WandbMode.DISABLED):
-            # we store cache, data and offline runs under directory
-            absolute_dir = directory.absolute()
-            os.environ["WANDB_CACHE_DIR"] = str(absolute_dir)
-            os.environ["WANDB_DIR"] = str(absolute_dir)
+            if directory is not None:
+                # we store cache, data and offline runs under directory
+                absolute_dir = directory.absolute()
+                (absolute_dir / "wandb").mkdir(parents=True, exist_ok=True)
 
-            # see https://community.wandb.ai/t/wandb-artifact-cache-directory-fills-up-the-home-directory/5224/5
-            # and https://github.com/wandb/wandb/issues/6792
-            os.environ["WANDB_DATA_DIR"] = str(absolute_dir)
-            os.environ["WANDB_ARTIFACT_LOCATION"] = str(absolute_dir)
-            os.environ["WANDB_ARTIFACT_DIR"] = str(absolute_dir)
-            os.environ["WANDB_CONFIG_DIR"] = str(absolute_dir)
+                os.environ["WANDB_CACHE_DIR"] = str(absolute_dir)
+                os.environ["WANDB_DIR"] = str(absolute_dir)
+
+                # see https://community.wandb.ai/t/wandb-artifact-cache-directory-fills-up-the-home-directory/5224/5
+                # and https://github.com/wandb/wandb/issues/6792
+                os.environ["WANDB_DATA_DIR"] = str(absolute_dir)
+                os.environ["WANDB_ARTIFACT_LOCATION"] = str(absolute_dir)
+                os.environ["WANDB_ARTIFACT_DIR"] = str(absolute_dir)
+                os.environ["WANDB_CONFIG_DIR"] = str(absolute_dir)
+            else:
+                absolute_dir = None
 
             result_subscriber = WandBEvaluationResultSubscriber(
                 project, experiment_id, mode, absolute_dir, config_file_path
