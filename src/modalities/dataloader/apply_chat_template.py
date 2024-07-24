@@ -1,4 +1,6 @@
+import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
@@ -9,49 +11,49 @@ from packaging import version
 from modalities.config.config import load_app_config_dict
 from modalities.config.sft_config import SFTConfig
 
-# TODO copy and adapt: src.modalities.dataloader.dataset.MemMapDataset
-# -> it reads lerge JSONL files, jq-pattern filters and tokenizes
-# -> select what to tokenize and what to loss-mask (we dont need to have the b_assistant_token)
-
-# Max idea: select what to tokenize and what to loss-mask (we dont need to have the b_assistant_token) then
-# have a collate function which applies the chat template
-# after collate the input could be too large; packing is more difficult.
-#   --> collate is after batching; packing would introduce dynamic batch size
-
 
 def apply_chat_template(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config = SFTConfig(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
-    chat_template_key = config.settings.chat_template_key
-    chat_templates = get_chat_templates(config.jinja2_chat_templates)
+    chat_template = get_chat_template(config.jinja2_chat_template)
 
-    with open(config.settings.dst_path, "w") as output_file:
-        # similar to an index file, put general information about the dataset into the first line of the JSONL
-        json.dump(config.chat_template_data, output_file)
-        output_file.write("\n")
+    dst_path = Path(config.settings.dst_path)
+    # similar to github only use the first 7 characters of the hash for readability
+    hash_str = hash_sum_file_sha256(config_file_path)[:7]
+    store_config_file_with_hash(config_file_path, dst_path, hash_str)
+    dst_path_with_uuid = dst_path.with_suffix(f".{hash_str}" + "".join(dst_path.suffixes))
+    with dst_path_with_uuid.open("w") as output_file:
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
             conversation = map_roles(conversation, config.instruction_data_transformation.role_mapping)
-            if chat_template_key in entry:
-                chat_template = chat_templates[entry[chat_template_key]]
-            else:
-                chat_template = chat_templates["default"]
-
             chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
-            if not all(special_token in chat for special_token in config.chat_template_data["special_tokens"].values()):
-                raise ValueError("Not all special tokens are present in the chat template!")
             entry["chat"] = chat
             json.dump(entry, output_file)
             output_file.write("\n")
 
 
-def get_chat_templates(jinja2_chat_templates: Dict[str, str]) -> Dict[str, Template]:
-    chat_templates = {}
-    for key, template_string in jinja2_chat_templates.items():
-        chat_template = template_string.replace("}\n{", "}{")
-        chat_templates[key] = _compile_jinja_template(chat_template)
-    return chat_templates
+def hash_sum_file_sha256(file_path: Path) -> str:
+    hash = hashlib.sha256()
+    bytes = bytearray(128 * 1024)
+    mem_view = memoryview(bytes)
+    with file_path.open("rb", buffering=0) as f:
+        while n := f.readinto(mem_view):
+            hash.update(mem_view[:n])
+    return hash.hexdigest()
+
+
+def store_config_file_with_hash(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
+    out_config_file_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
+    shutil.copyfile(config_file_path, out_config_file_path)
+
+
+def get_chat_template(jinja2_chat_template: str) -> Template:
+    # yaml adds a newline character when using the multiline "|" indicator. (with ">" it would add spaces instead)
+    # we need to remove those
+    chat_template = jinja2_chat_template.replace("}\n{", "}{")
+    compiled_chat_template = _compile_jinja_template(chat_template)
+    return compiled_chat_template
 
 
 def map_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
