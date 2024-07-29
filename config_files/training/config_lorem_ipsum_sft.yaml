@@ -47,6 +47,7 @@ train_dataset:
     raw_data_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
+    reuse_last_target: False
 
 train_dataloader:
   component_key: data_loader
