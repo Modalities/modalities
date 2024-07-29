@@ -9,7 +9,7 @@ import torch.distributed as dist
 # from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
 
-from modalities.config.lookup_enum import LookupEnum
+from modalities.component_instantiation.config.lookup_enum import LookupEnum
 
 
 def is_running_with_torchrun():

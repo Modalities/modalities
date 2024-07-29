@@ -10,8 +10,8 @@ from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 
-from modalities.config.lookup_enum import LookupEnum
-from modalities.config.pydanctic_if_types import (
+from modalities.component_instantiation.config.lookup_enum import LookupEnum
+from modalities.component_instantiation.config.pydanctic_if_types import (
     PydanticCheckpointLoadingIFType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
@@ -25,7 +25,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
 )
-from modalities.config.utils import parse_torch_device
+from modalities.component_instantiation.config.utils import parse_torch_device
 from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
 from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 

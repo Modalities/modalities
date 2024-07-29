@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
 
-from modalities.registry.components import ComponentEntity
+from modalities.component_instantiation.registry.components import ComponentEntity
 
 Entity = Tuple[Type, Type[BaseModel]]
 

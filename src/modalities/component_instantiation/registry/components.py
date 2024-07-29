@@ -14,7 +14,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
-from modalities.config.config import (
+from modalities.component_instantiation.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
