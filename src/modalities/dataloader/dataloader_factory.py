@@ -49,7 +49,7 @@ class DataloaderFactory:
             start_index=skip_num_batches, underlying_batch_sampler=batch_sampler, max_num_elements=fixed_num_batches
         )
 
-        if fixed_num_batches <= skip_num_batches:
+        if fixed_num_batches is not None and fixed_num_batches <= skip_num_batches:
             raise ConfigError("fixed_num_batches must be larger than skip_num_batches")
 
         # make sure that the batch sampler has enough elements such that we can fix the number of batches to num_batches
