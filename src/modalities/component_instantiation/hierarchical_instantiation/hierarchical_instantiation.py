@@ -1,63 +1,93 @@
-from typing import Any, Dict, List, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from pydantic import BaseModel
 
-from modalities.registry.registry import Registry
+from modalities.component_instantiation.hierarchical_instantiation.custom_component_builder_if import ComponentBuilderIF
+from modalities.component_instantiation.registry.registry import Registry
+from modalities.exceptions import HierachicalInstantiationError
+
+BaseModelChild = TypeVar("BaseModelChild", bound=BaseModel)
 
 
-class ComponentFactory:
-    def __init__(self, registry: Registry) -> None:
+class HierarchicalInstantiation:
+    def __init__(
+        self,
+        registry: Registry,
+        top_level_component_to_custom_factory: Optional[Dict[Tuple[str, str], ComponentBuilderIF]] = None,
+    ):
+        """_summary_
+
+        Args:
+            registry (Registry): _description_
+            top_level_component_to_custom_factory (Optional[Dict[Tuple[str, str], ComponentBuilderIF]]): _description_.
+                Defaults to None.
+        """
         self.registry = registry
+        if top_level_component_to_custom_factory is None:
+            top_level_component_to_custom_factory = {}
 
-    BaseModelChild = TypeVar("BaseModelChild", bound=BaseModel)
+        self.top_level_component_to_custom_factory = top_level_component_to_custom_factory
 
-    def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
-        component_names = list(components_model_type.model_fields.keys())
-        component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
-        print(component_dict)
-        components = components_model_type(**component_dict)
-        return components
-
-    def _build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
-        component_dict_filtered = {name: config_dict[name] for name in component_names}
-        components, _ = self._build_component(
-            current_component_config=component_dict_filtered,
-            component_config=config_dict,
-            top_level_components={},
-            traversal_path=[],
-        )
-        return components
-
-    def _build_component(
+    def build_components_recursively(
         self,
         current_component_config: Union[Dict, List, Any],
         component_config: Union[Dict, List, Any],
         top_level_components: Dict[str, Any],
         traversal_path: List,
-    ) -> Any:
+        allow_reference_config: bool = True,
+    ) -> Tuple[Dict[str, Any], List[str]]:
+        """_summary_
+
+        Args:
+            current_component_config (Union[Dict, List, Any]): _description_
+            component_config (Union[Dict, List, Any]): _description_
+            top_level_components (Dict[str, Any]): Dictionary that contains the top-level components that
+                have been built already. Initially empty.
+            traversal_path (List): List of keys reflecting the traversal path within the config.
+                Initially empty list.
+
+        Returns:
+            Any: _description_
+        """
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
-            # if the entities are top level components, we return the component,
+            # if the entities are already top level components, we return the component,
             # as it must have been built already via a referencing component
             if len(traversal_path) > 0 and traversal_path[-1] in top_level_components:
                 entity_key = traversal_path[-1]
                 return top_level_components[entity_key], top_level_components
-            # if it is not a component that has been built already, we need to build it.
+
+            # check if we have a custom instantiation config for this component
+            if HierarchicalInstantiation._is_custom_component_config(
+                config_dict=current_component_config,
+                top_level_component_to_custom_factory=self.top_level_component_to_custom_factory,
+            ):
+                if len(traversal_path) > 1:
+                    raise HierachicalInstantiationError(
+                        f"Could not instantiate component {traversal_path[-1]}. Only top-level components allow"
+                        " for custom instantiation routines."
+                    )
+                component_key = current_component_config["component_key"]
+                variant_key = current_component_config["variant_key"]
+
+            # if it is not a component that has been built already or a custom component, we need to build it.
             # We first traverse the config for possible sub components that need to build beforehand.
             materialized_component_config = {}
             for sub_entity_key, sub_component_config_dict in current_component_config.items():
-                materialized_component_config[sub_entity_key], top_level_components = self._build_component(
+                materialized_component_config[sub_entity_key], top_level_components = self.build_components_recursively(
                     current_component_config=sub_component_config_dict,
                     component_config=component_config,
                     top_level_components=top_level_components,
                     traversal_path=traversal_path + [sub_entity_key],
+                    allow_reference_config=allow_reference_config,
                 )
             # After building all the sub components, we can now build the actual component
             # if the config is component_config then we instantiate the component
-            if ComponentFactory._is_component_config(config_dict=current_component_config):
+            if HierarchicalInstantiation._is_component_config(config_dict=current_component_config):
                 # instantiate component config
                 component_key = current_component_config["component_key"]
                 variant_key = current_component_config["variant_key"]
+
                 current_component_config = self._instantiate_component_config(
                     component_key=component_key,
                     variant_key=variant_key,
@@ -78,14 +108,17 @@ class ComponentFactory:
                 return component, top_level_components
 
             # if the config is a reference_config then check if it exists and if not, we build it
-            if ComponentFactory._is_reference_config(config_dict=current_component_config):
+            if HierarchicalInstantiation._is_reference_config(config_dict=current_component_config):
+                if not allow_reference_config:
+                    raise ValueError("At least one of the components ")
                 referenced_entity_key = current_component_config["instance_key"]
                 if referenced_entity_key not in top_level_components:
-                    materialized_referenced_component, top_level_components = self._build_component(
+                    materialized_referenced_component, top_level_components = self.build_components_recursively(
                         current_component_config=component_config[referenced_entity_key],
                         component_config=component_config,
                         top_level_components=top_level_components,
                         traversal_path=[referenced_entity_key],
+                        allow_reference_config=allow_reference_config,
                     )
                     # we add the newly build reference config to the top level components dict
                     # so that we don't instantiate it again when we reach the respective component config
@@ -99,11 +132,12 @@ class ComponentFactory:
         elif isinstance(current_component_config, list):
             materialized_component_configs = []
             for sub_entity_key, sub_component_config in enumerate(current_component_config):
-                materialized_component_config, top_level_components = self._build_component(
+                materialized_component_config, top_level_components = self.build_components_recursively(
                     current_component_config=sub_component_config,
                     component_config=component_config,
                     top_level_components=top_level_components,
                     traversal_path=traversal_path + [str(sub_entity_key)],
+                    allow_reference_config=allow_reference_config,
                 )
                 materialized_component_configs.append(materialized_component_config)
             return materialized_component_configs, top_level_components
@@ -117,6 +151,17 @@ class ComponentFactory:
     def _is_component_config(config_dict: Dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return "component_key" in config_dict.keys()
+
+    @staticmethod
+    def _is_custom_component_config(
+        config_dict: Dict, top_level_component_to_custom_factory: Optional[Dict[Tuple[str, str], Callable]]
+    ) -> bool:
+        is_component_config = "component_key" in config_dict.keys() and "variant_key" in config_dict.keys()
+        is_custom_component_config = (
+            is_component_config
+            and (config_dict["component_key"], config_dict["variant_key"]) in top_level_component_to_custom_factory
+        )
+        return is_custom_component_config
 
     @staticmethod
     def _is_reference_config(config_dict: Dict) -> bool:
@@ -157,7 +202,7 @@ class ComponentFactory:
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
         component_type: Type = self.registry.get_component(component_key, variant_key)
-        component_config_dict = self.base_model_to_dict(component_config)
+        component_config_dict = HierarchicalInstantiation.base_model_to_dict(component_config)
         component = component_type(**component_config_dict)
         return component
 
