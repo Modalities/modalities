@@ -1,9 +1,8 @@
 import copy
 
-from lora_layers import LoRALayer
 from torch import nn
 
-from modalities.models.lora.lora_layers import LoRAEmbedding, LoRALinear
+from modalities.models.lora.lora_layers import LoRAEmbedding, LoRALinear, LoRALayer
 
 
 def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
@@ -24,6 +23,15 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
         raise NotImplementedError
 
 
+def conversion_lora(
+    model: nn.Module,
+    r: int,
+    alpha: int,
+):
+    replace_modules_in_attention(model=model, r=r, alpha=alpha)
+    mark_only_lora_as_trainable(model=model)
+    return model
+
 def replace_modules_in_attention(
     model: nn.Module,
     r: int,
@@ -40,7 +48,6 @@ def replace_modules_in_attention(
                     setattr(module, sub_name, new_linear)
         else:
             replace_modules_in_attention(module, r, alpha)
-
 
 def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
     if isinstance(layer, nn.Embedding):
