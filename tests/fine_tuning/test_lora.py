@@ -76,3 +76,25 @@ def test_convert_embedding_layer(model, r, alpha):
 def test_replace_modules_in_attention(model, r, alpha):
     converted = replace_modules_in_attention(model, r, alpha)
     assert isinstance(converted, nn.Module)
+
+
+def compute_trainable_num_parameters(model: nn.Module):
+    trainable_num_params = 0
+
+    total_params = 0
+
+    for name, param in model.named_parameters():
+        total_params += param.numel()
+
+        if param.requires_grad:
+            trainable_num_params += param.numel()
+
+    trainable_percentage = 100 * trainable_num_params / total_params
+
+    print(
+        f"trainable params: {trainable_num_params} || \
+          total params: {total_params} || \
+          trainable%: {trainable_percentage}"
+    )
+
+    return trainable_percentage

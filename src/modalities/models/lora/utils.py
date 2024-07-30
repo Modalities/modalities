@@ -1,8 +1,27 @@
 import copy
 
+from lora_layers import LoRALayer
 from torch import nn
 
 from modalities.models.lora.lora_layers import LoRAEmbedding, LoRALinear
+
+
+def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
+    for n, p in model.named_parameters():
+        if "lora_" not in n:
+            p.requires_grad = False
+    if bias == "none":
+        return
+    elif bias == "all":
+        for n, p in model.named_parameters():
+            if "bias" in n:
+                p.requires_grad = True
+    elif bias == "lora_only":
+        for m in model.modules():
+            if isinstance(m, LoRALayer) and hasattr(m, "bias") and m.bias is not None:
+                m.bias.requires_grad = True
+    else:
+        raise NotImplementedError
 
 
 def replace_modules_in_attention(
@@ -14,7 +33,7 @@ def replace_modules_in_attention(
     # "attn", "linear", "embedding", "conv1d", "conv2d", "conv3d"
     # also implement with different model key name 'attn'
     for name, module in model.named_children():
-        if "attn" in name.lower() and isinstance(module, nn.Module):
+        if "attention" in type(module).__name__.lower() and isinstance(module, nn.Module):
             for sub_name, sub_module in module.named_children():
                 if isinstance(sub_module, nn.Linear) or isinstance(sub_module, nn.Embedding):
                     new_linear = convert_layer(sub_module, r, alpha)
