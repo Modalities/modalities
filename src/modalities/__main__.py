@@ -13,12 +13,14 @@ from pydantic import BaseModel, FilePath
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.config.instantiation_models import (
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.component_instantiation.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
 )
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -30,8 +32,6 @@ from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import get_total_number_of_trainable_parameters

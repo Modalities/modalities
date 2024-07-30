@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.batch import DatasetBatch
-from modalities.config.config import load_app_config_dict
+from modalities.component_instantiation.config.config import load_app_config_dict
 from modalities.models.gpt2.collator import CollateFnIF
 
 

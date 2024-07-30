@@ -3,7 +3,7 @@ import os
 import torch
 import torch.distributed as dist
 
-from modalities.config.config import ProcessGroupBackendType
+from modalities.component_instantiation.config.config import ProcessGroupBackendType
 
 
 class CudaEnv:

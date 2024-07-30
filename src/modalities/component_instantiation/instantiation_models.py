@@ -4,7 +4,7 @@ from typing import Annotated, Dict, List, Optional
 
 from pydantic import BaseModel, Field, FilePath, field_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.component_instantiation.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
@@ -17,7 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
 )
-from modalities.config.utils import parse_torch_device
+from modalities.component_instantiation.config.utils import parse_torch_device
 
 
 class CudaEnvSettings(BaseModel):

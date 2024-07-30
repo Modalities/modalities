@@ -4,13 +4,13 @@ from typing import Optional
 
 from pydantic import FilePath
 
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.config.instantiation_models import TextGenerationInstantiationModel
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.component_instantiation.instantiation_models import TextGenerationInstantiationModel
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 from modalities.inference.text.config import TextInferenceComponentConfig
 from modalities.inference.text.inference_component import TextInferenceComponent
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import is_running_with_torchrun
 

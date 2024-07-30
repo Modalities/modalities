@@ -3,10 +3,10 @@ from typing import Dict
 
 from pydantic import BaseModel
 
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 
 
 class ModelTypeEnum(Enum):

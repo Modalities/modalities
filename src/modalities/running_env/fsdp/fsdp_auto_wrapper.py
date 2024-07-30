@@ -6,7 +6,7 @@ from typing import Callable, List
 import torch.nn as nn
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
-from modalities.config.lookup_enum import LookupEnum
+from modalities.component_instantiation.config.lookup_enum import LookupEnum
 from modalities.util import get_module_class_from_name
 
 

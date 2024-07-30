@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 
-from modalities.config.config import WandbMode
+from modalities.component_instantiation.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
     DummyProgressSubscriber,

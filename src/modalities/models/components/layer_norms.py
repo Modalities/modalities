@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field
 
-from modalities.config.lookup_enum import LookupEnum
+from modalities.component_instantiation.config.lookup_enum import LookupEnum
 
 
 class RMSLayerNorm(nn.Module):

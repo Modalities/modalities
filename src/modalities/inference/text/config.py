@@ -2,12 +2,12 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.component_instantiation.config.pydanctic_if_types import (
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTokenizerIFType,
 )
-from modalities.config.utils import parse_torch_device
+from modalities.component_instantiation.config.utils import parse_torch_device
 
 
 class TextInferenceComponentConfig(BaseModel):

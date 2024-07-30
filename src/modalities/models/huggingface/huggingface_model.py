@@ -5,7 +5,7 @@ import torch
 from pydantic import BaseModel, ConfigDict
 from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
 
-from modalities.config.lookup_enum import LookupEnum
+from modalities.component_instantiation.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
 
 # Huggingface Model dependencies

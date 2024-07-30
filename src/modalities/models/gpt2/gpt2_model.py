@@ -13,8 +13,8 @@ except ModuleNotFoundError:
 
 from pydantic import BaseModel, Field, model_validator, validator
 
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.config.utils import convert_base_model_config_to_dict
+from modalities.component_instantiation.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.component_instantiation.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 

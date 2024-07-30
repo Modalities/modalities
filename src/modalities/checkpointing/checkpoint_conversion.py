@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from modalities.config.config import load_app_config_dict
+from modalities.component_instantiation.config.config import load_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 
 

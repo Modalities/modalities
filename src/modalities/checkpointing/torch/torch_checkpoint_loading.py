@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
-from modalities.config.config import PrecisionEnum
+from modalities.component_instantiation.config.config import PrecisionEnum
 from modalities.util import get_local_number_of_trainable_parameters
 
 
