@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
-from modalities.config.config import PrecisionEnum
+from modalities.component_instantiation.config.config import PrecisionEnum
 
 
 class DummyModel(nn.Module):

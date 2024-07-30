@@ -4,8 +4,8 @@ import pytest
 import torch
 
 from modalities.__main__ import Main, load_app_config_dict
-from modalities.config.config import ProcessGroupBackendType
-from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
+from modalities.component_instantiation.config.config import ProcessGroupBackendType
+from modalities.component_instantiation.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.running_env.cuda_env import CudaEnv
 from tests.conftest import _ROOT_DIR

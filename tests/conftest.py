@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
-from modalities.config.config import load_app_config_dict
+from modalities.component_instantiation.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader

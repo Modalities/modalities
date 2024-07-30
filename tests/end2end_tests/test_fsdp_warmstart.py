@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.batch import EvaluationResultBatch
-from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
-from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
+from modalities.component_instantiation.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
+from modalities.component_instantiation.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF

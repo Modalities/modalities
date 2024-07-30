@@ -9,14 +9,14 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.__main__ import load_app_config_dict
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import get_optimizer_groups
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from tests.conftest import _ROOT_DIR

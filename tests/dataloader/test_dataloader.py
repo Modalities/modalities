@@ -9,15 +9,15 @@ import torch
 from pydantic import BaseModel
 from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
-from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.config import load_app_config_dict
+from modalities.component_instantiation.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.models.gpt2.collator import CollateFnIF
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
 
 
 class SequenceDataset(Dataset):

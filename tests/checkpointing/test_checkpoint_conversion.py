@@ -6,13 +6,13 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
+from modalities.component_instantiation.component_factory import ComponentFactory
+from modalities.component_instantiation.config.config import load_app_config_dict
+from modalities.component_instantiation.registry.components import COMPONENTS
+from modalities.component_instantiation.registry.registry import Registry
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 from modalities.models.model import NNModel
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
 from tests.conftest import _ROOT_DIR
 
 

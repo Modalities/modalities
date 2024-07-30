@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from modalities.config.config import PreTrainedHFTokenizerConfig
+from modalities.component_instantiation.config.config import PreTrainedHFTokenizerConfig
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer, TokenizerWrapper
 
 
