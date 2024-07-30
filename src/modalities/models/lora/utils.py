@@ -1,41 +1,26 @@
 import copy
-from lib2to3.pytree import convert
-from typing import List, Type
 
-from sympy.integrals.heurisch import components
 from torch import nn
 
 from modalities.models.lora.lora_layers import LoRAEmbedding, LoRALinear
 
 
-def convert_model(
-    model: nn.Module, r: int, alpha: int, layer_types: List[Type[nn.Module]]
+def replace_modules_in_attention(
+    model: nn.Module,
+    r: int,
+    alpha: int,
 ):
     # todo implement with different layer types
     # "attn", "linear", "embedding", "conv1d", "conv2d", "conv3d"
-    for module in model.modules():
-        if type(module) in layer_types:
-            to_be_converted = [i for i in module.modules() if type(i) != type(module)]
-            converted = convert_component(to_be_converted, r, alpha)
-            breakpoint()
-
-    # todo replace components
-    # old_head = model.lm_head
-    # model.lm_head = convert_layer(old_head, r, alpha)
-    # del old_head
-    # return model
-
-
-def convert_component(components: List[nn.Module], r, alpha):
-    # todo implement recursive function that does the conversion. see test for example
-    if components:
-        for component in components:
-            to_be_converted = [
-                i for i in component.modules() if type(i) != type(component)
-            ]
-            return convert_component(to_be_converted, r, alpha)
-    else:
-        return convert_layer(components[0], r, alpha)
+    # also implement with different model key name 'attn'
+    for name, module in model.named_children():
+        if "attn" in name.lower() and isinstance(module, nn.Module):
+            for sub_name, sub_module in module.named_children():
+                if isinstance(sub_module, nn.Linear) or isinstance(sub_module, nn.Embedding):
+                    new_linear = convert_layer(sub_module, r, alpha)
+                    setattr(module, sub_name, new_linear)
+        else:
+            replace_modules_in_attention(module, r, alpha)
 
 
 def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
@@ -52,9 +37,7 @@ def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
     return transfer_default_attributes(layer, result)
 
 
-def convert_embedding(
-    embedding_layer: nn.Embedding, r: int, alpha: int
-) -> LoRAEmbedding:
+def convert_embedding(embedding_layer: nn.Embedding, r: int, alpha: int) -> LoRAEmbedding:
     lora_embedding = LoRAEmbedding(
         num_embeddings=embedding_layer.num_embeddings,
         embedding_dim=embedding_layer.embedding_dim,
@@ -77,9 +60,7 @@ def convert_linear(linear_layer: nn.Linear, r: int, alpha: int) -> LoRALinear:
     return lora_linear
 
 
-def transfer_default_attributes(
-    reference_layer: nn.Module, result_layer: nn.Module
-) -> nn.Module:
+def transfer_default_attributes(reference_layer: nn.Module, result_layer: nn.Module) -> nn.Module:
     result_layer.training = reference_layer.training
     result_layer.dump_patches = reference_layer.dump_patches
     result_layer.call_super_init = reference_layer.call_super_init

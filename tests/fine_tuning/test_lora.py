@@ -5,11 +5,11 @@ import pytest
 from torch import nn
 
 from modalities.config.config import load_app_config_dict
-from modalities.models.gpt2.gpt2_model import CausalSelfAttention
-from modalities.models.lora.utils import convert_layer, convert_model
+from modalities.models.lora.utils import convert_layer, replace_modules_in_attention
 from modalities.models.model import NNModel
-from modalities.models.utils import get_model_from_config, ModelTypeEnum
-from tests.conftest import _ROOT_DIR
+from modalities.models.utils import ModelTypeEnum, get_model_from_config
+
+# from tests.conftest import _ROOT_DIR
 
 
 @pytest.fixture()
@@ -21,7 +21,7 @@ def set_env():
 
 @pytest.fixture()
 def config_file_path() -> Path:
-    config_file_path = _ROOT_DIR / Path("tests/fine_tuning/test_configs/" + "config_lorem_ipsum_sft.yaml")
+    config_file_path = "/home/nie/repos/modalities/config_files/training/config_lorem_ipsum_sft.yaml"
     return config_file_path
 
 
@@ -73,5 +73,6 @@ def test_convert_embedding_layer(model, r, alpha):
     assert lora_embedding.lora_B.shape[1] == r
 
 
-def test_convert_model(model, r, alpha, layer_types):
-    convert_model(model, r, alpha, [CausalSelfAttention])
+def test_replace_modules_in_attention(model, r, alpha):
+    converted = replace_modules_in_attention(model, r, alpha)
+    assert isinstance(converted, nn.Module)
