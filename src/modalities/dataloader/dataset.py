@@ -198,7 +198,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
 
         if self.reuse_last_target:
             # In this case we reuse the last target token as the first input token
-            # of the subsequent sample. Therfore, given a fixed number of samples we can
+            # of the subsequent sample. Therefore, given a fixed number of samples we can
             # compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
             # as the first sample always needs block_size many tokens and the following samples
