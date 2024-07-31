@@ -57,7 +57,7 @@ def _get_chat_template(jinja2_chat_template: str) -> Template:
 
 
 def _map_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
-    return [{key: role_mapping.get(value, value) for key, value in turn.items()} for turn in conversation]
+    return [{key: role_mapping.get(key=value, default=value) for key, value in turn.items()} for turn in conversation]
 
 
 def _stream_jsonl(src_file_path: str) -> Generator[Dict[str, Any], None, None]:
