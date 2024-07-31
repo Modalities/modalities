@@ -141,11 +141,11 @@ class PackedMemMapDatasetBase(Dataset):
         try:
             self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
             self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
-        except KeyError:
+        except KeyError as e:
             raise RuntimeError(
                 f"Encountered a required token representation with {self._token_size_in_bytes},"
                 " which is not supported. Consider using a smaller vocabulary."
-            )
+            ) from e
         self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
@@ -198,7 +198,8 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
 
         if self.reuse_last_target:
             # In this case we reuse the last target token as the first input token
-            # of the subsequent sample. Therfore, given a fixed number of samples we can compute the total number of tokens as
+            # of the subsequent sample. Therfore, given a fixed number of samples we can
+            # compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
             # as the first sample always needs block_size many tokens and the following samples
             # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
@@ -216,7 +217,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
                 ((i * self.block_size) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
                 for i in range(num_samples)
             ]
-        
+
         return packing_index
 
 
