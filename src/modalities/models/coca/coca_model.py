@@ -261,6 +261,13 @@ class CoCa(NNModel):
             output[self.vision_cls_prediction_key] = vision_cls_token
             modality_embd = vision_embd
 
+        ## MODIFIED
+        elif self.audio_sample_key and self.vision_sample_key in inputs:
+            audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
+            output[self.audio_cls_prediction_key] = audio_cls_token
+            output[self.vision_cls_prediction_key] = vision_cls_token
+            modality_embd = [audio_embd, vision_embd]
+
         else:
             raise NotImplementedError("Parallel vision audio in the same batch is currently not supported!")
 
@@ -298,6 +305,16 @@ class CoCa(NNModel):
         audio_embd, audio_cls_token = audio_embd[:, :-1, :], F.normalize(audio_embd[:, -1, :], dim=-1)
         return audio_embd, audio_cls_token
 
+    ## MODIFIED
+    def _forward_encode_audio_vision(
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        audio_inputs, vision_inputs = inputs
+        audio_embd, audio_cls_token = self._forward_encode_audio(audio_inputs)
+        vision_embd, vision_cls_token = self._forward_encode_vision(vision_inputs)
+
+        return audio_embd, audio_cls_token, vision_embd, vision_cls_token
+
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input text using the text decoder.
@@ -313,7 +330,10 @@ class CoCa(NNModel):
         text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
 
-    def _forward_decode(self, text_embd: torch.Tensor, modality_embd: torch.Tensor) -> torch.Tensor:
+    ## MODIFIED
+    def _forward_decode(
+        self, text_embd: torch.Tensor, modality_embd: list[torch.Tensor] | torch.Tensor
+    ) -> torch.Tensor:
         """
         Perform forward decoding using the given text and vision embeddings.
 

@@ -3,6 +3,7 @@ from typing import Dict
 
 import torch
 from torch import nn
+from transformers import PreTrainedTokenizer
 
 from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel, SwiGLU
@@ -76,13 +77,22 @@ class TransformerBlock(nn.Module):
             self.ln_4 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.mlp_2 = mlp()
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
+        if isinstance(self.with_context, list):
+            self.cross_attn2 = MultiHeadAttention(
+                n_embd=n_embd,
+                n_head=n_head,
+                bias=bias,
+                attention_config=attention_config,
+                attention_type=AttentionType.CROSS_ATTENTION,
+            )
+
+    def forward(self, x: torch.Tensor, context: list[torch.Tensor] | torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass of the TransformerBlock module.
 
         Args:
             x (torch.Tensor): Input tensor.
-            context (torch.Tensor, optional): Context tensor. Defaults to None.
+            context (list[torch.Tensor] | torch.Tensor, optional): Context tensor. Defaults to None.
 
         Returns:
             torch.Tensor: Output tensor.
@@ -90,7 +100,11 @@ class TransformerBlock(nn.Module):
         x = x + self.attn(self.ln_1(x))
         if not self.with_context or self.add_extra_mlp:
             x = x + self.mlp(self.ln_2(x))
-        if self.with_context:
+        if self.with_context and isinstance(self.with_context, List):
+            x = self.ln_3(x)
+            x = x + self.cross_attn(x, context=context[0]) + self.cross_attn2(x, context=context[1])
+            x = x + self.mlp_2(self.ln_4(x))
+        else:
             x = x + self.cross_attn(self.ln_3(x), context=context)
             x = x + self.mlp_2(self.ln_4(x))
         return x

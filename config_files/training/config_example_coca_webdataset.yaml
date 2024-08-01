@@ -47,6 +47,13 @@ train_image_transform:
     is_training: True
     input_size: 256
 
+train_image_transform:
+  component_key: transform
+  variant_key: image_transform
+  config:
+    is_training: True
+    input_size: 288
+
 text_transform:
   component_key: transform
   variant_key: text_transform
@@ -70,13 +77,32 @@ train_coco_dataset_builder:
       TEXT:
         instance_key: text_transform
         pass_type: BY_REFERENCE
-    num_samples: 566_748
+    num_samples: 30000
+
+train_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: /p/scratch/jureap63/multimodal_data/audio/commonvoice_17_test_wav_000000.tar
+    modality_key_mapping:
+      TEXT: ["transcript.txt", "input_ids"] # source and target keys
+      AUDIO: ["wav", "feats"]
+    modality_transforms:
+      AUDIO:
+        instance_key: train_audio_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10000
 
 train_dataset:
   component_key: dataset
   variant_key: web_dataset
   config:
     builders:
+      - instance_key: train_dataset_builder
+        pass_type: BY_REFERENCE 
       - instance_key: train_coco_dataset_builder
         pass_type: BY_REFERENCE
     shardshuffle: 100
@@ -162,8 +188,10 @@ contrastive_loss:
   component_key: loss
   variant_key: clip_loss
   config:
-    prediction_key1: ${model.config.vision_cls_prediction_key}
-    prediction_key2: ${model.config.text_cls_prediction_key}
+    prediction_keys:
+      - ${model.config.audio_cls_prediction_key}
+      - ${model.config.vision_cls_prediction_key}
+      - ${model.config.text_cls_prediction_key}
     logit_scale_key: ${model.config.logit_scale_prediction_key}
     tag: contrastive_loss
     weight: 1.0
