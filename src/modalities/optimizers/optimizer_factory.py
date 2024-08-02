@@ -9,7 +9,7 @@ from torch.optim import Adam, AdamW, Optimizer
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
-from modalities.util import get_local_number_of_trainable_parameters
+from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
 
 OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
 
@@ -136,8 +136,7 @@ def _print_params(params) -> None:
     for debugging only
     """
     for i, name in enumerate(params.keys()):
-        print(i + 1, name)
-
+        print_rank_0(i + 1, name)
 
 def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: List[str]) -> None:
     """
@@ -148,17 +147,17 @@ def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimize
     """
     assert len(optimizer_groups) == len(optimizer_groups_names)
     num_modules_all, num_params_all = 0, 0
-    print("=> optimizer groups:")
+    print_rank_0("=> optimizer groups:")
     for optimizer_group, optimizer_group_name in zip(optimizer_groups, optimizer_groups_names):
         num_modules = len(optimizer_group["params"])
         num_params = sum(parameter.numel() for parameter in optimizer_group["params"])
-        print(
+        print_rank_0(
             f"{optimizer_group_name} ({num_modules} modules with {num_params:,} parameters): "
             + f"weight_decay = {optimizer_group['weight_decay']}"
         )
         num_modules_all += num_modules
         num_params_all += num_params
-    print(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
+    print_rank_0(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
 
 
 def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: OptimizerGroups) -> None:
