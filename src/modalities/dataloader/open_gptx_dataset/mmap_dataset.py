@@ -24,14 +24,7 @@ import torch
 from numpy._typing import NDArray
 from torch.utils.data import Dataset
 
-
-def print_rank_0(message: str):
-    """If distributed is initialized, print only on rank 0."""
-    if torch.distributed.is_initialized():
-        if torch.distributed.get_rank() == 0:
-            print(message, flush=True)
-    else:
-        print(message, flush=True)
+from modalities.util import print_rank_0
 
 
 def get_best_fitting_dtype(vocab_size: Optional[int] = None) -> np.dtype:
