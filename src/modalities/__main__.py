@@ -278,7 +278,6 @@ class Main:
             evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
-        print_rank_0(f"Training done at {datetime.now()}.")
 
     def get_logging_publishers(
         self,

@@ -68,6 +68,7 @@ class Gym:
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
         )
+        print_rank_0(f"Training done at {datetime.now()}.")
 
     def _run_checkpointing(
         self,
