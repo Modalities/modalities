@@ -136,7 +136,7 @@ def _print_params(params) -> None:
     for debugging only
     """
     for i, name in enumerate(params.keys()):
-        print_rank_0(i + 1, name)
+        print_rank_0(f"{i + 1} {name}")
 
 
 def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: List[str]) -> None:
@@ -154,7 +154,7 @@ def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimize
         num_params = sum(parameter.numel() for parameter in optimizer_group["params"])
         print_rank_0(
             f"{optimizer_group_name} ({num_modules} modules with {num_params:,} parameters): "
-            + f"weight_decay = {optimizer_group['weight_decay']}"
+            f"weight_decay = {optimizer_group['weight_decay']}"
         )
         num_modules_all += num_modules
         num_params_all += num_params
