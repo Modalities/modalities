@@ -138,6 +138,7 @@ def _print_params(params) -> None:
     for i, name in enumerate(params.keys()):
         print_rank_0(i + 1, name)
 
+
 def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: List[str]) -> None:
     """
     for each optimizer group, the following is printed:

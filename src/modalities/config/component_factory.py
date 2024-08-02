@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Type, TypeVar, Union
 
-from modalities.util import print_rank_0
 from pydantic import BaseModel
 
 from modalities.registry.registry import Registry
+from modalities.util import print_rank_0
 
 
 class ComponentFactory:
@@ -92,7 +92,9 @@ class ComponentFactory:
                     # so that we don't instantiate it again when we reach the respective component config
                     # in the subsequent config traversal
                     top_level_components[referenced_entity_key] = materialized_referenced_component
-                print_rank_0(" -> ".join(traversal_path) + ": ", f"--ref--> {top_level_components[referenced_entity_key]}")
+                print_rank_0(
+                    " -> ".join(traversal_path) + ": ", f"--ref--> {top_level_components[referenced_entity_key]}"
+                )
                 return top_level_components[referenced_entity_key], top_level_components
 
             return materialized_component_config, top_level_components
