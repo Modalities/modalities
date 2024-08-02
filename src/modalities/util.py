@@ -18,7 +18,7 @@ from modalities.running_env.fsdp.reducer import Reducer
 
 
 def print_rank_0(message: str):
-    """If distributed is initialized, print only on rank 0."""
+    """If torch.distributed is initialized, print only on rank 0."""
     if torch.distributed.is_initialized():
         if torch.distributed.get_rank() == 0:
             print(message, flush=True)
