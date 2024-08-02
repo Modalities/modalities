@@ -16,7 +16,7 @@ from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
-from modalities.util import Aggregator, TimeRecorder
+from modalities.util import Aggregator, TimeRecorder, print_rank_0
 
 
 class ThroughputAggregationKeys(Enum):
@@ -194,8 +194,7 @@ class Trainer:
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=num_train_steps_done,
                 )
-                if self.global_rank == 0:
-                    print(training_metrics)
+                print_rank_0(training_metrics)
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,
