@@ -5,7 +5,7 @@ from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, FilePath, PositiveInt, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
@@ -234,6 +234,10 @@ class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     model_initializer: PydanticModelInitializationIFType
 
+    # avoid warning about protected namespace 'model_', see
+    # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
@@ -314,6 +318,7 @@ class LLMDataLoaderConfig(BaseModel):
     pin_memory: bool
     shuffle: bool
     skip_num_batches: Optional[int] = 0
+    fixed_num_batches: Optional[int] = None
 
 
 class RepeatingDataLoaderConfig(BaseModel):

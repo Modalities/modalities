@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Tuple, Type
 
@@ -34,7 +35,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import get_total_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
 
 
 @click.group()
@@ -211,6 +212,7 @@ class Main:
         return components
 
     def run(self, components: TrainingComponentsInstantiationModel):
+        print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
             experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
@@ -263,6 +265,7 @@ class Main:
                 model=wrapped_model,
                 activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
             )
+        print_rank_0(f"Model initialized at {datetime.now()}.")
 
         gym.run(
             train_data_loader=components.train_dataloader,
@@ -275,7 +278,6 @@ class Main:
             evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
-        print("done")
 
     def get_logging_publishers(
         self,

@@ -54,8 +54,7 @@ class NumberConversion:
     def get_local_num_batches_from_num_tokens(num_ranks: int, global_num_tokens: int, sequence_length: int) -> int:
         """Calculates the number of local batches for each rank, given the global
         number of tokens and number of ranks.
-        This helper function is primarily used to calculate the number of batches to
-        skip when resuming a dataloader during warmstart.
+        This helper function is primarily used to calculate a dataloader's number of batches (total and to skip)
 
         Args:
             num_ranks (int): _description_
