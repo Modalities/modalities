@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 import torch.nn as nn
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Annotated
 
 from modalities.config.pydanctic_if_types import PydanticModelInitializationIFType
@@ -17,6 +17,10 @@ from modalities.nn.model_initialization.parameter_name_filters import (
 class ModelInitializerWrapperConfig(BaseModel):
     model_initializers: List[PydanticModelInitializationIFType]
 
+    # avoid warning about protected namespace 'model_', see
+    # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class ComposedModelInitializationConfig(BaseModel):
     model_type: SupportWeightInitModels
@@ -26,6 +30,10 @@ class ComposedModelInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+
+    # avoid warning about protected namespace 'model_', see
+    # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
+    model_config = ConfigDict(protected_namespaces=())
 
     @model_validator(mode="after")
     def _check_values(self):
