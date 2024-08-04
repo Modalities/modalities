@@ -28,6 +28,7 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    FSDP2WrappedModelConfig,
     FSDPCheckpointLoadingConfig,
     FSDPCheckpointSavingConfig,
     FSDPWrappedModelConfig,
@@ -62,7 +63,7 @@ from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.mamba.mamba_config import MambaLLMConfig
 from modalities.models.mamba.mamba_model import MambaLLM
@@ -104,13 +105,14 @@ class ComponentEntity:
 
 COMPONENTS = [
     # models
-    ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),
