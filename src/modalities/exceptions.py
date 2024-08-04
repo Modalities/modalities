@@ -22,5 +22,9 @@ class OptimizerError(Exception):
     pass
 
 
+class ModelStateError(Exception):
+    pass
+
+
 class ConfigError(Exception):
     pass
