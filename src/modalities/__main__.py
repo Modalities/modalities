@@ -20,6 +20,7 @@ from modalities.config.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
 )
+from modalities.dataloader.apply_chat_template import apply_chat_template
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
@@ -37,6 +38,13 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
 
+config_file_path_option = click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+
 
 @click.group()
 def main() -> None:
@@ -44,12 +52,7 @@ def main() -> None:
 
 
 @main.command(name="run")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=False),
-    required=True,
-    help="Path to a file with the YAML config file.",
-)
+@config_file_path_option
 def entry_point_run_modalities(config_file_path: Path):
     main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -58,23 +61,13 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=False),
-    required=True,
-    help="Path to a file with the YAML config file.",
-)
+@config_file_path_option
 def entry_point_generate_text(config_file_path: FilePath):
     generate_text(config_file_path)
 
 
 @main.command(name="convert_pytorch_to_hf_checkpoint")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=True),
-    required=True,
-    help="Path to config of model checkpoint.",
-)
+@config_file_path_option
 @click.option(
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
@@ -104,6 +97,15 @@ def data():
     pass
 
 
+@data.command(name="apply_chat_template")
+@config_file_path_option
+def entry_point_data_apply_chat_template(config_file_path: Path):
+    """
+    Utility for applying a chat template to a jsonl-file using a jinja2 tempalate defined in the config.
+    """
+    apply_chat_template(config_file_path=config_file_path)
+
+
 @data.command(name="create_raw_index")
 @click.argument("src_path", type=Path)
 @click.option(
@@ -130,8 +132,8 @@ def entry_point_data_create_raw_index(src_path, index_path):
 
 
 @data.command(name="pack_encoded_data")
-@click.argument("config_path", type=FilePath)
-def entry_point_pack_encoded_data(config_path: FilePath):
+@config_file_path_option
+def entry_point_pack_encoded_data(config_file_path: FilePath):
     """
     Utility to encode an indexed, large jsonl-file.
 
@@ -145,7 +147,7 @@ def entry_point_pack_encoded_data(config_path: FilePath):
     #  One would requires an object of it to instantiate the ResolverRegistry.
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    config = load_app_config_dict(config_path)
+    config = load_app_config_dict(config_file_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(

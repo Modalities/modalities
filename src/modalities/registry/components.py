@@ -60,6 +60,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
+from modalities.models.components.collator_wrapper import LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -167,6 +168,9 @@ COMPONENTS = [
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
+    ComponentEntity(
+        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
+    ),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity(
