@@ -3,7 +3,10 @@ import torch
 import modalities
 import modalities.util
 from modalities.batch import DatasetBatch
-from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
+from modalities.util import (
+    get_local_number_of_trainable_parameters,
+    get_total_number_of_trainable_parameters,
+)
 
 
 def configure_dataloader_mock(
@@ -18,7 +21,9 @@ def configure_dataloader_mock(
     samples = {sample_key: sample_tensor[:, :-1]}
     targets = {target_key: sample_tensor[:, 1:]}
 
-    batches = [DatasetBatch(targets=targets, samples=samples) for _ in range(num_batches)]
+    batches = [
+        DatasetBatch(targets=targets, samples=samples) for _ in range(num_batches)
+    ]
 
     llm_data_loader_mock.__iter__ = lambda _: iter(batches)
     llm_data_loader_mock.batch_size = batch_size
@@ -30,7 +35,9 @@ def configure_dataloader_mock(
 
 def test_get_local_number_of_trainable_parameters():
     # Create a simple model with trainable parameters
-    model = torch.nn.Sequential(torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2))
+    model = torch.nn.Sequential(
+        torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2)
+    )
 
     # Calculate the expected number of trainable parameters
     expected_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -41,7 +48,9 @@ def test_get_local_number_of_trainable_parameters():
 
 def test_get_total_number_of_trainable_parameters():
     # Create a simple model with trainable parameters
-    model = torch.nn.Sequential(torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2))
+    model = torch.nn.Sequential(
+        torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2)
+    )
 
     # Calculate the expected number of trainable parameters
     expected_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -64,7 +73,9 @@ def test_get_total_number_of_trainable_parameters():
     def mock_get_local_number_of_trainable_parameters(model: MockFSDP):
         return get_local_number_of_trainable_parameters(model.model)
 
-    modalities.util.get_local_number_of_trainable_parameters = mock_get_local_number_of_trainable_parameters
+    modalities.util.get_local_number_of_trainable_parameters = (
+        mock_get_local_number_of_trainable_parameters
+    )
     torch.distributed.all_reduce = mock_all_reduce
     torch.Tensor.cuda = mock_cuda
 

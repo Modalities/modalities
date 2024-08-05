@@ -9,6 +9,8 @@ import torch.nn.functional as F
 import math
 from typing import Optional, List
 
+from xformers.triton.k_fused_matmul_bw import kernel_bw
+
 
 class LoRALayer:
     """
@@ -300,7 +302,7 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
 
 class ConvLoRA(nn.Module, LoRALayer):
     """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    Taken from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py and modified
     """
 
     def __init__(
@@ -324,7 +326,15 @@ class ConvLoRA(nn.Module, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
-        assert isinstance(kernel_size, int)
+
+        if not isinstance(kernel_size, int):
+            if len(set(kernel_size)) == 1:
+                kernel_size = kernel_size[0]
+            else:
+                raise ValueError(
+                    f"We do not support different kernel sizes per dimension such as {kernel_size}"
+                )
+
         # Actual trainable parameters
         if r > 0:
             self.lora_A = nn.Parameter(
@@ -379,15 +389,6 @@ class ConvLoRA(nn.Module, LoRALayer):
         return self.conv(x)
 
 
-class LoRAConv2d(ConvLoRA):
-    """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(LoRAConv2d, self).__init__(nn.Conv2d, *args, **kwargs)
-
-
 class LoRAConv1d(ConvLoRA):
     """
     Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
@@ -397,7 +398,13 @@ class LoRAConv1d(ConvLoRA):
         super(LoRAConv1d, self).__init__(nn.Conv1d, *args, **kwargs)
 
 
-# Can Extend to other ones like this
+class LoRAConv2d(ConvLoRA):
+    """
+    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(LoRAConv2d, self).__init__(nn.Conv2d, *args, **kwargs)
 
 
 class LoRAConv3d(ConvLoRA):
