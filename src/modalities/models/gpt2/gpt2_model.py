@@ -254,6 +254,7 @@ class CausalSelfAttention(nn.Module):
 
         return q, k, v
 
+    @torch.compiler.disable  # see https://github.com/Dao-AILab/flash-attention/issues/596
     @staticmethod
     def _repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
         """
