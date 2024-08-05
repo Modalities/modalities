@@ -79,6 +79,24 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
     def _mask_target(
         self, target: torch.Tensor, b_mask_token_id: int, e_mask_token_id: int, loss_ignore_index: int
     ) -> torch.Tensor:
+        """
+        We mask the target tensor with loss_ignore_index between, but not inclusive the begin and end mask token.
+        We do this vectorizes, as this is fast.
+        Example:
+            sample_orig =      [2,2,3,2, 2,4,2,2,2]
+            sample =           [2,2,3,2, 2,4,2,2] # from collate_fn
+            target =           [2,3,2,2, 4,2,2,2] # from collate_fn
+            mask_initially =   [0,0,0,0, 0,0,0,0] # mask = torch.zeros_like(target)
+            mask_shifted_1 =   [0,0,1,0, 0,0,0,0] # mask[:, 1:] += torch.where(target != b_mask_token_id, 0, 1)[:, :-1]
+            mask_shifted_2 =   [0,0,1,0,-1,0,0,0] # mask += torch.where(target != e_mask_token_id, 0, -1)
+            mask_cumsum =      [0,0,1,1, 0,0,0,0] # include_to_loss_mask = mask.cumsum(-1)
+
+
+        By shifting only the b_mask_token_id to the right, we exclude the begin mask token from the loss, as otherwise
+        cumsum would include the begin mask token. Example without shift:
+            mask_no_shift_2    [0,1,0,0,-1,0,0,0]
+            cumsum_no_shift    [0,1,1,1, 0,0,0,0]
+        """
         error_msg = ""
         if b_mask_token_id not in target:
             error_msg += "b_mask_token_id not found in target."
@@ -107,14 +125,11 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
                 + "This is not supported by the LossMaskingCollateFnWrapper."
                 + "Make sure to use padding and truncation with the tokenizer for PackedMemMapDatasetContinuous"
             )
-        # note: to enable splitted assistant answers uncomment:
-        # mask[:, 0] = end_before_begin.squeeze(-1)
 
         # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
-        # this includes the 1, but due to the shift above, we exclude both!
+        # this includes the -1, but due to the shift above, we exclude both!
         include_to_loss_mask = mask.cumsum(-1)
 
-        # TODO check that we have the mask with values between -1 and 1, otherwise the tokens would not be alternating
         if (mask > 1).any() or (mask < -1).any():
             raise ValueError(
                 "Masking tokens are not alternating in the target. "
