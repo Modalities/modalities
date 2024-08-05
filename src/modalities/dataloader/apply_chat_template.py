@@ -10,12 +10,12 @@ from jinja2.exceptions import TemplateError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from modalities.config.config import load_app_config_dict
-from modalities.config.sft_config import SFTConfig
+from modalities.config.instantiation_models import InstructionTuningInstantiationModel
 
 
 def apply_chat_template(config_file_path: Path):
     config_dict = load_app_config_dict(config_file_path=config_file_path)
-    config = SFTConfig(**config_dict)
+    config = InstructionTuningInstantiationModel(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
     chat_template = _get_chat_template(config.jinja2_chat_template)
 
