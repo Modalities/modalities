@@ -40,7 +40,6 @@ class DatasetFactory:
     @staticmethod
     def get_mem_map_dataset(
         raw_data_path: Path,
-        sequence_length: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
         index_path: Optional[Path] = None,
@@ -48,7 +47,6 @@ class DatasetFactory:
     ) -> MemMapDataset:
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
-            block_size=sequence_length + 1,
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
@@ -58,10 +56,13 @@ class DatasetFactory:
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(
-        raw_data_path: Path, sequence_length: int, sample_key: str
+        raw_data_path: Path, sequence_length: int, sample_key: str, reuse_last_target: Optional[bool] = True
     ) -> PackedMemMapDatasetContinuous:
         dataset = PackedMemMapDatasetContinuous(
-            raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
+            raw_data_path=raw_data_path,
+            block_size=sequence_length + 1,
+            sample_key=sample_key,
+            reuse_last_target=reuse_last_target,
         )
         return dataset
 

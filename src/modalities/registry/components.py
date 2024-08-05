@@ -50,6 +50,10 @@ from modalities.config.config import (
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
 )
+from modalities.dataloader.collate_fns.collator_wrapper import (
+    LossMaskingCollateFnWrapper,
+    LossMaskingCollateFnWrapperConfig,
+)
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
@@ -167,6 +171,9 @@ COMPONENTS = [
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
+    ComponentEntity(
+        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
+    ),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity(

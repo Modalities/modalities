@@ -23,6 +23,8 @@ dependencies = [
     "wandb",
     "einops>=0.7.0",
     "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+    "jsonlines",
+    "Jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
