@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import io
 import random
+import re
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Tuple, Union
 
+import decord
 import jq
 import numpy as np
 import torch
@@ -13,7 +16,7 @@ from pydantic import BaseModel, Field
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data.dataset import Dataset as TorchdataSet
-from torchvision import transforms
+from torchvision.transforms import v2 as transforms
 from tqdm import tqdm
 from transformers import BatchEncoding
 
@@ -24,6 +27,8 @@ from modalities.dataloader.create_packed_data import EmbeddedStreamData
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.util import flatten_dict
+
+decord.bridge.set_bridge("torch")
 
 
 class Dataset(TorchdataSet):
@@ -356,6 +361,31 @@ class MultimodalWebDatasetBuilderConfig(BaseModel):
     num_samples: Annotated[int, Field(ge=1)]
 
 
+def decord_video(key, data):
+    """Based on the torch_video decoder in webdataset
+    https://github.com/webdataset/webdataset/blob/5b12e0ba78bfb64741add2533c5d1e4cf088ffff/webdataset/autodecode.py#L394
+    """
+    extension = re.sub(r".*[.]", "", key)
+    if extension not in "mp4 ogv mjpeg avi mov h264 mpg webm wmv".split():
+        return None
+
+    file_obj = io.BytesIO(data)
+
+    # we could replace this with torchaudio.load(data)
+    ar = decord.AudioReader(file_obj, mono=False)
+    audio = ar[:]
+
+    # reset to start of file
+    file_obj.seek(0)
+    vr = decord.VideoReader(file_obj)
+    clip_num_frames = 64
+    # sample clip_num_frames uniformly from the full video
+    frame_ids = torch.linspace(0, len(vr) - 1, clip_num_frames, dtype=torch.int64)
+    frames = vr.get_batch(frame_ids.tolist())  # T x H x W x C
+
+    return (frames, audio)
+
+
 # @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
 class MultimodalWebDatasetBuilder:
     def __init__(
@@ -386,7 +416,7 @@ class MultimodalWebDatasetBuilder:
         self.modality_to_decode_fn = {
             ModalityEnum.TEXT: None,
             ModalityEnum.IMAGE: "pil",
-            ModalityEnum.VIDEO: wds.torch_video,
+            ModalityEnum.VIDEO: decord_video,
             ModalityEnum.AUDIO: wds.torch_audio,
         }
 

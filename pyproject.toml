@@ -9,6 +9,7 @@ dependencies = [
     "pyyaml",
     "transformers",
     "datasets",
+    "decord",
     "protobuf",
     "SentencePiece",
     "accelerate",
