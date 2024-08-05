@@ -2,11 +2,12 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator, List, Tuple
 
 import jsonlines
 from jinja2 import Template
-from packaging import version
+from jinja2.exceptions import TemplateError
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from modalities.config.config import load_app_config_dict
 from modalities.config.sft_config import SFTConfig
@@ -70,22 +71,17 @@ def _compile_jinja_template(chat_template: str) -> Template:
     """Code taken from
     https://github.com/huggingface/transformers/blob/v4.42.0/src/transformers/tokenization_utils_base.py#L1906
     """
-    try:
-        import jinja2
-        from jinja2.exceptions import TemplateError
-        from jinja2.sandbox import ImmutableSandboxedEnvironment
-    except ImportError:
-        raise ImportError("apply_chat_template requires jinja2 to be installed.")
 
-    if version.parse(jinja2.__version__) < version.parse("3.1.0"):
-        raise ImportError(
-            "apply_chat_template requires jinja2>=3.1.0 to be installed. Your version is " f"{jinja2.__version__}."
-        )
-
-    def raise_exception(message):
+    def raise_exception(message: str):
         raise TemplateError(message)
 
-    def tojson(x, ensure_ascii=False, indent=None, separators=None, sort_keys=False):
+    def tojson(
+        x: Any,
+        ensure_ascii: bool = False,
+        indent: int | str | None = None,
+        separators: Tuple[str, str] | None = None,
+        sort_keys: bool = False,
+    ):
         # We override the built-in tojson filter because Jinja's default filter escapes HTML characters
         # We also expose some options like custom indents and separators
         return json.dumps(x, ensure_ascii=ensure_ascii, indent=indent, separators=separators, sort_keys=sort_keys)

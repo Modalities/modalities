@@ -42,13 +42,15 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
     [
         (
             [
-                # the collate_fn will shift the sample and target:
-                # shifted sample:           [5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0]
-                # shifted target:           [5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1]
-                # masked shifted target:    [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100]
+                # the collate_fn will cut off the sample and target:
+                # sample no last token:     [5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0]
+                # target no first token:    [5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1]
+                # masked target:            [-100, -100, 5, 5, -100, -100, -100, 5, -100, -100, -100, -100, -100, -100]
                 {"sample": torch.Tensor([5, 5, 0, 5, 5, 1, 5, 0, 5, 1, 0, 1, 5, 0, 1])},
             ],
-            # the expected batch is shifted and masked for loss computation!
+            # the expected target is masked for loss computation!
+            # There expected target starts not with three -100,
+            # as the original skipped the frist token: [5, 0, 5, 5, ...]
             DatasetBatch(
                 targets={
                     "target": torch.Tensor(

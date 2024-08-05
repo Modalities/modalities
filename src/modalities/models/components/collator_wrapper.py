@@ -15,7 +15,7 @@ class MaskingTokenConfig(BaseModel):
 
 
 class LossMaskingCollateFnWrapperConfig(BaseModel):
-    collate_fn: PydanticCollateFnIFType
+    wrapped_collate_fn: PydanticCollateFnIFType
     target_keys_to_mask: List[str]
     loss_ignore_index: int
     mask_tokens: MaskingTokenConfig
@@ -25,21 +25,34 @@ class LossMaskingCollateFnWrapperConfig(BaseModel):
 class LossMaskingCollateFnWrapper(CollateFnIF):
     def __init__(
         self,
-        collate_fn: CollateFnIF,
+        wrapped_collate_fn: CollateFnIF,
         target_keys_to_mask: List[str],
         loss_ignore_index: int,
         mask_tokens: MaskingTokenConfig,
         tokenizer: TokenizerWrapper,
     ):
-        """Wraps the given collate_fn and masks the target keys if not within the given special mask tokens.
+        """
+        Initializes the LossMaskingCollateFnWrapper.
+        Wraps the given wrapped_collate_fn and masks the target keys if not within the given special mask tokens.
         Does not include both mask tokens into the loss. If you need a token to indicate the end of the assistant,
         use another special token for this!
         Works also for the continuous dataset reading, as if the "end-include-to-loss" token is detected in the front,
         all tokens before are included to the loss.
 
         Throws a ValueError if the mask tokens are not found in the target or if the mask tokens are the same.
+
+
+        Args:
+            wrapped_collate_fn (CollateFnIF): The wrapped collate function.
+            target_keys_to_mask (List[str]): The list of target keys to mask.
+            loss_ignore_index (int): The index to ignore in the loss calculation.
+            mask_tokens (MaskingTokenConfig): The configuration for masking tokens.
+            tokenizer (TokenizerWrapper): The tokenizer wrapper.
+
+        Raises:
+            ValueError: If b_mask_token_id and e_mask_token_id are the same.
         """
-        self.collate_fn = collate_fn
+        self.wrapped_collate_fn = wrapped_collate_fn
         self.target_keys_to_mask = target_keys_to_mask
         self.loss_ignore_index = loss_ignore_index
         self.tokenizer = tokenizer
@@ -51,7 +64,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             )
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
-        dataset_batch = self.collate_fn(batch)
+        dataset_batch = self.wrapped_collate_fn(batch)
         for target_key_to_mask in self.target_keys_to_mask:
             target = dataset_batch.targets[target_key_to_mask]
             masked_target = self._mask_target(

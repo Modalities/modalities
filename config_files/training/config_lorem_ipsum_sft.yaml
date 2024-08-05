@@ -24,7 +24,7 @@ collate_fn:
   component_key: collate_fn
   variant_key: mask_loss_collator_wrapper
   config:
-    collate_fn:  
+    wrapped_collate_fn:  
       component_key: collate_fn
       variant_key: gpt_2_llm_collator
       config:
@@ -47,7 +47,7 @@ train_dataset:
     raw_data_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
-    reuse_last_target: False
+    reuse_last_target: false
 
 train_dataloader:
   component_key: data_loader

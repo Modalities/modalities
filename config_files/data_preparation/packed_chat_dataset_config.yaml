@@ -19,4 +19,4 @@ tokenizer:
     truncation: true
     max_length: ${settings.sequence_length}
     special_tokens:
-      pad_token: <|endoftext|> # eos token
+      pad_token: ${settings.eod_token}

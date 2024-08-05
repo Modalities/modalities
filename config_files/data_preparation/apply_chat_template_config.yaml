@@ -1,7 +1,7 @@
 settings:
   src_path: data/lorem_ipsum_sft.jsonl
   dst_path: data/lorem_ipsum_sft_converted.jsonl
-  conversations_key: 'conversations'
+  conversations_key: conversations
 
 instruction_data_transformation:
   role_mapping:

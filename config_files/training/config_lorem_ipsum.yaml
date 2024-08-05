@@ -42,8 +42,7 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: "train"
-    gradient_acc_steps: ${settings.training.gradient_acc_steps}
+    dataloader_tag: train
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE

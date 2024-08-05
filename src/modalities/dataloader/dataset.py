@@ -196,10 +196,12 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         if self.block_size < 2:
             raise ValueError("Block size must be at least 2.")
 
+        # TODO ask Richard if this is actually needed.
+        # The collator discards the first target token and the last sample token
         if self.reuse_last_target:
             # In this case we reuse the last target token as the first input token
-            # of the subsequent sample. Therefore, given a fixed number of samples we can
-            # compute the total number of tokens as
+            # of the subsequent sample.
+            # Therfore, given a fixed number of samples we can compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
             # as the first sample always needs block_size many tokens and the following samples
             # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
