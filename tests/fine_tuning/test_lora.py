@@ -1,3 +1,4 @@
+import copy
 import os
 from pathlib import Path
 
@@ -5,13 +6,19 @@ import pytest
 from torch import nn
 
 from modalities.config.config import load_app_config_dict
+from modalities.models.gpt2.gpt2_model import CausalSelfAttention
 from modalities.models.lora.lora_layers import (
     LoRALinear,
     LoRAConv1d,
     LoRAConv2d,
     LoRAConv3d,
 )
-from modalities.models.lora.utils import convert_layer, conversion_lora, convert_convXd
+from modalities.models.lora.utils import (
+    convert_layer,
+    convert_to_lora,
+    convert_convXd,
+    recursive_layer_conversion,
+)
 from modalities.models.model import NNModel
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
 from tests.conftest import _ROOT_DIR
@@ -91,29 +98,6 @@ def test_convert_embedding_layer(model, r, alpha):
     assert lora_embedding.lora_B.shape[1] == r
 
 
-def test_replace_modules_in_attention(model, r, alpha):
-    percentage_trainable_params_before_lora = compute_trainable_num_parameters(
-        model=model
-    )
-    assert isinstance(model.transformer.h[0].attn.c_proj, nn.Linear)
-
-    converted = conversion_lora(model, r, alpha)
-    percentage_trainable_params_after_lora = compute_trainable_num_parameters(
-        model=model
-    )
-
-    assert isinstance(converted, nn.Module)
-    # Checking the percentage of trainable weights before and after conversion.
-    assert (
-        percentage_trainable_params_before_lora > percentage_trainable_params_after_lora
-    ), "Percentage of trainable weights should be greater before lora."
-
-    # Checking if the conversion from nn.Linear to LoRALinear actually happened.
-    assert isinstance(
-        model.transformer.h[0].attn.c_proj, LoRALinear
-    ), "After conversion nn.Linear should be a LoRALinear."
-
-
 def test_conv1d(r, alpha):
     conv1d = nn.Conv1d(3, 6, 5)
     lora_conv1d = convert_convXd(conv1d, r, alpha)
@@ -158,16 +142,77 @@ def test_attribute_copying(r, alpha):
     assert (lora_conv2d.conv.bias == conv2d.bias).all()
 
 
-def test_do_recursive(model):
-    def convert_to_lora(module, list_allowed_conversion_types=["attn", "..."]):
-        for name, child in module.named_children():
-            # If it's a leaf module (i.e., has no children), replace it with Linear
-            if len(list(child.children())) == 0:
-                ...
-                # converted_child = convert_layer(child, r=8, alpha=1)
-                # setattr(module, child, converted_child)
-            else:
-                # Recursively apply to child modules
-                convert_to_lora(child)
+@pytest.mark.parametrize(
+    "list_allowed_conversion_types",
+    [
+        ["Linear"],
+        ["Embedding"],
+    ],
+)
+def test_linear_layer_conversion(model, r, alpha, list_allowed_conversion_types):
+    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
+    assert not list_allowed_conversion_types[0] in [
+        type(i).__name__ for i in model.modules()
+    ]
 
-    convert_to_lora(model)
+
+def test_attention_layer_conversion(model, r, alpha):
+    def find_causal_self_attention_module(model: nn.Module):
+        result = []
+        for name, module in model.named_modules():
+            if isinstance(module, CausalSelfAttention):
+                result.append(module)
+        return result
+
+    list_allowed_conversion_types = ["CausalSelfAttention"]
+    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
+    attention_layers_after = find_causal_self_attention_module(model)
+    for attention_layer in attention_layers_after:
+        types = [type(i).__name__ for i in attention_layer.modules()]
+        assert "Linear" not in types
+        assert "LoRALinear" in types
+
+
+def test_no_layer_conversion(model, r, alpha):
+    list_allowed_conversion_types = []
+    model_before = copy.deepcopy(model)
+    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
+    model_after = model
+    module_types_before = [type(i).__name__ for i in model_before.modules()]
+    module_types_after = [type(i).__name__ for i in model_after.modules()]
+    assert module_types_before == module_types_after
+
+
+@pytest.fixture
+def list_allowed_conversion_types():
+    return [
+        "CausalSelfAttention",
+        "Linear",
+        "Embedding",
+        "Conv1d",
+        "Conv2d",
+        "Conv3d",
+    ]
+
+
+def test_replace_modules_in_attention(model, r, alpha, list_allowed_conversion_types):
+    percentage_trainable_params_before_lora = compute_trainable_num_parameters(
+        model=model
+    )
+    assert isinstance(model.transformer.h[0].attn.c_proj, nn.Linear)
+
+    converted = convert_to_lora(model, r, alpha, list_allowed_conversion_types)
+    percentage_trainable_params_after_lora = compute_trainable_num_parameters(
+        model=model
+    )
+
+    assert isinstance(converted, nn.Module)
+    # Checking the percentage of trainable weights before and after conversion.
+    assert (
+        percentage_trainable_params_before_lora > percentage_trainable_params_after_lora
+    ), "Percentage of trainable weights should be greater before lora."
+
+    # Checking if the conversion from nn.Linear to LoRALinear actually happened.
+    assert isinstance(
+        model.transformer.h[0].attn.c_proj, LoRALinear
+    ), "After conversion nn.Linear should be a LoRALinear."

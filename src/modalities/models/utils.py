@@ -29,6 +29,9 @@ def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
         class PydanticConfig(BaseModel):
             checkpointed_model: PydanticPytorchModuleType
 
+    elif model_type.value == "lora":
+        ... # todo maybe test the LORA construction here
+
     else:
         raise NotImplementedError()
 

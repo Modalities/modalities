@@ -1,9 +1,7 @@
 import copy
-from typing import Union
+from typing import Union, List
 
-from pyarrow.conftest import groups
 from torch import nn
-from wandb.apis.reports.v1.util import Typed
 
 from modalities.models.lora.lora_layers import (
     LoRAEmbedding,
@@ -33,34 +31,35 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
         raise NotImplementedError
 
 
-def conversion_lora(
+def convert_to_lora(
     model: nn.Module,
     r: int,
     alpha: int,
+    list_allowed_conversion_types: List[str],
 ):
-    replace_modules_in_attention(model=model, r=r, alpha=alpha)
+    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
     mark_only_lora_as_trainable(model=model)
     return model
 
 
-def replace_modules_in_attention(
-    model: nn.Module,
+def recursive_layer_conversion(
+    module: nn.Module,
     r: int,
     alpha: int,
+    list_allowed_conversion_types: List[str],
 ):
-    # todo implement configuration / pydantic
-    for name, module in model.named_children():
-        if "attention" in type(module).__name__.lower() and isinstance(
-            module, nn.Module
-        ):
-            for sub_name, sub_module in module.named_children():
-                if isinstance(sub_module, nn.Linear) or isinstance(
-                    sub_module, nn.Embedding
-                ):
-                    new_linear = convert_layer(sub_module, r, alpha)
-                    setattr(module, sub_name, new_linear)
+    for name, child in module.named_children():
+        # If it's a leaf module (i.e., has no children), replace it with Linear
+        if len(list(child.children())) == 0:
+            if (
+                type(child).__name__ in list_allowed_conversion_types
+                or type(module).__name__ in list_allowed_conversion_types
+            ):
+                converted_child = convert_layer(child, r=r, alpha=alpha)
+                setattr(module, name, converted_child)
         else:
-            replace_modules_in_attention(module, r, alpha)
+            # Recursively apply to child modules
+            recursive_layer_conversion(child, r, alpha, list_allowed_conversion_types)
 
 
 def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
@@ -73,7 +72,7 @@ def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
         or isinstance(layer, nn.Conv2d)
         or isinstance(layer, nn.Conv3d)
     ):
-        result = convert_convXd(layer)
+        result = convert_convXd(layer, r, alpha)
     else:
         # todo log
         print(f"{layer} was not converted.")

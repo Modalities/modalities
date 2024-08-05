@@ -13,16 +13,6 @@ settings:
     gradient_acc_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 2048
-    lora_config:
-      alpha: 1
-      r: 8
-      target_layer_class_names:
-          - CausalSelfAttention
-          - Linear
-          - Embedding
-          - Conv1d
-          - Conv2d
-          - Conv3d
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -200,6 +190,20 @@ wrapped_model:
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     block_names: [ GPT2Block ]
+
+lora_model:
+  component_key: model
+  variant_key: lora
+  config:
+    alpha: 1
+    r: 8
+    target_layer_class_names:
+      - CausalSelfAttention
+      - Linear
+      - Embedding
+      - Conv1d
+      - Conv2d
+      - Conv3d
 
 model:
   component_key: model

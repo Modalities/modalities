@@ -1,83 +1,83 @@
-[project]
-name = "modalities"
-version = "0.1.0"
-requires-python = ">=3.10,<3.12"
-description = "Modalities, a python framework for distributed and reproducible foundation model training."
-dependencies = [
-    "numpy<2.0",
-    "torch>=2.3",
-    "packaging",
-    "tqdm",
-    "pyyaml",
-    "transformers",
-    "datasets",
-    "protobuf",
-    "SentencePiece",
-    "rich",
-    "omegaconf",
-    "pydantic",
-    "click",
-    "click_pathlib",
-    "jq",
-    "class_resolver",
-    "wandb",
-    "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
-    "jsonlines",
-]
-
-[project.optional-dependencies]
-linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov"]
-install_helper = ["ninja"]
-
-[project.scripts]
-modalities = "modalities.__main__:main"
-
-[build-system]
-requires = ["setuptools >= 61.0.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.black]
-target-version = ["py310"]
-line-length = 120
-
-[tool.isort]
-profile = "black"
-line_length = 120
-src_paths = ["src", "tests"]
-
-[tool.ruff]
-line-length = 120
-
-[tool.pytest.ini_options]
-addopts = "--cov=src --cov-report term --cov-report html"
-
-[tool.coverage.run]
-branch = true
-omit = ["*/src/modalities/dataloader/open_gptx_dataset/*"]
-
-[tool.coverage.report]
-# Regexes for lines to exclude from consideration
-exclude_also = [
-    # Don't complain about missing debug-only code:
-    "def __repr__",
-    "if self\\.debug",
-
-    # Don't complain if tests don't hit defensive assertion code:
-    "raise AssertionError",
-    "raise NotImplementedError",
-
-    # Don't complain if non-runnable code isn't run:
-    "if 0:",
-    "if __name__ == .__main__.:",
-
-    # Don't complain about abstract methods, they aren't run:
-    "@(abc\\.)?abstractmethod",
-]
-
-
-ignore_errors = true
-
-[tool.coverage.html]
-directory = "coverage_html_report"
+#[project]
+#name = "modalities"
+#version = "0.1.0"
+#requires-python = ">=3.10,<3.12"
+#description = "Modalities, a python framework for distributed and reproducible foundation model training."
+#dependencies = [
+#    "numpy<2.0",
+#    "torch>=2.3",
+#    "packaging",
+#    "tqdm",
+#    "pyyaml",
+#    "transformers",
+#    "datasets",
+#    "protobuf",
+#    "SentencePiece",
+#    "rich",
+#    "omegaconf",
+#    "pydantic",
+#    "click",
+#    "click_pathlib",
+#    "jq",
+#    "class_resolver",
+#    "wandb",
+#    "einops>=0.7.0",
+#    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+#    "jsonlines",
+#]
+#
+#[project.optional-dependencies]
+#linting = ["pre-commit"]
+#tests = ["pytest", "pytest-cov"]
+#install_helper = ["ninja"]
+#
+#[project.scripts]
+#modalities = "modalities.__main__:main"
+#
+#[build-system]
+#requires = ["setuptools >= 61.0.0"]
+#build-backend = "setuptools.build_meta"
+#
+#[tool.black]
+#target-version = ["py310"]
+#line-length = 120
+#
+#[tool.isort]
+#profile = "black"
+#line_length = 120
+#src_paths = ["src", "tests"]
+#
+#[tool.ruff]
+#line-length = 120
+#
+#[tool.pytest.ini_options]
+#addopts = "--cov=src --cov-report term --cov-report html"
+#
+#[tool.coverage.run]
+#branch = true
+#omit = ["*/src/modalities/dataloader/open_gptx_dataset/*"]
+#
+#[tool.coverage.report]
+## Regexes for lines to exclude from consideration
+#exclude_also = [
+#    # Don't complain about missing debug-only code:
+#    "def __repr__",
+#    "if self\\.debug",
+#
+#    # Don't complain if tests don't hit defensive assertion code:
+#    "raise AssertionError",
+#    "raise NotImplementedError",
+#
+#    # Don't complain if non-runnable code isn't run:
+#    "if 0:",
+#    "if __name__ == .__main__.:",
+#
+#    # Don't complain about abstract methods, they aren't run:
+#    "@(abc\\.)?abstractmethod",
+#]
+#
+#
+#ignore_errors = true
+#
+#[tool.coverage.html]
+#directory = "coverage_html_report"

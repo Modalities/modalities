@@ -8,9 +8,12 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.models.lora.utils import convert_to_lora
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
+from modalities.running_env.fsdp.fsdp_auto_wrapper import (
+    FSDPTransformerAutoWrapPolicyFactory,
+)
 from modalities.util import get_local_number_of_trainable_parameters
 
 
@@ -39,7 +42,9 @@ class ModelFactory:
         )
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
-        fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
+        fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(
+            model=model, block_names=block_names
+        )
 
         # model is on CPU before input to FSDP
         fsdp_model = FSDP(
@@ -59,6 +64,16 @@ class ModelFactory:
         return fsdp_model
 
     @staticmethod
-    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+    def get_lora_model(
+        model: nn.Module,
+    ) -> nn.Module:
+        return convert_to_lora(
+            model,
+        )  # todo how do we get the stuff from the config
+
+    @staticmethod
+    def get_weight_initalized_model(
+        model: nn.Module, model_initializer: ModelInitializationIF
+    ) -> nn.Module:
         model_initializer.initialize_in_place(model)
         return model
