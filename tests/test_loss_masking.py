@@ -7,7 +7,7 @@ from modalities.batch import DatasetBatch
 from modalities.dataloader.collate_fns.collator_wrapper import (
     LossMaskingCollateFnWrapper,
     LossMaskingCollateFnWrapperConfig,
-    MaskingTokenConfig,
+    LossMaskingTokenConfig,
 )
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
@@ -31,7 +31,7 @@ def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
         collate_fn=GPT2LLMCollateFn(sample_key="sample", target_key="target"),
         target_keys_to_mask=["target"],
         loss_ignore_index=-100,
-        mask_tokens=MaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
+        mask_tokens=LossMaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
         tokenizer=dummy_tokenizer,
     )
 

@@ -9,7 +9,7 @@ from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 
-class MaskingTokenConfig(BaseModel):
+class LossMaskingTokenConfig(BaseModel):
     b_include_to_loss_token: str
     e_include_to_loss_token: str
 
@@ -18,7 +18,7 @@ class LossMaskingCollateFnWrapperConfig(BaseModel):
     wrapped_collate_fn: PydanticCollateFnIFType
     target_keys_to_mask: List[str]
     loss_ignore_index: int
-    mask_tokens: MaskingTokenConfig
+    mask_tokens: LossMaskingTokenConfig
     tokenizer: PydanticTokenizerIFType
 
 
@@ -28,7 +28,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         wrapped_collate_fn: CollateFnIF,
         target_keys_to_mask: List[str],
         loss_ignore_index: int,
-        mask_tokens: MaskingTokenConfig,
+        mask_tokens: LossMaskingTokenConfig,
         tokenizer: TokenizerWrapper,
     ):
         """
