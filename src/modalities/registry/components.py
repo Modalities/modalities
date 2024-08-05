@@ -50,6 +50,10 @@ from modalities.config.config import (
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
 )
+from modalities.dataloader.collate_fns.collator_wrapper import (
+    LossMaskingCollateFnWrapper,
+    LossMaskingCollateFnWrapperConfig,
+)
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
@@ -60,7 +64,6 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
-from modalities.models.components.collator_wrapper import LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig

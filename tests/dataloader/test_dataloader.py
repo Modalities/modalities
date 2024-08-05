@@ -12,10 +12,10 @@ from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.models.gpt2.collator import CollateFnIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
