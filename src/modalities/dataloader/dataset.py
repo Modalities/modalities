@@ -583,7 +583,7 @@ def decord_video(key, data):
     file_obj = io.BytesIO(data)
 
     # we could replace this with torchaudio.load(data)
-    ar = decord.AudioReader(file_obj, mono=False)
+    ar = decord.AudioReader(file_obj, sample_rate=16000, mono=True)
     audio = ar[:]
 
     # reset to start of file
