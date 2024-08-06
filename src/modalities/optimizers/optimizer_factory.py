@@ -8,7 +8,7 @@ from torch.optim import Adam, AdamW, Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
-from modalities.models.model import NNModel
+from modalities.models.model import NNModel, WeightDecayGroups
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
 
 OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
@@ -73,7 +73,9 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: List[str]) -> None:
+def _assert_existence_of_weight_decay_groups_excluded(
+    model: nn.Module, weight_decay_groups_excluded: List[str]
+) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -82,7 +84,12 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
         weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
         if group not in weight_decay_groups.keys():
@@ -98,9 +105,16 @@ def _create_optimizer_groups(
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+
+    _assert_parameters_belong_to_single_group(params=params, weight_decay_groups=weight_decay_groups)
 
     if (
         False
@@ -129,6 +143,24 @@ def _filter_params_for_weight_decay_group(
         for name, parameter in params.items()
         if any([bool(re.search(regex_expression, name)) for regex_expression in regex_expressions])
     ]
+
+
+def _assert_parameters_belong_to_single_group(
+    params: Dict[str, List[nn.Parameter]], weight_decay_groups: WeightDecayGroups
+):
+    for name in params.keys():
+        group_names = []
+        for group_name, regex_expressions in weight_decay_groups.items():
+            if any([bool(re.search(regex_expression, name)) for regex_expression in regex_expressions]):
+                group_names += [group_name]
+
+        # assert that every parameter is assigned to exactly one optimizer group
+        if len(group_names) == 0:
+            raise OptimizerError(
+                f"Parameter {name} is not assigned to any of the groups {list(weight_decay_groups.keys())}"
+            )
+        elif len(group_names) > 1:
+            raise OptimizerError(f"Parameter {name} assigned to multiple groups {group_names}")
 
 
 def _print_params(params) -> None:
@@ -161,7 +193,7 @@ def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimize
     print_rank_0(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
 
 
-def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: OptimizerGroups) -> None:
+def _assert_completeness_of_optimizer_groups(model: nn.Module, optimizer_groups: OptimizerGroups) -> None:
     """
     checks that the number of parameters in the optimizer groups
     sum up to the total number of model parameters as expected
