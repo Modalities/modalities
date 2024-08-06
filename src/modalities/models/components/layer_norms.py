@@ -37,14 +37,19 @@ class RMSLayerNorm(nn.Module):
         else:
             return output * self.weight + self.bias
 
+    def reset_parameters(self):
+        # inpired by torch titan RMS Norm implementation:
+        # https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/models/norms.py#L113C1-L114C57
+        torch.nn.init.ones_(self.weight)
+
 
 class LayerNorms(LookupEnum):
     """
     An enumeration of the different layer normalization techniques.
     """
 
-    RMSNorm = RMSLayerNorm
-    LayerNorm = nn.LayerNorm
+    rms_norm = RMSLayerNorm
+    layer_norm = nn.LayerNorm
 
 
 class LayerNormConfig(BaseModel):
@@ -58,3 +63,8 @@ class RMSLayerNormConfig(BaseModel):
     ndim: Annotated[int, Field(strict=True, ge=1)]
     epsilon: Annotated[float, Field(gt=0, default=1e-6)]
     bias: Annotated[bool, Field(strict=True, default=True)]
+
+
+class LayerNormConfig(BaseModel):
+    norm_type: LayerNorms
+    config: LayerNormConfig | RMSLayerNormConfig
