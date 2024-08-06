@@ -1,4 +1,3 @@
-import itertools
 from pathlib import Path
 from typing import List
 
@@ -12,7 +11,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
-from modalities.exceptions import ModelStateError
+from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, AttentionConfig, AttentionImplementation, PositionTypes
 from modalities.models.model import ActivationType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
@@ -113,12 +112,12 @@ class ModelFactory:
             # reshard_after_forward=reshard_after_forward
         )
 
-        for tensor in itertools.chain(model.parameters(), model.buffers()):
-            if tensor.device != torch.device("meta"):
-                raise ModelStateError("All parameters and buffers must be on meta device!")
+        # for tensor in itertools.chain(model.parameters(), model.buffers()):
+        #     if tensor.device != torch.device("meta"):
+        #         raise ModelStateError("All parameters and buffers must be on meta device!")
 
         # Allocate buffers and sharded parameters on GPU
-        model.to_empty("cuda")
+        # model.to_empty("cuda")
         # Run user-defined initializers
         # model.init_weights() # or `model.apply(init_weights)`
 
@@ -131,6 +130,7 @@ class ModelFactory:
 
     @staticmethod
     def get_gpt2_model(
+        use_meta_device: bool,
         sample_key: str,
         prediction_key: str,
         poe_type: PositionTypes,
@@ -146,31 +146,36 @@ class ModelFactory:
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
         attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
+        attention_norm_config: LayerNormConfig,
+        ffn_norm_config: LayerNormConfig,
+        lm_head_norm_config: LayerNormConfig,
         seed: int = None,
     ) -> GPT2LLM:
-        with torch.device("meta"):
-            model = GPT2LLM(
-                sample_key=sample_key,
-                prediction_key=prediction_key,
-                poe_type=poe_type,
-                sequence_length=sequence_length,
-                vocab_size=vocab_size,
-                n_layer=n_layer,
-                n_head_q=n_head_q,
-                n_head_kv=n_head_kv,
-                n_embd=n_embd,
-                ffn_hidden=ffn_hidden,
-                dropout=dropout,
-                bias=bias,
-                activation_type=activation_type,
-                attention_implementation=attention_implementation,
-                attention_config=attention_config,
-                attention_norm=attention_norm,
-                ffn_norm=ffn_norm,
-                lm_head_norm=lm_head_norm,
-                seed=seed,
-            )
+        config = dict(
+            sample_key=sample_key,
+            prediction_key=prediction_key,
+            poe_type=poe_type,
+            sequence_length=sequence_length,
+            vocab_size=vocab_size,
+            n_layer=n_layer,
+            n_head_q=n_head_q,
+            n_head_kv=n_head_kv,
+            n_embd=n_embd,
+            ffn_hidden=ffn_hidden,
+            dropout=dropout,
+            bias=bias,
+            activation_type=activation_type,
+            attention_implementation=attention_implementation,
+            attention_config=attention_config,
+            attention_norm_config=attention_norm_config,
+            ffn_norm_config=ffn_norm_config,
+            lm_head_norm_config=lm_head_norm_config,
+            seed=seed,
+        )
+
+        if use_meta_device:
+            with torch.device("meta"):
+                model = GPT2LLM(**config)
+        else:
+            model = GPT2LLM(**config)
         return model
