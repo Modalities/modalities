@@ -2,6 +2,7 @@ from typing import Dict
 
 import torch
 from torch import nn
+from transformers import PreTrainedTokenizer
 
 from modalities.models.coca.multi_modal_decoder import TransformerBlock
 from modalities.models.gpt2.gpt2_model import ActivationType
@@ -68,6 +69,7 @@ class TextDecoder(NNModel):
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
                             with_context=False,
+                            is_two_input_modalities=False,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
                         )

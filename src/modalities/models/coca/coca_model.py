@@ -160,6 +160,8 @@ class CoCa(NNModel):
         self.epsilon_attn_pool = epsilon_attn_pool
         self.text_decoder_config = text_decoder_config
 
+        num_input_modalities = 0
+
         self.vision_sample_key = None
         if vision_encoder_config is not None:
             self.vision_sample_key = vision_encoder_config.sample_key
@@ -168,6 +170,7 @@ class CoCa(NNModel):
                 vision_encoder_config,
                 n_queries,
             )
+            num_input_modalities += 1
 
         self.audio_sample_key = None
         if audio_encoder_config is not None:
@@ -177,6 +180,7 @@ class CoCa(NNModel):
                 audio_encoder_config,
                 n_queries,
             )
+            num_input_modalities += 1
 
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
@@ -202,6 +206,7 @@ class CoCa(NNModel):
             n_head=text_decoder_config.n_head,
             n_embd=text_decoder_config.n_embd,
             ffn_hidden=text_decoder_config.ffn_hidden,
+            is_two_input_modalities=num_input_modalities == 2,
             dropout=text_decoder_config.dropout,
             bias=text_decoder_config.bias,
             attention_config=text_decoder_config.attention_config,
@@ -251,25 +256,21 @@ class CoCa(NNModel):
         output = {}
         # TODO stack features from different modalities (ensure correct alignment with the text features)
         modality_embd = None
-        if self.audio_sample_key is not None and self.audio_sample_key in inputs:
+        if self.audio_sample_key is not None and self.vision_sample_key is None:
             audio_embd, audio_cls_token = self._forward_encode_audio(inputs)
             output[self.audio_cls_prediction_key] = audio_cls_token
             modality_embd = audio_embd
 
-        elif self.vision_sample_key is not None and self.vision_sample_key in inputs:
+        elif self.vision_sample_key is not None and self.audio_sample_key is None:
             vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
             output[self.vision_cls_prediction_key] = vision_cls_token
             modality_embd = vision_embd
 
-        ## MODIFIED
-        elif self.audio_sample_key and self.vision_sample_key in inputs:
+        else:
             audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
             output[self.audio_cls_prediction_key] = audio_cls_token
             output[self.vision_cls_prediction_key] = vision_cls_token
             modality_embd = [audio_embd, vision_embd]
-
-        else:
-            raise NotImplementedError("Parallel vision audio in the same batch is currently not supported!")
 
         text_embd, text_cls_token = self._forward_encode_text(inputs)
         logits = self._forward_decode(text_embd, modality_embd)
@@ -309,7 +310,8 @@ class CoCa(NNModel):
     def _forward_encode_audio_vision(
         self, inputs: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        audio_inputs, vision_inputs = inputs
+        audio_inputs = {k: inputs[k] for k in inputs if k in ["audio", "audio_len"]}
+        vision_inputs = {k: inputs[k] for k in inputs if k in ["video"]}
         audio_embd, audio_cls_token = self._forward_encode_audio(audio_inputs)
         vision_embd, vision_cls_token = self._forward_encode_vision(vision_inputs)
 
