@@ -1,9 +1,26 @@
 import argparse
+import os
 import subprocess
-from os.path import isfile
+from os.path import isdir, isfile, join
 from pathlib import Path
 
 _ROOT_DIR = Path(__file__).parents[1]
+
+
+def clear_getting_started_example_output_directory(output_directory):
+    assert isdir(output_directory), f"ERROR! {output_directory} does not exist."
+    output_files = [
+        "redpajama_v2_samples_512_train.idx",
+        "redpajama_v2_samples_512_test.idx",
+        "redpajama_v2_samples_512_train.pbin",
+        "redpajama_v2_samples_512_test.pbin",
+    ]
+    print()
+    for output_file in output_files:
+        output_file_path = join(output_directory, output_file)
+        assert isfile(output_file_path), f"ERROR! {output_file_path} does not exist."
+        os.remove(output_file_path)
+        print(f"> removed {output_file_path}")
 
 
 def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: str = "0,1"):
@@ -41,38 +58,45 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
 
     # run cpu / single-gpu tests
     if cpu or single_gpu:
+        print("\n=== RUN CPU & SINGLE-GPU TESTS ===" if single_gpu else "\n=== RUN CPU TESTS ===")
         command_unit_tests = (
             f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} python -m pytest"
         )
-
-        print("\n=== RUN CPU & SINGLE-GPU TESTS ===" if single_gpu else "\n=== RUN CPU TESTS ===")
         print(command_unit_tests)
         subprocess.run(command_unit_tests, shell=True, capture_output=False, text=True)
 
     # run multi-gpu tests
     if multi_gpu:
         # distributed tests
+        print("\n=== RUN MULTI-GPU TESTS ===")
         run_distributed_tests_directory = _ROOT_DIR / "tests"
         run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
         assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
         command_end_to_end_tests = (
             f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]}"
         )
-
-        print("\n=== RUN MULTI-GPU TESTS ===")
         print(command_end_to_end_tests)
         subprocess.run(command_end_to_end_tests, shell=True, capture_output=False, text=True)
 
         # getting started example
-        run_distributed_tests_directory = _ROOT_DIR / "examples" / "getting_started"
-        run_distributed_tests_script = _ROOT_DIR / "examples" / "getting_started" / "run_getting_started_example.sh"
-        assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
-        command_getting_started_example = (
-            f"cd {run_distributed_tests_directory}; bash run_getting_started_example.sh {devices[0]},{devices[1]}"
-        )
         print("\n=== RUN GETTING STARTED EXAMPLE ===")
+        run_getting_started_example_directory = _ROOT_DIR / "examples" / "getting_started"
+        run_getting_started_example_script = (
+            _ROOT_DIR / "examples" / "getting_started" / "run_getting_started_example.sh"
+        )
+        assert isfile(
+            run_getting_started_example_script
+        ), f"ERROR! {run_getting_started_example_script} does not exist."
+        command_getting_started_example = (
+            f"cd {run_getting_started_example_directory}; bash run_getting_started_example.sh {devices[0]},{devices[1]}"
+        )
         print(command_getting_started_example)
         subprocess.run(command_getting_started_example, shell=True, capture_output=False, text=True)
+
+        output_directory = join(run_getting_started_example_directory, "data", "mem_map")
+        clear_getting_started_example_output_directory(output_directory)
+
+    print("\n=== DONE ===")
 
 
 if __name__ == "__main__":
