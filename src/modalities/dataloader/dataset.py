@@ -514,7 +514,7 @@ class AudioTransform(Transform):
                 torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
             )
 
-        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
+        log_mel_spec = torch.clamp(self.extract_features(raw_audio[1]), 1e-10).log10().squeeze(0)
         log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
         feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
 
@@ -628,16 +628,15 @@ class MultimodalWebDatasetBuilder:
             ModalityEnum.TEXT: None,
             ModalityEnum.IMAGE: "pil",
             ModalityEnum.VIDEO: decord_video,
-            ModalityEnum.AUDIO: wds.torch_audio,
+            ModalityEnum.AUDIO: decord_video,
         }
 
         self.additional_extreacted_keys = []
-        self.additional_extreacted_keys.append("modality")
         if ModalityEnum.TEXT in self.modality_transforms:
             self.additional_extreacted_keys.append("attention_mask")
 
         if ModalityEnum.AUDIO in self.modality_transforms:
-            self.additional_extreacted_keys.append("feats_len")
+            self.additional_extreacted_keys.append("audio_len")
 
         # Mapping between modality and transform
         self.modality_to_transform_fn = {
@@ -701,15 +700,14 @@ class MultimodalWebDatasetBuilder:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
         transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
         sample[target_key] = transform(sample[source_key])
-        del sample[source_key]
+        # del sample[source_key]
         return sample
 
     def _transform_audio(self, sample):
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
         transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
-        sample[target_key], sample["feats_len"] = transform(sample[source_key])
+        sample[target_key], sample["audio_len"] = transform(sample[source_key])
         del sample[source_key]
-        sample["modality"] = [0]
         return sample
 
     def _flatten_sample(self, sample):

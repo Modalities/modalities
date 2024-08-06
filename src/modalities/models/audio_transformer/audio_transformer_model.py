@@ -197,7 +197,7 @@ class AudioTransformer(nn.Module):
         inputs: Dict[str, tuple[torch.Tensor, torch.Tensor]],
     ) -> Dict[str, tuple[torch.Tensor, torch.Tensor]]:
         x = inputs[self.sample_key]  # x.shape: B, T, D
-        attn_key_mask = self._get_attn_key_mask(inputs["feats_len"])
+        attn_key_mask = self._get_attn_key_mask(inputs["audio_len"])
         # x.shape: B, T, D
         x = self.project(x.transpose(1, 2))  # x.shape: B, D, T
         x = self.subsampler(x)  # x.shape: B, D, T/4
