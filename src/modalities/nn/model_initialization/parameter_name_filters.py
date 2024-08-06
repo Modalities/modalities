@@ -53,7 +53,8 @@ NAMED_PARAMETER_INIT_GROUPS = {
         WeightInitTypes.SCALED: RegexFilter(
             weights=[
                 r"transformer\.h\.\d+\.attn\.c_proj\.weight",
-                r"transformer\.h\.\w+\.mlp\.W_2.weight" r"transformer\.h\.\w+\.mlp\.c_proj\.weight",  # SwiGLU  # gelu
+                r"transformer\.h\.\w+\.mlp\.W_2.weight",  # SwiGLU
+                r"transformer\.h\.\w+\.mlp\.c_proj\.weight",  # gelu
             ]
         ),
         WeightInitTypes.SCALED_EMBED: RegexFilter(
