@@ -574,7 +574,7 @@ class MultimodalWebDatasetBuilderConfig(BaseModel):
 
 def decord_video(key, data):
     """Based on the torch_video decoder in webdataset
-    https://github.com/webdataset/webdataset/blob/5b12e0ba78bfb64741add2533c5d1e4cf088ffff/webdataset/autodecode.py#L394
+    https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L394
     """
     extension = re.sub(r".*[.]", "", key)
     if extension not in "mp4 ogv mjpeg avi mov h264 mpg webm wmv".split():
@@ -595,6 +595,18 @@ def decord_video(key, data):
     frames = vr.get_batch(frame_ids.tolist())  # T x H x W x C
 
     return (frames, audio)
+
+
+def torch_audio(key, data):
+    """Based on the torch_audio decoder in webdataset
+    https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L418
+    """
+    extension = re.sub(r".*[.]", "", key)
+    valid_extensions = "mp4 ogv mjpeg avi mov h264 mpg webm wmv flac mp3 sox wav m4a ogg wma".split()
+    if extension not in valid_extensions:
+        return None
+
+    return torchaudio.load(data)
 
 
 # @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
@@ -628,7 +640,7 @@ class MultimodalWebDatasetBuilder:
             ModalityEnum.TEXT: None,
             ModalityEnum.IMAGE: "pil",
             ModalityEnum.VIDEO: decord_video,
-            ModalityEnum.AUDIO: decord_video,
+            ModalityEnum.AUDIO: torch_audio,
         }
 
         self.additional_extreacted_keys = []
