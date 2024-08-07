@@ -226,6 +226,8 @@ class LoraConfig(BaseModel):
     alpha: int
     r: int
     target_layer_class_names: List[str]
+    model: PydanticPytorchModuleType
+
 
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType

@@ -21,7 +21,11 @@ from modalities.config.instantiation_models import (
 )
 from modalities.dataloader.apply_chat_template import apply_chat_template
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
+from modalities.dataloader.create_packed_data import (
+    EmbeddedStreamData,
+    PackedDataGenerator,
+    join_embedded_stream_data,
+)
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
@@ -31,6 +35,7 @@ from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
+from modalities.models.lora.utils import convert_to_lora
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -55,7 +60,9 @@ def main() -> None:
 def entry_point_run_modalities(config_file_path: Path):
     main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        components = main_obj.build_components(
+            components_model_type=TrainingComponentsInstantiationModel
+        )
         main_obj.run(components)
 
 
@@ -122,7 +129,9 @@ def entry_point_data_create_raw_index(src_path, index_path):
     """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
+        raise ValueError(
+            "index already exists. delete it or specify different output folder."
+        )
 
     print(f"reading raw data from {src_path}")
     print(f"writing index to {index_path}")
@@ -149,8 +158,11 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
     config = load_app_config_dict(config_file_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
+    components: PackedDatasetComponentsInstantiationModel = (
+        component_factory.build_components(
+            config_dict=config,
+            components_model_type=PackedDatasetComponentsInstantiationModel,
+        )
     )
 
     generator = PackedDataGenerator(
@@ -168,8 +180,16 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
 
 
 @data.command(name="merge_packed_data")
-@click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
-@click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
+@click.argument(
+    "src_paths",
+    type=click.types.Path(exists=True, path_type=Path),
+    nargs=-1,
+    required=True,
+)
+@click.argument(
+    "target_path",
+    type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path),
+)
 def entry_point_merge_packed_data(src_paths, target_path):
     """
     Utility for merging different pbin-files into one.
@@ -198,7 +218,9 @@ class Main:
         self.registry = Registry(COMPONENTS)
         self.component_factory = ComponentFactory(registry=self.registry)
 
-    def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
+    def add_custom_component(
+        self, component_key: str, variant_key: str, custom_component, custom_config
+    ) -> None:
         self.registry.add_entity(
             component_key=component_key,
             variant_key=variant_key,
@@ -215,15 +237,20 @@ class Main:
     def run(self, components: TrainingComponentsInstantiationModel):
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
-            experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+            experiment_path = (
+                components.settings.paths.checkpointing_path
+                / components.settings.experiment_id
+            )
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
-            progress_subscriber=components.batch_progress_subscriber,
-            results_subscriber=components.evaluation_subscriber,
-            global_rank=components.settings.cuda_env.global_rank,
-            local_rank=components.settings.cuda_env.local_rank,
+        evaluation_result_publisher, batch_processed_publisher = (
+            self.get_logging_publishers(
+                progress_subscriber=components.batch_progress_subscriber,
+                results_subscriber=components.evaluation_subscriber,
+                global_rank=components.settings.cuda_env.global_rank,
+                local_rank=components.settings.cuda_env.local_rank,
+            )
         )
 
         # Trainer
@@ -285,7 +312,10 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[
+        MessagePublisher[EvaluationResultBatch],
+        MessagePublisher[BatchProgressUpdate],
+    ]:
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,
@@ -298,7 +328,9 @@ class Main:
             local_rank=local_rank,
         )
 
-        message_broker.add_subscriber(subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber)
+        message_broker.add_subscriber(
+            subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber
+        )
         message_broker.add_subscriber(
             subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
             subscriber=progress_subscriber,

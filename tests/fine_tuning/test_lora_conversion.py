@@ -34,7 +34,7 @@ def set_env():
 @pytest.fixture()
 def config_file_path() -> Path:
     config_file_path = _ROOT_DIR / Path(
-        "tests/fine_tuning/test_configs/" + "config_lorem_ipsum_sft.yaml"
+        "tests/fine_tuning/test_configs/" + "config_lorem_ipsum_lora_conversion.yaml"
     )
     return config_file_path
 
@@ -149,11 +149,11 @@ def test_attribute_copying(r, alpha):
         ["Embedding"],
     ],
 )
-def test_linear_layer_conversion(model, r, alpha, list_allowed_conversion_types):
+def test_layer_conversion(model, r, alpha, list_allowed_conversion_types):
     recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
     assert not list_allowed_conversion_types[0] in [
         type(i).__name__ for i in model.modules()
-    ]
+    ], "The layer type shouldn't be present in the whole model anymore."
 
 
 def test_attention_layer_conversion(model, r, alpha):
@@ -169,8 +169,12 @@ def test_attention_layer_conversion(model, r, alpha):
     attention_layers_after = find_causal_self_attention_module(model)
     for attention_layer in attention_layers_after:
         types = [type(i).__name__ for i in attention_layer.modules()]
-        assert "Linear" not in types
-        assert "LoRALinear" in types
+        assert (
+            "Linear" not in types
+        ), "There shouldn't be any layers of type 'Linear' anymore."
+        assert (
+            "LoRALinear" in types
+        ), "There should only be layers of type 'LoraLinear'."
 
 
 def test_no_layer_conversion(model, r, alpha):
@@ -180,7 +184,9 @@ def test_no_layer_conversion(model, r, alpha):
     model_after = model
     module_types_before = [type(i).__name__ for i in model_before.modules()]
     module_types_after = [type(i).__name__ for i in model_after.modules()]
-    assert module_types_before == module_types_after
+    assert (
+        module_types_before == module_types_after
+    ), "If I don't give any layers for conversion the model should be the same after."
 
 
 @pytest.fixture

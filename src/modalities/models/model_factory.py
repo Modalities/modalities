@@ -66,10 +66,17 @@ class ModelFactory:
     @staticmethod
     def get_lora_model(
         model: nn.Module,
+        r: int,
+        alpha: int,
+        target_layer_class_names: List[str],
     ) -> nn.Module:
-        return convert_to_lora(
-            model,
-        )  # todo how do we get the stuff from the config
+        convert_to_lora(
+            model=model,
+            r=r,
+            alpha=alpha,
+            target_layer_class_names=target_layer_class_names,
+        )
+        return model
 
     @staticmethod
     def get_weight_initalized_model(

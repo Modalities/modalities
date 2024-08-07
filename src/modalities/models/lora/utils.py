@@ -1,4 +1,5 @@
 import copy
+import logging
 from typing import Union, List
 
 from torch import nn
@@ -35,9 +36,9 @@ def convert_to_lora(
     model: nn.Module,
     r: int,
     alpha: int,
-    list_allowed_conversion_types: List[str],
+    target_layer_class_names: List[str],
 ):
-    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
+    recursive_layer_conversion(model, r, alpha, target_layer_class_names)
     mark_only_lora_as_trainable(model=model)
     return model
 
@@ -46,20 +47,20 @@ def recursive_layer_conversion(
     module: nn.Module,
     r: int,
     alpha: int,
-    list_allowed_conversion_types: List[str],
+    target_layer_class_names: List[str],
 ):
     for name, child in module.named_children():
         # If it's a leaf module (i.e., has no children), replace it with Linear
         if len(list(child.children())) == 0:
             if (
-                type(child).__name__ in list_allowed_conversion_types
-                or type(module).__name__ in list_allowed_conversion_types
+                type(child).__name__ in target_layer_class_names
+                or type(module).__name__ in target_layer_class_names
             ):
                 converted_child = convert_layer(child, r=r, alpha=alpha)
                 setattr(module, name, converted_child)
         else:
             # Recursively apply to child modules
-            recursive_layer_conversion(child, r, alpha, list_allowed_conversion_types)
+            recursive_layer_conversion(child, r, alpha, target_layer_class_names)
 
 
 def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
@@ -74,8 +75,7 @@ def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
     ):
         result = convert_convXd(layer, r, alpha)
     else:
-        # todo log
-        print(f"{layer} was not converted.")
+        logging.info(f"{layer} was not converted.")
         return layer
     return transfer_default_attributes(layer, result)
 
