@@ -5,7 +5,7 @@ from modalities.utils.number_conversion import NumberConversion
 
 @pytest.mark.parametrize(
     "num_ranks,global_num_samples,local_micro_batch_size,expected",
-    [(2, 100, 10, 5), (2, 110, 10, 5), (4, 100, 10, 2), (4, 100, 5, 5)]
+    [(2, 100, 10, 5), (2, 110, 10, 5), (4, 100, 10, 2), (4, 100, 5, 5)],
 )
 def test_get_local_num_batches_from_num_samples(
     num_ranks: int, global_num_samples: int, local_micro_batch_size: int, expected: int
