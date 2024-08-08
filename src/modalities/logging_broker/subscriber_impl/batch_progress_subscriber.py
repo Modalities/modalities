@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from rich.console import Group
 from rich.live import Live
@@ -14,7 +14,7 @@ class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
     def consume_message(self, message: Message[BatchProgressUpdate]):
         pass
 
-    def consume_dict(self, key: str, value: str):
+    def consume_dict(self, mesasge_dict: Dict[str, Any]):
         pass
 
 
@@ -95,3 +95,6 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
                 task_id=task_id,
                 completed=batch_progress.num_steps_done,
             )
+
+    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+        raise NotImplementedError
