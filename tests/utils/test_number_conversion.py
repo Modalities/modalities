@@ -18,7 +18,7 @@ def test_get_local_num_batches_from_num_samples(
 
 @pytest.mark.parametrize(
     "num_ranks,global_num_tokens,sequence_length,local_micro_batch_size,expected",
-    [(2, 100, 2, 10, 2), (2, 110, 2, 10, 2), (2, 120, 2, 10, 3)],
+    [(2, 100, 2, 10, 2), (2, 110, 2, 10, 2), (2, 120, 2, 10, 3), (4, 100, 3, 4, 2)],
 )
 def test_get_local_num_batches_from_num_tokens(
     num_ranks: int, global_num_tokens: int, sequence_length: int, local_micro_batch_size: int, expected: int
