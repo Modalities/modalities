@@ -8,7 +8,7 @@ import torch.distributed as dist
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
@@ -35,9 +35,7 @@ def test_resumable_dataloader_without_shuffling():
 
     config_file_path = working_dir / "dist_repeating_dataloader_config_without_shuffling_but_skipped_batch.yaml"
 
-    config_dict = load_app_config_dict(config_file_path)
-
-    main = Main(config_dict, config_file_path)
+    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         main.add_custom_component(
             component_key="dataset",
