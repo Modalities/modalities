@@ -59,6 +59,7 @@ class SpanMaskingCollateFn(CollateFnIF):
         Sentinel ids creation given the indices that should be masked.
         The start indices of each mask are replaced by the sentinel ids in increasing
         order. Consecutive mask indices to be deleted are replaced with `-1`.
+        Sentinel ids are defined by the tokenizer as 32099: <extra_id_0>, 32098: <extra_id_1>, ..., 32000: <extra_id_99>
         """
         start_indices = mask_indices - np.roll(mask_indices, 1, axis=-1) * mask_indices
         start_indices[:, 0] = mask_indices[:, 0]

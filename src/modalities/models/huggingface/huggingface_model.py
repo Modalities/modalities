@@ -87,19 +87,36 @@ class HuggingFacePretrainedModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
+    # TODO: Maybe separate Encoder/Decoder into separate class?
+    # TODO: Generalize so that we can either pass decoder_inputs or targets.
+    # The _shift_tokens_right logic exists in the LongT5 implementation,
+    # but when passing targets it also already computes the loss, and this fails due to type mismatch.
+    # Computing it here is a workaround.
     def forward(
             self,
             inputs: Dict[str, torch.Tensor],
-            decoder_inputs: Optional[Dict[str, torch.Tensor]] = None,
+            targets: Optional[Dict[str, torch.Tensor]] = None,
         ) -> Dict[str, torch.Tensor]:
         if isinstance(self.huggingface_model, LongT5Model | LongT5ForConditionalGeneration):
+            # TODO: refactor so that target_key and decoder_start_token_id can be set in config/obtained automatically
+            decoder_input_ids = self._shift_tokens_right(
+                targets["target_ids"],
+                1,
+                )
             output = self.huggingface_model.forward(
                 input_ids = inputs[self.sample_key],
-                decoder_input_ids = decoder_inputs["target_ids"],
+                decoder_input_ids = decoder_input_ids,
             )
         else:
             output = self.huggingface_model.forward(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
+    
+    @staticmethod
+    def _shift_tokens_right(input_ids: torch.Tensor, decoder_start_token_id: int) -> torch.Tensor:
+        shifted_input_ids = torch.roll(input_ids, 1, dims=1)
+        shifted_input_ids[:, 0] = decoder_start_token_id
+
+        return shifted_input_ids
 
     @property
     def fsdp_block_names(self) -> List[str]:
