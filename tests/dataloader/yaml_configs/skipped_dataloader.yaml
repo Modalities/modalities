@@ -4,7 +4,7 @@ settings:
     target_key: target_ids
   training:
     local_train_micro_batch_size: 2
-    global_num_seen_tokens: 512
+    global_num_seen_tokens: 2048
     sequence_length: 256
   cuda_env:
     global_rank: 0

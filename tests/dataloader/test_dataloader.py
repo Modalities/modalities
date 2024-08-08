@@ -208,8 +208,8 @@ def test_skipped_and_distributed_dataloader_from_config():
 
     # we manually build up the batches from each dataloader to compare on a value basis
     # with [1:] we skip the first batch
-    dataset_indices_rank_0 = np.arange(0, 28, 2).reshape(-1, 2)[1:]
-    dataset_indices_rank_1 = np.arange(1, 29, 2).reshape(-1, 2)[1:]
+    dataset_indices_rank_0 = np.arange(0, 28, 2).reshape(-1, 2)[2:]
+    dataset_indices_rank_1 = np.arange(1, 29, 2).reshape(-1, 2)[2:]
 
     assert all((dataset_indices_rank_0 == list(components_rank_0.train_dataloader.batch_sampler)).flatten())
     assert all((dataset_indices_rank_1 == list(components_rank_1.train_dataloader.batch_sampler)).flatten())
@@ -277,18 +277,20 @@ def test_dataloader_with_fixed_num_batches(global_rank):
     # compare it with the one calculated during the component build and the dataloader length
     cfg = config_dict["settings"]["training"]
     world_size = config_dict["settings"]["cuda_env"]["world_size"]
-    calculated_fixed_num_batches = cfg["global_num_train_tokens"] // cfg["sequence_length"] // world_size
+    calculated_fixed_num_batches = (
+        cfg["global_num_train_tokens"] // cfg["local_train_micro_batch_size"] // cfg["sequence_length"] // world_size
+    )
     assert calculated_fixed_num_batches == components.fixed_num_batches
     assert len(dataloader) == calculated_fixed_num_batches
 
     # We make sure that the dataloader outputs the correct batches as follows:
     # The dataset contains 1000 samples (NOTE that we neglected squence_length and made each sample an integer value)
-    # we calculated 16 batches above per rank and have 2 ranks in total.
-    # Therefore the dataloader for rank 0 returns 16 ordered batches of batch_size 2.
+    # we calculated 8 batches above per rank and have 2 ranks in total.
+    # Therefore the dataloader for rank 0 returns 8 ordered batches of batch_size 2.
     # The batches are ordered and not shuffled as per YAML configuration.
     # We expect the following output:
-    # [[0, 2], [4, 6], [8, 10], ..., [56, 58], [60, 62]]  (global_rank=0)
-    # [[1, 3], [5, 7], [9, 11], ..., [57, 59], [61, 63]]  (global_rank=1)
-    calculated_dataloader_content = np.array(list(range(global_rank, 64 + global_rank, 2))).reshape(-1, 2).tolist()
+    # [[0, 2], [4, 6], [8, 10], ..., [24, 26], [28, 30]]  (global_rank=0)
+    # [[1, 3], [5, 7], [9, 11], ..., [25, 27], [29, 31]]  (global_rank=1)
+    calculated_dataloader_content = np.array(list(range(global_rank, 32 + global_rank, 2))).reshape(-1, 2).tolist()
     actual_dataloader_content = [i for i in dataloader]
     assert calculated_dataloader_content == actual_dataloader_content
