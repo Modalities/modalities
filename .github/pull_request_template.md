@@ -14,3 +14,4 @@ This PR ..
 - [ ] I have reviewed my own code w.r.t. correct implementation, missing type hints, proper documentation, etc.
 - [ ] I have run a sample config for model training
 - [ ] I have checked that all tests run through (`python tests/tests.py`)
+- [ ] I have updated the internal changelog (`CHANGELOG_DEV.md`)
