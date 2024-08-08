@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.logging_broker package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=2709fde1"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.logging_broker.subscriber_impl package" href="modalities.logging_broker.subscriber_impl.html" />
+    <link rel="prev" title="modalities.inference.text package" href="modalities.inference.text.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.1.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-activation-checkpointing-module">modalities.activation_checkpointing module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-batch-module">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-loss-functions-module">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-util-module">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+      <li class="breadcrumb-item active">modalities.logging_broker package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.logging_broker.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-logging-broker-package">
+<h1>modalities.logging_broker package<a class="headerlink" href="#modalities-logging-broker-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html">modalities.logging_broker.subscriber_impl package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html#modalities-logging-broker-subscriber-impl-batch-progress-subscriber-module">modalities.logging_broker.subscriber_impl.batch_progress_subscriber module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html#modalities-logging-broker-subscriber-impl-results-subscriber-module">modalities.logging_broker.subscriber_impl.results_subscriber module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html#modalities-logging-broker-subscriber-impl-subscriber-factory-module">modalities.logging_broker.subscriber_impl.subscriber_factory module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.logging_broker.subscriber_impl.html#module-modalities.logging_broker.subscriber_impl">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.logging_broker.message_broker">
+<span id="modalities-logging-broker-message-broker-module"></span><h2>modalities.logging_broker.message_broker module<a class="headerlink" href="#module-modalities.logging_broker.message_broker" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBroker">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.message_broker.</span></span><span class="sig-name descname"><span class="pre">MessageBroker</span></span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBroker"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBroker" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.logging_broker.message_broker.MessageBrokerIF" title="modalities.logging_broker.message_broker.MessageBrokerIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">MessageBrokerIF</span></code></a></p>
+<p>The MessageBroker sends notifications to its subscribers.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBroker.add_subscriber">
+<span class="sig-name descname"><span class="pre">add_subscriber</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subscription</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subscriber</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBroker.add_subscriber"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBroker.add_subscriber" title="Link to this definition"></a></dt>
+<dd><p>Adds a single subscriber.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>subscription</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><em>MessageTypes</em></a>)</p></li>
+<li><p><strong>subscriber</strong> (<a class="reference internal" href="#modalities.logging_broker.subscriber.MessageSubscriberIF" title="modalities.logging_broker.subscriber.MessageSubscriberIF"><em>MessageSubscriberIF</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBroker.distribute_message">
+<span class="sig-name descname"><span class="pre">distribute_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBroker.distribute_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBroker.distribute_message" title="Link to this definition"></a></dt>
+<dd><p>Distributes message to all subscribers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.Message" title="modalities.logging_broker.messages.Message"><em>Message</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBrokerIF">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.message_broker.</span></span><span class="sig-name descname"><span class="pre">MessageBrokerIF</span></span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBrokerIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBrokerIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Interface for message broker objects.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBrokerIF.add_subscriber">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_subscriber</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subscription</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subscriber</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBrokerIF.add_subscriber"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBrokerIF.add_subscriber" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>subscription</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><em>MessageTypes</em></a>)</p></li>
+<li><p><strong>subscriber</strong> (<a class="reference internal" href="#modalities.logging_broker.subscriber.MessageSubscriberIF" title="modalities.logging_broker.subscriber.MessageSubscriberIF"><em>MessageSubscriberIF</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.message_broker.MessageBrokerIF.distribute_message">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">distribute_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/message_broker.html#MessageBrokerIF.distribute_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.message_broker.MessageBrokerIF.distribute_message" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.Message" title="modalities.logging_broker.messages.Message"><em>Message</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.logging_broker.messages">
+<span id="modalities-logging-broker-messages-module"></span><h2>modalities.logging_broker.messages module<a class="headerlink" href="#module-modalities.logging_broker.messages" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.BatchProgressUpdate">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.messages.</span></span><span class="sig-name descname"><span class="pre">BatchProgressUpdate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_steps_done</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">experiment_status</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataloader_tag</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/messages.html#BatchProgressUpdate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.messages.BatchProgressUpdate" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Object holding the state of the current batch computation progress.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_steps_done</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>)</p></li>
+<li><p><strong>experiment_status</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.ExperimentStatus" title="modalities.logging_broker.messages.ExperimentStatus"><em>ExperimentStatus</em></a>)</p></li>
+<li><p><strong>dataloader_tag</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.BatchProgressUpdate.dataloader_tag">
+<span class="sig-name descname"><span class="pre">dataloader_tag</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></em><a class="headerlink" href="#modalities.logging_broker.messages.BatchProgressUpdate.dataloader_tag" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.BatchProgressUpdate.experiment_status">
+<span class="sig-name descname"><span class="pre">experiment_status</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.logging_broker.messages.ExperimentStatus" title="modalities.logging_broker.messages.ExperimentStatus"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExperimentStatus</span></code></a></em><a class="headerlink" href="#modalities.logging_broker.messages.BatchProgressUpdate.experiment_status" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.BatchProgressUpdate.num_steps_done">
+<span class="sig-name descname"><span class="pre">num_steps_done</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#modalities.logging_broker.messages.BatchProgressUpdate.num_steps_done" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.ExperimentStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.messages.</span></span><span class="sig-name descname"><span class="pre">ExperimentStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/messages.html#ExperimentStatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.messages.ExperimentStatus" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.ExperimentStatus.EVALUATION">
+<span class="sig-name descname"><span class="pre">EVALUATION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'EVALUATION'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.ExperimentStatus.EVALUATION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.ExperimentStatus.TRAIN">
+<span class="sig-name descname"><span class="pre">TRAIN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'TRAIN'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.ExperimentStatus.TRAIN" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.Message">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.messages.</span></span><span class="sig-name descname"><span class="pre">Message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">payload</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_rank</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_rank</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/messages.html#Message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.messages.Message" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generic" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code>]</p>
+<p>An object representing a message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message_type</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><em>MessageTypes</em></a>)</p></li>
+<li><p><strong>payload</strong> (<em>T</em>)</p></li>
+<li><p><strong>global_rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>)</p></li>
+<li><p><strong>local_rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.Message.global_rank">
+<span class="sig-name descname"><span class="pre">global_rank</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#modalities.logging_broker.messages.Message.global_rank" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.Message.local_rank">
+<span class="sig-name descname"><span class="pre">local_rank</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#modalities.logging_broker.messages.Message.local_rank" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.Message.message_type">
+<span class="sig-name descname"><span class="pre">message_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><code class="xref py py-class docutils literal notranslate"><span class="pre">MessageTypes</span></code></a></em><a class="headerlink" href="#modalities.logging_broker.messages.Message.message_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.Message.payload">
+<span class="sig-name descname"><span class="pre">payload</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.TypeVar" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code></a><span class="pre">(</span><code class="docutils literal notranslate"><span class="pre">T</span></code><span class="pre">)</span></em><a class="headerlink" href="#modalities.logging_broker.messages.Message.payload" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.MessageTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.messages.</span></span><span class="sig-name descname"><span class="pre">MessageTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/messages.html#MessageTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.messages.MessageTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.MessageTypes.BATCH_PROGRESS_UPDATE">
+<span class="sig-name descname"><span class="pre">BATCH_PROGRESS_UPDATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PROGRESS_UPDATE'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.MessageTypes.BATCH_PROGRESS_UPDATE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.MessageTypes.ERROR_MESSAGE">
+<span class="sig-name descname"><span class="pre">ERROR_MESSAGE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ERROR_MESSAGE'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.MessageTypes.ERROR_MESSAGE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.MessageTypes.EVALUATION_RESULT">
+<span class="sig-name descname"><span class="pre">EVALUATION_RESULT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'EVALUATION_RESULT'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.MessageTypes.EVALUATION_RESULT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.logging_broker.messages.MessageTypes.HIGH_LEVEL_PROGRESS_UPDATE">
+<span class="sig-name descname"><span class="pre">HIGH_LEVEL_PROGRESS_UPDATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'HIGH_LEVEL_PROGRESS_UPDATE'</span></em><a class="headerlink" href="#modalities.logging_broker.messages.MessageTypes.HIGH_LEVEL_PROGRESS_UPDATE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.logging_broker.publisher">
+<span id="modalities-logging-broker-publisher-module"></span><h2>modalities.logging_broker.publisher module<a class="headerlink" href="#module-modalities.logging_broker.publisher" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.publisher.MessagePublisher">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.publisher.</span></span><span class="sig-name descname"><span class="pre">MessagePublisher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message_broker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_rank</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_rank</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/publisher.html#MessagePublisher"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.publisher.MessagePublisher" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.logging_broker.publisher.MessagePublisherIF" title="modalities.logging_broker.publisher.MessagePublisherIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">MessagePublisherIF</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code>]</p>
+<p>The MessagePublisher sends messages through a message broker.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message_broker</strong> (<a class="reference internal" href="#modalities.logging_broker.message_broker.MessageBroker" title="modalities.logging_broker.message_broker.MessageBroker"><em>MessageBroker</em></a>)</p></li>
+<li><p><strong>global_rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>)</p></li>
+<li><p><strong>local_rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.publisher.MessagePublisher.publish_message">
+<span class="sig-name descname"><span class="pre">publish_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">payload</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/publisher.html#MessagePublisher.publish_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.publisher.MessagePublisher.publish_message" title="Link to this definition"></a></dt>
+<dd><p>Publish a message through the message broker.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>payload</strong> (<em>T</em>)</p></li>
+<li><p><strong>message_type</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><em>MessageTypes</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.publisher.MessagePublisherIF">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.publisher.</span></span><span class="sig-name descname"><span class="pre">MessagePublisherIF</span></span><a class="reference internal" href="../_modules/modalities/logging_broker/publisher.html#MessagePublisherIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.publisher.MessagePublisherIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generic" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code>]</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.publisher.MessagePublisherIF.publish_message">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">publish_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">payload</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/publisher.html#MessagePublisherIF.publish_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.publisher.MessagePublisherIF.publish_message" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>payload</strong> (<em>T</em>)</p></li>
+<li><p><strong>message_type</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.MessageTypes" title="modalities.logging_broker.messages.MessageTypes"><em>MessageTypes</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.logging_broker.subscriber">
+<span id="modalities-logging-broker-subscriber-module"></span><h2>modalities.logging_broker.subscriber module<a class="headerlink" href="#module-modalities.logging_broker.subscriber" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.logging_broker.subscriber.MessageSubscriberIF">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.logging_broker.subscriber.</span></span><span class="sig-name descname"><span class="pre">MessageSubscriberIF</span></span><a class="reference internal" href="../_modules/modalities/logging_broker/subscriber.html#MessageSubscriberIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.subscriber.MessageSubscriberIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generic" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code>]</p>
+<p>Interface for message subscribers.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.subscriber.MessageSubscriberIF.consume_dict">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">consume_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mesasge_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/subscriber.html#MessageSubscriberIF.consume_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.subscriber.MessageSubscriberIF.consume_dict" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mesasge_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.12)"><em>Dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><em>Any</em></a><em>]</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.logging_broker.subscriber.MessageSubscriberIF.consume_message">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">consume_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/logging_broker/subscriber.html#MessageSubscriberIF.consume_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.logging_broker.subscriber.MessageSubscriberIF.consume_message" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference internal" href="#modalities.logging_broker.messages.Message" title="modalities.logging_broker.messages.Message"><em>Message</em></a><em>[</em><em>T</em><em>]</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.logging_broker">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.logging_broker" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.inference.text.html" class="btn btn-neutral float-left" title="modalities.inference.text package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.logging_broker.subscriber_impl.html" class="btn btn-neutral float-right" title="modalities.logging_broker.subscriber_impl package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

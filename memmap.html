@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemMap Datasets &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=2709fde1"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Entrypoints" href="entrypoints.html" />
+    <link rel="prev" title="Known Issues" href="known_issues.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Modalities
+              <img src="_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.1.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">MemMap Datasets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#memmapdataset-index-generator">MemMapDataset Index Generator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#packed-dataset-generator">Packed Dataset Generator</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#packed-data-format">Packed Data Format</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">MemMap Datasets</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/memmap.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="memmap-datasets">
+<h1>MemMap Datasets<a class="headerlink" href="#memmap-datasets" title="Link to this heading"></a></h1>
+<section id="memmapdataset-index-generator">
+<h2>MemMapDataset Index Generator<a class="headerlink" href="#memmapdataset-index-generator" title="Link to this heading"></a></h2>
+<p>The <code class="code highlight python docutils literal highlight-python"><span class="n">MemMapDataset</span></code> requires an index file providing the necessary pointers into the raw data file. The <code class="code highlight python docutils literal highlight-python"><span class="n">MemMapDataset</span></code> can create the index file lazily, however, it is advised to create it beforehand. This can be done by running</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>modalities<span class="w"> </span>data<span class="w"> </span>create_raw_index<span class="w"> </span>&lt;path/to/jsonl/file&gt;
+</pre></div>
+</div>
+<p>The index will be created in the same directory as the raw data file. For further options you may look into the usage documentation via <code class="code highlight bash docutils literal highlight-bash">modalities<span class="w"> </span>data<span class="w"> </span>create_raw_index<span class="w"> </span>--help</code>.</p>
+</section>
+<section id="packed-dataset-generator">
+<h2>Packed Dataset Generator<a class="headerlink" href="#packed-dataset-generator" title="Link to this heading"></a></h2>
+<p>The <code class="code highlight python docutils literal highlight-python"><span class="n">PackedMemMapDatasetContinuous</span></code> and <code class="code highlight python docutils literal highlight-python"><span class="n">PackedMemMapDatasetMegatron</span></code> require a packed data file. To create the data file, you first have to generate a <code class="code highlight python docutils literal highlight-python"><span class="n">MemMapDataset</span></code> index file as described <a class="reference external" href="memMapDataset-index-generator">above</a>. Assuming the index and raw data are located in the same directory, you can simply execute the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>modalities<span class="w"> </span>data<span class="w"> </span>pack_encoded_data<span class="w"> </span>&lt;path/to/jsonl/file&gt;
+</pre></div>
+</div>
+<p>The packed data file will be created in the same directory as the raw data file. For further options you may look into the usage documentation via <code class="code highlight bash docutils literal highlight-bash">modalities<span class="w"> </span>data<span class="w"> </span>pack_encoded_data<span class="w"> </span>--help</code>.</p>
+<section id="packed-data-format">
+<h3>Packed Data Format<a class="headerlink" href="#packed-data-format" title="Link to this heading"></a></h3>
+<p>The packed data file is a bytestream containing both the tokenized data as well as an index denoting the start and length of the tokenized documents inside the bytestream. The data file consists of 3 concatenated parts:</p>
+<p>header segment | data segment | index segment</p>
+<ul class="simple">
+<li><p><strong>header segment</strong>: This section is a 8 bytes sized integer which encodes the length of the data segment in bytes.</p></li>
+<li><p><strong>data segment</strong>: This section contains a concatenation of all documents in form of 4 bytes sized tokens. An end-of-sequence token is placed between consecutive documents.</p></li>
+<li><p><strong>index segment</strong>: This section contains a pickled index which locates the documents inside the data segment. The index is basically a list of tuples, where each tuple contains the start position and length in bytes for the corresponding document, e.g., <code class="code highlight python docutils literal highlight-python"><span class="p">[(</span><span class="n">start_doc1</span><span class="p">,</span> <span class="n">len_doc1</span><span class="p">),</span> <span class="p">(</span><span class="n">start_doc2</span><span class="p">,</span> <span class="n">len_doc2</span><span class="p">),</span> <span class="o">....</span><span class="p">]</span></code>.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="known_issues.html" class="btn btn-neutral float-left" title="Known Issues" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="entrypoints.html" class="btn btn-neutral float-right" title="Entrypoints" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

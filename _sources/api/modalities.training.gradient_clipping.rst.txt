@@ -1,0 +1,37 @@
+modalities.training.gradient\_clipping package
+==============================================
+
+Submodules
+----------
+
+modalities.training.gradient\_clipping.fsdp\_gradient\_clipper module
+---------------------------------------------------------------------
+
+.. automodule:: modalities.training.gradient_clipping.fsdp_gradient_clipper
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.training.gradient\_clipping.fsdp\_gradient\_clipper\_config module
+-----------------------------------------------------------------------------
+
+.. automodule:: modalities.training.gradient_clipping.fsdp_gradient_clipper_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.training.gradient\_clipping.gradient\_clipper module
+---------------------------------------------------------------
+
+.. automodule:: modalities.training.gradient_clipping.gradient_clipper
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.training.gradient_clipping
+   :members:
+   :undoc-members:
+   :show-inheritance:

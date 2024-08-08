@@ -1,0 +1,37 @@
+modalities.models.gpt2 package
+==============================
+
+Submodules
+----------
+
+modalities.models.gpt2.collator module
+--------------------------------------
+
+.. automodule:: modalities.models.gpt2.collator
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.models.gpt2.gpt2\_model module
+-----------------------------------------
+
+.. automodule:: modalities.models.gpt2.gpt2_model
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.models.gpt2.pretrained\_gpt\_model module
+----------------------------------------------------
+
+.. automodule:: modalities.models.gpt2.pretrained_gpt_model
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.gpt2
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,21 @@
+modalities.models.vision\_transformer package
+=============================================
+
+Submodules
+----------
+
+modalities.models.vision\_transformer.vision\_transformer\_model module
+-----------------------------------------------------------------------
+
+.. automodule:: modalities.models.vision_transformer.vision_transformer_model
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.vision_transformer
+   :members:
+   :undoc-members:
+   :show-inheritance:

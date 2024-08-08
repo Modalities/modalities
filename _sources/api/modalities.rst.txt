@@ -1,0 +1,96 @@
+modalities package
+==================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.checkpointing
+   modalities.config
+   modalities.dataloader
+   modalities.inference
+   modalities.logging_broker
+   modalities.models
+   modalities.nn
+   modalities.optimizers
+   modalities.registry
+   modalities.running_env
+   modalities.tokenization
+   modalities.training
+
+Submodules
+----------
+
+modalities.activation\_checkpointing module
+-------------------------------------------
+
+.. automodule:: modalities.activation_checkpointing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.batch module
+-----------------------
+
+.. automodule:: modalities.batch
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.evaluator module
+---------------------------
+
+.. automodule:: modalities.evaluator
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.exceptions module
+----------------------------
+
+.. automodule:: modalities.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.gym module
+---------------------
+
+.. automodule:: modalities.gym
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.loss\_functions module
+---------------------------------
+
+.. automodule:: modalities.loss_functions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.trainer module
+-------------------------
+
+.. automodule:: modalities.trainer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.util module
+----------------------
+
+.. automodule:: modalities.util
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities
+   :members:
+   :undoc-members:
+   :show-inheritance:
