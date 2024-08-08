@@ -18,6 +18,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticDeviceMeshIFType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -217,6 +218,7 @@ class FSDP2WrappedModelConfig(BaseModel):
     block_names: List[str]
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
+    device_mesh: PydanticDeviceMeshIFType
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
@@ -334,6 +336,7 @@ class ResumableBatchSamplerConfig(BaseModel):
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
+    device_mesh: PydanticDeviceMeshIFType
 
 
 class LLMDataLoaderConfig(BaseModel):

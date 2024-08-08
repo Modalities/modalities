@@ -26,6 +26,9 @@ collate_fn:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     target_key: ${settings.referencing_keys.target_key}
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 train_dataset:
   component_key: dataset
@@ -166,12 +169,22 @@ loss_fn:
     target_key: target_ids
     prediction_key: logits
 
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+
+
 wrapped_model:
   component_key: model
   variant_key: fsdp_2_wrapped
   config:
     model:
       instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
       pass_type: BY_REFERENCE
     mixed_precision_settings:
       param_dtype: BF_16
@@ -213,32 +226,30 @@ model_raw:
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
-      qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
+      qkv_transforms: []
+      #   - type_hint: RotaryTransform
+      #     config:
+      #       n_embd: ${model_raw.config.n_embd}
+      #       n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+      #       seq_length_dim: -2
     attention_implementation: pytorch_flash
     activation_type: swiglu
     attention_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
     ffn_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
     lm_head_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+
 
 scheduler:
   component_key: scheduler

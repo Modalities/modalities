@@ -74,6 +74,7 @@ from modalities.nn.model_initialization.composed_initialization import (
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
@@ -117,6 +118,8 @@ COMPONENTS = [
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # Device Mesh
+    ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
