@@ -207,7 +207,7 @@ def test_skipped_and_distributed_dataloader_from_config():
     )
 
     # we manually build up the batches from each dataloader to compare on a value basis
-    # with [1:] we skip the first batch
+    # with [2:] we skip the first two batches
     dataset_indices_rank_0 = np.arange(0, 28, 2).reshape(-1, 2)[2:]
     dataset_indices_rank_1 = np.arange(1, 29, 2).reshape(-1, 2)[2:]
 
