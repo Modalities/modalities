@@ -1,23 +1,24 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
   training:
     training_log_interval_in_steps: 1
-    checkpointing_interval_in_steps: 4
-    evaluation_interval_in_steps: 1
-    global_num_seen_tokens:  2048 # 4 steps * 256 tokens per step * 2 ranks
-    do_apply_activation_checkpointing: false
+    checkpointing_interval_in_steps: 1000
+    evaluation_interval_in_steps: 1000
+    global_num_seen_tokens: 0
+    activation_checkpointing_modules: []
     gradient_acc_steps: 1
-    local_train_micro_batch_size: 1
-    sequence_length: 256
+    local_train_micro_batch_size: 6
+    sequence_length: 2048
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: tmp/checkpoints
+    checkpointing_path: data/checkpoints
 
 collate_fn:  
   component_key: collate_fn
@@ -30,9 +31,17 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: lorem_ipsum.pbin
+    raw_data_path: /workspaces/modalities/data/preprocessed/hf_gpt2/fineweb-edu/sample-10BT/train_num_docs_9188495.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
+
+# test_dataset:
+#   component_key: dataset
+#   variant_key: packed_mem_map_dataset_continuous
+#   config:
+#     raw_data_path: /gpfs/projects/ehpc17/modalities/data/fineweb-edu/sample-10BT/test_num_docs_483606.pbin
+#     sequence_length: ${settings.training.sequence_length}
+#     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -42,17 +51,10 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: "train"
-    skip_num_batches:
-      component_key: number_conversion
-      variant_key: local_num_batches_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        global_num_tokens: ${settings.training.global_num_seen_tokens}
-        sequence_length: ${settings.training.sequence_length}
-        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
+    fixed_num_batches: 100
     batch_sampler:
       component_key: batch_sampler
       variant_key: default
@@ -73,16 +75,40 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-eval_dataloaders: []
+# test_dataloader:
+#   component_key: data_loader
+#   variant_key: default
+#   config:
+#     num_workers: 2
+#     pin_memory: true
+#     shuffle: false
+#     dataloader_tag: "val"
+#     dataset:
+#       instance_key: test_dataset
+#       pass_type: BY_REFERENCE
+#     batch_sampler:
+#       component_key: batch_sampler
+#       variant_key: default
+#       config:
+#         batch_size: 4
+#         drop_last: true
+#         sampler:
+#           component_key: sampler
+#           variant_key: distributed_sampler
+#           config:
+#             rank: ${settings.cuda_env.global_rank}
+#             num_replicas: ${settings.cuda_env.world_size}
+#             shuffle: false
+#             dataset:
+#               instance_key: test_dataset
+#               pass_type: BY_REFERENCE
+#     collate_fn:
+#       instance_key: collate_fn
+#       pass_type: BY_REFERENCE
 
-checkpoint_loading:
-  component_key: checkpoint_loading
-  variant_key: fsdp
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    block_names: [GPT2Block]
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
+eval_dataloaders: []
+  # - instance_key: test_dataloader
+  #   pass_type: BY_REFERENCE 
 
 checkpoint_saving:
   component_key: checkpoint_saving
@@ -97,38 +123,36 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: fsdp
       config:
-        checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
+        checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
-        experiment_id: ${settings.experiment_id} 
+        experiment_id: ${settings.experiment_id}
         get_num_tokens_from_num_steps_callable:
           component_key: number_conversion
           variant_key: num_tokens_from_num_steps_callable
           config:
             num_ranks: ${settings.cuda_env.world_size}
             local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            sequence_length: ${settings.training.sequence_length}        
-
-# resolving class types via different enums sucks...
+            sequence_length: ${settings.training.sequence_length}
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
   config:
-    target_key: target_ids
+    target_key: ${settings.referencing_keys.target_key}
     prediction_key: logits
 
 wrapped_model:
   component_key: model
-  variant_key: checkpointed
+  variant_key: fsdp_wrapped
   config:
     model:
       instance_key: model
       pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
-      pass_type: BY_REFERENCE
-    checkpoint_path: must_be_set_in_test_impl
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: HYBRID_SHARD
+    block_names: [GPT2Block]
 
-model:
+model: 
   component_key: model
   variant_key: model_initialized
   config:
@@ -154,72 +178,46 @@ model_raw:
     sequence_length: ${settings.training.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 2
-    n_head_q: 8
-    n_head_kv: 8
-    ffn_hidden: 128
-    n_embd: 128
+    n_layer: 32
+    n_head_q: 32
+    n_head_kv: 32
+    ffn_hidden: 6784
+    n_embd: 2560
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            n_head: ${model_raw.config.n_head_q}
             seq_length_dim: -2
-    attention_implementation: manual
-    activation_type: gelu
+    attention_implementation: dao_flash
+    activation_type: swiglu
     attention_norm:
       component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+      variant_key: layer_norm
+      config: 
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-6
     ffn_norm:
       component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+      variant_key: layer_norm
+      config: 
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-6
     lm_head_norm:
       component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+      variant_key: layer_norm
+      config: 
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-6
 
-scheduler:
-  component_key: scheduler
-  variant_key: dummy_lr
-  config:
-    optimizer:
-      instance_key: optimizer
-      pass_type: BY_REFERENCE
-
-optimizer:
-  component_key: optimizer
-  variant_key: checkpointed
-  config:
-    optimizer:
-      instance_key: optimizer_original
-      pass_type: BY_REFERENCE
-    wrapped_model:
-      instance_key: wrapped_model
-      pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
-      pass_type: BY_REFERENCE
-    checkpoint_path: must_be_set_in_test_impl
-
-optimizer_original:  
+optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
-    lr: 0.0001
+    lr: 3e-4
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
@@ -227,6 +225,20 @@ optimizer_original:
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
+
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 3e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 9536
+    pct_start: 0.001
+    anneal_strategy: cos
 
 gradient_clipper:
   component_key: gradient_clipper
@@ -255,10 +267,18 @@ batch_progress_subscriber:
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
-    eval_dataloaders: []
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
 
-    
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: save_all
-  config: {}
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: test_fineweb_edu
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
+    config_file_path: ${settings.config_file_path}
+
