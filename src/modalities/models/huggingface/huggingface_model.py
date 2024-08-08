@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from pydantic import BaseModel, ConfigDict
-import torch.distributed
 from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer, LongT5Model, LongT5ForConditionalGeneration
 
 from modalities.config.lookup_enum import LookupEnum
@@ -44,6 +43,42 @@ class HuggingFacePretrainedModelConfig(BaseModel):
 
 
 class HuggingFacePretrainedModel(NNModel):
+    def __init__(
+        self,
+        model_type: HuggingFaceModelTypes,
+        model_name: str,
+        prediction_key: str,
+        huggingface_prediction_subscription_key: str,
+        sample_key: str,
+        model_args: Optional[Any] = None,
+        kwargs: Optional[Any] = None,
+    ):
+        super().__init__()
+        if model_args is None:
+            model_args = []
+        if kwargs is None:
+            kwargs = {}
+        self.prediction_key = prediction_key
+        self.huggingface_prediction_subscription_key = huggingface_prediction_subscription_key
+        self.sample_key = sample_key
+
+        # NOTE: If the model needs to be downloaded, it is NOT necessary to guard the access for rank 0.
+        # This is taken care of internally in huggingface hub see:
+        # https://github.com/huggingface/huggingface_hub/blob/3788f537b10c7d02149d6bf017d2ce19885f90a2/src/huggingface_hub/file_download.py#L1457
+        self.huggingface_model = model_type.value.from_pretrained(
+            model_name, local_files_only=False, *model_args, **kwargs
+        )
+
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        output = self.huggingface_model.forward(inputs[self.sample_key])
+        return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
+
+    @property
+    def fsdp_block_names(self) -> List[str]:
+        return self.huggingface_model._no_split_modules
+
+
+class HuggingFacePretrainedEncoderDecoderModel(NNModel):
     def __init__(
         self,
         model_type: HuggingFaceModelTypes,
@@ -121,6 +156,7 @@ class HuggingFacePretrainedModel(NNModel):
     @property
     def fsdp_block_names(self) -> List[str]:
         return self.huggingface_model._no_split_modules
+
 
 
 if __name__ == "__main__":

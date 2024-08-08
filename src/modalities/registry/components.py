@@ -63,7 +63,7 @@ from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
-from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
+from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedEncoderDecoderModel, HuggingFacePretrainedModelConfig
 from modalities.models.huggingface.collator import SpanMaskingCollateFn, SpanMaskingCollateFnConfig
 from modalities.models.mamba.mamba_config import MambaLLMConfig
 from modalities.models.mamba.mamba_model import MambaLLM
@@ -109,6 +109,9 @@ COMPONENTS = [
     ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
+    ),
+    ComponentEntity(
+        "model", "huggingface_pretrained_encoder_decoder_model", HuggingFacePretrainedEncoderDecoderModel, HuggingFacePretrainedModelConfig
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
