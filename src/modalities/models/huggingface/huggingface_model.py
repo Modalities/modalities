@@ -3,7 +3,8 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from pydantic import BaseModel, ConfigDict
-from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
+import torch.distributed
+from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer, LongT5Model, LongT5ForConditionalGeneration
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
@@ -24,6 +25,8 @@ from modalities.models.model import NNModel
 class HuggingFaceModelTypes(LookupEnum):
     AutoModelForCausalLM = AutoModelForCausalLM
     AutoModelForMaskedLM = AutoModelForMaskedLM
+    LongT5Model = LongT5Model
+    LongT5ForConditionalGeneration = LongT5ForConditionalGeneration
 
 
 class HuggingFacePretrainedModelConfig(BaseModel):
@@ -51,7 +54,24 @@ class HuggingFacePretrainedModel(NNModel):
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
     ):
-        super().__init__()
+        if model_type.value in [LongT5Model, LongT5ForConditionalGeneration]:
+            # with the regex, we match all parameters in the SelfAttention layer except global_input_layer_norm to prevent double counting
+            weight_decay_groups = {
+                "linear": [".DenseReluDense\\.w", ".SelfAttention\\.([^g]|global_)($|[^i])", ".EncDecAttention", ".lm_head"],
+                "embedding": [".shared", ".embed_tokens"],
+                "layernorm": [".layer_norm"],
+            }
+        elif 'llama' in model_name.lower():
+            weight_decay_groups = {
+                "linear": [".self_attn", ".mlp"],
+                "embedding": [".embed_tokens", ".lm_head"],
+                "layernorm": [".norm"],
+            }
+        else:
+            # must set weight_decay_groups_excluded in config file to empty list
+            weight_decay_groups = {}
+
+        super().__init__(weight_decay_groups=weight_decay_groups)
         if model_args is None:
             model_args = []
         if kwargs is None:
@@ -67,8 +87,18 @@ class HuggingFacePretrainedModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        output = self.huggingface_model.forward(inputs[self.sample_key])
+    def forward(
+            self,
+            inputs: Dict[str, torch.Tensor],
+            decoder_inputs: Optional[Dict[str, torch.Tensor]] = None,
+        ) -> Dict[str, torch.Tensor]:
+        if isinstance(self.huggingface_model, LongT5Model | LongT5ForConditionalGeneration):
+            output = self.huggingface_model.forward(
+                input_ids = inputs[self.sample_key],
+                decoder_input_ids = decoder_inputs["target_ids"],
+            )
+        else:
+            output = self.huggingface_model.forward(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
 
     @property

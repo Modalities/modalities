@@ -1,0 +1,33 @@
+{
+  "_name_or_path": "Stancld/LongT5-TGlobal-Base",
+  "architectures": [
+    "LongT5ForConditionalGeneration"
+  ],
+  "d_ff": 2048,
+  "d_kv": 64,
+  "d_model": 768,
+  "decoder_start_token_id": 0,
+  "dropout_rate": 0.1,
+  "encoder_attention_type": "transient-global",
+  "eos_token_id": 1,
+  "feed_forward_proj": "gated-gelu",
+  "global_block_size": 16,
+  "initializer_factor": 1.0,
+  "is_encoder_decoder": true,
+  "layer_norm_epsilon": 1e-06,
+  "local_radius": 127,
+  "model_type": "longt5",
+  "n_positions": 4096,
+  "num_decoder_layers": 12,
+  "num_heads": 12,
+  "num_layers": 12,
+  "output_past": true,
+  "pad_token_id": 0,
+  "relative_attention_max_distance": 128,
+  "relative_attention_num_buckets": 32,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float32",
+  "transformers_version": "4.19.0.dev0",
+  "use_cache": true,
+  "vocab_size": 32128
+}
