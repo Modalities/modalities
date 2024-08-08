@@ -65,9 +65,8 @@ class RotaryTransform(QueryKeyValueTransform):
         self._sin_cached = None
 
     def reset_parameters(self):
-        self.register_buffer("inv_freq", self.inv_freq_tensor)
-
-    #     # self.register_buffer("inv_freq", self.inv_freq)
+        # self.register_buffer("inv_freq", self.inv_freq_tensor)
+        pass
 
     def rotate_half(self, x):
         x1, x2 = x.chunk(2, dim=-1)
@@ -499,6 +498,8 @@ class GPT2LLM(NNModel):
         assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
         f"input sequence length is only {self.sequence_length}"
 
+        # Shard this tensor over the mesh by sharding `big_tensor`'s 0th dimension over the 0th dimension of `mesh`.
+        # input_ids_dtensor = distribute_tensor(input_ids, GLOBAL_MESH, [Shard(dim=0)])
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
 

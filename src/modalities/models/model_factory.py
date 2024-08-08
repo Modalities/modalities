@@ -1,16 +1,18 @@
+import itertools
 from pathlib import Path
 from typing import List
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from torch.distributed._composable.fsdp._fsdp_api import MixedPrecisionPolicy
-from torch.distributed._composable.fully_shard import fully_shard
+from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.exceptions import ModelStateError
 from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, AttentionConfig, AttentionImplementation, PositionTypes
 from modalities.models.model import ActivationType
@@ -72,7 +74,7 @@ class ModelFactory:
     def get_fsdp_2_wrapped_model(
         model: nn.Module,
         block_names: List[str],
-        # dp_mesh: DeviceMesh,
+        device_mesh: DeviceMesh,
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
     ) -> nn.Module:
@@ -89,10 +91,12 @@ class ModelFactory:
         # map the block names to the actual block class (e.b., GPT2Block)
         block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
 
-        MixedPrecisionPolicy(
+        mp_policy = MixedPrecisionPolicy(
             param_dtype=mixed_precision_settings.param_dtype.value,
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
+
+        fsdp_config = {"mesh": device_mesh, "mp_policy": mp_policy}
 
         modules = list(model.modules())
         for module_id, module in enumerate(modules):
@@ -101,25 +105,28 @@ class ModelFactory:
                 # transformer block since FSDP would prefetch it immediately.
                 fully_shard(
                     module,
+                    **fsdp_config
                     # mesh=dp_mesh,
                     # mp_policy=mp_policy,
                     # reshard_after_forward=reshard_after_forward and int(module_id) < len(modules) - 1,
                 )
         fully_shard(
             model,
+            **fsdp_config
             # mesh=dp_mesh,
             # mp_policy=mp_policy,
             # reshard_after_forward=reshard_after_forward
         )
 
-        # for tensor in itertools.chain(model.parameters(), model.buffers()):
-        #     if tensor.device != torch.device("meta"):
-        #         raise ModelStateError("All parameters and buffers must be on meta device!")
+        for tensor in itertools.chain(model.parameters(), model.buffers()):
+            if tensor.device != torch.device("meta"):
+                raise ModelStateError("All parameters and buffers must be on meta device!")
 
         # Allocate buffers and sharded parameters on GPU
         # model.to_empty("cuda")
         # Run user-defined initializers
         # model.init_weights() # or `model.apply(init_weights)`
+        model = model.to_empty(device="cuda")
 
         return model
 
