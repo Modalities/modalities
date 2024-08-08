@@ -7,8 +7,13 @@ from modalities.utils.number_conversion import NumberConversion
     "num_ranks,global_num_samples,local_micro_batch_size,expected",
     [(2, 100, 10, 5), (2, 110, 10, 5)],
 )
-def test_get_local_num_batches_from_num_samples(num_ranks: int, global_num_samples: int, local_micro_batch_size: int, expected: int):
-    assert NumberConversion.get_local_num_batches_from_num_samples(num_ranks, global_num_samples, local_micro_batch_size) == expected
+def test_get_local_num_batches_from_num_samples(
+    num_ranks: int, global_num_samples: int, local_micro_batch_size: int, expected: int
+):
+    assert (
+        NumberConversion.get_local_num_batches_from_num_samples(num_ranks, global_num_samples, local_micro_batch_size)
+        == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -19,7 +24,9 @@ def test_get_local_num_batches_from_num_tokens(
     num_ranks: int, global_num_tokens: int, sequence_length: int, local_micro_batch_size: int, expected: int
 ):
     assert (
-        NumberConversion.get_local_num_batches_from_num_tokens(num_ranks, global_num_tokens, sequence_length, local_micro_batch_size)
+        NumberConversion.get_local_num_batches_from_num_tokens(
+            num_ranks, global_num_tokens, sequence_length, local_micro_batch_size
+        )
         == expected
     )
 

@@ -37,7 +37,9 @@ class NumTokensFromNumStepsConfig(BaseModel):
 
 class NumberConversion:
     @staticmethod
-    def get_local_num_batches_from_num_samples(num_ranks: int, global_num_samples: int, local_micro_batch_size: int) -> int:
+    def get_local_num_batches_from_num_samples(
+        num_ranks: int, global_num_samples: int, local_micro_batch_size: int
+    ) -> int:
         """Calculates the number of local batches for each rank, given the global
         number of samples and number of ranks.
         This helper function is primarily used to calculate the number of batches to
@@ -54,7 +56,9 @@ class NumberConversion:
         return (global_num_samples) // (num_ranks * local_micro_batch_size)
 
     @staticmethod
-    def get_local_num_batches_from_num_tokens(num_ranks: int, global_num_tokens: int, sequence_length: int, local_micro_batch_size: int) -> int:
+    def get_local_num_batches_from_num_tokens(
+        num_ranks: int, global_num_tokens: int, sequence_length: int, local_micro_batch_size: int
+    ) -> int:
         """Calculates the number of local batches for each rank, given the global
         number of tokens and number of ranks.
         This helper function is primarily used to calculate a dataloader's number of batches (total and to skip)
@@ -63,7 +67,7 @@ class NumberConversion:
             num_ranks (int): _description_
             global_num_tokens (int): _description_
             sequence_length (int): _description_
-            local_micro_batch_size (int): _description_ 
+            local_micro_batch_size (int): _description_
         Returns:
             int: _description_
         """
