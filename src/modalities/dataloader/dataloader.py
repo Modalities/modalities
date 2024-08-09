@@ -1,17 +1,17 @@
 from typing import Iterable, Optional, Union
 
 from torch.utils.data import Dataset, DistributedSampler, Sampler
-from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
+from torch.utils.data.dataloader import DataLoader, _collate_fn_t, _worker_init_fn_t
 
 from modalities.dataloader.samplers import ResumableBatchSampler
 
 
-class LLMDataLoader(DataLoader[T_co]):
+class LLMDataLoader(DataLoader):
     def __init__(
         self,
         dataloader_tag: str,
         batch_sampler: ResumableBatchSampler,
-        dataset: Dataset[T_co],
+        dataset: Dataset,
         batch_size: Optional[int] = 1,
         shuffle: Optional[bool] = None,
         sampler: Union[Sampler, Iterable, None] = None,
@@ -78,8 +78,8 @@ class LLMDataLoader(DataLoader[T_co]):
         return self.batch_sampler.start_index
 
 
-class RepeatingDataLoader(LLMDataLoader[T_co]):
-    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
+class RepeatingDataLoader(LLMDataLoader):
+    def __init__(self, dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False):
         """Wraps an iterator to allow for infinite iteration. This is especially useful
         for DataLoader types that we wish to automatically restart upon completion.
 
