@@ -270,7 +270,7 @@ class CoCa(NNModel):
             audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
             output[self.audio_cls_prediction_key] = audio_cls_token
             output[self.vision_cls_prediction_key] = vision_cls_token
-            modality_embd = [audio_embd, vision_embd]
+            modality_embd = {"audio": audio_embd, "video": vision_embd}
 
         text_embd, text_cls_token = self._forward_encode_text(inputs)
         logits = self._forward_decode(text_embd, modality_embd)

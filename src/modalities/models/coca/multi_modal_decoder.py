@@ -103,9 +103,9 @@ class TransformerBlock(nn.Module):
         if not self.with_context or self.add_extra_mlp:
             x = x + self.mlp(self.ln_2(x))
         if self.with_context:
-            if isinstance(context, List):
+            if isinstance(context, Dict):
                 x = self.ln_3(x)
-                x = x + self.cross_attn(x, context=context[0]) + self.cross_attn2(x, context=context[1])
+                x = x + self.cross_attn(x, context=context["audio"]) + self.cross_attn2(x, context=context["video"])
                 x = x + self.mlp_2(self.ln_4(x))
             else:
                 x = x + self.cross_attn(self.ln_3(x), context=context)
