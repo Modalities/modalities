@@ -73,7 +73,7 @@ class CoCaCollatorFn(CollateFnIF):
             None.
         """
         samples = {
-            sample_key: torch.stack([self._prepare_sample(d[sample_key]) for d in batch])
+            sample_key: torch.stack([self._prepare_sample(d[sample_key]) for d in batch if sample_key in d])
             for sample_key in self.sample_keys
         }
         if "attention_mask" in batch[0]:

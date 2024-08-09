@@ -90,7 +90,6 @@ train_video_builder:
     modality_key_mapping:
       TEXT: ["json", "input_ids"]
       VIDEO: ["mp4", "video"]
-      AUDIO: ["mp4","audio"]
     modality_transforms:
       AUDIO:
         instance_key: train_audio_transform
@@ -111,7 +110,6 @@ val_video_builder:
     modality_key_mapping:
       TEXT: ["json", "input_ids"]
       VIDEO: ["mp4", "video"]
-      AUDIO: ["mp4","audio"]
     modality_transforms:
       AUDIO:
         instance_key: val_audio_transform

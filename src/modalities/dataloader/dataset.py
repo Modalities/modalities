@@ -514,7 +514,7 @@ class AudioTransform(Transform):
                 torchaudio.transforms.TimeMasking(time_mask_param=self.time_domain_mask_length),
             )
 
-        log_mel_spec = torch.clamp(self.extract_features(raw_audio[1]), 1e-10).log10().squeeze(0)
+        log_mel_spec = torch.clamp(self.extract_features(raw_audio[0]), 1e-10).log10().squeeze(0)
         log_mel_spec = self.masking(log_mel_spec) if self.is_training else log_mel_spec
         feats_len = log_mel_spec.shape[-1] // SUB_SAMPLING_FACTOR
 
@@ -580,21 +580,24 @@ def decord_video(key, data):
     if extension not in "mp4 ogv mjpeg avi mov h264 mpg webm wmv".split():
         return None
 
+    audio = None
+    audio_sample_rate = -1
+    stream = torchaudio.io.StreamReader(data)
+    for idx in range(stream.num_src_streams):
+        if stream.get_src_stream_info(idx).media_type == "audio":
+            audio, audio_sample_rate = torchaudio.load(data)
+            if audio.shape[0] > 1:  # more than one audio channel
+                audio = torch.mean(audio, dim=0)
+            break
+
     file_obj = io.BytesIO(data)
-
-    # we could replace this with torchaudio.load(data)
-    ar = decord.AudioReader(file_obj, sample_rate=16000, mono=True)
-    audio = ar[:]
-
-    # reset to start of file
-    file_obj.seek(0)
     vr = decord.VideoReader(file_obj)
     clip_num_frames = 64
     # sample clip_num_frames uniformly from the full video
     frame_ids = torch.linspace(0, len(vr) - 1, clip_num_frames, dtype=torch.int64)
     frames = vr.get_batch(frame_ids.tolist())  # T x H x W x C
 
-    return (frames, audio)
+    return (frames, audio, audio_sample_rate)  # audio can be None if no audio stream exists
 
 
 def torch_audio(key, data):
@@ -606,7 +609,11 @@ def torch_audio(key, data):
     if extension not in valid_extensions:
         return None
 
-    return torchaudio.load(data)
+    # torchaudio.load returns (torch.Tensor, int)
+    audio, sample_rate = torchaudio.load(data)
+    if audio.shape[0] > 1:  # more than one channel
+        audio = torch.mean(audio, dim=0)
+    return (audio, sample_rate)
 
 
 # @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
@@ -630,7 +637,10 @@ class MultimodalWebDatasetBuilder:
         self.urls = urls
         self.modality_key_mapping = modality_key_mapping
         self.modality_transforms = modality_transforms
-        assert self.modality_key_mapping.keys() == self.modality_transforms.keys()
+        # transforms should be specified for all modality_key mappings,
+        # but we can also specify more transforms than necessary
+        # so modality_key_mappings should be a subset of modality_transforms
+        assert set(self.modality_key_mapping.keys()).issubset(self.modality_transforms.keys())
         self.modalities = list(self.modality_key_mapping.keys())
         self.num_samples = num_samples
         self.web_dataset = None
@@ -647,7 +657,7 @@ class MultimodalWebDatasetBuilder:
         if ModalityEnum.TEXT in self.modality_transforms:
             self.additional_extreacted_keys.append("attention_mask")
 
-        if ModalityEnum.AUDIO in self.modality_transforms:
+        if ModalityEnum.AUDIO in self.modality_transforms or ModalityEnum.VIDEO in self.modality_transforms:
             self.additional_extreacted_keys.append("audio_len")
 
         # Mapping between modality and transform
@@ -712,7 +722,13 @@ class MultimodalWebDatasetBuilder:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
         transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
         sample[target_key] = transform(sample[source_key])
-        # del sample[source_key]
+        # if the video contains audio
+        if sample[source_key][1] is not None and ModalityEnum.AUDIO in self.modality_transforms:
+            transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
+            sample["audio"], sample["audio_len"] = transform((sample[source_key][1], sample[source_key][2]))
+            if "audio" not in self.additional_extreacted_keys:
+                self.additional_extreacted_keys.append("audio")
+        del sample[source_key]
         return sample
 
     def _transform_audio(self, sample):
@@ -785,7 +801,6 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         """
         super().__init__()
         self.builders = builders
-        assert len(builders) == 1, "Multiple dataset builders are not supported yet"  # TODO
 
         self.output_keys_by_modality = {}
         for b in builders:
