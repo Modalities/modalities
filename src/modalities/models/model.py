@@ -72,6 +72,6 @@ class SwiGLU(nn.Module):
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
-    forward_result = model.forward(batch.samples)
+    forward_result = model(batch.samples)
     result_batch = InferenceResultBatch(targets=batch.targets, predictions=forward_result)
     return result_batch
