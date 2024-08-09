@@ -22,6 +22,7 @@ from modalities.config.config import (
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
+    CompiledModelConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
@@ -114,6 +115,7 @@ COMPONENTS = [
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
+    ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),

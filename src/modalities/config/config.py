@@ -230,6 +230,11 @@ class FSDP2WrappedModelConfig(BaseModel):
         return self
 
 
+class CompiledModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: List[str]
+
+
 @deprecated(
     "With version 0.3, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) "
     "and FSDP2WrappedModelConfig instead.",
