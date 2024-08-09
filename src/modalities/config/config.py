@@ -336,7 +336,6 @@ class ResumableBatchSamplerConfig(BaseModel):
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
-    device_mesh: PydanticDeviceMeshIFType
 
 
 class LLMDataLoaderConfig(BaseModel):
