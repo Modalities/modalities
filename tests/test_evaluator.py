@@ -32,4 +32,4 @@ def test_evaluate_cpu(
     evaluator.evaluate(
         model=nn_model_mock, data_loaders=[llm_data_loader_mock], loss_fun=loss_mock, num_train_steps_done=1
     )
-    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
+    nn_model_mock.assert_has_calls([call(b.samples) for b in batches])
