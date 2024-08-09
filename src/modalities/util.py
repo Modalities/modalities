@@ -205,16 +205,31 @@ def get_theoretical_gpu_peak_performance(world_size: int) -> Optional[Number]:
         return None
 
 
+def get_theoretical_flops_per_token(model: FSDP) -> Optional[int]:
+    """
+    compute theoretical_flops_per_token = 6*N + 12*L*T*H
+    see App. B in the PaLM paper (https://arxiv.org/pdf/2204.02311)
+    """
+    N = get_total_number_of_trainable_parameters(model)
+    try:
+        L = model.module.n_layer
+        T = model.module.sequence_length
+        H = model.module.n_embd
+        return 6 * N + 12 * L * T * H
+    except AttributeError:
+        return None
+
+
 def compute_mfu(
     synced_num_samples_per_second: torch.Tensor,
-    theoretical_flops_per_token: Number,
+    theoretical_flops_per_token: Optional[Number],
     theoretical_gpu_peak_performance: Optional[Number],
 ) -> torch.Tensor:
     """
     compute mfu = throughput * theoretical_flops_per_token / theoretical_gpu_peak_performance
     units:  [1] = [tokens/s] * [FLOPs / token]             / [FLOPs / s]
     """
-    if theoretical_gpu_peak_performance is None:
-        return torch.tensor(-1).type_as(synced_num_samples_per_second)
+    if theoretical_flops_per_token is None or theoretical_gpu_peak_performance is None:
+        return torch.tensor(-1.0)  # needs to be float for EvaluationResultBatch
     else:
         return synced_num_samples_per_second * theoretical_flops_per_token / theoretical_gpu_peak_performance
