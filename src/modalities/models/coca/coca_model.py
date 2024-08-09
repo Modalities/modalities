@@ -256,12 +256,12 @@ class CoCa(NNModel):
         output = {}
         # TODO stack features from different modalities (ensure correct alignment with the text features)
         modality_embd = None
-        if self.audio_sample_key is not None and self.vision_sample_key is None:
+        if self.audio_sample_key and self.vision_sample_key is None:
             audio_embd, audio_cls_token = self._forward_encode_audio(inputs)
             output[self.audio_cls_prediction_key] = audio_cls_token
             modality_embd = audio_embd
 
-        elif self.vision_sample_key is not None and self.audio_sample_key is None:
+        elif self.vision_sample_key and self.audio_sample_key is None:
             vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
             output[self.vision_cls_prediction_key] = vision_cls_token
             modality_embd = vision_embd
