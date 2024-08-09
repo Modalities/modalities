@@ -193,7 +193,9 @@ class Trainer:
                 }
                 gradient_norm_scores = []
 
-                mfu = compute_mfu(synced_num_samples, theoretical_flops_per_token, theoretical_gpu_peak_performance)
+                mfu = compute_mfu(
+                    synced_num_samples_per_second, theoretical_flops_per_token, theoretical_gpu_peak_performance
+                )
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
