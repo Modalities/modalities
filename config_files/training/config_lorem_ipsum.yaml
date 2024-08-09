@@ -175,7 +175,7 @@ wrapped_model:
       pass_type: BY_REFERENCE
     sync_module_states: true
     mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
+    sharding_strategy: HYBRID_SHARD
     block_names: [GPT2Block]
 
 model: 
