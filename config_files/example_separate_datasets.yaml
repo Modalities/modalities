@@ -1,0 +1,362 @@
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+  training:
+    global_training_log_interval_in_steps: 30 # Needs to be a multiple of gradient_acc_steps
+    global_checkpointing_interval_in_steps: 9_990
+    global_evaluation_interval_in_steps: 4_980
+    global_num_training_samples: 100_000 # 491 steps with 8 gpus and global bs of 1152
+    global_num_seen_steps: 0
+    do_apply_activation_checkpointing: true
+    gradient_acc_steps: 30
+    local_train_micro_batch_size: 1
+    sequence_length: 64
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpointing_path: data/checkpoints
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: tokenizer/
+    padding: true
+    max_length: ${settings.training.sequence_length}
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: coca_collator
+  config:
+    sample_keys:
+      - video
+      - audio
+      - audio_len
+      - ${settings.referencing_keys.sample_key}
+    target_keys: []
+    text_sample_key: ${settings.referencing_keys.sample_key}
+    text_target_key: ${settings.referencing_keys.target_key}
+
+train_audio_transform:
+  component_key: transform
+  variant_key: audio_transform
+  config:
+    is_training: True
+    block_size_audio_encoder: 300
+    freq_domain_mask_length: 30
+    time_domain_mask_length: 100
+
+val_audio_transform:
+  component_key: transform
+  variant_key: audio_transform
+  config:
+    is_training: false
+    block_size_audio_encoder: 300
+
+train_video_transform:
+  component_key: transform
+  variant_key: video_transform
+  config:
+    is_training: True
+    input_size: 288
+    num_frames: ${model.config.vision_encoder_config.num_video_frames}
+
+val_video_transform:
+  component_key: transform
+  variant_key: video_transform
+  config:
+    is_training: True
+    input_size: 288
+    num_frames: ${model.config.vision_encoder_config.num_video_frames}
+
+text_transform:
+  component_key: transform
+  variant_key: text_transform
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+train_video_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "videodata/validation/000000.tar"
+    modality_key_mapping:
+      TEXT: ["json", "input_ids"]
+      VIDEO: ["mp4", "video"]
+      AUDIO: ["mp4","audio"]
+    modality_transforms:
+      AUDIO:
+        instance_key: train_audio_transform
+        pass_type: BY_REFERENCE
+      VIDEO:
+        instance_key: train_video_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 100_000
+
+val_video_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "videodata/validation/000000.tar"
+    modality_key_mapping:
+      TEXT: ["json", "input_ids"]
+      VIDEO: ["mp4", "video"]
+      AUDIO: ["mp4","audio"]
+    modality_transforms:
+      AUDIO:
+        instance_key: val_audio_transform
+        pass_type: BY_REFERENCE
+      VIDEO:
+        instance_key: val_video_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10_000
+
+train_dataset:
+  component_key: dataset
+  variant_key: web_dataset
+  config:
+    builders:
+      - instance_key: train_video_builder
+        pass_type: BY_REFERENCE
+    shardshuffle: 100
+    repeat: true
+    resample: true
+    shuffle_buffer: 10_000
+
+val_dataset:
+  component_key: dataset
+  variant_key: web_dataset
+  config:
+    builders:
+      - instance_key: val_video_builder
+        pass_type: BY_REFERENCE
+    shardshuffle: 1000
+    repeat: true
+    resample: true
+    shuffle_buffer: 10_000
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: web_loader
+  config:
+    num_workers: 2
+    pin_memory: true
+    drop_last: true
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_size: ${settings.training.local_train_micro_batch_size}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: web_loader
+  config:
+    num_workers: 8
+    pin_memory: true
+    drop_last: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: val_dataset
+      pass_type: BY_REFERENCE
+    batch_size: ${settings.training.local_train_micro_batch_size}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: -1 # -1 to save all checkpoints
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
+      config:
+        checkpoint_path: ${settings.paths.checkpointing_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+captioning_loss:
+  component_key: loss
+  variant_key: cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${model.config.prediction_key}
+    tag: captioning_loss
+    weight: 2.0
+
+contrastive_loss:
+  component_key: loss
+  variant_key: clip_loss
+  config:
+    prediction_keys:
+      - ${model.config.individual_datasets_cls_prediction_key}
+      - ${model.config.text_cls_prediction_key}
+    logit_scale_key: ${model.config.logit_scale_prediction_key}
+    tag: contrastive_loss
+
+loss_fn:
+  - instance_key: captioning_loss
+    pass_type: BY_REFERENCE
+  - instance_key: contrastive_loss
+    pass_type: BY_REFERENCE
+
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: FP_16
+    sharding_strategy: HYBRID_SHARD
+    block_names: [TransformerBlock, PerceiverTransformerBlock]
+
+model:
+  component_key: model
+  variant_key: coca
+  config:
+    prediction_key: logits
+    audio_embd_prediction_key: audio_embeddings
+    vision_embd_prediction_key: vision_embeddings
+    text_embd_prediction_key: text_embeddings
+    vision_cls_prediction_key: vision_cls
+    individual_datasets_cls_prediction_key: modalities_cls
+    audio_cls_prediction_key: audio_cls
+    text_cls_prediction_key: text_cls
+    logit_scale_prediction_key: logit_scale
+    audio_encoder_config:
+      sample_key: audio
+      prediction_key: audio_embeddings
+      block_size: 300
+      n_mels: 128
+      n_embd: 768
+      n_heads: 12
+      n_conformer_blocks: 3
+      attention_config:
+        attention_engine_type: default_attention
+      pointwise_conv_kernel_size: 1
+      depthwise_conv_kernel_size: 31
+    vision_encoder_config:
+      sample_key: video
+      prediction_key: vision_embeddings
+      img_size: 288 # 288 in the original coca
+      n_classes: Null # Disable vision transformer head
+      n_layer: 3
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      n_embd: 768
+      dropout: 0.0
+      patch_size: 18 # 18 in the original coca
+      patch_stride: 18 # 18 in the original coca
+      n_img_channels: 3
+      add_cls_token: False
+      bias: True
+      num_video_frames: 16
+      n_latents: 64
+    text_decoder_config:
+      sample_key: ${settings.referencing_keys.sample_key}
+      prediction_key: ${model.config.prediction_key}
+      block_size: 77
+      vocab_size: 49_408 # 64k in the original coca
+      n_layer_text: 2
+      n_layer_multimodal_text: 1
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      ffn_hidden: 3072
+      n_embd: 768
+      dropout: 0.0
+      bias: true
+      activation: fused_swiglu
+      epsilon: 1e-5
+    n_pool_head: 12
+    n_queries: 256
+    bias_attn_pool: False
+    epsilon_attn_pool: 1e-5
+    weight_init:
+      mean: 0.0
+      std: 0.02
+
+scheduler:
+  component_key: scheduler
+  variant_key: cosine_annealing_with_warmup_lr # COCA uses linear decay
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    num_warmup_steps: 2_000
+    num_training_steps: 500_000
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 8e-4
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+
+batch_progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    local_rank: ${settings.cuda_env.global_rank}
+    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    train_dataloader:
+      instance_key: train_dataloader
+      pass_type: BY_REFERENCE
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    local_rank: ${settings.cuda_env.global_rank}
+    project: modalities
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
+    config_file_path: ${settings.config_file_path}

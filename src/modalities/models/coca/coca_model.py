@@ -83,6 +83,7 @@ class CoCaConfig(BaseModel):
     vision_embd_prediction_key: Optional[str] = None
     audio_cls_prediction_key: Optional[str] = None
     vision_cls_prediction_key: Optional[str] = None
+    individual_datasets_cls_prediction_key: Optional[str] = None
     audio_encoder_config: Optional[AudioTransformerConfig] = None
     vision_encoder_config: Optional[VisionTransformerConfig] = None
     text_decoder_config: TextDecoderConfig
@@ -113,6 +114,7 @@ class CoCa(NNModel):
         vision_embd_prediction_key: Optional[str],
         audio_cls_prediction_key: Optional[str],
         vision_cls_prediction_key: Optional[str],
+        individual_datasets_cls_prediction_key: Optional[str],
         audio_encoder_config: Optional[AudioTransformerConfig],
         vision_encoder_config: Optional[VisionTransformerConfig],
         text_decoder_config: TextDecoderConfig,
@@ -154,6 +156,7 @@ class CoCa(NNModel):
         self.vision_embd_prediction_key = vision_embd_prediction_key
         self.audio_cls_prediction_key = audio_cls_prediction_key
         self.vision_cls_prediction_key = vision_cls_prediction_key
+        self.individual_datasets_cls_prediction_key = individual_datasets_cls_prediction_key
 
         self.n_pool_head = n_pool_head
         self.bias_attn_pool = bias_attn_pool
@@ -254,7 +257,7 @@ class CoCa(NNModel):
             dict[str, torch.Tensor]: Output dictionary.
         """
         output = {}
-        # TODO stack features from different modalities (ensure correct alignment with the text features)
+
         modality_embd = None
         if self.audio_sample_key and self.vision_sample_key is None:
             audio_embd, audio_cls_token = self._forward_encode_audio(inputs)
@@ -267,13 +270,25 @@ class CoCa(NNModel):
             modality_embd = vision_embd
 
         else:
-            audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
-            output[self.audio_cls_prediction_key] = audio_cls_token
-            output[self.vision_cls_prediction_key] = vision_cls_token
-            modality_embd = {"audio": audio_embd, "video": vision_embd}
+            if self.individual_datasets_cls_prediction_key:  # audio / vision / text BUT separate datasets
+                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
+                output[self.individual_datasets_cls_prediction_key] = torch.cat([vision_cls_token, audio_cls_token])
+                modality_embd = {"audio": audio_embd, "image": vision_embd}
+            else:  # audio + vision from one single dataset
+                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
+                output[self.audio_cls_prediction_key] = audio_cls_token
+                output[self.vision_cls_prediction_key] = vision_cls_token
+                modality_embd = {"audio": audio_embd, "video": vision_embd}
 
         text_embd, text_cls_token = self._forward_encode_text(inputs)
-        logits = self._forward_decode(text_embd, modality_embd)
+        if self.vision_sample_key and self.audio_sample_key and self.individual_datasets_cls_prediction_key:
+            image_text_embd, audio_text_embd = text_embd[: len(vision_embd), :], text_embd[len(vision_embd) :, :]
+            image_logits = self._forward_decode(image_text_embd, modality_embd["image"])
+            audio_logits = self._forward_decode(audio_text_embd, modality_embd["audio"])
+            logits = torch.cat([image_logits, audio_logits])
+        else:
+            logits = self._forward_decode(text_embd, modality_embd)
+
         output.update(
             {
                 self.prediction_key: logits,
