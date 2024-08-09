@@ -53,7 +53,18 @@ class HuggingFacePretrainedModel(NNModel):
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
     ):
-        super().__init__()
+        
+        if 'llama' in str(model_name).lower():
+            weight_decay_groups = {
+                "linear": [".self_attn", ".mlp"],
+                "embedding": [".embed_tokens", ".lm_head"],
+                "layernorm": [".norm"],
+            }
+        else:
+            # must set weight_decay_groups_excluded in config file to empty list
+            weight_decay_groups = {}
+
+        super().__init__(weight_decay_groups=weight_decay_groups)
         if model_args is None:
             model_args = []
         if kwargs is None:
@@ -89,18 +100,13 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
     ):
+        assert model_type.value in [LongT5Model, LongT5ForConditionalGeneration]
         if model_type.value in [LongT5Model, LongT5ForConditionalGeneration]:
             # with the regex, we match all parameters in the SelfAttention layer except global_input_layer_norm to prevent double counting
             weight_decay_groups = {
                 "linear": [".DenseReluDense\\.w", ".SelfAttention\\.([^g]|global_)($|[^i])", ".EncDecAttention", ".lm_head"],
                 "embedding": [".shared", ".embed_tokens"],
                 "layernorm": [".layer_norm"],
-            }
-        elif 'llama' in model_name.lower():
-            weight_decay_groups = {
-                "linear": [".self_attn", ".mlp"],
-                "embedding": [".embed_tokens", ".lm_head"],
-                "layernorm": [".norm"],
             }
         else:
             # must set weight_decay_groups_excluded in config file to empty list
@@ -122,9 +128,7 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    # TODO: Maybe separate Encoder/Decoder into separate class?
-    # TODO: Generalize so that we can either pass decoder_inputs or targets.
-    # The _shift_tokens_right logic exists in the LongT5 implementation,
+    # LongT5 accepts either decoder_inputs or targets, and the _shift_tokens_right logic exists in the LongT5 implementation,
     # but when passing targets it also already computes the loss, and this fails due to type mismatch.
     # Computing it here is a workaround.
     def forward(
@@ -132,25 +136,18 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
             inputs: Dict[str, torch.Tensor],
             targets: Optional[Dict[str, torch.Tensor]] = None,
         ) -> Dict[str, torch.Tensor]:
-        if isinstance(self.huggingface_model, LongT5Model | LongT5ForConditionalGeneration):
-            # TODO: refactor so that target_key and decoder_start_token_id can be set in config/obtained automatically
-            decoder_input_ids = self._shift_tokens_right(
-                targets["target_ids"],
-                1,
-                )
-            output = self.huggingface_model.forward(
-                input_ids = inputs[self.sample_key],
-                decoder_input_ids = decoder_input_ids,
-            )
-        else:
-            output = self.huggingface_model.forward(inputs[self.sample_key])
+        # TODO: refactor so that target_key and decoder_start_token_id can be set in config/obtained automatically
+        decoder_input_ids = self._shift_tokens_right(targets["target_ids"], 1)
+        output = self.huggingface_model.forward(
+            input_ids = inputs[self.sample_key],
+            decoder_input_ids = decoder_input_ids,
+        )
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
     
     @staticmethod
     def _shift_tokens_right(input_ids: torch.Tensor, decoder_start_token_id: int) -> torch.Tensor:
         shifted_input_ids = torch.roll(input_ids, 1, dims=1)
         shifted_input_ids[:, 0] = decoder_start_token_id
-
         return shifted_input_ids
 
     @property

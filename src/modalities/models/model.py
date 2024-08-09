@@ -72,6 +72,9 @@ class SwiGLU(nn.Module):
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
-    forward_result = model.forward(inputs=batch.samples, targets=batch.targets)
+    if hasattr(model, "huggingface_model") and hasattr(model.huggingface_model, "encoder"):
+        forward_result = model.forward(inputs=batch.samples, targets=batch.targets)
+    else:
+        forward_result = model.forward(inputs=batch.samples)
     result_batch = InferenceResultBatch(targets=batch.targets, predictions=forward_result)
     return result_batch

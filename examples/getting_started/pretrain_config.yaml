@@ -184,7 +184,7 @@ wrapped_model:
 
 model_raw:
   component_key: model
-  variant_key: huggingface_pretrained_model
+  variant_key: huggingface_pretrained_encoder_decoder_model
   config:
     #model_type: AutoModelForCausalLM
     #model_name: TinyLlama/TinyLlama_v1.1 
