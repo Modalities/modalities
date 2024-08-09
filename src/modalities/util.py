@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
-from typing import Callable, Dict, Generic, Optional, Type, TypeVar
+from typing import Callable, Dict, Generic, Optional, Tuple, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -205,23 +205,28 @@ def get_theoretical_gpu_peak_performance(world_size: int) -> Optional[Number]:
         return None
 
 
-def get_theoretical_flops_per_token(model: FSDP) -> Optional[int]:
+def get_theoretical_flops_per_token(model: FSDP) -> Tuple[Optional[int], Optional[int]]:
     """
     compute theoretical_flops_per_token = 6*N + 12*L*T*H
     see App. B in the PaLM paper (https://arxiv.org/pdf/2204.02311)
+
+    Returns:
+        theoretical_flops_per_token
+        sequence_length (needed to convert samples to tokens in compute_mfu)
     """
     N = get_total_number_of_trainable_parameters(model)
     try:
         L = model.module.n_layer
         T = model.module.sequence_length
         H = model.module.n_embd
-        return 6 * N + 12 * L * T * H
+        return 6 * N + 12 * L * T * H, T
     except AttributeError:
-        return None
+        return None, None
 
 
 def compute_mfu(
     synced_num_samples_per_second: torch.Tensor,
+    sequence_length: int,
     theoretical_flops_per_token: Optional[Number],
     theoretical_gpu_peak_performance: Optional[Number],
 ) -> torch.Tensor:
@@ -232,4 +237,5 @@ def compute_mfu(
     if theoretical_flops_per_token is None or theoretical_gpu_peak_performance is None:
         return torch.tensor(-1.0)  # needs to be float for EvaluationResultBatch
     else:
-        return synced_num_samples_per_second * theoretical_flops_per_token / theoretical_gpu_peak_performance
+        num_tokens_per_second = synced_num_samples_per_second * sequence_length
+        return num_tokens_per_second * theoretical_flops_per_token / theoretical_gpu_peak_performance
