@@ -99,33 +99,24 @@ class ModelFactory:
         fsdp_config = {"mesh": device_mesh, "mp_policy": mp_policy}
 
         modules = list(model.modules())
+        # we first shard all the blocks
         for module_id, module in enumerate(modules):
             if isinstance(module, block_types):
                 # As an optimization, we do not reshard after forward for the last
                 # transformer block since FSDP would prefetch it immediately.
                 fully_shard(
                     module,
-                    **fsdp_config
-                    # mesh=dp_mesh,
-                    # mp_policy=mp_policy,
-                    # reshard_after_forward=reshard_after_forward and int(module_id) < len(modules) - 1,
+                    **fsdp_config,
+                    reshard_after_forward=reshard_after_forward and int(module_id) < len(modules) - 1,
                 )
-        fully_shard(
-            model,
-            **fsdp_config
-            # mesh=dp_mesh,
-            # mp_policy=mp_policy,
-            # reshard_after_forward=reshard_after_forward
-        )
+        # finally, we shard the entire model
+        fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
 
         for tensor in itertools.chain(model.parameters(), model.buffers()):
             if tensor.device != torch.device("meta"):
                 raise ModelStateError("All parameters and buffers must be on meta device!")
 
         # Allocate buffers and sharded parameters on GPU
-        # model.to_empty("cuda")
-        # Run user-defined initializers
-        # model.init_weights() # or `model.apply(init_weights)`
         model = model.to_empty(device="cuda")
 
         return model
