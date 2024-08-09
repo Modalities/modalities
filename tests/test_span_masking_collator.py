@@ -1,15 +1,16 @@
 import pytest
 import torch
-from modalities.batch import DatasetBatch
-from modalities.models.huggingface.collator import (
-    SpanMaskingCollateFn,
-    SpanMaskingCollateFnConfig,
-)
-from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
+
 from modalities.config.config import PreTrainedHFTokenizerConfig
+from modalities.models.huggingface.collator import SpanMaskingCollateFn, SpanMaskingCollateFnConfig
+from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
+
+
 def tokenize(word: str):
     vocab = {"begin": 0, "end": 1}
     return vocab[word]
+
+
 @pytest.fixture
 def hf_tokenizer_config() -> PreTrainedHFTokenizerConfig:
     return dict(
@@ -17,10 +18,14 @@ def hf_tokenizer_config() -> PreTrainedHFTokenizerConfig:
         truncation=False,
         padding=False,
     )
+
+
 @pytest.fixture
 def dummy_tokenizer(hf_tokenizer_config):
     # get the tokenizer
     return PreTrainedHFTokenizer(**hf_tokenizer_config)
+
+
 @pytest.fixture
 def span_masking_config(dummy_tokenizer) -> SpanMaskingCollateFnConfig:
     return dict(
@@ -30,6 +35,8 @@ def span_masking_config(dummy_tokenizer) -> SpanMaskingCollateFnConfig:
         mean_noise_span_length=3.0,
         tokenizer=dummy_tokenizer,
     )
+
+
 @pytest.mark.parametrize(
     "batch",
     [
@@ -54,15 +61,12 @@ def test_span_masking_collator(span_masking_config, batch):
     # Text tokens are ascending (same order as input)
     assert (torch.diff(sample_ids[(sample_ids > 1) & (sample_ids < 32000)]) >= 1).all()
     assert (torch.diff(target_ids[(target_ids > 1) & (target_ids < 32000)]) >= 1).all()
-    # Special mask tokens are descending 
-    assert(torch.diff(sample_ids[sample_ids >= 32000]) == -1).all()
-    assert(torch.diff(target_ids[target_ids >= 32000]) == -1).all()
+    # Special mask tokens are descending
+    assert (torch.diff(sample_ids[sample_ids >= 32000]) == -1).all()
+    assert (torch.diff(target_ids[target_ids >= 32000]) == -1).all()
     # All input tokens are either in sample or target
     joined_ids = torch.concatenate(
-        (
-            sample_ids[(sample_ids > 1) & (sample_ids < 32000)],
-            target_ids[(target_ids > 1) & (target_ids < 32000)]
-        )
+        (sample_ids[(sample_ids > 1) & (sample_ids < 32000)], target_ids[(target_ids > 1) & (target_ids < 32000)])
     )
     sorted_join_ids, _ = torch.sort(joined_ids)
     assert torch.equal(sorted_join_ids, input_ids)

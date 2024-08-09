@@ -1,23 +1,23 @@
-from abc import ABC, abstractmethod
 from typing import Dict, List
-from pydantic import BaseModel
 
+import numpy as np
 import torch
 import torch.distributed
-import numpy as np
+from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch
 from modalities.config.pydanctic_if_types import PydanticTokenizerIFType
 from modalities.models.gpt2.collator import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
-  
+
 class SpanMaskingCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
     noise_density: float
     mean_noise_span_length: float
     tokenizer: PydanticTokenizerIFType
+
 
 class SpanMaskingCollateFn(CollateFnIF):
     """
@@ -26,10 +26,15 @@ class SpanMaskingCollateFn(CollateFnIF):
     Code taken with minor modifications from <https://github.com/huggingface/transformers/blob/main/examples/flax/language-modeling/run_t5_mlm_flax.py#L308>
     and ported from jax to torch.
     """
-    def __init__(self,
-                 sample_key: str, target_key: str, noise_density: float, mean_noise_span_length: float,
-                 tokenizer: TokenizerWrapper,
-                 ):
+
+    def __init__(
+        self,
+        sample_key: str,
+        target_key: str,
+        noise_density: float,
+        mean_noise_span_length: float,
+        tokenizer: TokenizerWrapper,
+    ):
         self.sample_key = sample_key
         self.target_key = target_key
         self.noise_density = noise_density
@@ -42,7 +47,7 @@ class SpanMaskingCollateFn(CollateFnIF):
         batch_size, expanded_input_length = sample_tensor.shape
         mask_indices = np.asarray([self.random_spans_noise_mask(expanded_input_length) for i in range(batch_size)])
         labels_mask = ~mask_indices
-        
+
         input_ids_sentinel = self.create_sentinel_ids(mask_indices.astype(np.int8))
         labels_sentinel = self.create_sentinel_ids(labels_mask.astype(np.int8))
 
@@ -53,7 +58,7 @@ class SpanMaskingCollateFn(CollateFnIF):
         targets = {self.target_key: torch.from_numpy(label_ids)}
 
         return DatasetBatch(targets=targets, samples=samples)
-    
+
     def create_sentinel_ids(self, mask_indices):
         """
         Sentinel ids creation given the indices that should be masked.
@@ -86,7 +91,6 @@ class SpanMaskingCollateFn(CollateFnIF):
         )
         return input_ids
 
-    
     def random_spans_noise_mask(self, length: int):
         orig_length = length
 
@@ -98,7 +102,6 @@ class SpanMaskingCollateFn(CollateFnIF):
         num_noise_spans = int(np.round(min(num_noise_tokens, num_nonnoise_tokens) / self.mean_noise_span_length))
         # avoid degeneracy by ensuring positive number of noise spans
         num_noise_spans = max(num_noise_spans, 1)
-    
 
         # pick the lengths of the noise spans and the non-noise spans
         def _random_segmentation(num_items, num_segments):
@@ -131,11 +134,11 @@ class SpanMaskingCollateFn(CollateFnIF):
         is_noise = np.equal(span_num % 2, 1)
 
         return is_noise[:orig_length]
-    
 
 
 def compute_input_and_target_lengths(inputs_length, noise_density, mean_noise_span_length):
-    """This function is copy of `random_spans_helper <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2466>`__ .
+    """This function is copy of random_spans_helper
+    <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2466>
 
     Training parameters to avoid padding with random_spans_noise_mask.
     When training a model with random_spans_noise_mask, we would like to set the other

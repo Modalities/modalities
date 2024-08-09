@@ -3,7 +3,13 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from pydantic import BaseModel, ConfigDict
-from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer, LongT5Model, LongT5ForConditionalGeneration
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForMaskedLM,
+    AutoTokenizer,
+    LongT5ForConditionalGeneration,
+    LongT5Model,
+)
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
@@ -53,8 +59,7 @@ class HuggingFacePretrainedModel(NNModel):
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
     ):
-        
-        if 'llama' in str(model_name).lower():
+        if "llama" in str(model_name).lower():
             weight_decay_groups = {
                 "linear": [".self_attn", ".mlp"],
                 "embedding": [".embed_tokens", ".lm_head"],
@@ -102,9 +107,15 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
     ):
         assert model_type.value in [LongT5Model, LongT5ForConditionalGeneration]
         if model_type.value in [LongT5Model, LongT5ForConditionalGeneration]:
-            # with the regex, we match all parameters in the SelfAttention layer except global_input_layer_norm to prevent double counting
+            # with the regex, we match all parameters in the SelfAttention layer,
+            # except global_input_layer_norm to prevent double counting
             weight_decay_groups = {
-                "linear": [".DenseReluDense\\.w", ".SelfAttention\\.([^g]|global_)($|[^i])", ".EncDecAttention", ".lm_head"],
+                "linear": [
+                    ".DenseReluDense\\.w",
+                    ".SelfAttention\\.([^g]|global_)($|[^i])",
+                    ".EncDecAttention",
+                    ".lm_head",
+                ],
                 "embedding": [".shared", ".embed_tokens"],
                 "layernorm": [".layer_norm"],
             }
@@ -128,22 +139,23 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    # LongT5 accepts either decoder_inputs or targets, and the _shift_tokens_right logic exists in the LongT5 implementation,
+    # LongT5 accepts either decoder_inputs or targets.
+    # The _shift_tokens_right logic exists in the LongT5 implementation,
     # but when passing targets it also already computes the loss, and this fails due to type mismatch.
     # Computing it here is a workaround.
     def forward(
-            self,
-            inputs: Dict[str, torch.Tensor],
-            targets: Optional[Dict[str, torch.Tensor]] = None,
-        ) -> Dict[str, torch.Tensor]:
+        self,
+        inputs: Dict[str, torch.Tensor],
+        targets: Optional[Dict[str, torch.Tensor]] = None,
+    ) -> Dict[str, torch.Tensor]:
         # TODO: refactor so that target_key and decoder_start_token_id can be set in config/obtained automatically
         decoder_input_ids = self._shift_tokens_right(targets["target_ids"], 1)
         output = self.huggingface_model.forward(
-            input_ids = inputs[self.sample_key],
-            decoder_input_ids = decoder_input_ids,
+            input_ids=inputs[self.sample_key],
+            decoder_input_ids=decoder_input_ids,
         )
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
-    
+
     @staticmethod
     def _shift_tokens_right(input_ids: torch.Tensor, decoder_start_token_id: int) -> torch.Tensor:
         shifted_input_ids = torch.roll(input_ids, 1, dims=1)
@@ -153,7 +165,6 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
     @property
     def fsdp_block_names(self) -> List[str]:
         return self.huggingface_model._no_split_modules
-
 
 
 if __name__ == "__main__":
