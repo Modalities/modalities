@@ -96,7 +96,7 @@ class Trainer:
 
         # throughput & MFU
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
-        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance()
+        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(world_size=dist.get_world_size())
         num_params = get_total_number_of_trainable_parameters(model)
         theoretical_flops_per_token = 6 * num_params  # approximation
 

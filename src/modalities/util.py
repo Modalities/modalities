@@ -182,15 +182,22 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
                 return module_class
 
 
-def get_theoretical_gpu_peak_performance() -> Optional[Number]:
+# TODO: move?
+PEAK_PERFORMANCE = {
+    "A100": 312e12,  # TODO: double-check (also floating point precision types)
+    "H100": 989e12,  # TODO: double-check (also floating point precision types)
+}
+
+
+def get_theoretical_gpu_peak_performance(world_size: int) -> Optional[Number]:
     """
     returns theoretical gpu peak performance in units FLOPs / s for given gpu type
     """
     device_name = torch.cuda.get_device_name()
     if device_name.startswith("NVIDIA A100"):
-        return 312e12  # TODO: double-check (also floating point precision types)
+        return PEAK_PERFORMANCE["A100"] * world_size
     elif device_name.startswith("NVIDIA H100"):
-        return 989e12  # TODO: double-check (also floating point precision types)
+        return PEAK_PERFORMANCE["H100"] * world_size
     else:
         print(
             f"WARNING: could not get theoretical peak performance for found device = {device_name}"
