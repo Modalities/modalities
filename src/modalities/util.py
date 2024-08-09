@@ -76,6 +76,11 @@ def get_total_number_of_trainable_parameters(model: FSDP) -> Number:
     num_params_tensor = torch.tensor(num_params).cuda()
     dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
     total_num_params = num_params_tensor.item()
+    # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
+    if model.sharding_strategy.name == "HYBRID_SHARD":
+        sharding_factor_hybrid_sharding = torch.distributed.get_world_size() // torch.cuda.device_count()
+        total_num_params = total_num_params // sharding_factor_hybrid_sharding
+
     return total_num_params
 
 
