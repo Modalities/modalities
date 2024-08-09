@@ -16,7 +16,14 @@ from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
-from modalities.util import Aggregator, TimeRecorder, print_rank_0
+from modalities.util import (
+    Aggregator,
+    TimeRecorder,
+    compute_mfu,
+    get_theoretical_gpu_peak_performance,
+    get_total_number_of_trainable_parameters,
+    print_rank_0,
+)
 
 
 class ThroughputAggregationKeys(Enum):
@@ -87,7 +94,11 @@ class Trainer:
         model.train()
         cumulated_losses = self._reset_tracked_losses()
 
+        # throughput & MFU
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance()
+        num_params = get_total_number_of_trainable_parameters(model)
+        theoretical_flops_per_token = 6 * num_params  # approximation
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -183,12 +194,14 @@ class Trainer:
                 }
                 gradient_norm_scores = []
 
+                mfu = compute_mfu(synced_num_samples, theoretical_flops_per_token, theoretical_gpu_peak_performance)
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
                         "train samples/s": synced_num_samples_per_second,
+                        "train mfu": mfu,
                         "lr mean": torch.tensor(scheduler.get_last_lr()).mean(),
                     },
                     dataloader_tag=train_loader.dataloader_tag,

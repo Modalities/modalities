@@ -180,3 +180,34 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
             module_class = get_module_class_from_name(child_module, name)
             if module_class is not None:
                 return module_class
+
+
+def get_theoretical_gpu_peak_performance() -> Optional[Number]:
+    """
+    returns theoretical gpu peak performance in units FLOPs / s for given gpu type
+    """
+    device_name = torch.cuda.get_device_name()
+    if device_name.startswith("NVIDIA A100"):
+        return 312e12  # TODO: double-check (also floating point precision types)
+    elif device_name.startswith("NVIDIA H100"):
+        return 989e12  # TODO: double-check (also floating point precision types)
+    else:
+        print(
+            f"WARNING: could not get theoretical peak performance for found device = {device_name}"
+        )  # TODO: print as warning
+        return None
+
+
+def compute_mfu(
+    synced_num_samples_per_second: torch.Tensor,
+    theoretical_flops_per_token: Number,
+    theoretical_gpu_peak_performance: Optional[Number],
+) -> torch.Tensor:
+    """
+    compute mfu = throughput * theoretical_flops_per_token / theoretical_gpu_peak_performance
+    units:  [1] = [tokens/s] * [FLOPs / token]             / [FLOPs / s]
+    """
+    if theoretical_gpu_peak_performance is None:
+        return torch.tensor(-1).type_as(synced_num_samples_per_second)
+    else:
+        return synced_num_samples_per_second * theoretical_flops_per_token / theoretical_gpu_peak_performance
