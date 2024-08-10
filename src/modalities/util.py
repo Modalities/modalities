@@ -79,6 +79,9 @@ def get_total_number_of_trainable_parameters(model: FSDP) -> Number:
     # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
     if model.sharding_strategy.name == "HYBRID_SHARD":
         # Assumes that CUDA is available and each node has the same number of GPUs
+        # Note: Per default FSDP constructs process groups for the user to shard intra-node and replicate inter-node.
+        # However, users can also provide their own sharding process groups (currently not supported in Modalities)
+        # which would require to adapt the code.
         sharding_factor_hybrid_sharding = dist.get_world_size() // torch.cuda.device_count()
         total_num_params = total_num_params // sharding_factor_hybrid_sharding
 
