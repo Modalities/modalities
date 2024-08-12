@@ -44,7 +44,7 @@ def get_model_from_config(model_config_dict: Dict) -> GPT2LLM:
 
 def _load_gpt2(mixed_precision_settings: MixedPrecisionSettings) -> FSDP:
     """load gpt2 model from config and fsdp-wrap it"""
-    config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_optimizer.yaml")
+    config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_mfu.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     # config_dict = _replace_config_dict(config_dict, _initialization_type='scaled', _std='auto')
 
@@ -93,7 +93,7 @@ D_MODEL = 768
 VOCAB_SIZE = 50304
 SEQUENCE_LENGTH = 2048
 
-#   LINEAR                  + EMBEDDING                            + LAYER NORM
+#   LINEAR                      + EMBEDDING                                + LAYER NORM
 N = 12 * N_LAYER * (D_MODEL**2) + (VOCAB_SIZE + SEQUENCE_LENGTH) * D_MODEL + (2 * N_LAYER + 1) * D_MODEL
 ATTENTION = 12 * N_LAYER * D_MODEL * SEQUENCE_LENGTH
 EXPECTED_THEORETICAL_FLOPS_PER_TOKEN = 6 * N + ATTENTION  # 977453568
@@ -104,16 +104,15 @@ EXPECTED_THEORETICAL_FLOPS_PER_TOKEN = 6 * N + ATTENTION  # 977453568
     reason="This test requires 1 GPU and a torchrun distributed environment.",
 )
 @pytest.mark.parametrize(
-    "mixed_precision_settings, expected_theoretical_flops_per_token",
+    "expected_theoretical_flops_per_token",
     [
-        (MixedPrecisionSettings.BF_16, EXPECTED_THEORETICAL_FLOPS_PER_TOKEN),
+        (EXPECTED_THEORETICAL_FLOPS_PER_TOKEN),
     ],
 )
 def test_get_theoretical_flops_per_token(
-    mixed_precision_settings: MixedPrecisionSettings,
     expected_theoretical_flops_per_token: int,
 ):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        model = _load_gpt2(mixed_precision_settings)
+        model = _load_gpt2(MixedPrecisionSettings.BF_16)
         theoretical_flops_per_token, _ = get_theoretical_flops_per_token(model)
         assert theoretical_flops_per_token == expected_theoretical_flops_per_token
