@@ -15,7 +15,7 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
     """Class to load PyTorch model and optimizer checkpoints."""
 
     def __init__(self, device: torch.device, precision: Optional[PrecisionEnum] = None):
-        """Initilaizes the TorchCheckpointLoading class.
+        """Initilaizes the TorchCheckpointLoading object.
 
         Args:
             device (torch.device): The device to load the model on.

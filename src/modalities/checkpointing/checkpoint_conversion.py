@@ -13,7 +13,7 @@ class CheckpointConversion:
         output_hf_checkpoint_dir: Path,
     ):
         """
-        Initializes the CheckpointConversion class.
+        Initializes the CheckpointConversion object.
 
         Args:
             config_file_path (Path): The path to the configuration file.
