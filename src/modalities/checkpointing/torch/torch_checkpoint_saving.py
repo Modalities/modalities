@@ -42,8 +42,8 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
         Args:
             checkpointing_instruction (CheckpointingInstruction): The instruction for checkpointing.
             global_train_sample_id (int): The global train sample ID.
-            model (nn.Module): The model to be checkpointed.
-            optimizer (Optimizer): The optimizer associated with the model.
+            model (nn.Module): The model to be saved.
+            optimizer (Optimizer): The optimizer to be saved.
 
         Returns:
             None
