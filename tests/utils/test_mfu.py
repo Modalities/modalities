@@ -17,7 +17,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.utils.mfu import get_theoretical_gpu_peak_performance
+from modalities.utils.mfu import get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
 from tests.conftest import _ROOT_DIR
 
 # NOTE: We need to run the tests in a torch distributed environment with 1 GPU.
@@ -85,3 +85,35 @@ def test_get_theoretical_gpu_peak_performance(
         model = _load_gpt2(mixed_precision_settings)
         theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(model, world_size)
         assert theoretical_gpu_peak_performance == expected_theoretical_gpu_peak_performance
+
+
+# MODEL ARCHITECTURE FROM CONFIG
+N_LAYER = 12
+D_MODEL = 768
+VOCAB_SIZE = 50304
+SEQUENCE_LENGTH = 2048
+
+#   LINEAR                  + EMBEDDING                            + LAYER NORM
+N = 12 * N_LAYER * (D_MODEL**2) + (VOCAB_SIZE + SEQUENCE_LENGTH) * D_MODEL + (2 * N_LAYER + 1) * D_MODEL
+ATTENTION = 12 * N_LAYER * D_MODEL * SEQUENCE_LENGTH
+EXPECTED_THEORETICAL_FLOPS_PER_TOKEN = 6 * N + ATTENTION  # 977453568
+
+
+@pytest.mark.skipif(
+    "RANK" not in os.environ or torch.cuda.device_count() < 1,
+    reason="This test requires 1 GPU and a torchrun distributed environment.",
+)
+@pytest.mark.parametrize(
+    "mixed_precision_settings, expected_theoretical_flops_per_token",
+    [
+        (MixedPrecisionSettings.BF_16, EXPECTED_THEORETICAL_FLOPS_PER_TOKEN),
+    ],
+)
+def test_get_theoretical_flops_per_token(
+    mixed_precision_settings: MixedPrecisionSettings,
+    expected_theoretical_flops_per_token: int,
+):
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        model = _load_gpt2(mixed_precision_settings)
+        theoretical_flops_per_token, _ = get_theoretical_flops_per_token(model)
+        assert theoretical_flops_per_token == expected_theoretical_flops_per_token

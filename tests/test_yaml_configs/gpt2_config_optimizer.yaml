@@ -27,10 +27,10 @@ model_raw:
     n_layer: 12
     n_head_q: 12
     n_head_kv: 12
-    ffn_hidden: 2048
+    ffn_hidden: 3072
     n_embd: 768
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
       qkv_transforms: []
     attention_implementation: manual
@@ -40,19 +40,19 @@ model_raw:
       variant_key: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
     ffn_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
     lm_head_norm:
       component_key: layer_norm
       variant_key: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
