@@ -44,3 +44,6 @@ CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 -
 
 # test initialization
 CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) test_initialization.py $COVERAGE
+
+# test mfu
+CUDA_VISIBLE_DEVICES=$DEV0 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) utils/test_mfu.py $COVERAGE
