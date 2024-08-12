@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import pytest
 import torch
 from pydantic import BaseModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
+from torch.types import Number
 
 from modalities.__main__ import load_app_config_dict
 from modalities.config.component_factory import ComponentFactory
@@ -17,7 +18,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.utils.mfu import get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
+from modalities.utils.mfu import compute_mfu, get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
 from tests.conftest import _ROOT_DIR
 
 # NOTE: We need to run the tests in a torch distributed environment with 1 GPU.
@@ -116,3 +117,31 @@ def test_get_theoretical_flops_per_token(
         model = _load_gpt2(MixedPrecisionSettings.BF_16)
         theoretical_flops_per_token, _ = get_theoretical_flops_per_token(model)
         assert theoretical_flops_per_token == expected_theoretical_flops_per_token
+
+
+@pytest.mark.parametrize(
+    "num_samples_per_second, sequence_length, theoretical_flops_per_token, "
+    "theoretical_gpu_peak_performance, expected_mfu",
+    [
+        (2, 4, 6, 8, 6.0),  # 2*4*6/8 = 6
+        (2, 4, None, 8, -1.0),
+        (2, 4, 6, None, -1.0),
+        # 125M model, see 3rd last row here:
+        # https://github.com/mosaicml/llm-foundry/blob/main/scripts/train/benchmarking/README.md
+        (532, 2048, EXPECTED_THEORETICAL_FLOPS_PER_TOKEN, 312e12 * 8, 0.4275),
+    ],
+)
+def test_compute_mfu(
+    num_samples_per_second: int,
+    sequence_length: int,
+    theoretical_flops_per_token: Optional[Number],
+    theoretical_gpu_peak_performance: Optional[Number],
+    expected_mfu: Number,
+):
+    mfu = compute_mfu(
+        torch.tensor(num_samples_per_second),
+        sequence_length,
+        theoretical_flops_per_token,
+        theoretical_gpu_peak_performance,
+    )
+    torch.testing.assert_close(mfu, torch.tensor(expected_mfu), atol=0.001, rtol=0)  # only absolute difference matters
