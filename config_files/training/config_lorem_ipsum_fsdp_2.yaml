@@ -171,10 +171,10 @@ device_mesh:
   variant_key: default
   config:
     device_type: cuda
-    # data_parallel_degree: 2
-    # tensor_parallel_degree: 1
-    # pipeline_parallel_degree: 1
-    # world_size: ${settings.cuda_env.world_size}
+    data_parallel_degree: 2
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    world_size: ${settings.cuda_env.world_size}
 
 
 wrapped_model: 
@@ -324,7 +324,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}

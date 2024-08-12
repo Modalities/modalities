@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
 from modalities.exceptions import ConfigError
+from modalities.util import print_rank_0
 
 
 class DeviceMeshConfig(BaseModel):
@@ -31,7 +32,12 @@ class DeviceMeshConfig(BaseModel):
 
 
 def get_device_mesh(
-    device_type: str, data_parallel_degree: int, tensor_parallel_degree: int, pipeline_parallel_degree: int
+    device_type: str,
+    data_parallel_degree: int,
+    tensor_parallel_degree: int,
+    pipeline_parallel_degree: int,
+    enable_loss_parallel: bool,
+    world_size: int,
 ) -> DeviceMesh:
     dims = []
     names = []
@@ -42,4 +48,6 @@ def get_device_mesh(
             dims.append(d)
             names.append(name)
     names = tuple(names)
-    return init_device_mesh(device_type, dims, mesh_dim_names=names)
+    device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
+    print_rank_0(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
+    return device_mesh
