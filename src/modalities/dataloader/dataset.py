@@ -587,7 +587,7 @@ def decord_video(key, data):
         if stream.get_src_stream_info(idx).media_type == "audio":
             audio, audio_sample_rate = torchaudio.load(data)
             if audio.shape[0] > 1:  # more than one audio channel
-                audio = torch.mean(audio, dim=0)
+                audio = torch.mean(audio, dim=0, keepdim=True)
             break
 
     file_obj = io.BytesIO(data)
@@ -612,7 +612,7 @@ def torch_audio(key, data):
     # torchaudio.load returns (torch.Tensor, int)
     audio, sample_rate = torchaudio.load(data)
     if audio.shape[0] > 1:  # more than one channel
-        audio = torch.mean(audio, dim=0)
+        audio = torch.mean(audio, dim=0, keepdim=True)
     return (audio, sample_rate)
 
 
