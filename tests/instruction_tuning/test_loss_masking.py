@@ -28,7 +28,7 @@ def dummy_tokenizer():
 @pytest.fixture
 def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
     return dict(
-        collate_fn=GPT2LLMCollateFn(sample_key="sample", target_key="target"),
+        wrapped_collate_fn=GPT2LLMCollateFn(sample_key="sample", target_key="target"),
         target_keys_to_mask=["target"],
         loss_ignore_index=-100,
         mask_tokens=LossMaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
