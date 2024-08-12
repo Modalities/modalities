@@ -98,7 +98,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             None
         """
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
-        # TODO Need to check if LR schedulers also need checkpointing
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(
