@@ -67,15 +67,6 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
-from modalities.models.components.collator_wrapper import (
-    LossMaskingCollateFnWrapper,
-    LossMaskingCollateFnWrapperConfig,
-)
-from modalities.models.components.layer_norms import (
-    LayerNormConfig,
-    RMSLayerNorm,
-    RMSLayerNormConfig,
-)
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -162,16 +153,10 @@ COMPONENTS = [
         ComposedModelInitializationConfig,
     ),
     # losses
-    ComponentEntity(
-        "loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig
-    ),
+    ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     # optmizers
-    ComponentEntity(
-        "optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig
-    ),
-    ComponentEntity(
-        "optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig
-    ),
+    ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
+    ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
         "optimizer",
         "checkpointed",
@@ -180,9 +165,7 @@ COMPONENTS = [
     ),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
-    ComponentEntity(
-        "scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig
-    ),
+    ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
     ComponentEntity(
         "scheduler",
         "constant_lr",

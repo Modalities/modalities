@@ -60,9 +60,7 @@ def main() -> None:
 def entry_point_run_modalities(config_file_path: Path):
     main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        components = main_obj.build_components(
-            components_model_type=TrainingComponentsInstantiationModel
-        )
+        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
 
@@ -129,14 +127,13 @@ def entry_point_data_create_raw_index(src_path, index_path):
     """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        raise ValueError(
-            "index already exists. delete it or specify different output folder."
-        )
+        raise ValueError("index already exists. delete it or specify different output folder.")
 
     print(f"reading raw data from {src_path}")
     print(f"writing index to {index_path}")
     generator = IndexGenerator(src_path)
     generator.create_index(index_path)
+    print("done")
 
 
 @data.command(name="pack_encoded_data")
@@ -158,11 +155,9 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
     config = load_app_config_dict(config_file_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsInstantiationModel = (
-        component_factory.build_components(
-            config_dict=config,
-            components_model_type=PackedDatasetComponentsInstantiationModel,
-        )
+    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
+        config_dict=config,
+        components_model_type=PackedDatasetComponentsInstantiationModel,
     )
 
     generator = PackedDataGenerator(
@@ -218,9 +213,7 @@ class Main:
         self.registry = Registry(COMPONENTS)
         self.component_factory = ComponentFactory(registry=self.registry)
 
-    def add_custom_component(
-        self, component_key: str, variant_key: str, custom_component, custom_config
-    ) -> None:
+    def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
         self.registry.add_entity(
             component_key=component_key,
             variant_key=variant_key,
@@ -237,20 +230,15 @@ class Main:
     def run(self, components: TrainingComponentsInstantiationModel):
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
-            experiment_path = (
-                components.settings.paths.checkpointing_path
-                / components.settings.experiment_id
-            )
+            experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-        evaluation_result_publisher, batch_processed_publisher = (
-            self.get_logging_publishers(
-                progress_subscriber=components.batch_progress_subscriber,
-                results_subscriber=components.evaluation_subscriber,
-                global_rank=components.settings.cuda_env.global_rank,
-                local_rank=components.settings.cuda_env.local_rank,
-            )
+        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+            progress_subscriber=components.batch_progress_subscriber,
+            results_subscriber=components.evaluation_subscriber,
+            global_rank=components.settings.cuda_env.global_rank,
+            local_rank=components.settings.cuda_env.local_rank,
         )
 
         # Trainer
@@ -328,9 +316,7 @@ class Main:
             local_rank=local_rank,
         )
 
-        message_broker.add_subscriber(
-            subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber
-        )
+        message_broker.add_subscriber(subscription=MessageTypes.EVALUATION_RESULT, subscriber=results_subscriber)
         message_broker.add_subscriber(
             subscription=MessageTypes.BATCH_PROGRESS_UPDATE,
             subscriber=progress_subscriber,

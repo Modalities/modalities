@@ -12,7 +12,7 @@ Currently supported are Instruction-tuning and Low-rank Adaption (LorA), as expl
 * re-use last target
 
 ### Create Prompts from Conversations
-To prepare the instruction-tuning data we created a new entry point `apply_chat_template`, which requires a [configuration file](./config_files/data_preparation/apply_chat_template_config.yaml). Wihtin it we define:
+To prepare the instruction-tuning data we created a new entry point `apply_chat_template`, which requires a [configuration file](./config_files/data_preparation/apply_chat_template_config.yaml). Within it we define:
 * the path to instruction-tuning dataset as a JSONL file wereas each line contains a structured conversation as an array of dictionaries.
 * A [jinja2](https://jinja.palletsprojects.com/en/3.1.x/) chat template which defines the rules how to glue `chat_template_data` and the data within the JSONL together to one `chat` string.
 
