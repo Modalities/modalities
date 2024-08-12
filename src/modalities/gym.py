@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import partial
 from typing import Callable, List
 
@@ -10,6 +11,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
 from modalities.trainer import Trainer
+from modalities.util import print_rank_0
 
 
 class Gym:
@@ -55,6 +57,7 @@ class Gym:
             checkpointing_interval_in_steps=checkpointing_interval_in_steps,
         )
 
+        print_rank_0(f"Start model training at {datetime.now()}.")
         self.trainer.train(
             model=model,
             train_loader=train_data_loader,
@@ -65,6 +68,7 @@ class Gym:
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
         )
+        print_rank_0(f"Training done at {datetime.now()}.")
 
     def _run_checkpointing(
         self,

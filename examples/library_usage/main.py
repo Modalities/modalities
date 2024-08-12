@@ -6,8 +6,10 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.batch import DatasetBatch
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType
+from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.collate_fns.collate_if import CollateFnIF
+from modalities.running_env.cuda_env import CudaEnv
 
 
 class CustomGPT2LLMCollateFnConfig(BaseModel):
@@ -35,10 +37,8 @@ class CustomGPT2LLMCollateFn(CollateFnIF):
 def main():
     # load and parse the config file
     config_file_path = Path("config_lorem_ipsum.yaml")
-    config_dict = load_app_config_dict(config_file_path)
-
-    # instantiate the Main entrypoint of modalities by passing in the config
-    modalities_main = Main(config_dict=config_dict, config_path=config_file_path)
+    # instantiate the Main entrypoint of modalities by passing in the config path
+    modalities_main = Main(config_path=config_file_path)
 
     # add the custom component to modalities
     modalities_main.add_custom_component(
@@ -48,7 +48,9 @@ def main():
         custom_config=CustomGPT2LLMCollateFnConfig,
     )
     # run the experiment
-    modalities_main.run()
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        components = modalities_main.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        modalities_main.run(components)
 
 
 if __name__ == "__main__":

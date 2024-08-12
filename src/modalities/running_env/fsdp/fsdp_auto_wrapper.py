@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.util import get_module_class_from_name
+from modalities.util import get_module_class_from_name, print_rank_0
 
 
 class FSDPAutoWrapFactoryIF(ABC):
@@ -38,7 +38,7 @@ class FSDPTransformerAutoWrapPolicyFactory(FSDPAutoWrapFactoryIF):
     def get_auto_wrap_policy(self) -> Callable:
         transformer_layer_cls = self._get_fsdp_blocks_from_block_names(model=self.model, block_names=self.block_names)
         logging.info(f"Wrapped layer classes: {transformer_layer_cls}\n")
-        print(f"\nWrapped layer classes: {transformer_layer_cls}\n")
+        print_rank_0(f"\nWrapped layer classes: {transformer_layer_cls}\n")
 
         if len(transformer_layer_cls) == 0:
             raise ValueError("No FSDP blocks found in model")

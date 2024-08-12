@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, FilePath, field_validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
@@ -81,6 +81,10 @@ class TextGenerationInstantiationModel(BaseModel):
         sequence_length: int
         device: PydanticPytorchDeviceType
         referencing_keys: Dict[str, str]
+
+        # avoid warning about protected namespace 'model_', see
+        # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
+        model_config = ConfigDict(protected_namespaces=())
 
         @field_validator("device", mode="before")
         def parse_device(cls, device) -> PydanticPytorchDeviceType:

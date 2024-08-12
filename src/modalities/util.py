@@ -17,6 +17,15 @@ from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
 
 
+def print_rank_0(message: str):
+    """If torch.distributed is initialized, print only on rank 0."""
+    if torch.distributed.is_initialized():
+        if torch.distributed.get_rank() == 0:
+            print(message, flush=True)
+    else:
+        print(message, flush=True)
+
+
 def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
     try:
         return enum_type[name]

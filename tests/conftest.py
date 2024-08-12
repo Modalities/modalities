@@ -213,9 +213,15 @@ def set_env_cpu(monkeypatch):
 
     # TODO: discuss with Mehdi and Max and explain the side effects here.
     torch_distributed_cleanup()
+
     # setting CUDA_VISIBLE_DEVICES to "" creates a cache entry, which prevents resetting this CPU-only setup.
     # therefore after finish using this fixture, we need to clear this cache
-    torch.cuda.device_count.cache_clear()
+    if torch.__version__ < "2.4":
+        # see https://pytorch.org/docs/2.3/_modules/torch/cuda.html#device_count
+        torch.cuda.device_count.cache_clear()
+    else:
+        # see https://pytorch.org/docs/2.4/_modules/torch/cuda.html#device_count
+        torch.cuda._cached_device_count = None
 
 
 @pytest.fixture(scope="function")
