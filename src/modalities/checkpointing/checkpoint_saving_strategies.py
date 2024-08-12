@@ -6,6 +6,8 @@ from modalities.checkpointing.checkpoint_saving_instruction import Checkpointing
 
 
 class CheckpointSavingStrategyIF(ABC):
+    """Checkpoint saving strategy interface."""
+
     @abstractmethod
     def get_checkpoint_instruction(
         self,
