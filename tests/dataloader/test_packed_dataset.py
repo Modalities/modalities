@@ -21,7 +21,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
 
 
 @pytest.mark.parametrize(
-    "block_size, expected_length, expected_output",
+    "block_size, expected_length, expected_output, reuse_last_target",
     [
         (
             2,
@@ -47,6 +47,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
                 [17, 18],
                 [18, 19],
             ],
+            True,
         ),
         (
             3,
@@ -62,18 +63,28 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
                 [14, 15, 16],
                 [16, 17, 18],
             ],
+            True,
         ),
-        (10, 2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]),
-        (6, 3, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11, 12, 13, 14, 15]]),
-        (20, 1, [list(range(20))]),
-        (21, 0, ValueError),
-        (1, 0, ValueError),
+        (10, 2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]], True),
+        (6, 3, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11, 12, 13, 14, 15]], True),
+        (20, 1, [list(range(20))], True),
+        (21, 0, ValueError, True),
+        (1, 0, ValueError, True),
+        # "block_size, expected_length, expected_output, re_use_last_token",
+        # tokens = list(range(20))
+        (2, 10, [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15], [16, 17], [18, 19]], False),
+        (6, 3, [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [12, 13, 14, 15, 16, 17]], False),
     ],
 )
-def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
+def test_packed_continuous_dataset_loading(
+    dummy_packed_data_path, block_size, expected_length, expected_output, reuse_last_target
+):
     try:
         ds = PackedMemMapDatasetContinuous(
-            raw_data_path=dummy_packed_data_path, block_size=block_size, sample_key="input_ids"
+            raw_data_path=dummy_packed_data_path,
+            block_size=block_size,
+            sample_key="input_ids",
+            reuse_last_target=reuse_last_target,
         )
     except ValueError:
         assert expected_output == ValueError

@@ -19,19 +19,24 @@ def apply_chat_template(config_file_path: Path):
     instruction_data = _stream_jsonl(config.settings.src_path)
     chat_template = _get_chat_template(config.jinja2_chat_template)
 
+    # we want to have all files of the same hash in the same directory
     dst_path = Path(config.settings.dst_path)
     # similar to github only use the first 7 characters of the hash for readability
     hash_str = _hash_sum_file_sha256(config_file_path)[:7]
+    dst_path = dst_path.parent / f"{config.settings.src_path.stem}_{hash_str}" / dst_path.name
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+
     _store_config_file_with_hash(config_file_path, dst_path, hash_str)
     dst_path_with_uuid = dst_path.with_suffix(f".{hash_str}" + "".join(dst_path.suffixes))
-    with dst_path_with_uuid.open("w") as output_file:
+    with dst_path_with_uuid.open("w", encoding="utf-8") as output_file:
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
             conversation = _map_roles(conversation, config.instruction_data_transformation.role_mapping)
             chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
             entry["chat"] = chat
-            json.dump(entry, output_file)
+            json.dump(entry, output_file, ensure_ascii=False)
             output_file.write("\n")
+    print(f"Chat template applied and saved to {dst_path_with_uuid}")
 
 
 def _hash_sum_file_sha256(file_path: Path) -> str:
@@ -58,7 +63,13 @@ def _get_chat_template(jinja2_chat_template: str) -> Template:
 
 
 def _map_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
-    return [{key: role_mapping.get(key=value, default=value) for key, value in turn.items()} for turn in conversation]
+    new_conversation = []
+    for turn in conversation:
+        for key, value in turn.items():
+            if key == "role" or key == "from":
+                turn[key] = role_mapping[value]
+        new_conversation.append(turn)
+    return new_conversation
 
 
 def _stream_jsonl(src_file_path: str) -> Generator[Dict[str, Any], None, None]:

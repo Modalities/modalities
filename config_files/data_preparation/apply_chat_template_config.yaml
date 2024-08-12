@@ -31,7 +31,12 @@ jinja2_chat_template: |
 chat_template_data:
   assistant_role: Assistant
   system_instruction: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages."
+  # Currently only works with HF tokenizers, as the special tokens are added to the tokenizer
   special_tokens:
+      # tokens to indicate the beginning and end of the assistant's response, only needed for proper loss masking
       b_include_to_loss_token: ^
       e_include_to_loss_token: $
+      # the user must need to know that any special tokens must be re-introduced in the pbin file creation config and the training config
+      # if not the training will run, but the e_assistant_token might not be learned correctly, as it is per default not a special token in the tokenizer
+      # the e_assistant_token is used to mask the end of the assistant's response. It will be trained and can be used as early stopping criterion during generation in inference mode
       e_assistant_token: °

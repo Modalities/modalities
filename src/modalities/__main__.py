@@ -147,6 +147,15 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     config = load_app_config_dict(config_file_path)
+
+    # copy the config file to the src_path parent and append the original hash
+    src_path = Path(config["settings"]["src_path"])
+    src_path_has_hash_suffix = len(src_path.suffixes) > 1 and len(src_path.suffixes[0]) == 7
+    if src_path_has_hash_suffix:
+        hash_suffix = src_path.suffixes[0]
+        config_file_name_with_hash = config_file_path.stem + hash_suffix + "".join(config_file_path.suffixes)
+        shutil.copyfile(config_file_path, src_path.parent / config_file_name_with_hash)
+
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
