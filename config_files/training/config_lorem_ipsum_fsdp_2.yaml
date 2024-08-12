@@ -171,6 +171,11 @@ device_mesh:
   variant_key: default
   config:
     device_type: cuda
+    # data_parallel_degree: 2
+    # tensor_parallel_degree: 1
+    # pipeline_parallel_degree: 1
+    # world_size: ${settings.cuda_env.world_size}
+
 
 wrapped_model: 
   component_key: model
@@ -194,7 +199,7 @@ fsdp_model:
   variant_key: fsdp_2_wrapped
   config:
     model:
-      instance_key: model_raw
+      instance_key: compiled_model
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -202,6 +207,15 @@ fsdp_model:
     mixed_precision_settings:
       param_dtype: BF_16
       reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+compiled_model:
+  component_key: model
+  variant_key: compiled
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
     block_names: [GPT2Block]
 
 model_raw:
