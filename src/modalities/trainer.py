@@ -16,14 +16,8 @@ from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
-from modalities.util import (
-    Aggregator,
-    TimeRecorder,
-    compute_mfu,
-    get_theoretical_flops_per_token,
-    get_theoretical_gpu_peak_performance,
-    print_rank_0,
-)
+from modalities.util import Aggregator, TimeRecorder, print_rank_0
+from modalities.utils.mfu import compute_mfu, get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
 
 
 class ThroughputAggregationKeys(Enum):
