@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, FilePath, field_validator
 
@@ -88,3 +88,18 @@ class TextGenerationInstantiationModel(BaseModel):
 
     text_inference_component: PydanticTextInferenceComponentType
     settings: TextGenerationSettings
+
+
+class InstructionTuningInstantiationModel(BaseModel):
+    class Settings(BaseModel):
+        src_path: FilePath
+        dst_path: Path
+        conversations_key: str
+
+    class InstructionDataTransformation(BaseModel):
+        role_mapping: Dict[str, str]
+
+    settings: Settings
+    instruction_data_transformation: InstructionDataTransformation
+    jinja2_chat_template: str
+    chat_template_data: Dict[str, Any]

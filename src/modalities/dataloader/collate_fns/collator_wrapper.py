@@ -5,41 +5,54 @@ from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch
 from modalities.config.pydanctic_if_types import PydanticCollateFnIFType, PydanticTokenizerIFType
-from modalities.models.gpt2.collator import CollateFnIF
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 
-class MaskingTokenConfig(BaseModel):
+class LossMaskingTokenConfig(BaseModel):
     b_include_to_loss_token: str
     e_include_to_loss_token: str
 
 
 class LossMaskingCollateFnWrapperConfig(BaseModel):
-    collate_fn: PydanticCollateFnIFType
+    wrapped_collate_fn: PydanticCollateFnIFType
     target_keys_to_mask: List[str]
     loss_ignore_index: int
-    mask_tokens: MaskingTokenConfig
+    mask_tokens: LossMaskingTokenConfig
     tokenizer: PydanticTokenizerIFType
 
 
 class LossMaskingCollateFnWrapper(CollateFnIF):
     def __init__(
         self,
-        collate_fn: CollateFnIF,
+        wrapped_collate_fn: CollateFnIF,
         target_keys_to_mask: List[str],
         loss_ignore_index: int,
-        mask_tokens: MaskingTokenConfig,
+        mask_tokens: LossMaskingTokenConfig,
         tokenizer: TokenizerWrapper,
     ):
-        """Wraps the given collate_fn and masks the target keys if not within the given special mask tokens.
+        """
+        Initializes the LossMaskingCollateFnWrapper.
+        Wraps the given wrapped_collate_fn and masks the target keys if not within the given special mask tokens.
         Does not include both mask tokens into the loss. If you need a token to indicate the end of the assistant,
         use another special token for this!
         Works also for the continuous dataset reading, as if the "end-include-to-loss" token is detected in the front,
         all tokens before are included to the loss.
 
         Throws a ValueError if the mask tokens are not found in the target or if the mask tokens are the same.
+
+
+        Args:
+            wrapped_collate_fn (CollateFnIF): The wrapped collate function.
+            target_keys_to_mask (List[str]): The list of target keys to mask.
+            loss_ignore_index (int): The index to ignore in the loss calculation.
+            mask_tokens (MaskingTokenConfig): The configuration for masking tokens.
+            tokenizer (TokenizerWrapper): The tokenizer wrapper.
+
+        Raises:
+            ValueError: If b_mask_token_id and e_mask_token_id are the same.
         """
-        self.collate_fn = collate_fn
+        self.wrapped_collate_fn = wrapped_collate_fn
         self.target_keys_to_mask = target_keys_to_mask
         self.loss_ignore_index = loss_ignore_index
         self.tokenizer = tokenizer
@@ -51,7 +64,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             )
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
-        dataset_batch = self.collate_fn(batch)
+        dataset_batch = self.wrapped_collate_fn(batch)
         for target_key_to_mask in self.target_keys_to_mask:
             target = dataset_batch.targets[target_key_to_mask]
             masked_target = self._mask_target(
@@ -66,6 +79,24 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
     def _mask_target(
         self, target: torch.Tensor, b_mask_token_id: int, e_mask_token_id: int, loss_ignore_index: int
     ) -> torch.Tensor:
+        """
+        We mask the target tensor with loss_ignore_index between, but not inclusive the begin and end mask token.
+        We do this vectorizes, as this is fast.
+        Example:
+            sample_orig =      [2,2,3,2, 2,4,2,2,2]
+            sample =           [2,2,3,2, 2,4,2,2] # from collate_fn
+            target =           [2,3,2,2, 4,2,2,2] # from collate_fn
+            mask_initially =   [0,0,0,0, 0,0,0,0] # mask = torch.zeros_like(target)
+            mask_shifted_1 =   [0,0,1,0, 0,0,0,0] # mask[:, 1:] += torch.where(target != b_mask_token_id, 0, 1)[:, :-1]
+            mask_shifted_2 =   [0,0,1,0,-1,0,0,0] # mask += torch.where(target != e_mask_token_id, 0, -1)
+            mask_cumsum =      [0,0,1,1, 0,0,0,0] # include_to_loss_mask = mask.cumsum(-1)
+
+
+        By shifting only the b_mask_token_id to the right, we exclude the begin mask token from the loss, as otherwise
+        cumsum would include the begin mask token. Example without shift:
+            mask_no_shift_2    [0,1,0,0,-1,0,0,0]
+            cumsum_no_shift    [0,1,1,1, 0,0,0,0]
+        """
         error_msg = ""
         if b_mask_token_id not in target:
             error_msg += "b_mask_token_id not found in target."
@@ -94,14 +125,11 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
                 + "This is not supported by the LossMaskingCollateFnWrapper."
                 + "Make sure to use padding and truncation with the tokenizer for PackedMemMapDatasetContinuous"
             )
-        # note: to enable splitted assistant answers uncomment:
-        # mask[:, 0] = end_before_begin.squeeze(-1)
 
         # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
-        # this includes the 1, but due to the shift above, we exclude both!
+        # this includes the -1, but due to the shift above, we exclude both!
         include_to_loss_mask = mask.cumsum(-1)
 
-        # TODO check that we have the mask with values between -1 and 1, otherwise the tokens would not be alternating
         if (mask > 1).any() or (mask < -1).any():
             raise ValueError(
                 "Masking tokens are not alternating in the target. "

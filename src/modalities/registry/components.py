@@ -53,6 +53,10 @@ from modalities.config.config import (
     WeightInitializedModelConfig,
     LoraConfig,
 )
+from modalities.dataloader.collate_fns.collator_wrapper import (
+    LossMaskingCollateFnWrapper,
+    LossMaskingCollateFnWrapperConfig,
+)
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
@@ -72,6 +76,7 @@ from modalities.models.components.layer_norms import (
     RMSLayerNorm,
     RMSLayerNormConfig,
 )
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import (
@@ -235,40 +240,24 @@ COMPONENTS = [
         DatasetFactory.get_open_gptx_mmap_dataset,
         OpenGPTXMMapDatasetConfig,
     ),
-    ComponentEntity(
-        "dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig
-    ),
+    ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers
-    ComponentEntity(
-        "sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig
-    ),
+    ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
-    ComponentEntity(
-        "collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig
-    ),
+    ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     ComponentEntity(
-        "collate_fn",
-        "mask_loss_collator_wrapper",
-        LossMaskingCollateFnWrapper,
-        LossMaskingCollateFnWrapperConfig,
+        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
     ),
     # data loaders
+    ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity(
-        "data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig
-    ),
-    ComponentEntity(
-        "data_loader",
-        "repeating_data_loader",
-        DataloaderFactory.get_repeating_dataloader,
-        RepeatingDataLoaderConfig,
+        "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
     # checkpointing
-    ComponentEntity(
-        "checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig
-    ),
+    ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
     ComponentEntity(
         "checkpoint_saving_strategy",
@@ -283,22 +272,10 @@ COMPONENTS = [
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
     # checkpoint saving execution
-    ComponentEntity(
-        "checkpoint_saving_execution",
-        "fsdp",
-        FSDPCheckpointSaving,
-        FSDPCheckpointSavingConfig,
-    ),
+    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
     # checkpoint loading
-    ComponentEntity(
-        "checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig
-    ),
-    ComponentEntity(
-        "checkpoint_loading",
-        "torch",
-        TorchCheckpointLoading,
-        TorchCheckpointLoadingConfig,
-    ),
+    ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(
         "progress_subscriber",
@@ -314,16 +291,10 @@ COMPONENTS = [
     ),
     # Results subscriber
     ComponentEntity(
-        "results_subscriber",
-        "dummy",
-        ResultsSubscriberFactory.get_dummy_result_subscriber,
-        DummyResultSubscriberConfig,
+        "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
     ),
     ComponentEntity(
-        "results_subscriber",
-        "rich",
-        ResultsSubscriberFactory.get_rich_result_subscriber,
-        RichResultSubscriberConfig,
+        "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig
     ),
     ComponentEntity(
         "results_subscriber",
@@ -335,18 +306,11 @@ COMPONENTS = [
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
     # gradient clippers
+    ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig
+        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
-    ComponentEntity(
-        "gradient_clipper",
-        "fsdp_logging_only",
-        FSDPLoggingOnlyGradientClipper,
-        FSDPDummyGradientClipperConfig,
-    ),
-    ComponentEntity(
-        "gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig
-    ),
+    ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
     # Number conversion
     ComponentEntity(
         "number_conversion",
