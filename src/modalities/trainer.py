@@ -90,7 +90,7 @@ class Trainer:
 
         # throughput & MFU
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
-        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(world_size=dist.get_world_size())
+        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(model, world_size=dist.get_world_size())
         theoretical_flops_per_token, sequence_length = get_theoretical_flops_per_token(model)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
