@@ -12,19 +12,34 @@ from modalities.util import get_local_number_of_trainable_parameters
 
 
 class TorchCheckpointLoading(CheckpointLoadingIF):
+    """Class to load PyTorch model and optimizer checkpoints."""
+
     def __init__(self, device: torch.device, precision: Optional[PrecisionEnum] = None):
-        """Loads a a model checkpoint via the general pytorch checkpoint loading implementation.
+        """Initilaizes the TorchCheckpointLoading class.
 
         Args:
             device (torch.device): The device to load the model on.
             precision (Optional[PrecisionEnum], optional): If specified, the model checkpoint will
                 loaded with the given precision. Otherwise, the precision as specified in the state_dict
                 will be used. Defaults to None.
+
+        Returns:
+            None
         """
         self.device = device
         self.precision = precision
 
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+        """
+        Loads a model checkpoint from the specified file path.
+
+        Args:
+            model (nn.Module): The model to load the checkpoint into.
+            file_path (Path): The path to the checkpoint file.
+
+        Returns:
+            nn.Module: The model with the loaded checkpoint.
+        """
         if self.precision is not None:
             model = model.to(self.device, dtype=self.precision.value)
         else:
@@ -51,4 +66,18 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         return model
 
     def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+        """
+        Load the optimizer checkpoint from the specified file path.
+
+        Args:
+            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            model (nn.Module): The model associated with the optimizer.
+            file_path (Path): The path to the checkpoint file.
+
+        Returns:
+            Optimizer: The optimizer with the loaded checkpoint.
+
+        Raises:
+            NotImplementedError: This method is not implemented yet. It is reserved for future work.
+        """
         raise NotImplementedError  # TODO future work
