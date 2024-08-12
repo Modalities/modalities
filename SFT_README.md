@@ -65,6 +65,7 @@ Make sure to use the wrapped collate function.
 * You need to look up the `b_include_to_loss_token` and `e_include_to_loss_token` as defined within your `sft_chat_template_config.aadd295.yaml`. If configured the pbin creation correctly, you only need to check for matching hash suffixes.
 * Set the `loss_ignore_index` which gets ignored by your loss function. In torch this is usually -100.
 * We need a tokenizer to tokenize the `b_include_to_loss_token` and `e_include_to_loss_token`
+* We need to not re-use the last token
 
 For example (Copied from [config_files/training/config_lorem_ipsum_sft.yaml](config_files/training/config_lorem_ipsum_sft.yaml)):
 ```yaml
@@ -88,6 +89,20 @@ collate_fn:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
 ```
+and
+```yaml
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+    reuse_last_target: true
+```
+
+# TODO
+Reuse last token
 
 Finally, run the instruction-tuning with the `run` entry point:
 ```bash
