@@ -306,7 +306,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: "."
+    directory: wandb_storage
     config_file_path: ${settings.config_file_path}

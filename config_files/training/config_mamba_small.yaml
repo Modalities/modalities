@@ -268,5 +268,5 @@ evaluation_subscriber:
     project: modalities_lorem_ipsum
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
-    directory: "."
+    directory: wandb_storage
     config_file_path: ${settings.config_file_path}
