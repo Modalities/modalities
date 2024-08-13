@@ -13,9 +13,20 @@ from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
 
 class HFModelAdapterConfig(PretrainedConfig):
+    """HFModelAdapterConfig configuration class for the HFModelAdapter."""
+
     model_type = "modalities"
 
     def __init__(self, **kwargs):
+        """
+        Initializes an HFModelAdapterConfig object.
+
+        Args:
+            **kwargs: Additional keyword arguments.
+
+        Raises:
+            ConfigError: If the config is not passed in HFModelAdapterConfig.
+        """
         super().__init__(**kwargs)
         # self.config is added by the super class via kwargs
         if self.config is None:
@@ -24,6 +35,16 @@ class HFModelAdapterConfig(PretrainedConfig):
         self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
     def to_json_string(self, use_diff: bool = True) -> str:
+        """
+        Converts the adapter object configuration to a JSON string representation.
+
+        Args:
+            use_diff (bool, optional): Whether to include only the differences from the default configuration.
+                Defaults to True.
+
+        Returns:
+            str: The JSON string representation of the adapter object.
+        """
         json_dict = {"config": self.config.copy(), "model_type": self.model_type}
         return json.dumps(json_dict)
 
@@ -31,8 +52,16 @@ class HFModelAdapterConfig(PretrainedConfig):
         self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
     ) -> Union[Dict[str, Any], List[Any], PosixPath, Any]:
         """
-        Recursively iterate and convert PosixPath values to strings.
+        Recursively converts any PosixPath objects within a nested data structure to strings.
+
+        Args:
+            data_to_be_formatted (Union[Dict[str, Any], List[Any], PosixPath, Any]): The data structure to be formatted.
+
+        Returns:
+            Union[Dict[str, Any], List[Any], PosixPath, Any]:
+            The formatted data structure with PosixPath objects converted to strings.
         """
+
         if isinstance(data_to_be_formatted, dict):
             for key, value in data_to_be_formatted.items():
                 data_to_be_formatted[key] = self._convert_posixpath_to_str(data_to_be_formatted=value)
@@ -45,11 +74,23 @@ class HFModelAdapterConfig(PretrainedConfig):
 
 
 class HFModelAdapter(PreTrainedModel):
+    """HFModelAdapter class for the HuggingFace model adapter."""
+
     config_class = HFModelAdapterConfig
 
     def __init__(
         self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
     ):
+        """
+        Initializes the HFAdapter object.
+
+        Args:
+            config (HFModelAdapterConfig): The configuration object for the HFAdapter.
+            prediction_key (str): The key for the prediction.
+            load_checkpoint (bool, optional): Whether to load a checkpoint. Defaults to False.
+            *inputs: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
         if load_checkpoint:
@@ -65,6 +106,19 @@ class HFModelAdapter(PreTrainedModel):
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
     ):
+        """
+        Forward pass of the HFAdapter module.
+
+        Args:
+            input_ids (torch.Tensor): The input tensor of token indices.
+            attention_mask (Optional[torch.Tensor], optional): The attention mask tensor. Defaults to None.
+            return_dict (Optional[bool], optional): Whether to return a dictionary as output. Defaults to False.
+            output_attentions (Optional[bool], optional): Whether to output attentions. Defaults to False.
+            output_hidden_states (Optional[bool], optional): Whether to output hidden states. Defaults to False.
+
+        Returns:
+            Union[ModalitiesModelOutput, torch.Tensor]: The output of the forward pass.
+        """
         # These parameters are required by HuggingFace. We do not use them and hence don't implement them.
         if output_attentions or output_hidden_states:
             raise NotImplementedError
@@ -79,8 +133,19 @@ class HFModelAdapter(PreTrainedModel):
         self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
     ) -> Dict[str, Any]:
         """
-        Implement in subclasses of :class:`~transformers.PreTrainedModel` for custom behavior to prepare inputs in the
-        generate method.
+        Prepares the inputs for generation.
+
+        Args:
+            input_ids (torch.LongTensor): The input tensor of token IDs.
+            attention_mask (torch.LongTensor, optional): The attention mask tensor. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the prepared inputs for generation.
+
+        Note:
+            Implement in subclasses of :class:`~transformers.PreTrainedModel`
+            for custom behavior to prepare inputs in the generate method.
         """
         return {
             "input_ids": input_ids,
@@ -90,6 +155,15 @@ class HFModelAdapter(PreTrainedModel):
 
 @dataclass
 class ModalitiesModelOutput(ModelOutput):
+    """
+    ModalitiesModelOutput class.
+
+    Args:
+        logits (Optional[torch.FloatTensor]): The logits output of the model. Defaults to None.
+        hidden_states (Optional[Tuple[torch.FloatTensor]]): The hidden states output of the model. Defaults to None.
+        attentions (Optional[Tuple[torch.FloatTensor]]): The attentions output of the model. Defaults to None.
+    """
+
     logits: Optional[torch.FloatTensor] = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
