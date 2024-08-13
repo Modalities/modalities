@@ -22,11 +22,32 @@ from modalities.models.model import NNModel
 
 
 class HuggingFaceModelTypes(LookupEnum):
+    """
+    HuggingFaceModelTypes enumeration class representing different types of HuggingFace models.
+
+    Attributes:
+        AutoModelForCausalLM: Represents the AutoModelForCausalLM class.
+        AutoModelForMaskedLM: Represents the AutoModelForMaskedLM class.
+    """
+
     AutoModelForCausalLM = AutoModelForCausalLM
     AutoModelForMaskedLM = AutoModelForMaskedLM
 
 
 class HuggingFacePretrainedModelConfig(BaseModel):
+    """
+    Configuration class for HuggingFacePretrainedModel.
+
+    Attributes:
+        model_type (HuggingFaceModelTypes): The type of the HuggingFace model.
+        model_name (Path): The path to the HuggingFace model.
+        prediction_key (str): The key for accessing the prediction.
+        huggingface_prediction_subscription_key (str): The subscription key for HuggingFace prediction.
+        sample_key (str): The key for accessing the sample.
+        model_args (Optional[Any]): Optional additional arguments for the model.
+        kwargs (Optional[Any]): Optional additional keyword arguments.
+    """
+
     model_type: HuggingFaceModelTypes
     model_name: Path
     prediction_key: str
@@ -41,6 +62,8 @@ class HuggingFacePretrainedModelConfig(BaseModel):
 
 
 class HuggingFacePretrainedModel(NNModel):
+    """HuggingFacePretrainedModel class for HuggingFace models."""
+
     def __init__(
         self,
         model_type: HuggingFaceModelTypes,
@@ -51,6 +74,18 @@ class HuggingFacePretrainedModel(NNModel):
         model_args: Optional[Any] = None,
         kwargs: Optional[Any] = None,
     ):
+        """
+        Initializes a HuggingFaceModel object.
+
+        Args:
+            model_type (HuggingFaceModelTypes): The type of Hugging Face model.
+            model_name (str): The name of the Hugging Face model.
+            prediction_key (str): The key for accessing predictions.
+            huggingface_prediction_subscription_key (str): The subscription key for Hugging Face predictions.
+            sample_key (str): The key for accessing samples.
+            model_args (Optional[Any], optional): Additional arguments for the Hugging Face model. Defaults to None.
+            kwargs (Optional[Any], optional): Additional keyword arguments for the Hugging Face model. Defaults to None.
+        """
         super().__init__()
         if model_args is None:
             model_args = []
@@ -68,11 +103,26 @@ class HuggingFacePretrainedModel(NNModel):
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass of the model.
+
+        Args:
+            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+
+        Returns:
+            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+        """
         output = self.huggingface_model.forward(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
 
     @property
     def fsdp_block_names(self) -> List[str]:
+        """
+        Returns a list of FSDP block names.
+
+        Returns:
+            List[str]: A list of FSDP block names.
+        """
         return self.huggingface_model._no_split_modules
 
 
