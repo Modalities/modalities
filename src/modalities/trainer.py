@@ -79,7 +79,7 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         """
         Conducts a training step on batch of data.
 

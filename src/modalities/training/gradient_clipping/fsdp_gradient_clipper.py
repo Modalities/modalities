@@ -56,7 +56,7 @@ class FSDPLoggingOnlyGradientClipper(GradientClipperIF):
 
     def __init__(self, wrapped_model: FSDP, norm_type=GradientClippingMode) -> None:
         """
-        Initialize the SDPLoggingOnlyGradientClipper.
+        Initialize the FSDPLoggingOnlyGradientClipper.
 
         Args:
             wrapped_model (FSDP): The wrapped FSDP model.
@@ -87,10 +87,10 @@ class DummyGradientClipper(GradientClipperIF):
 
     def clip_gradients(self) -> torch.Tensor:
         """
-        Returns a tensor with value 1.0 indicating that DummyGradientClipper does not actually apply gradient clipping.
+        Returns a tensor with value -1.0 indicating that DummyGradientClipper does not actually apply gradient clipping.
 
         Returns:
-            torch.Tensor: Tensor with valiue -1.0
+            torch.Tensor: Tensor with value -1.0
         """
         gradient_norm_score = torch.Tensor([-1.0])
         return gradient_norm_score
