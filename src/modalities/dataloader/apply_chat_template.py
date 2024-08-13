@@ -14,6 +14,18 @@ from modalities.config.instantiation_models import InstructionTuningInstantiatio
 
 
 def apply_chat_template(config_file_path: Path):
+    """
+    Applies a chat template to the given configuration file.
+
+    Args:
+        config_file_path (Path): The path to the configuration file.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config = InstructionTuningInstantiationModel(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
