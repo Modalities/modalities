@@ -46,7 +46,7 @@ def test_get_total_number_of_trainable_parameters():
     model = torch.nn.Sequential(torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2))
 
     # Calculate the expected number of trainable parameters
-    expected_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    expected_params = 10*5 + 5 + 5*2 + 2  # weights_1 + bias_1 + weights_2 + bias_2 = 67
     world_size = 8
     num_gpus_per_node = 4
 
