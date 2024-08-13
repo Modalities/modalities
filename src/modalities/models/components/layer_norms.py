@@ -8,17 +8,25 @@ from modalities.config.lookup_enum import LookupEnum
 
 
 class RMSLayerNorm(nn.Module):
+    """RMS normalization class."""
+
     def __init__(self, ndim: int, bias: bool = True, epsilon: float = 1e-5):
         """
-        Initialize the RMSNorm normalization layer.
-        Original paper: https://arxiv.org/pdf/1910.07467.pdf
-        Source code adopted from https://github.com/facebookresearch/llama/blob/a0a4da8b497c566403941ceec47c2512ecf9dd20/llama/model.py#L34C1-L77C36
+        Initializes a LayerNorm module.
 
         Args:
-            ndim (int): The dimension of the input tensor.
-            epsilon (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
-            bias (bool, optional): If True, the layer will learn an additive bias. Default is True.
+            ndim (int): The number of dimensions of the input tensor.
+            bias (bool, optional): If True, adds a learnable bias to the normalized tensor. Defaults to True.
+            epsilon (float, optional): A small value added to the denominator for numerical stability. Defaults to 1e-5.
+
+        Note:
+            Original paper: https://arxiv.org/pdf/1910.07467.pdf
+            Source code adopted from https://github.com/facebookresearch/llama/blob/a0a4da8b497c566403941ceec47c2512ecf9dd20/llama/model.py#L34C1-L77C36
+
+        Returns:
+            None
         """
+
         super().__init__()
         self.epsilon = epsilon
         self.weight = nn.Parameter(torch.ones(ndim))
@@ -28,9 +36,29 @@ class RMSLayerNorm(nn.Module):
             self.bias = None
 
     def _norm(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Applies layer normalization to the input tensor.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The normalized tensor.
+
+        """
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.epsilon)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the layer normalization module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after applying layer normalization.
+
+        """
         output = self._norm(x.float()).type_as(x)
         if self.bias is None:
             return output * self.weight
@@ -40,7 +68,11 @@ class RMSLayerNorm(nn.Module):
 
 class LayerNorms(LookupEnum):
     """
-    An enumeration of the different layer normalization techniques.
+    Enum lookup class for LayerNorms.
+
+    Attributes:
+        RMSNorm: RMSLayerNorm class.
+        LayerNorm: nn.LayerNorm class.
     """
 
     RMSNorm = RMSLayerNorm
@@ -48,6 +80,16 @@ class LayerNorms(LookupEnum):
 
 
 class LayerNormConfig(BaseModel):
+    """
+    Configuration class for Layer Normalization.
+
+    Args:
+        normalized_shape (int): The expected size of the input shape.
+        eps (float, optional): A value added to the denominator for numerical stability. Defaults to 1e-6.
+        elementwise_affine (bool, optional): Whether to include learnable affine parameters. Defaults to True.
+        bias (bool, optional): Whether to include a bias term. Defaults to True.
+    """
+
     normalized_shape: Annotated[int, Field(strict=True, ge=1)]
     eps: Annotated[float, Field(strict=True, gt=0, default=1e-6)]
     elementwise_affine: Annotated[bool, Field(strict=True, default=True)]
@@ -55,6 +97,15 @@ class LayerNormConfig(BaseModel):
 
 
 class RMSLayerNormConfig(BaseModel):
+    """
+    Configuration class for RMSLayerNorm.
+
+    Args:
+        ndim (int): Number of dimensions for the input tensor. Must be greater than or equal to 1.
+        epsilon (float, optional): Small value added to the input to avoid division by zero. Defaults to 1e-6.
+        bias (bool, optional): Whether to include a bias term. Defaults to True.
+    """
+
     ndim: Annotated[int, Field(strict=True, ge=1)]
     epsilon: Annotated[float, Field(gt=0, default=1e-6)]
     bias: Annotated[bool, Field(strict=True, default=True)]
