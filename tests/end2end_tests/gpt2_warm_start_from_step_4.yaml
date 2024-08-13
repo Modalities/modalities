@@ -49,6 +49,7 @@ train_dataloader:
         num_ranks: ${settings.cuda_env.world_size}
         global_num_tokens: ${settings.training.global_num_seen_tokens}
         sequence_length: ${settings.training.sequence_length}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -241,7 +242,7 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     global_num_seen_steps:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens

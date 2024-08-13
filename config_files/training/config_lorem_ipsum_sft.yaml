@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum_sft_converted.aadd295.pbin
+    raw_data_path: ./data/lorem_ipsum_sft_40e0699/lorem_ipsum_sft_converted.40e0699.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -263,6 +263,11 @@ tokenizer:
     pretrained_model_name_or_path: data/tokenizer/hf_gpt2
     padding: false
     truncation: false
+    special_tokens:
+      additional_special_tokens: 
+        - "^"
+        - "$"
+        - "°"
 
 scheduler:
   component_key: scheduler

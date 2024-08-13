@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Tuple, Type
 
@@ -40,7 +41,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import get_total_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
 
 config_file_path_option = click.option(
     "--config_file_path",
@@ -153,6 +154,15 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     config = load_app_config_dict(config_file_path)
+
+    # copy the config file to the src_path parent and append the original hash
+    src_path = Path(config["settings"]["src_path"])
+    src_path_has_hash_suffix = len(src_path.suffixes) > 1 and len(src_path.suffixes[0]) == 7
+    if src_path_has_hash_suffix:
+        hash_suffix = src_path.suffixes[0]
+        config_file_name_with_hash = config_file_path.stem + hash_suffix + "".join(config_file_path.suffixes)
+        shutil.copyfile(config_file_path, src_path.parent / config_file_name_with_hash)
+
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
@@ -228,6 +238,7 @@ class Main:
         return components
 
     def run(self, components: TrainingComponentsInstantiationModel):
+        print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
             experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
@@ -280,6 +291,7 @@ class Main:
                 model=wrapped_model,
                 activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
             )
+        print_rank_0(f"Model initialized at {datetime.now()}.")
 
         gym.run(
             train_data_loader=components.train_dataloader,
@@ -292,7 +304,6 @@ class Main:
             evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
         )
-        print("done")
 
     def get_logging_publishers(
         self,
