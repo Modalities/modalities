@@ -7,7 +7,7 @@ from modalities.running_env.cuda_env import CudaEnv
 from tests.conftest import _ROOT_DIR
 
 
-def test_e2e_instruction_tuning(monkeypatch):
+def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
@@ -18,8 +18,13 @@ def test_e2e_instruction_tuning(monkeypatch):
     dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum_sft.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
 
-    # Disable checkpointing
-    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 0
+    checkpointing_path = tmp_path / "sft_checkpoints/"
+    config_dict["settings"]["paths"]["checkpointing_path"] = checkpointing_path.__str__()
+    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
+        "checkpoint_path"
+    ] = checkpointing_path.__str__()
+    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 1
+
     # Here we need to set it to the batched size of our dataset + 1 to not abort early
     # With the original configuration as above and data prallel of 2 total_steps of 16 per GPU is okay,
     # as the real total_steps (which is 12) is smaller
@@ -31,3 +36,13 @@ def test_e2e_instruction_tuning(monkeypatch):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)
+
+    assert (
+        sum(
+            [
+                "model" in path.name or "optimizer" in path.name or path.suffix == ".yaml"
+                for path in list(checkpointing_path.glob("*"))[0].glob("*")
+            ]
+        )
+        == 3
+    ), "Output of the test i.e. a model checkpoint was not created!"
