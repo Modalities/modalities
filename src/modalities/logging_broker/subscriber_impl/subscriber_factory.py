@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -65,7 +65,7 @@ class ResultsSubscriberFactory:
         experiment_id: str,
         mode: WandbMode,
         config_file_path: Path,
-        directory: Path = None,
+        directory: Optional[Path] = None,
     ) -> WandBEvaluationResultSubscriber:
         if global_rank == 0 and (mode != WandbMode.DISABLED):
             if directory is not None:
