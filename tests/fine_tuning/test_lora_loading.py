@@ -67,3 +67,5 @@ def test_load_lora_model(lora_model, config_dict_without_checkpoint_path):
     ]["target_layer_class_names"]
     for module in list(lora_model.modules()):
         assert type(module).__name__ not in target_layer_class_names
+
+

@@ -13,6 +13,7 @@ class ModelTypeEnum(Enum):
     MODEL = "model"
     CHECKPOINTED_MODEL = "checkpointed_model"
     LORA_MODEL = "lora_model"
+    HUGGINGFACE_SMOL_LLM_MODEL = "huggingface_smol_llm_model"
 
 
 def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
@@ -34,6 +35,11 @@ def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
 
         class PydanticConfig(BaseModel):
             lora_model: PydanticPytorchModuleType
+
+    elif model_type.value == "huggingface_smol_llm_model":
+
+        class PydanticConfig(BaseModel):
+            huggingface_smol_llm_model: PydanticPytorchModuleType
 
     else:
         raise NotImplementedError()

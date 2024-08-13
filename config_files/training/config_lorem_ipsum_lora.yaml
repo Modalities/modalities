@@ -180,17 +180,26 @@ loss_fn:
     target_key: target_ids
     prediction_key: logits
 
-wrapped_model:
+#wrapped_model:
+#  component_key: model
+#  variant_key: fsdp_wrapped
+#  config:
+#    model:
+#      instance_key: checkpointed_model
+#      pass_type: BY_REFERENCE
+#    sync_module_states: true
+#    mixed_precision_settings: BF_16
+#    sharding_strategy: FULL_SHARD
+#    block_names: [ GPT2Block ]
+huggingface_smol_llm_model:
   component_key: model
-  variant_key: fsdp_wrapped
+  variant_key: huggingface_pretrained_model
   config:
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [ GPT2Block ]
+    model_type: AutoModelForCausalLM
+    model_name: HuggingFaceTB/SmolLM-1.7B
+    prediction_key: logits
+    huggingface_prediction_subscription_key: logits
+    sample_key: input_ids
 
 lora_model:
   component_key: model
@@ -199,84 +208,83 @@ lora_model:
     alpha: 1
     r: 8
     target_layer_class_names:
-      - CausalSelfAttention
-      - Linear
       - Embedding
-      - Conv1d
-      - Conv2d
-      - Conv3d
-
-model:
-  component_key: model
-  variant_key: model_initialized
-  config:
+      - Linear
     model:
-      instance_key: model_raw
+      instance_key: huggingface_smol_llm_model
       pass_type: BY_REFERENCE
-    model_initializer:
-      component_key: model_initialization
-      variant_key: composed
-      config:
-        model_type: gpt2
-        weight_init_type: scaled
-        mean: 0.0
-        std: 0.02
-        num_layers: ${model_raw.config.n_layer}
 
-model_raw:
-  component_key: model
-  variant_key: gpt2
-  config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    poe_type: NOPE
-    sequence_length: ${settings.training.sequence_length}
-    prediction_key: ${loss_fn.config.prediction_key}
-    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 2
-    n_head_q: 8
-    n_head_kv: 4
-    ffn_hidden: 128
-    n_embd: 128
-    dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    attention_config:
-      qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
-    attention_implementation: manual
-    activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
-      config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+#model:
+#  component_key: model
+#  variant_key: model_initialized
+#  config:
+#    model:
+#      instance_key: model_raw
+#      pass_type: BY_REFERENCE
+#    model_initializer:
+#      component_key: model_initialization
+#      variant_key: composed
+#      config:
+#        model_type: gpt2
+#        weight_init_type: scaled
+#        mean: 0.0
+#        std: 0.02
+#        num_layers: ${model_raw.config.n_layer}
+#
+#model_raw:
+#  component_key: model
+#  variant_key: gpt2
+#  config:
+#    sample_key: ${settings.referencing_keys.sample_key}
+#    poe_type: NOPE
+#    sequence_length: ${settings.training.sequence_length}
+#    prediction_key: ${loss_fn.config.prediction_key}
+#    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+#    n_layer: 2
+#    n_head_q: 8
+#    n_head_kv: 4
+#    ffn_hidden: 128
+#    n_embd: 128
+#    dropout: 0.0
+#    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+#    attention_config:
+#      qkv_transforms:
+#        - type_hint: RotaryTransform
+#          config:
+#            n_embd: ${model_raw.config.n_embd}
+#            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+#            seq_length_dim: -2
+#    attention_implementation: manual
+#    activation_type: swiglu
+#    attention_norm:
+#      component_key: layer_norm
+#      variant_key: rms_norm
+#      config:
+#        ndim: ${model_raw.config.n_embd}
+#        bias: true
+#        epsilon: 1e-5
+#    ffn_norm:
+#      component_key: layer_norm
+#      variant_key: rms_norm
+#      config:
+#        ndim: ${model_raw.config.n_embd}
+#        bias: true
+#        epsilon: 1e-5
+#    lm_head_norm:
+#      component_key: layer_norm
+#      variant_key: rms_norm
+#      config:
+#        ndim: ${model_raw.config.n_embd}
+#        bias: true
+#        epsilon: 1e-5
 
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
-    padding: false
-    truncation: false
+#tokenizer:
+#  component_key: tokenizer
+#  variant_key: pretrained_hf_tokenizer
+#  config:
+#    pretrained_model_name_or_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B
+#    padding: false
+#    truncation: false
 
 scheduler:
   component_key: scheduler
@@ -346,3 +354,19 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
+
+checkpointed_model:
+  component_key: model
+  variant_key: checkpointed
+  config:
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: 0
+        precision: BF16
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B
+

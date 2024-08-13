@@ -2,14 +2,12 @@
 #  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
+import math
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import math
-from typing import Optional, List
-
-from xformers.triton.k_fused_matmul_bw import kernel_bw
 
 
 class LoRALayer:
