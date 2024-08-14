@@ -1,32 +1,26 @@
 #!/bin/sh
+set -e 
 
-# ---------------------------------------------------
-# bash run_getting_started_example.sh 0,1,2,3,4,5,6,7
-# ---------------------------------------------------
+# ---------------------------------------------
+# bash run_getting_started_example.sh 0 1
+# (can only be run on 2 GPUs using this script)
+# ---------------------------------------------
 
 #######################
 ### INPUT ARGUMENTS ###
 #######################
-if [ -z "$1" ]  # if input argument does not exist
+if [ -z "$1" ] || [ -z "$2" ]  # if one of the two input arguments does not exist
   then
-    echo "Need to specify the GPU devices as arguments, e.g. bash run_getting_started_example.sh 0,1,2,3,4,5,6,7"
+    echo "Need to specify 2 GPU devices as arguments, e.g. bash run_getting_started_example.sh 0 1"
     exit
 fi
-CUDA_VISIBLE_DEVICES=$1
-
-first_character=${1:0:1}
-if [[ $first_character =~ [^0-7] ]]   # if the first character is not an integer 0-7
+if [[ $1 =~ [^0-7] ]] || [[ $2 =~ [^0-7] ]]  # if one of the two input arguments is not an integer 0-7
     then
-        echo "First character of specified argument needs to be an integer, e.g. bash run_getting_started_example.sh 0,1,2,3,4,5,6,7"
+        echo "Need to specify integers 0-7 as arguments, e.g. bash run_getting_started_example.sh 0 1"
         exit
 fi
 
-last_character=${1:0-1}
-if [[ $last_character =~ [^0-7] ]]   # if the last character is not an integer 0-7
-    then
-        echo "Last character of specified argument needs to be an integer, e.g. bash run_getting_started_example.sh 0,1,2,3,4,5,6,7"
-        exit
-fi
+CUDA_VISIBLE_DEVICES="$1,$2"
 
 #############
 ### RUN #####

@@ -88,7 +88,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
             run_getting_started_example_script
         ), f"ERROR! {run_getting_started_example_script} does not exist."
         command_getting_started_example = (
-            f"cd {run_getting_started_example_directory}; bash run_getting_started_example.sh {devices[0]},{devices[1]}"
+            f"cd {run_getting_started_example_directory}; bash run_getting_started_example.sh {devices[0]} {devices[1]}"
         )
         print(command_getting_started_example)
         subprocess.run(command_getting_started_example, shell=True, capture_output=False, text=True)
