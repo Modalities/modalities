@@ -22,7 +22,7 @@ if [[ $first_character =~ [^0-7] ]]   # if the first character is not an integer
 fi
 
 last_character=${1:0-1}
-if [[ $last_character =~ [^0-7] ]]   # if the first character is not an integer 0-7
+if [[ $last_character =~ [^0-7] ]]   # if the last character is not an integer 0-7
     then
         echo "Last character of specified argument needs to be an integer, e.g. bash run_getting_started_example.sh 0,1,2,3,4,5,6,7"
         exit
