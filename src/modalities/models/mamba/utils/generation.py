@@ -373,8 +373,8 @@ class DecodingCGCache:
         dtype: The data type used for decoding.
         callables (Dict): A dictionary of callables used for decoding.
         mempool: The memory pool used for decoding.
-        inference_params (Optional[InferenceParams]): Optional inference parameters for decoding.
-        run (Optional[Callable]): Optional callable for running the decoding process.
+        inference_params (InferenceParams, optional): Optional inference parameters for decoding.
+        run (Callable, optional): Optional callable for running the decoding process.
     """
 
     max_batch_size: int = 0
@@ -403,14 +403,14 @@ def update_graph_cache(
 
     Args:
         model (nn.Module): The model for which the cache is being updated.
-        cache (Optional[DecodingCGCache]): The existing cache to be updated. If None, a new cache will be created.
+        cache (DecodingCGCache, optional): The existing cache to be updated. If None, a new cache will be created.
         batch_size (int): The batch size of the input data.
         seqlen_og (int): The original sequence length.
         max_seqlen (int): The maximum sequence length.
-        decoding_seqlens (Optional[Tuple]): The decoding sequence lengths to be cached. Defaults to (1,).
-        dtype (Optional[torch.dtype]): The data type of the cache.
+        decoding_seqlens (Tuple, optional): The decoding sequence lengths to be cached. Defaults to (1,).
+        dtype (torch.dtype, optional): The data type of the cache.
         If None, the data type of the model's parameters will be used.
-        n_warmups (Optional[int]): The number of warmup iterations for capturing the CUDA graph. Defaults to 2.
+        n_warmups (int, optional): The number of warmup iterations for capturing the CUDA graph. Defaults to 2.
 
     Returns:
         DecodingCGCache: The updated cache.

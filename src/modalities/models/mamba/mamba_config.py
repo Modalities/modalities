@@ -67,8 +67,8 @@ class MambaLLMConfig(BaseModel):
         tie_embeddings (bool): Defiesn, whether to tie the input and output embeddings.
         prediction_key (str): The prediction keys.
         sample_key (str): The sample keys.
-        seed (Optional[int]): The random seed for reproducibility.
-        dtype (Optional[int]): The data type of the model.
+        seed (int, optional): The random seed for reproducibility.
+        dtype (int, optional): The data type of the model.
         initializer_cfg (dict): The configuration for model initialization.
         num_last_tokens (int): -.
         inference_params (dict): The parameters for inference.

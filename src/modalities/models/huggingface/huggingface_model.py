@@ -44,8 +44,8 @@ class HuggingFacePretrainedModelConfig(BaseModel):
         prediction_key (str): The key for accessing the prediction.
         huggingface_prediction_subscription_key (str): The subscription key for HuggingFace prediction.
         sample_key (str): The key for accessing the sample.
-        model_args (Optional[Any]): Optional additional arguments for the model.
-        kwargs (Optional[Any]): Optional additional keyword arguments.
+        model_args (Any, optional): Optional additional arguments for the model.
+        kwargs (Any, optional): Optional additional keyword arguments.
     """
 
     model_type: HuggingFaceModelTypes
@@ -83,8 +83,8 @@ class HuggingFacePretrainedModel(NNModel):
             prediction_key (str): The key for accessing predictions.
             huggingface_prediction_subscription_key (str): The subscription key for Hugging Face predictions.
             sample_key (str): The key for accessing samples.
-            model_args (Optional[Any], optional): Additional arguments for the Hugging Face model. Defaults to None.
-            kwargs (Optional[Any], optional): Additional keyword arguments for the Hugging Face model. Defaults to None.
+            model_args (Any, optional): Additional arguments for the Hugging Face model. Defaults to None.
+            kwargs (Any, optional): Additional keyword arguments for the Hugging Face model. Defaults to None.
         """
         super().__init__()
         if model_args is None:

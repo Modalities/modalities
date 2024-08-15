@@ -136,8 +136,8 @@ class MixerModel(nn.Module):
             initializer_cfg (dict): Configuration for initializing the model's weights.
             fused_add_norm (bool): Flag, indicating whether to use fused add and normalization function.
             residual_in_fp32 (bool): Flag indicating whether to use FP32 for residual connections.
-            device (Optional[str]): The device to use for the model's tensors.
-            dtype (Optional[str]): The data type to use for the model's tensors.
+            device (str, optional): The device to use for the model's tensors.
+            dtype (str, optional): The data type to use for the model's tensors.
             mamba_block_config (MambaBlockConfig): Configuration for the MambaBlock.
 
         Returns:
@@ -262,8 +262,8 @@ class MambaLLM(NNModel):
             tie_embeddings (bool): Flag indicating whether to tie the embeddings.
             prediction_key (str): The prediction key.
             sample_key (str): The sample sampling key.
-            seed (Optional[int]): The seed value for random number generation. Defaults to None.
-            dtype (Optional[str]): The data type of the model. Defaults to None.
+            seed (int, optional): The seed value for random number generation. Defaults to None.
+            dtype (str, optional): The data type of the model. Defaults to None.
             initializer_cfg (dict): The configuration for model initialization.
             num_last_tokens (int): -.
             inference_params (dict): The parameters for inference.

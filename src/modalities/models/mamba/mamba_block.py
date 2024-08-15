@@ -67,8 +67,8 @@ class MambaBlock(nn.Module):
             bias (bool): Whether to include a bias term in the linear layers.
             use_fast_path (bool): -.
             layer_idx (int): The index of the layer.
-            device (Optional[str]): The device to be used for computation. Defaults to None.
-            dtype (Optional[str]): The data type to be used for computation. Defaults to None.
+            device (str, optional): The device to be used for computation. Defaults to None.
+            dtype (str, optional): The data type to be used for computation. Defaults to None.
         """
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -298,7 +298,7 @@ class MambaBlock(nn.Module):
         Args:
             batch_size (int): The batch size.
             max_seqlen (int): The maximum sequence length.
-            dtype (Optional[str], optional): The data type of the cache tensors. Defaults to None.
+            dtype (str, optional): The data type of the cache tensors. Defaults to None.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -320,9 +320,9 @@ class MambaBlock(nn.Module):
         Retrieves the states from the cache.
 
         Args:
-            inference_params (Optional[dict]): The dictionary containing the inference parameters.
+            inference_params (dict, optional): The dictionary containing the inference parameters.
             batch_size (int): The size of the batch.
-            initialize_states (Optional[bool]): Whether to initialize the states or not. Defaults to False.
+            initialize_states (bool, optional): Whether to initialize the states or not. Defaults to False.
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: A tuple containing the convolutional state and the SSM state.
@@ -423,7 +423,7 @@ class Block(nn.Module):
         Args:
             batch_size (int): The batch size of the input data.
             max_seqlen (int): The maximum sequence length.
-            dtype (Optional[str], optional): The data type of the cache. Defaults to None.
+            dtype (str, optional): The data type of the cache. Defaults to None.
             **kwargs: Additional keyword arguments.
 
         Returns:

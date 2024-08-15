@@ -111,10 +111,10 @@ class HFModelAdapter(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): The input tensor of token indices.
-            attention_mask (Optional[torch.Tensor], optional): The attention mask tensor. Defaults to None.
-            return_dict (Optional[bool], optional): Whether to return a dictionary as output. Defaults to False.
-            output_attentions (Optional[bool], optional): Whether to output attentions. Defaults to False.
-            output_hidden_states (Optional[bool], optional): Whether to output hidden states. Defaults to False.
+            attention_mask (torch.Tensor, optional): The attention mask tensor. Defaults to None.
+            return_dict (bool, optional): Whether to return a dictionary as output. Defaults to False.
+            output_attentions (bool, optional): Whether to output attentions. Defaults to False.
+            output_hidden_states (bool, optional): Whether to output hidden states. Defaults to False.
 
         Returns:
             Union[ModalitiesModelOutput, torch.Tensor]: The output of the forward pass.
@@ -159,9 +159,9 @@ class ModalitiesModelOutput(ModelOutput):
     ModalitiesModelOutput class.
 
     Args:
-        logits (Optional[torch.FloatTensor]): The logits output of the model. Defaults to None.
-        hidden_states (Optional[Tuple[torch.FloatTensor]]): The hidden states output of the model. Defaults to None.
-        attentions (Optional[Tuple[torch.FloatTensor]]): The attentions output of the model. Defaults to None.
+        logits (torch.FloatTensor, optional): The logits output of the model. Defaults to None.
+        hidden_states (Tuple[torch.FloatTensor], optional): The hidden states output of the model. Defaults to None.
+        attentions (Tuple[torch.FloatTensor], optional): The attentions output of the model. Defaults to None.
     """
 
     logits: Optional[torch.FloatTensor] = None
