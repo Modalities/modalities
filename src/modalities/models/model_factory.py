@@ -6,9 +6,11 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
+from torch.distributed._tensor import Replicate
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
@@ -149,6 +151,37 @@ class ModelFactory:
                 compiled_module = torch.compile(module, fullgraph=True)
                 parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
                 parent_module.register_module(name=child_name, module=compiled_module)
+
+        return model
+
+    @staticmethod
+    def get_tensor_parallelized_model(model: nn.Module) -> nn.Module:
+        # TODO: this is gpt-2 specific and should be part of the configuration
+        {
+            # by default ColwiseParallel input layouts is replicated
+            # and RowwiseParallel output layouts is replicated
+            # SwiGLU parallelization
+            "mlp.W": ColwiseParallel(),
+            "feed_forward.W_2": RowwiseParallel(),
+            "feed_forward.V": ColwiseParallel(),
+            # attention matrices parallelization
+            "attn.q_attn": ColwiseParallel(),
+            "attn.k_attn": ColwiseParallel(),
+            "attn.v_attn": ColwiseParallel(),
+            "attn.c_proj": RowwiseParallel(),
+        }
+
+        {
+            "tok_embeddings": RowwiseParallel(
+                input_layouts=Replicate(),
+            ),
+            "transformer.wte": ColwiseParallel(
+                output_layouts=Replicate(),
+            ),
+            "transformer.wpe": ColwiseParallel(
+                output_layouts=Replicate(),
+            ),
+        }
 
         return model
 
