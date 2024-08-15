@@ -157,7 +157,7 @@ class ModelFactory:
     @staticmethod
     def get_tensor_parallelized_model(model: nn.Module) -> nn.Module:
         # TODO: this is gpt-2 specific and should be part of the configuration
-        {
+        attention_block_tp_plan = {
             # by default ColwiseParallel input layouts is replicated
             # and RowwiseParallel output layouts is replicated
             # SwiGLU parallelization
@@ -170,18 +170,18 @@ class ModelFactory:
             "attn.v_attn": ColwiseParallel(),
             "attn.c_proj": RowwiseParallel(),
         }
-
-        {
-            "tok_embeddings": RowwiseParallel(
+        outer_model_tp_plan = {
+            "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
             ),
-            "transformer.wte": ColwiseParallel(
-                output_layouts=Replicate(),
+            "transformer.wpe": RowwiseParallel(
+                input_layouts=Replicate(),
             ),
-            "transformer.wpe": ColwiseParallel(
+            "lm_head": ColwiseParallel(
                 output_layouts=Replicate(),
             ),
         }
+        print(outer_model_tp_plan, attention_block_tp_plan)
 
         return model
 
