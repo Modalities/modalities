@@ -57,12 +57,12 @@ class MambaLLMConfig(BaseModel):
     Configuration class for MambaLLM model.
 
     Args:
-        d_model (int): The dimensionality of the model's hidden states.
+        d_model (int): The dimensionality of the feature vectors.
         n_layer (int): The number of layers in the model.
         vocab_size (int): The size of the vocabulary.
         rms_norm (bool): Defines, whether to apply root mean square normalization.
         residual_in_fp32 (bool): Defines, whether to use FP32 for residual connections.
-        fused_add_norm (bool): Defines, whether to use fused add and normalization operation.
+        fused_add_norm (bool): Defines, whether to use fused add and normalization function.
         pad_vocab_size_multiple (int): The multiple of vocabulary size to pad to.
         tie_embeddings (bool): Defiesn, whether to tie the input and output embeddings.
         prediction_key (str): The prediction keys.

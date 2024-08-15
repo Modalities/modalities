@@ -28,6 +28,23 @@ def create_block(
     device: str,
     dtype: str,
 ) -> Block:
+    """
+    Create a Block object with the given parameters.
+
+    Args:
+        d_model (int): The dimensionality of the feature vectors.
+        ssm_cfg (dict): Configuration parameters for the MambaBlock mixer.
+        norm_epsilon (float): The epsilon value for layer normalization.
+        rms_norm (bool): Flag indicating whether to use RMSNorm instead of nn.LayerNorm.
+        residual_in_fp32 (bool): Flag indicating whether to use FP32 for residual connections.
+        fused_add_norm (bool): Flag indicating whether to use fused add and layer normalization function.
+        layer_idx (int): The index of the layer.
+        device (str): The device to be used for computation.
+        dtype (str): The data type to be used for computation.
+
+    Returns:
+        Block: The created Block object.
+    """
     factory_kwargs = {"device": device, "dtype": dtype}
     mixer_cls = partial(MambaBlock, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs)
     norm_cls = partial(nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs)
@@ -50,6 +67,21 @@ def _init_weights(
     rescale_prenorm_residual: bool = True,
     n_residuals_per_layer: int = 1,  # Change to 2 if we have MLP
 ) -> None:
+    """
+    Initializes the weights.
+
+    Args:
+        module (nn.Module): The module whose weights need to be initialized.
+        n_layer (int): The number of layers in the model.
+        initializer_range (float, optional): The range of the normal distribution
+        used for initializing the embedding layer weights. Defaults to 0.02.
+        rescale_prenorm_residual (bool, optional): Flag indicating whether to rescale the weights of the residual layers
+        based on the OpenAI GPT-2 Paper Scheme. Defaults to True.
+        n_residuals_per_layer (int, optional): The number of residuals per layer. Defaults to 1.
+
+    Returns:
+        None
+    """
     if isinstance(module, nn.Linear):
         if module.bias is not None:
             if not getattr(module.bias, "_no_reinit", False):
@@ -76,6 +108,8 @@ def _init_weights(
 
 
 class MixerModel(nn.Module):
+    """Mixer model class."""
+
     def __init__(
         self,
         d_model: int,
@@ -90,6 +124,25 @@ class MixerModel(nn.Module):
         dtype: Optional[str],
         mamba_block_config: MambaBlockConfig,
     ) -> None:
+        """
+        Initializes the MambaModel.
+
+        Args:
+            d_model (int): The size of the model's hidden dimension.
+            n_layer (int): The number of layers in the model.
+            vocab_size (int): The size of the vocabulary.
+            norm_epsilon (float): The epsilon value for normalization layers.
+            rms_norm (bool): Flag, indicating whether to use RMSNorm isntead of nn.LayerNorm.
+            initializer_cfg (dict): Configuration for initializing the model's weights.
+            fused_add_norm (bool): Flag, indicating whether to use fused add and normalization function.
+            residual_in_fp32 (bool): Flag indicating whether to use FP32 for residual connections.
+            device (Optional[str]): The device to use for the model's tensors.
+            dtype (Optional[str]): The data type to use for the model's tensors.
+            mamba_block_config (MambaBlockConfig): Configuration for the MambaBlock.
+
+        Returns:
+            None
+        """
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
         self.embedding = nn.Embedding(vocab_size, d_model, **factory_kwargs)
@@ -123,12 +176,34 @@ class MixerModel(nn.Module):
         )
 
     def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> dict:
+        """
+        Allocates the inference cache for the model.
+
+        Args:
+            batch_size (int): The batch size of the input data.
+            max_seqlen (int): The maximum sequence length of the input data.
+            dtype (str, optional): The data type of the cache. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: A dictionary containing the allocated inference cache for each layer of the model.
+        """
         return {
             i: layer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
             for i, layer in enumerate(self.layers)
         }
 
     def forward(self, input_ids: torch.Tensor, inference_params: Optional[dict] = None) -> torch.Tensor:
+        """
+        Forward pass of the MixerModel.
+
+        Args:
+            input_ids (torch.Tensor): The input tensor.
+            inference_params (dict, optional): Optional dictionary of inference parameters.
+
+        Returns:
+            torch.Tensor: The output tensor.
+        """
         hidden_states = self.embedding(input_ids)
         residual = None
         for layer in self.layers:
@@ -152,6 +227,8 @@ class MixerModel(nn.Module):
 
 
 class MambaLLM(NNModel):
+    """MambaLLM class."""
+
     def __init__(
         self,
         d_model: int,
@@ -171,6 +248,30 @@ class MambaLLM(NNModel):
         inference_params: dict,
         mixer_model_config: MixerModelConfig,
     ):
+        """
+        Initializes an MambaModel object.
+
+        Args:
+            d_model (int): The size of the model's hidden dimension.
+            n_layer (int): The number of layers in the model.
+            vocab_size (int): The size of the vocabulary.
+            rms_norm (bool): Flag indicating whether to use root mean square normalization.
+            residual_in_fp32 (bool): Flag indicating whether to use residual connections in FP32.
+            fused_add_norm (bool): Flag indicating whether to use fused add and normalization function.
+            pad_vocab_size_multiple (int): The multiple to pad the vocabulary size to.
+            tie_embeddings (bool): Flag indicating whether to tie the embeddings.
+            prediction_key (str): The prediction key.
+            sample_key (str): The sample sampling key.
+            seed (Optional[int]): The seed value for random number generation. Defaults to None.
+            dtype (Optional[str]): The data type of the model. Defaults to None.
+            initializer_cfg (dict): The configuration for model initialization.
+            num_last_tokens (int): -.
+            inference_params (dict): The parameters for inference.
+            mixer_model_config (MixerModelConfig): The configuration for the MixerModel.
+
+        Returns:
+            None
+        """
         super().__init__(seed=seed)
 
         self.d_model = d_model
@@ -217,10 +318,33 @@ class MambaLLM(NNModel):
         self.tie_weights()
 
     def tie_weights(self) -> None:
+        """
+        Ties the weights of the language model head with the weights of the backbone embedding.
+
+        This function is used to ensure that the language model head and the backbone embedding share the same weights.
+        If `tie_embeddings` is set to True, the weights of the language model head (`self.lm_head.weight`) will be set
+        equal to the weights of the backbone embedding (`self.backbone.embedding.weight`).
+
+        Returns:
+            None
+        """
         if self.tie_embeddings:
             self.lm_head.weight = self.backbone.embedding.weight
 
     def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: str = None, **kwargs) -> dict:
+        """
+        Allocates the inference cache for the model.
+
+        Args:
+            batch_size (int): The batch size.
+            max_seqlen (int): The maximum sequence length.
+            dtype (str, optional): The data type for the inference cache. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: The allocated inference cache.
+
+        """
         return self.backbone.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
