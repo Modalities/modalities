@@ -28,7 +28,7 @@ def check_existence_and_clear_getting_started_example_output(
             os.remove(output_file_path)
             print(f"> removed {output_file_path}")
         except OSError as e:
-            print("Error: %s - %s." % (e.filename, e.strerror))
+            print(f"Error: {e.filename} - {e.strerror}.")
 
     # checkpoint
     output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
@@ -46,7 +46,7 @@ def check_existence_and_clear_getting_started_example_output(
         shutil.rmtree(checkpoint_to_delete)
         print(f"> removed {checkpoint_to_delete}")
     except OSError as e:
-        print("Error: %s - %s." % (e.filename, e.strerror))
+        print(f"Error: {e.filename} - {e.strerror}.")
 
 
 def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: str = "0,1"):
