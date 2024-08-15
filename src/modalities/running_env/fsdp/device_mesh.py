@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
@@ -17,7 +17,7 @@ class DeviceMeshConfig(BaseModel):
 
     # TODO add sequence parallel degree
 
-    enable_loss_parallel: bool = False
+    enable_loss_parallel: Optional[bool] = False
     world_size: Annotated[int, Field(strict=True, gt=0)]
 
     @model_validator(mode="after")
@@ -29,6 +29,9 @@ class DeviceMeshConfig(BaseModel):
                 f"Invalid parallel dims: dp({self.data_parallel_degree}) * tp({self.tensor_parallel_degree}) "
                 "* pp({self.pipeline_parallel_degree}) != WORLD_SIZE({self.world_size})"
             )
+        if self.enable_loss_parallel and self.tensor_parallel_degree == 1:
+            raise ConfigError(f"{self.enable_loss_parallel=} requires tensor_parallel_degree > 1")
+        return self
 
 
 def get_device_mesh(
