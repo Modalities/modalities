@@ -270,8 +270,8 @@ class CoCa(NNModel):
             modality_embd = vision_embd
 
         else:
-            if self.individual_datasets_cls_prediction_key:  # audio / vision / text BUT separate datasets
-                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
+            if self.individual_datasets:  # audio / vision / text BUT separate datasets
+                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_image(inputs)
                 output[self.individual_datasets_cls_prediction_key] = torch.cat([vision_cls_token, audio_cls_token])
                 modality_embd = {"audio": audio_embd, "image": vision_embd}
             else:  # audio + vision from one single dataset
@@ -322,6 +322,16 @@ class CoCa(NNModel):
         return audio_embd, audio_cls_token
 
     ## MODIFIED
+    def _forward_encode_audio_image(
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        audio_inputs = {k: inputs[k] for k in inputs if k in ["audio", "audio_len"]}
+        vision_inputs = {k: inputs[k] for k in inputs if k in ["images"]}
+        audio_embd, audio_cls_token = self._forward_encode_audio(audio_inputs)
+        vision_embd, vision_cls_token = self._forward_encode_vision(vision_inputs)
+
+        return audio_embd, audio_cls_token, vision_embd, vision_cls_token
+
     def _forward_encode_audio_vision(
         self, inputs: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
