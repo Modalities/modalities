@@ -650,7 +650,7 @@ class MultimodalWebDatasetBuilder:
             ModalityEnum.TEXT: None,
             ModalityEnum.IMAGE: "pil",
             ModalityEnum.VIDEO: decord_video,
-            ModalityEnum.AUDIO: torch_audio,
+            ModalityEnum.AUDIO: wds.torch_audio,
         }
 
         self.additional_extreacted_keys = []
