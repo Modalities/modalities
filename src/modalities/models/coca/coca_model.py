@@ -82,8 +82,10 @@ class CoCaConfig(BaseModel):
     audio_embd_prediction_key: Optional[str] = None
     vision_embd_prediction_key: Optional[str] = None
     audio_cls_prediction_key: Optional[str] = None
+    audio_text_cls_prediction_key: Optional[str] = None
     vision_cls_prediction_key: Optional[str] = None
-    individual_datasets_cls_prediction_key: Optional[str] = None
+    image_text_cls_prediction_key: Optional[str] = None
+    individual_datasets: Optional[bool] = None
     audio_encoder_config: Optional[AudioTransformerConfig] = None
     vision_encoder_config: Optional[VisionTransformerConfig] = None
     text_decoder_config: TextDecoderConfig
@@ -113,8 +115,10 @@ class CoCa(NNModel):
         audio_embd_prediction_key: Optional[str],
         vision_embd_prediction_key: Optional[str],
         audio_cls_prediction_key: Optional[str],
+        audio_text_cls_prediction_key: Optional[str],
         vision_cls_prediction_key: Optional[str],
-        individual_datasets_cls_prediction_key: Optional[str],
+        image_text_cls_prediction_key: Optional[str],
+        individual_datasets: Optional[bool],
         audio_encoder_config: Optional[AudioTransformerConfig],
         vision_encoder_config: Optional[VisionTransformerConfig],
         text_decoder_config: TextDecoderConfig,
@@ -155,8 +159,10 @@ class CoCa(NNModel):
         self.audio_embd_prediction_key = audio_embd_prediction_key
         self.vision_embd_prediction_key = vision_embd_prediction_key
         self.audio_cls_prediction_key = audio_cls_prediction_key
+        self.audio_text_cls_prediction_key = audio_text_cls_prediction_key
         self.vision_cls_prediction_key = vision_cls_prediction_key
-        self.individual_datasets_cls_prediction_key = individual_datasets_cls_prediction_key
+        self.image_text_cls_prediction_key = image_text_cls_prediction_key
+        self.individual_datasets = individual_datasets
 
         self.n_pool_head = n_pool_head
         self.bias_attn_pool = bias_attn_pool
@@ -272,7 +278,8 @@ class CoCa(NNModel):
         else:
             if self.individual_datasets:  # audio / vision / text BUT separate datasets
                 audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_image(inputs)
-                output[self.individual_datasets_cls_prediction_key] = torch.cat([vision_cls_token, audio_cls_token])
+                output[self.audio_cls_prediction_key] = audio_cls_token
+                output[self.vision_cls_prediction_key] = vision_cls_token
                 modality_embd = {"audio": audio_embd, "image": vision_embd}
             else:  # audio + vision from one single dataset
                 audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
@@ -281,8 +288,19 @@ class CoCa(NNModel):
                 modality_embd = {"audio": audio_embd, "video": vision_embd}
 
         text_embd, text_cls_token = self._forward_encode_text(inputs)
-        if self.vision_sample_key and self.audio_sample_key and self.individual_datasets_cls_prediction_key:
-            image_text_embd, audio_text_embd = text_embd[: len(vision_embd), :], text_embd[len(vision_embd) :, :]
+        if self.vision_sample_key and self.audio_sample_key and self.individual_datasets:
+            image_text_cls_token, audio_text_cls_token = (
+                text_cls_token[: len(vision_embd)],
+                text_cls_token[len(vision_embd) :],
+            )
+            output.update(
+                {
+                    self.image_text_cls_prediction_key: image_text_cls_token,
+                    self.audio_text_cls_prediction_key: audio_text_cls_token,
+                }
+            )
+
+            image_text_embd, audio_text_embd = text_embd[: len(vision_embd)], text_embd[len(vision_embd) :]
             image_logits = self._forward_decode(image_text_embd, modality_embd["image"])
             audio_logits = self._forward_decode(audio_text_embd, modality_embd["audio"])
             logits = torch.cat([image_logits, audio_logits])
