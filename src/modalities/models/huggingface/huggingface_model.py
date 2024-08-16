@@ -139,10 +139,6 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    # LongT5 accepts either decoder_inputs or targets.
-    # The _shift_tokens_right logic exists in the LongT5 implementation,
-    # but when passing targets it also already computes the loss, and this fails due to type mismatch.
-    # Computing it here is a workaround.
     def forward(
         self,
         inputs: Dict[str, torch.Tensor],
@@ -158,6 +154,19 @@ class HuggingFacePretrainedEncoderDecoderModel(NNModel):
 
     @staticmethod
     def _shift_tokens_right(input_ids: torch.Tensor, decoder_start_token_id: int) -> torch.Tensor:
+        """Shifts target sequence right by 1 to create decoder input sequence,
+        which is used for autoregressive modeling with teacher forcing.
+        LongT5 accepts either decoder_inputs or targets and _shift_tokens_right is already implemented by LongT5,
+        however, when passing targets it also already computes the loss and this fails due to type mismatch.
+        Computing it here is a workaround.
+
+        Args:
+            input_ids (torch.Tensor): _description_
+            decoder_start_token_id (int): _description_
+
+        Returns:
+            torch.Tensor: _description_
+        """
         shifted_input_ids = torch.roll(input_ids, 1, dims=1)
         shifted_input_ids[:, 0] = decoder_start_token_id
         return shifted_input_ids

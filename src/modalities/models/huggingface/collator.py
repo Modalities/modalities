@@ -42,6 +42,19 @@ class SpanMaskingCollateFn(CollateFnIF):
         self.tokenizer = tokenizer
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+        """The collator prepares data for an encoder-decoder model.
+        `samples` are used as encoder input, `targets` are shifted right by 1
+        and used as decoder input for autoregressive modeling with teacher forcing.
+        Length after masking is deterministic given noise_density and mean_noise_span_length:
+        all samples will have the same length, as will all targets.
+
+
+        Args:
+            batch (List[Dict[str, torch.Tensor]]): batch of input token ids
+
+        Returns:
+            DatasetBatch: Contains samples and targets with random spans masked out.
+        """
         sample_tensor = torch.stack([torch.tensor(d[self.sample_key]) for d in batch])
 
         batch_size, expanded_input_length = sample_tensor.shape
@@ -59,12 +72,18 @@ class SpanMaskingCollateFn(CollateFnIF):
 
         return DatasetBatch(targets=targets, samples=samples)
 
-    def create_sentinel_ids(self, mask_indices):
+    def create_sentinel_ids(self, mask_indices: np.ndarray[bool]) -> np.ndarray[int]:
         """
         Sentinel ids creation given the indices that should be masked.
         The start indices of each mask are replaced by the sentinel ids in increasing
         order. Consecutive mask indices to be deleted are replaced with `-1`.
         Sentinel ids are defined by the tokenizer as 32099: <extra_id_0>, 32098: <extra_id_1>, ..., 32000: <extra_id_99>
+
+        Args:
+            mask_indices (np.ndarray[bool]): binary mask of tokens to mask out
+
+        Returns:
+            np.ndarray[int]: array of sentinel ids at starting point of spans to be masked out
         """
         start_indices = mask_indices - np.roll(mask_indices, 1, axis=-1) * mask_indices
         start_indices[:, 0] = mask_indices[:, 0]
@@ -75,10 +94,18 @@ class SpanMaskingCollateFn(CollateFnIF):
 
         return sentinel_ids
 
-    def filter_input_ids(self, input_ids, sentinel_ids):
+    def filter_input_ids(self, input_ids: np.ndarray[int], sentinel_ids: np.ndarray[int]) -> np.ndarray[int]:
         """
         Puts sentinel mask on `input_ids` and fuse consecutive mask tokens into a single mask token by deleting.
         This will reduce the sequence length from `expanded_inputs_length` to `input_length`.
+        Sequence length after masking is deterministic: all masked sequences will have the same length.
+
+        Args:
+            input_ids (np.ndarray[int]): sequence of input token ids
+            sentinel_ids (np.ndarray[int]): array of sentinel ids at starting point of spans to be masked out
+
+        Returns:
+            np.ndarray[int]: input ids with masked out spans replaced by single sentinel token
         """
         batch_size = input_ids.shape[0]
 
@@ -91,7 +118,15 @@ class SpanMaskingCollateFn(CollateFnIF):
         )
         return input_ids
 
-    def random_spans_noise_mask(self, length: int):
+    def random_spans_noise_mask(self, length: int) -> np.ndarray[bool]:
+        """Generate a random mask to apply to input.
+
+        Args:
+            length (int): length of the noise mask
+
+        Returns:
+            np.ndarray: binary noise mask of tokens to mask out
+        """
         orig_length = length
 
         num_noise_tokens = int(np.round(length * self.noise_density))
@@ -136,9 +171,16 @@ class SpanMaskingCollateFn(CollateFnIF):
         return is_noise[:orig_length]
 
 
-def compute_input_and_target_lengths(inputs_length, noise_density, mean_noise_span_length):
-    """This function is copy of random_spans_helper
+def compute_input_and_target_lengths(
+    inputs_length: int, noise_density: float, mean_noise_span_length: float
+) -> tuple[int, int]:
+    """This function is a copy of random_spans_helper
     <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2466>
+    This is a helper function that is currently unused by the pipeline,
+    but can be used to compute optimal settings for config files.
+    Because the span masking collator replaces masked spans with a single token and therefore shortens them,
+    we can increase the length of the original token sequence passed to the collator.
+
 
     Training parameters to avoid padding with random_spans_noise_mask.
     When training a model with random_spans_noise_mask, we would like to set the other
@@ -155,7 +197,7 @@ def compute_input_and_target_lengths(inputs_length, noise_density, mean_noise_sp
         noise_density: a float
         mean_noise_span_length: a float
     Returns:
-        tokens_length: length of original text in tokens
+        tokens_length: an integer - length of original text in tokens
         targets_length: an integer - length in tokens of encoded targets sequence
     """
 

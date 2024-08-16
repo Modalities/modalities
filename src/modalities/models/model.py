@@ -72,6 +72,9 @@ class SwiGLU(nn.Module):
 
 
 def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResultBatch:
+    # Ideally we would do this by checking isinstance(model, HuggingFacePretrainedEncoderDecoderModel),
+    # but HuggingFacePretrainedEncoderDecoderModel depends on NNModel from this file
+    # so this creates a circular dependency
     if hasattr(model, "huggingface_model") and hasattr(model.huggingface_model, "encoder"):
         forward_result = model.forward(inputs=batch.samples, targets=batch.targets)
     else:
