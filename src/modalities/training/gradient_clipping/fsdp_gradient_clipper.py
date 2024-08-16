@@ -19,7 +19,7 @@ class FSDPGradientClipper(GradientClipperIF):
 
     def clip_gradients(self) -> torch.Tensor:
         gradient_norm_score = torch.nn.utils.clip_grad_norm_(
-            self.wrapped_model.parameters(), max_norm=self.max_norm, norm_type=self.norm_type.value
+            self.wrapped_model.parameters(), max_norm=self.max_norm, norm_type=self.norm_type.value, foreach=True
         )
         return gradient_norm_score
 
