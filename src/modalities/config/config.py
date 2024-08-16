@@ -229,6 +229,23 @@ class FSDP2WrappedModelConfig(BaseModel):
             raise ValueError("BF16 not supported in the current environment")
         return self
 
+    @model_validator(mode="after")
+    def validate_dp_mesh_existence(self):
+        if "dp" not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Data parallelism key dp not in {self.device_mesh=}")
+        return self
+
+
+class TensorParallelizedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_tp_mesh_existence(self):
+        if "tp" not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Tensor parallelism key tp not in {self.device_mesh=}")
+        return self
+
 
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleType

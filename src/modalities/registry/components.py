@@ -48,6 +48,7 @@ from modalities.config.config import (
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
     StepLRSchedulerConfig,
+    TensorParallelizedModelConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
@@ -118,6 +119,9 @@ COMPONENTS = [
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
+    ComponentEntity(
+        "model", "tensor_parallelized", ModelFactory.get_tensor_parallelized_model, TensorParallelizedModelConfig
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # Device Mesh
