@@ -114,17 +114,27 @@ class ModelFactory:
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
 
-        for tensor in itertools.chain(model.parameters(), model.buffers()):
-            if tensor.device != torch.device("meta"):
-                raise ModelStateError("All parameters and buffers must be on meta device!")
-
-        # Allocate buffers and sharded parameters on GPU
-        model = model.to_empty(device="cuda")
-
         return model
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+        # initialize the weights if they are on a meta device
+        def is_model_on_meta_device(model: nn.Module) -> bool:
+            meta_counter = 0
+            param_counter = 0
+            for tensor in itertools.chain(model.parameters(), model.buffers()):
+                if tensor.device == torch.device("meta"):
+                    meta_counter += 1
+                param_counter += 1
+
+            if meta_counter > 0 and meta_counter < param_counter:
+                raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
+            return meta_counter > 0
+
+        if is_model_on_meta_device(model=model):
+            # Allocate buffers and sharded parameters on GPU
+            model = model.to_empty(device="cuda")
+
         model_initializer.initialize_in_place(model)
         return model
 
