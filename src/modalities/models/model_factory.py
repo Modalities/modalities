@@ -10,7 +10,7 @@ from torch.distributed._tensor import Replicate
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
-from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel
+from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, parallelize_module
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
@@ -98,7 +98,7 @@ class ModelFactory:
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
 
-        fsdp_config = {"mesh": device_mesh, "mp_policy": mp_policy}
+        fsdp_config = {"mesh": device_mesh["dp"], "mp_policy": mp_policy}
 
         modules = list(model.modules())
         # we first shard all the blocks
@@ -155,7 +155,10 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_tensor_parallelized_model(model: nn.Module) -> nn.Module:
+    def get_tensor_parallelized_model(
+        model: nn.Module,
+        device_mesh: DeviceMesh,
+    ) -> nn.Module:
         # TODO: this is gpt-2 specific and should be part of the configuration
         attention_block_tp_plan = {
             # by default ColwiseParallel input layouts is replicated
@@ -167,9 +170,10 @@ class ModelFactory:
             # attention matrices parallelization
             "attn.q_attn": ColwiseParallel(),
             "attn.k_attn": ColwiseParallel(),
-            "attn.v_attn": ColwiseParallel(),
-            "attn.c_proj": RowwiseParallel(),
+            "attn.v_attn": ColwiseParallel(),  # default: input replicated, output sharded on dim -1
+            "attn.c_proj": RowwiseParallel(),  # default: input sharded on dim -1, output replicated
         }
+
         outer_model_tp_plan = {
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
@@ -181,6 +185,8 @@ class ModelFactory:
                 output_layouts=Replicate(),
             ),
         }
+
+        model = parallelize_module(model, device_mesh["tp"], outer_model_tp_plan)
         print(outer_model_tp_plan, attention_block_tp_plan)
 
         return model
