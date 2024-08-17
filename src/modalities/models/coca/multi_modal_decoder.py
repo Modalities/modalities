@@ -171,10 +171,10 @@ class MultiModalTextDecoder(NNModel):
         Forward pass of the MultiModalTextDecoder module.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): Input dictionary containing the input tensors.
+            inputs (dict[str, torch.Tensor]): Input dictionary containing the input tensors.
 
         Returns:
-            Dict[str, torch.Tensor]: Output dictionary containing the output logits tensor:
+            dict[str, torch.Tensor]: Output dictionary containing the output logits tensor:
         """
         x = inputs[self.sample_key]
         for block in self.transformer.h:
