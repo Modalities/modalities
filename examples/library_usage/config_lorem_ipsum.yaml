@@ -312,5 +312,5 @@ evaluation_subscriber:
     project: modalities
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: "."
+    directory: wandb_storage
     
