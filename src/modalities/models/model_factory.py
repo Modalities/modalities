@@ -172,10 +172,32 @@ class ModelFactory:
 
     @staticmethod
     def get_tensor_parallelized_model(
-        model: nn.Module,
+        model: GPT2LLM,
         device_mesh: DeviceMesh,
     ) -> nn.Module:
         # TODO: this is gpt-2 specific and should be part of the configuration
+
+        # parallelize outer model
+        outer_model_tp_plan = {
+            "transformer.wte": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(1),
+            ),
+            "transformer.wpe": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(1),
+            ),
+            "transformer.lm_head_norm": SequenceParallel(),
+            "transformer.lm_head": ColwiseParallel(
+                input_layouts=Shard(1),
+                output_layouts=Replicate(),  # Shard(-1) if loss_parallel else Replicate(),
+                use_local_output=True,  # not loss_parallel,
+            ),
+        }
+
+        model = parallelize_module(model, device_mesh["tp"], outer_model_tp_plan)
+
+        # parallelize layers
         attention_block_tp_plan = {
             # by default ColwiseParallel input layouts is replicated
             # and RowwiseParallel output layouts is replicated
@@ -197,25 +219,12 @@ class ModelFactory:
             "ffn_norm": SequenceParallel(),
         }
 
-        outer_model_tp_plan = {
-            "transformer.wte": RowwiseParallel(
-                input_layouts=Replicate(),
-                output_layouts=Shard(1),
-            ),
-            "transformer.wpe": RowwiseParallel(
-                input_layouts=Replicate(),
-                output_layouts=Shard(1),
-            ),
-            "lm_head_norm": SequenceParallel(),
-            "lm_head": ColwiseParallel(
-                input_layouts=Shard(1),
-                output_layouts=Replicate(),  # Shard(-1) if loss_parallel else Replicate(),
-                use_local_output=True,  # not loss_parallel,
-            ),
-        }
-
-        model = parallelize_module(model, device_mesh["tp"], outer_model_tp_plan)
-        print(outer_model_tp_plan, attention_block_tp_plan)
+        for transformer_block in model.transformer.h:
+            parallelize_module(
+                module=transformer_block,
+                device_mesh=device_mesh["tp"],
+                parallelize_plan=attention_block_tp_plan,
+            )
 
         return model
 
