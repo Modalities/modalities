@@ -6,11 +6,17 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
-from torch.distributed._tensor import Replicate
+from torch.distributed._tensor import Replicate, Shard
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
-from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, parallelize_module
+from torch.distributed.tensor.parallel import (
+    ColwiseParallel,
+    PrepareModuleInput,
+    RowwiseParallel,
+    SequenceParallel,
+    parallelize_module,
+)
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
@@ -175,24 +181,36 @@ class ModelFactory:
             # and RowwiseParallel output layouts is replicated
             # SwiGLU parallelization
             "mlp.W": ColwiseParallel(),
-            "feed_forward.W_2": RowwiseParallel(),
-            "feed_forward.V": ColwiseParallel(),
+            "mlp.W_2": RowwiseParallel(),
+            "mlp.V": ColwiseParallel(),
             # attention matrices parallelization
+            "attention": PrepareModuleInput(
+                input_layouts=(Shard(1), None),
+                desired_input_layouts=(Replicate(), None),
+            ),
             "attn.q_attn": ColwiseParallel(),
             "attn.k_attn": ColwiseParallel(),
             "attn.v_attn": ColwiseParallel(),  # default: input replicated, output sharded on dim -1
-            "attn.c_proj": RowwiseParallel(),  # default: input sharded on dim -1, output replicated
+            "attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),  # input sharded on dim -1, output sharded on dim 1
+            # norms
+            "attention_norm": SequenceParallel(),
+            "ffn_norm": SequenceParallel(),
         }
 
         outer_model_tp_plan = {
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
+                output_layouts=Shard(1),
             ),
             "transformer.wpe": RowwiseParallel(
                 input_layouts=Replicate(),
+                output_layouts=Shard(1),
             ),
+            "lm_head_norm": SequenceParallel(),
             "lm_head": ColwiseParallel(
-                output_layouts=Replicate(),
+                input_layouts=Shard(1),
+                output_layouts=Replicate(),  # Shard(-1) if loss_parallel else Replicate(),
+                use_local_output=True,  # not loss_parallel,
             ),
         }
 
