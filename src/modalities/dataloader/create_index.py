@@ -12,14 +12,19 @@ from tqdm import tqdm
 class IndexGenerator:
     def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
         """
-        Reads in a JSON file as a binary file, iterates character by character und builds up
-        the sample index (char-wise start and end position for each JSON sample) via "\n" character positions.
+        Creates IndexGenerator object.
+        Reads a JSONL file as a binary file, and iterates through it character by character.
+        It builds the sample index by tracking the start and end positions of each JSON sample
+        based on the positions of newline (\n) characters.
 
-        :param src_file: Path to a jsonl-file.
-        :param chunksize: defines the size of byte chunks that are processed via a producer-consumer approach.
-                          The producer reads chunks from the `src_file`, while the consumer creates index entries.
-        :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
-                                    Otherwise, the index generation fails with an exception.
+        Args:
+            src_file (Path): Path to a jsonl-file.
+            chunksize (int): Defines the size of byte chunks that are processed using a producer-consumer approach.
+                     The producer reads chunks from the `src_file`, while the consumer creates index entries.
+            drop_faulty_entries (bool): Allow broken json entries in `src_file` by just skipping them.
+                        Otherwise, the index generation fails with an exception.
+        Returns:
+            None
         """
         self.src_file = src_file
         self.chunksize = chunksize
@@ -35,6 +40,19 @@ class IndexGenerator:
         self._exception_buffer = []
 
     def create_index(self, target_path_for_index_file: Path):
+        """
+        Creates an index file where each sample in the index represents the start and end position of a
+        JSON document within a JSONL file.
+
+        Args:
+            target_path_for_index_file (Path): The path where the index file will be created.
+
+        Raises:
+            Exception: If an exception occurs during the indexing process.
+
+        Returns:
+            None
+        """
         self._exception_buffer = []
         reader = threading.Thread(target=self._reader_thread)
         reader.start()
@@ -48,7 +66,26 @@ class IndexGenerator:
         target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
 
     def _indexer_thread(self):
+        """
+        This method is responsible for indexing the lines in the queue and parsing them as JSON.
+
+        It iterates over the lines in the queue and checks if each line is a valid JSON. If a line is valid,
+        it appends the line's start index and length to the index map. If a line is not valid, it either
+        skips the line or raises a ValueError, depending on the value of `drop_faulty_entries`.
+
+        Returns:
+            None
+        """
+
         def queue_generator():
+            """
+            Generator function that continuously yields lines
+            (i.e. JSON documents) from a queue until None is encountered.
+
+            Yields:
+                str: The next line (i.e. JSON document) from the queue.
+
+            """
             while True:
                 line = self._queue_of_raw_lines.get()
                 if line is None:
@@ -56,6 +93,22 @@ class IndexGenerator:
                 yield line
 
         def parse_line_as_json(line_start_idx: int, line: str):
+            """
+            Parses a line as JSON and appends the sample index, i.e., the line start index and length to the index map.
+
+            Args:
+                line_start_idx (int): The start index of the line.
+                line (str): The line to be parsed as JSON.
+
+            Raises:
+                ValueError: If the line is faulty and `drop_faulty_entries` is set to False.
+
+            Warnings:
+                If the line is faulty and `drop_faulty_entries` is set to True, a warning is issued.
+
+            Returns:
+                None
+            """
             try:  # check if line is a valid json
                 json.loads(line)
                 self._index_map.append((line_start_idx, len(line)))
@@ -74,6 +127,16 @@ class IndexGenerator:
             parse_line_as_json(line_start_idx, line)
 
     def _reader_thread(self):
+        """
+        Reads lines from the source file and puts them into a queue.
+
+        This method is executed in a separate thread. It reads lines from the source file until
+        the end of the file is reached. Each line is put into a queue along with its cursor position. If any
+        errors are detected, the method returns immediately.
+
+        Returns:
+            None
+        """
         with open(self.src_file, "r") as fin:
             while True:
                 cursor = fin.tell()
@@ -88,4 +151,10 @@ class IndexGenerator:
         self._queue_of_raw_lines.put(None)
 
     def _check_for_parallel_errors(self) -> bool:
+        """
+        Checks if there are any errors in the exception buffer.
+
+        Returns:
+            bool: True if there are errors, False otherwise.
+        """
         return bool(self._exception_buffer)
