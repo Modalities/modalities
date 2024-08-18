@@ -482,14 +482,14 @@ class GPT2LLM(NNModel):
                     ]
                 ),
                 lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
+                lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
-        self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        # self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+        # self.transformer.wte.weight = self.transformer.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
@@ -514,7 +514,7 @@ class GPT2LLM(NNModel):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.lm_head_norm(x)
-        logits = self.lm_head(x)
+        logits = self.transformer.lm_head(x)
         return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
