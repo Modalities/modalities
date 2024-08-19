@@ -802,16 +802,6 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         super().__init__()
         self.builders = builders
 
-        self.output_keys_by_modality = {}
-        for b in builders:
-            for k, v in b.modality_key_mapping.items():
-                if k not in self.output_keys_by_modality:
-                    self.output_keys_by_modality[k] = v[1]
-                else:
-                    assert (
-                        self.output_keys_by_modality[k] == v[1]
-                    ), "Output keys for the same modality of all builders should be the same."
-
         # Build datasets
         [
             b.prepare(shardshuffle=shardshuffle, resample=resample, repeat=repeat, shuffle_buffer=shuffle_buffer)
