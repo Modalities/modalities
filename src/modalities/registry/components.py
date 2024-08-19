@@ -53,7 +53,7 @@ from modalities.config.config import (
     WeightInitializedModelConfig,
     LoraConfig,
 )
-from modalities.dataloader.collate_fns.collator_wrapper import (
+from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
     LossMaskingCollateFnWrapper,
     LossMaskingCollateFnWrapperConfig,
 )

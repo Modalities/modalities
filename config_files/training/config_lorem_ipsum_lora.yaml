@@ -46,7 +46,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/lorem_ipsum_sft_converted.44a6969.pbin
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_9cc8d41/ultrachat_200k_fastchat_converted.9cc8d41.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -97,7 +97,7 @@ val_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 4
+        batch_size: 2
         drop_last: true
         sampler:
           component_key: sampler

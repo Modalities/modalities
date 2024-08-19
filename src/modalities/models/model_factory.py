@@ -42,11 +42,11 @@ class ModelFactory:
         )
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
-        fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(
-            model=model, block_names=block_names
-        )
+        fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
 
         # model is on CPU before input to FSDP
+        model = model.to("cpu")
+
         fsdp_model = FSDP(
             model,
             auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
@@ -79,8 +79,6 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_weight_initalized_model(
-        model: nn.Module, model_initializer: ModelInitializationIF
-    ) -> nn.Module:
+    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
         model_initializer.initialize_in_place(model)
         return model
