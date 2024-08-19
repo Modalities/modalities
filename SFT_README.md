@@ -188,9 +188,11 @@ tokenizer:
   variant_key: pretrained_hf_tokenizer
   config:
     pretrained_model_name_or_path: data/tokenizer/hf_gpt2
-    padding: false
-    truncation: false
+    padding: max_length
+    truncation: true
+    max_length: ${settings.sequence_length}
     special_tokens:
+      pad_token: ${settings.eod_token}
       additional_special_tokens: 
         - "^"
         - "$"
