@@ -80,14 +80,18 @@ class CoCaConfig(BaseModel):
     text_cls_prediction_key: str
     logit_scale_prediction_key: str
     audio_embd_prediction_key: Optional[str] = None
-    vision_embd_prediction_key: Optional[str] = None
+    image_embd_prediction_key: Optional[str] = None
+    video_embd_prediction_key: Optional[str] = None
     audio_cls_prediction_key: Optional[str] = None
     audio_text_cls_prediction_key: Optional[str] = None
-    vision_cls_prediction_key: Optional[str] = None
+    image_cls_prediction_key: Optional[str] = None
     image_text_cls_prediction_key: Optional[str] = None
+    video_cls_prediction_key: Optional[str] = None
+    video_text_cls_prediction_key: Optional[str] = None
     individual_datasets: Optional[bool] = None
     audio_encoder_config: Optional[AudioTransformerConfig] = None
-    vision_encoder_config: Optional[VisionTransformerConfig] = None
+    image_encoder_config: Optional[VisionTransformerConfig] = None
+    video_encoder_config: Optional[VisionTransformerConfig] = None
     text_decoder_config: TextDecoderConfig
     n_pool_head: Annotated[int, Field(ge=1)]
     n_queries: Optional[Annotated[int, Field(ge=1)]]
@@ -113,14 +117,18 @@ class CoCa(NNModel):
         text_cls_prediction_key: str,
         logit_scale_prediction_key: str,
         audio_embd_prediction_key: Optional[str],
-        vision_embd_prediction_key: Optional[str],
+        image_embd_prediction_key: Optional[str],
+        video_embd_prediction_key: Optional[str],
         audio_cls_prediction_key: Optional[str],
         audio_text_cls_prediction_key: Optional[str],
-        vision_cls_prediction_key: Optional[str],
+        image_cls_prediction_key: Optional[str],
         image_text_cls_prediction_key: Optional[str],
+        video_cls_prediction_key: Optional[str],
+        video_text_cls_prediction_key: Optional[str],
         individual_datasets: Optional[bool],
         audio_encoder_config: Optional[AudioTransformerConfig],
-        vision_encoder_config: Optional[VisionTransformerConfig],
+        image_encoder_config: Optional[VisionTransformerConfig],
+        video_encoder_config: Optional[VisionTransformerConfig],
         text_decoder_config: TextDecoderConfig,
         n_pool_head: int,
         n_queries: Optional[int],
@@ -157,11 +165,14 @@ class CoCa(NNModel):
         self.text_cls_prediction_key = text_cls_prediction_key
 
         self.audio_embd_prediction_key = audio_embd_prediction_key
-        self.vision_embd_prediction_key = vision_embd_prediction_key
+        self.image_embd_prediction_key = image_embd_prediction_key
+        self.video_embd_prediction_key = video_embd_prediction_key
         self.audio_cls_prediction_key = audio_cls_prediction_key
         self.audio_text_cls_prediction_key = audio_text_cls_prediction_key
-        self.vision_cls_prediction_key = vision_cls_prediction_key
+        self.image_cls_prediction_key = image_cls_prediction_key
         self.image_text_cls_prediction_key = image_text_cls_prediction_key
+        self.video_cls_prediction_key = video_cls_prediction_key
+        self.video_text_cls_prediction_key = video_text_cls_prediction_key
         self.individual_datasets = individual_datasets
 
         self.n_pool_head = n_pool_head
@@ -171,12 +182,22 @@ class CoCa(NNModel):
 
         num_input_modalities = 0
 
-        self.vision_sample_key = None
-        if vision_encoder_config is not None:
-            self.vision_sample_key = vision_encoder_config.sample_key
-            self.vision_encoder, self.vision_queries, self.vision_attn_pool = self._init_modality(
+        self.image_sample_key = None
+        if image_encoder_config is not None:
+            self.image_sample_key = image_encoder_config.sample_key
+            self.image_encoder, self.image_queries, self.image_attn_pool = self._init_modality(
                 VisionTransformer,
-                vision_encoder_config,
+                image_encoder_config,
+                n_queries,
+            )
+            num_input_modalities += 1
+
+        self.video_sample_key = None
+        if video_encoder_config is not None:
+            self.video_sample_key = video_encoder_config.sample_key
+            self.video_encoder, self.video_queries, self.video_attn_pool = self._init_modality(
+                VisionTransformer,
+                video_encoder_config,
                 n_queries,
             )
             num_input_modalities += 1
@@ -264,59 +285,70 @@ class CoCa(NNModel):
         """
         output = {}
 
-        modality_embd = None
-        if self.audio_sample_key and self.vision_sample_key is None:
+        # encode modalities
+        image_embd = audio_embd = video_embd = None
+        if self.image_sample_key:
+            image_embd, image_cls_token = self._forward_encode_image(inputs)
+            output[self.image_cls_prediction_key] = image_cls_token
+
+        if self.audio_sample_key:
             audio_embd, audio_cls_token = self._forward_encode_audio(inputs)
             output[self.audio_cls_prediction_key] = audio_cls_token
-            modality_embd = audio_embd
 
-        elif self.vision_sample_key and self.audio_sample_key is None:
-            vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
-            output[self.vision_cls_prediction_key] = vision_cls_token
-            modality_embd = vision_embd
+        if self.video_sample_key:
+            video_embd, video_cls_token = self._forward_encode_video(inputs)
+            output[self.video_cls_prediction_key] = video_cls_token
 
-        else:
-            if self.individual_datasets:  # audio / vision / text BUT separate datasets
-                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_image(inputs)
-                output[self.audio_cls_prediction_key] = audio_cls_token
-                output[self.vision_cls_prediction_key] = vision_cls_token
-                modality_embd = {"audio": audio_embd, "image": vision_embd}
-            else:  # audio + vision from one single dataset
-                audio_embd, audio_cls_token, vision_embd, vision_cls_token = self._forward_encode_audio_vision(inputs)
-                output[self.audio_cls_prediction_key] = audio_cls_token
-                output[self.vision_cls_prediction_key] = vision_cls_token
-                modality_embd = {"audio": audio_embd, "video": vision_embd}
-
+        # encode text
         text_embd, text_cls_token = self._forward_encode_text(inputs)
-        if self.vision_sample_key and self.audio_sample_key and self.individual_datasets:
-            image_text_cls_token, audio_text_cls_token = (
-                text_cls_token[: len(vision_embd)],
-                text_cls_token[len(vision_embd) :],
-            )
-            output.update(
-                {
-                    self.image_text_cls_prediction_key: image_text_cls_token,
-                    self.audio_text_cls_prediction_key: audio_text_cls_token,
-                }
-            )
 
-            image_text_embd, audio_text_embd = text_embd[: len(vision_embd)], text_embd[len(vision_embd) :]
-            image_logits = self._forward_decode(image_text_embd, modality_embd["image"])
-            audio_logits = self._forward_decode(audio_text_embd, modality_embd["audio"])
-            logits = torch.cat([image_logits, audio_logits])
-        else:
+        # decode modality + text
+        if self.individual_datasets:  # multiple modalities (from different datasets)
+            start = 0
+            modality_logits = []
+            if image_embd is not None:
+                image_text_cls_token = text_cls_token[: len(image_embd)]
+                output.update({self.image_text_cls_prediction_key: image_text_cls_token})
+                image_text_embd = text_embd[: len(image_embd)]
+                image_logits = self._forward_decode(image_text_embd, image_embd)
+                modality_logits.append(image_logits)
+                start = start + len(image_embd)
+            if audio_embd is not None:
+                audio_text_cls_token = text_cls_token[start : start + len(audio_embd)]
+                output.update({self.audio_text_cls_prediction_key: audio_text_cls_token})
+                audio_text_embd = text_embd[start : start + len(audio_embd)]
+                audio_logits = self._forward_decode(audio_text_embd, audio_embd)
+                modality_logits.append(audio_logits)
+                start = start + len(audio_embd)
+            if video_embd is not None:
+                video_text_cls_token = text_cls_token[start:]
+                output.update({self.video_text_cls_prediction_key: video_text_cls_token})
+                video_text_embd = text_embd[start:]
+                video_logits = self._forward_decode(video_text_embd, video_embd)
+                modality_logits.append(video_logits)
+            logits = torch.cat(modality_logits)
+        elif audio_embd is not None and video_embd is not None:  # video dataset that contains audio
+            modality_embd = {"audio": audio_embd, "video": video_embd}
             logits = self._forward_decode(text_embd, modality_embd)
+            output.update({self.text_cls_prediction_key: text_cls_token})
+        else:  # single modality
+            output.update({self.text_cls_prediction_key: text_cls_token})
+            if image_embd is not None:
+                logits = self._forward_decode(text_embd, image_embd)
+            elif audio_embd is not None:
+                logits = self._forward_decode(text_embd, audio_embd)
+            elif video_embd is not None:
+                logits = self._forward_decode(text_embd, video_embd)
 
         output.update(
             {
                 self.prediction_key: logits,
-                self.text_cls_prediction_key: text_cls_token,
                 self.logit_scale_prediction_key: self.logit_scale.exp(),
             }
         )
         return output
 
-    def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_image(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input image using the vision encoder.
 
@@ -326,11 +358,18 @@ class CoCa(NNModel):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
         """
-        vision_embd = self.vision_encoder(inputs)[self.modality_embd_prediction_key]
-        queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
-        vision_embd = self.vision_attn_pool(queries, context=vision_embd)
-        vision_embd, vision_cls_token = vision_embd[:, :-1, :], F.normalize(vision_embd[:, -1, :], dim=-1)
-        return vision_embd, vision_cls_token
+        image_embd = self.image_encoder(inputs)[self.image_embd_prediction_key]
+        queries = repeat(self.image_queries, "n d -> b n d", b=image_embd.shape[0])
+        image_embd = self.image_attn_pool(queries, context=image_embd)
+        image_embd, image_cls_token = image_embd[:, :-1, :], F.normalize(image_embd[:, -1, :], dim=-1)
+        return image_embd, image_cls_token
+
+    def _forward_encode_video(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        video_embd = self.video_encoder(inputs)[self.video_embd_prediction_key]
+        queries = repeat(self.video_queries, "n d -> b n d", b=video_embd.shape[0])
+        video_embd = self.video_attn_pool(queries, context=video_embd)
+        video_embd, video_cls_token = video_embd[:, :-1, :], F.normalize(video_embd[:, -1, :], dim=-1)
+        return video_embd, video_cls_token
 
     def _forward_encode_audio(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         audio_embd = self.audio_encoder(inputs)[self.audio_embd_prediction_key]
@@ -338,27 +377,6 @@ class CoCa(NNModel):
         audio_embd = self.audio_attn_pool(queries, context=audio_embd)
         audio_embd, audio_cls_token = audio_embd[:, :-1, :], F.normalize(audio_embd[:, -1, :], dim=-1)
         return audio_embd, audio_cls_token
-
-    ## MODIFIED
-    def _forward_encode_audio_image(
-        self, inputs: Dict[str, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        audio_inputs = {k: inputs[k] for k in inputs if k in ["audio", "audio_len"]}
-        vision_inputs = {k: inputs[k] for k in inputs if k in ["images"]}
-        audio_embd, audio_cls_token = self._forward_encode_audio(audio_inputs)
-        vision_embd, vision_cls_token = self._forward_encode_vision(vision_inputs)
-
-        return audio_embd, audio_cls_token, vision_embd, vision_cls_token
-
-    def _forward_encode_audio_vision(
-        self, inputs: Dict[str, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        audio_inputs = {k: inputs[k] for k in inputs if k in ["audio", "audio_len"]}
-        vision_inputs = {k: inputs[k] for k in inputs if k in ["video"]}
-        audio_embd, audio_cls_token = self._forward_encode_audio(audio_inputs)
-        vision_embd, vision_cls_token = self._forward_encode_vision(vision_inputs)
-
-        return audio_embd, audio_cls_token, vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -375,7 +393,6 @@ class CoCa(NNModel):
         text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
 
-    ## MODIFIED
     def _forward_decode(
         self, text_embd: torch.Tensor, modality_embd: list[torch.Tensor] | torch.Tensor
     ) -> torch.Tensor:
