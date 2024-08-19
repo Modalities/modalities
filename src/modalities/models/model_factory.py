@@ -124,6 +124,16 @@ class ModelFactory:
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+        def reset_parameters_if_function_exists(module: nn.Module):
+            # Recursively apply to all submodules
+            for submodule in module.children():
+                reset_parameters_if_function_exists(submodule)
+
+            # Check if the module has the `reset_parameters` method
+            if hasattr(module, "reset_parameters") and callable(getattr(module, "reset_parameters")):
+                # Call the `reset_parameters` method
+                module.reset_parameters()
+
         # initialize the weights if they are on a meta device
         def is_model_on_meta_device(model: nn.Module) -> bool:
             meta_counter = 0
@@ -141,6 +151,8 @@ class ModelFactory:
             # Allocate buffers and sharded parameters on GPU
             model = model.to_empty(device="cuda")
 
+        # call reset_parameters on all nn.Modules that implement this function
+        reset_parameters_if_function_exists(module=model)
         model_initializer.initialize_in_place(model)
         return model
 
