@@ -9,7 +9,7 @@ settings:
     checkpointing_interval_in_steps: 4
     evaluation_interval_in_steps: 2
     global_num_seen_tokens: 0
-    activation_checkpointing_modules: [ GPT2Block ]
+    activation_checkpointing_modules: [ LlamaDecoderLayer ]
     gradient_acc_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 2048
@@ -39,6 +39,8 @@ collate_fn:
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
+
+
 
 train_dataset:
   component_key: dataset
@@ -179,6 +181,7 @@ loss_fn:
     target_key: target_ids
     prediction_key: logits
 
+
 huggingface_smol_llm_model:
   component_key: model
   variant_key: huggingface_pretrained_model
@@ -189,6 +192,21 @@ huggingface_smol_llm_model:
     huggingface_prediction_subscription_key: logits
     sample_key: input_ids
 
+checkpointed_model:
+  component_key: model
+  variant_key: checkpointed
+  config:
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: 0
+        precision: FP_32
+    model:
+      instance_key: huggingface_smol_llm_model
+      pass_type: BY_REFERENCE
+    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B_saved/model.bin
+
 lora_model:
   component_key: model
   variant_key: lora
@@ -196,11 +214,35 @@ lora_model:
     alpha: 1
     r: 8
     target_layer_class_names:
-      - Embedding
-      - Linear
+      - LlamaSdpaAttention
     model:
-      instance_key: huggingface_smol_llm_model
+      instance_key: checkpointed_model
       pass_type: BY_REFERENCE
+
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: lora_model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: FP_32
+    sharding_strategy: FULL_SHARD
+    block_names: [ LlamaDecoderLayer ]
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name} #HuggingFaceTB/SmolLM-1.7B
+    padding: false
+    truncation: false
+    special_tokens:
+      additional_special_tokens:
+        - "^"
+        - "$"
+        - "°"
 
 scheduler:
   component_key: scheduler
@@ -224,7 +266,7 @@ optimizer:
     betas: [ 0.9, 0.95 ]
     eps: 1e-8
     weight_decay: 1e-1
-    weight_decay_groups_excluded: [ embedding, layernorm ]
+    weight_decay_groups_excluded: [ ]
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -270,19 +312,3 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
-
-checkpointed_model:
-  component_key: model
-  variant_key: checkpointed
-  config:
-    checkpoint_loading:
-      component_key: checkpoint_loading
-      variant_key: torch
-      config:
-        device: 0
-        precision: BF16
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B
-

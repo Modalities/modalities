@@ -142,6 +142,7 @@ test_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
+
 eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE

@@ -51,9 +51,9 @@ class WandbMode(LookupEnum):
 
 
 class PrecisionEnum(LookupEnum):
-    FP32 = torch.float32
-    FP16 = torch.float16
-    BF16 = torch.bfloat16
+    FP_32 = torch.float32
+    FP_16 = torch.float16
+    BF_16 = torch.bfloat16
 
 
 class ReferenceConfig(BaseModel):
@@ -151,24 +151,19 @@ class StepLRSchedulerConfig(BaseModel):
 
 class OneCycleLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
-    max_lr: (
-        Annotated[float, Field(strict=True, gt=0.0)]
-        | List[Annotated[float, Field(strict=True, gt=0.0)]]
-    )
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
     total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
     cycle_momentum: bool = True
-    base_momentum: (
-        Annotated[float, Field(strict=True, gt=0)]
-        | List[Annotated[float, Field(strict=True, gt=0.0)]]
-    ) = 0.85
-    max_momentum: (
-        Annotated[float, Field(strict=True, gt=0.0)]
-        | List[Annotated[float, Field(strict=True, gt=0.0)]]
-    ) = 0.95
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.85
+    )
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.95
+    )
     div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     three_phase: bool = False
@@ -177,12 +172,8 @@ class OneCycleLRSchedulerConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
-        if self.total_steps is None and (
-            self.epochs is None or self.steps_per_epoch is None
-        ):
-            raise ValueError(
-                "Please define total_steps or (epochs and steps_per_epoch)."
-            )
+        if self.total_steps is None and (self.epochs is None or self.steps_per_epoch is None):
+            raise ValueError("Please define total_steps or (epochs and steps_per_epoch).")
         return self
 
 
@@ -350,9 +341,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(
-        default_factory=list
-    )
+    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     global_num_seen_steps: int
     global_rank: int
     gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
@@ -379,15 +368,9 @@ class RichResultSubscriberConfig(BaseModel):
 def load_app_config_dict(config_file_path: Path) -> Dict:
     def cuda_env_resolver_fun(var_name: str) -> int:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
-        return (
-            int(os.getenv(var_name))
-            if var_name in int_env_variable_names
-            else os.getenv(var_name)
-        )
+        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(
-        var_name: str, config_file_path: Path
-    ) -> str | Path:
+    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
         if var_name == "experiment_id":
             return get_experiment_id_of_run(config_file_path=config_file_path)
         elif var_name == "config_file_path":

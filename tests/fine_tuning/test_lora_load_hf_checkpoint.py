@@ -31,17 +31,13 @@ def config_dict(config_file_path: Path) -> dict:
 
 @pytest.fixture()
 def hf_model(set_env, config_dict: dict) -> NNModel:
-    return get_model_from_config(
-        config=config_dict, model_type=ModelTypeEnum.HUGGINGFACE_SMOL_LLM_MODEL
-    )
+    return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.HUGGINGFACE_SMOL_LLM_MODEL)
 
 
 @pytest.fixture()
 def lora_model(set_env, config_dict: dict) -> NNModel:
-    return get_model_from_config(
-        config=config_dict, model_type=ModelTypeEnum.LORA_MODEL
-    )
+    return get_model_from_config(config=config_dict, model_type=ModelTypeEnum.LORA_MODEL)
 
 
-def test_loading_of_hf_model_from_config(hf_model, lora_model):
-    ...
+def test_loading_of_hf_model_from_config(lora_model):
+    breakpoint()

@@ -40,6 +40,7 @@ def convert_to_lora(
 ):
     recursive_layer_conversion(model, r, alpha, target_layer_class_names)
     mark_only_lora_as_trainable(model=model)
+    logging.info(f"All layers of type {target_layer_class_names} were converted.")
     return model
 
 
@@ -52,10 +53,7 @@ def recursive_layer_conversion(
     for name, child in module.named_children():
         # If it's a leaf module (i.e., has no children), replace it with Linear
         if len(list(child.children())) == 0:
-            if (
-                type(child).__name__ in target_layer_class_names
-                or type(module).__name__ in target_layer_class_names
-            ):
+            if type(child).__name__ in target_layer_class_names or type(module).__name__ in target_layer_class_names:
                 converted_child = convert_layer(child, r=r, alpha=alpha)
                 setattr(module, name, converted_child)
         else:
@@ -68,11 +66,7 @@ def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
         result = convert_embedding(layer, r, alpha)
     elif isinstance(layer, nn.Linear):
         result = convert_linear(layer, r, alpha)
-    elif (
-        isinstance(layer, nn.Conv1d)
-        or isinstance(layer, nn.Conv2d)
-        or isinstance(layer, nn.Conv3d)
-    ):
+    elif isinstance(layer, nn.Conv1d) or isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Conv3d):
         result = convert_convXd(layer, r, alpha)
     else:
         logging.info(f"{layer} was not converted.")
@@ -80,9 +74,7 @@ def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:
     return transfer_default_attributes(layer, result)
 
 
-def convert_embedding(
-    embedding_layer: nn.Embedding, r: int, alpha: int
-) -> LoRAEmbedding:
+def convert_embedding(embedding_layer: nn.Embedding, r: int, alpha: int) -> LoRAEmbedding:
     lora_embedding = LoRAEmbedding(
         num_embeddings=embedding_layer.num_embeddings,
         embedding_dim=embedding_layer.embedding_dim,
@@ -127,9 +119,7 @@ def convert_convXd(
     return lora_convXd
 
 
-def transfer_default_attributes(
-    reference_layer: nn.Module, result_layer: nn.Module
-) -> nn.Module:
+def transfer_default_attributes(reference_layer: nn.Module, result_layer: nn.Module) -> nn.Module:
     result_layer.training = reference_layer.training
     result_layer.dump_patches = reference_layer.dump_patches
     result_layer.call_super_init = reference_layer.call_super_init

@@ -21,7 +21,7 @@ checkpointed_model:
     model:
       instance_key: huggingface_smol_llm_model
       pass_type: BY_REFERENCE
-    checkpoint_path: ...
+    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B_saved/model.bin
 
 lora_model:
   component_key: model
@@ -30,8 +30,7 @@ lora_model:
     alpha: 1
     r: 8
     target_layer_class_names:
-      - Embedding
-      - Linear
+      - LlamaSdpaAttention
     model:
-      instance_key: huggingface_smol_llm_model
+      instance_key: checkpointed_model
       pass_type: BY_REFERENCE
