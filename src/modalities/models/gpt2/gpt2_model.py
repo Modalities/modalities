@@ -337,7 +337,7 @@ class CausalSelfAttention(nn.Module):
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
-        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
+        y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
@@ -400,8 +400,13 @@ class GPT2Block(nn.Module):
             raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.attention_norm(x))
-        x = x + self.mlp(self.ffn_norm(x))
+        x_attn_normed = self.attention_norm(x)
+        x = x + self.attn(x_attn_normed)
+
+        x_ffn_normed = self.ffn_norm(x)
+        x_mlp = self.mlp(x_ffn_normed)
+
+        x = x + x_mlp
         return x
 
 
@@ -498,8 +503,6 @@ class GPT2LLM(NNModel):
         assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
         f"input sequence length is only {self.sequence_length}"
 
-        # Shard this tensor over the mesh by sharding `big_tensor`'s 0th dimension over the 0th dimension of `mesh`.
-        # input_ids_dtensor = distribute_tensor(input_ids, GLOBAL_MESH, [Shard(dim=0)])
         # forward the GPT model itself
         tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
 
