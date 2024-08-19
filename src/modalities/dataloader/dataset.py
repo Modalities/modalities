@@ -727,7 +727,7 @@ class MultimodalWebDatasetBuilder:
         transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
         sample[target_key] = transform(sample[source_key])
         # if the video contains audio
-        if sample[source_key][1] is not None and ModalityEnum.AUDIO in self.modality_transforms:
+        if sample[source_key][1] is not None and ModalityEnum.AUDIO in self.modality_transforms and self.is_audio_video:
             transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
             sample["audio"], sample["audio_len"] = transform((sample[source_key][1], sample[source_key][2]))
             if "audio" not in self.additional_extreacted_keys:
