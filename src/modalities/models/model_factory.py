@@ -181,13 +181,15 @@ class ModelFactory:
         outer_model_tp_plan = {
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
-                output_layouts=Shard(1),
+                output_layouts=Shard(
+                    1
+                ),  # we shard on the sequence dimension, output shape: [batch_size, sequence_length, n_embd]
             ),
             "transformer.wpe": RowwiseParallel(
                 input_layouts=Replicate(),
-                output_layouts=Shard(1),
+                output_layouts=Shard(0),  # we shard on the sequence dimension, output shape: [sequence_length, n_embd]
             ),
-            "transformer.lm_head_norm": SequenceParallel(),
+            "transformer.lm_head_norm": SequenceParallel(sequence_dim=1),
             "transformer.lm_head": ColwiseParallel(
                 input_layouts=Shard(1),
                 output_layouts=Replicate(),  # Shard(-1) if loss_parallel else Replicate(),
@@ -201,22 +203,24 @@ class ModelFactory:
         attention_block_tp_plan = {
             # by default ColwiseParallel input layouts is replicated
             # and RowwiseParallel output layouts is replicated
-            # SwiGLU parallelization
-            "mlp.W": ColwiseParallel(),
-            "mlp.W_2": RowwiseParallel(),
-            "mlp.V": ColwiseParallel(),
             # attention matrices parallelization
-            "attention": PrepareModuleInput(
-                input_layouts=(Shard(1), None),
-                desired_input_layouts=(Replicate(), None),
+            # the input is prepared such that the input tensor, initially sharded on dim 1 (seq dim),
+            # is replicated (i.e., synced) on all tensor parallel ranks within the DP group
+            "attn": PrepareModuleInput(
+                input_layouts=Shard(1),
+                desired_input_layouts=Replicate(),
             ),
             "attn.q_attn": ColwiseParallel(),
             "attn.k_attn": ColwiseParallel(),
             "attn.v_attn": ColwiseParallel(),  # default: input replicated, output sharded on dim -1
             "attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),  # input sharded on dim -1, output sharded on dim 1
+            # SwiGLU parallelization
+            "mlp.W": ColwiseParallel(),
+            "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
+            "mlp.V": ColwiseParallel(),
             # norms
-            "attention_norm": SequenceParallel(),
-            "ffn_norm": SequenceParallel(),
+            "attention_norm": SequenceParallel(sequence_dim=1),
+            "ffn_norm": SequenceParallel(sequence_dim=1),
         }
 
         for transformer_block in model.transformer.h:
