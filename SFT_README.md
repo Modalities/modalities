@@ -201,10 +201,11 @@ Finally, run the instruction-tuning with the `run` entry point:
 torch.distributed.run --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29555 src/modalities/__main__.py run --config_file_path config_files/training/config_lorem_ipsum_sft.yaml
 ```
 
-> Note, that it is advised to add a special token (which is already known as non-special token to the tokenizers' voabulary) to indicate the end of an assistant turn within the `b_include_to_loss_token` and `e_include_to_loss_token` in your chat template. Change your chat template accordingly and make sure to inlcude this token as special token in the tokenizer configuration for the pbin file creation step and model training!
+> Note, that it is advised to add a special token (which is already known as non-special token to the tokenizer's voabulary) to indicate the end of an assistant turn within the `b_include_to_loss_token` and `e_include_to_loss_token` in your chat template. Change your chat template accordingly and make sure to inlcude this token as special token in the tokenizer configuration for the pbin file creation step and model training! 
 
-#### A Note on Tokanization in Huggingface
-The special tokens are added to a [Trie](https://en.wikipedia.org/wiki/Trie), so that longer special tokens are split first and then shorter special tokens.
+#### A Note on Tokenization in Huggingface
+The special tokens are added to a [Trie](https://en.wikipedia.org/wiki/Trie).
+With that data structure, longer special tokens are matched with a higher priority than shorter ones. Regular tokens are tokenized after handling the special tokens first.
 Example from the huggingface documentation:
 
 ```python

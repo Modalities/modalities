@@ -58,6 +58,20 @@ class DatasetFactory:
     def get_packed_mem_map_dataset_continuous(
         raw_data_path: Path, sequence_length: int, sample_key: str, reuse_last_target: Optional[bool] = True
     ) -> PackedMemMapDatasetContinuous:
+        """
+        Initializes a Dataset object. In case `reuse_last_target` is True,
+        we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
+        we don't reuse the last target in the next sample but never have the the first token of a sample as the target.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sequence_length (int): The length of each sequence.
+            sample_key (str): The key to access the sample data.
+            reuse_last_target (Optional[bool], optional): Whether to reuse the last target. Defaults to True.
+
+        Returns:
+            PackedMemMapDatasetContinuous: The created dataset object.
+        """
         dataset = PackedMemMapDatasetContinuous(
             raw_data_path=raw_data_path,
             block_size=sequence_length + 1,

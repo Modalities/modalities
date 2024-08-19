@@ -181,6 +181,17 @@ class PackedMemMapDatasetBase(Dataset):
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, reuse_last_target: bool = True):
+        """
+        Initializes a Dataset object. In case `reuse_last_target` is True,
+        we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
+        we don't reuse the last target in the next sample but never have the the first token of a sample as the target.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sample_key (str): The key to access the sample data.
+            block_size (int): The size of each data block (equals to context size + 1).
+            reuse_last_target (bool, optional): Whether to reuse the last target. Defaults to True.
+        """
         self.block_size = block_size
         self.reuse_last_target = reuse_last_target
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
@@ -196,11 +207,8 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         if self.block_size < 2:
             raise ValueError("Block size must be at least 2.")
 
-        # TODO ask Richard if this is actually needed.
-        # The collator discards the first target token and the last sample token
         if self.reuse_last_target:
-            # In this case we reuse the last target token as the first input token
-            # of the subsequent sample.
+            # In this case we reuse the last target token as the first input token of the subsequent sample.
             # Therfore, given a fixed number of samples we can compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
             # as the first sample always needs block_size many tokens and the following samples

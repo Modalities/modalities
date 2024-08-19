@@ -46,7 +46,8 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             wrapped_collate_fn (CollateFnIF): The wrapped collate function.
             target_keys_to_mask (List[str]): The list of target keys to mask.
             loss_ignore_index (int): The index to ignore in the loss calculation.
-            mask_tokens (MaskingTokenConfig): The configuration for masking tokens.
+            mask_tokens (MaskingTokenConfig): Entails begin and end tokens, which mark (exclusive) inclusion to the
+            loss.
             tokenizer (TokenizerWrapper): The tokenizer wrapper.
 
         Raises:
@@ -60,10 +61,22 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         self.e_mask_token_id = self.tokenizer.get_token_id(mask_tokens.e_include_to_loss_token)
         if self.b_mask_token_id == self.e_mask_token_id:
             raise ValueError(
-                "b_mask_token_id and e_mask_token_id of the " + "LossMaskingCollateFnWrapper must be different!"
+                "b_mask_token_id and e_mask_token_id of the LossMaskingCollateFnWrapper must be different!"
             )
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+        """
+        Collates a batch of data by calling the wrapped collate function and applies target masking.
+
+        Args:
+            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries, where each dictionary represents a sample
+            in the batch. Each dictionary contains keys corresponding to different data modalities and their
+            respective tensors.
+
+        Returns:
+            DatasetBatch: A batch of collated data with masked targets.
+
+        """
         dataset_batch = self.wrapped_collate_fn(batch)
         for target_key_to_mask in self.target_keys_to_mask:
             target = dataset_batch.targets[target_key_to_mask]
@@ -96,6 +109,20 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         cumsum would include the begin mask token. Example without shift:
             mask_no_shift_2    [0,1,0,0,-1,0,0,0]
             cumsum_no_shift    [0,1,1,1, 0,0,0,0]
+
+        Args:
+            target (torch.Tensor): The target tensor to be masked.
+            b_mask_token_id (int): The token ID indicating the beginning of the mask.
+            e_mask_token_id (int): The token ID indicating the end of the mask.
+            loss_ignore_index (int): The index to replace masked tokens with.
+
+        Returns:
+            torch.Tensor: The masked target tensor.
+
+        Raises:
+            ValueError: If the b_mask_token_id or e_mask_token_id is not found in the target tensor.
+            ValueError: If the end mask token indicator is before the begin mask token indicator in the target tensor.
+            ValueError: If the masking tokens are not alternating in the target tensor.
         """
         error_msg = ""
         if b_mask_token_id not in target:
