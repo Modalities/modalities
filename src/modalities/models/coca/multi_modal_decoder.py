@@ -3,7 +3,6 @@ from typing import Dict
 
 import torch
 from torch import nn
-from transformers import PreTrainedTokenizer
 
 from modalities.models.gpt2.gpt2_model import ActivationType
 from modalities.models.model import NNModel, SwiGLU
@@ -24,7 +23,7 @@ class TransformerBlock(nn.Module):
         dropout: float,
         ffn_hidden: int,
         with_context: bool,
-        is_two_input_modalities: bool,
+        is_audio_video: bool,
         attention_type: AttentionType,
         attention_config: AttentionConfig = None,
         add_extra_mlp: bool = False,
@@ -48,7 +47,7 @@ class TransformerBlock(nn.Module):
         """
         super().__init__()
         self.with_context = with_context
-        self.is_two_input_modalities = is_two_input_modalities
+        self.is_audio_video = is_audio_video
         self.add_extra_mlp = add_extra_mlp
 
         if activation == ActivationType.GELU:
@@ -79,7 +78,7 @@ class TransformerBlock(nn.Module):
             self.ln_4 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.mlp_2 = mlp()
 
-            if self.is_two_input_modalities:
+            if self.is_audio_video:
                 self.cross_attn2 = MultiHeadAttention(
                     n_embd=n_embd,
                     n_head=n_head,
@@ -126,7 +125,7 @@ class MultiModalTextDecoder(NNModel):
         n_head: int,
         n_embd: int,
         ffn_hidden: int,
-        is_two_input_modalities: bool,
+        is_audio_video: bool,
         dropout: float,
         bias: bool,
         activation: ActivationType,
@@ -172,7 +171,7 @@ class MultiModalTextDecoder(NNModel):
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
                             with_context=True,
-                            is_two_input_modalities=is_two_input_modalities,
+                            is_audio_video=is_audio_video,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
                             add_extra_mlp=False,

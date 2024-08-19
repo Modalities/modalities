@@ -223,6 +223,8 @@ model:
     text_embd_prediction_key: text_embeddings
     vision_cls_prediction_key: vision_cls
     text_cls_prediction_key: text_cls
+    individual_datasets: false
+    modality_keys: ${collate_fn.config.sample_keys}
     logit_scale_prediction_key: logit_scale
     vision_encoder_config:
       sample_key: images

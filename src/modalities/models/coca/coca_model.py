@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Annotated, Dict, Optional, Tuple
+from typing import Annotated, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -88,7 +88,9 @@ class CoCaConfig(BaseModel):
     image_text_cls_prediction_key: Optional[str] = None
     video_cls_prediction_key: Optional[str] = None
     video_text_cls_prediction_key: Optional[str] = None
-    individual_datasets: Optional[bool] = None
+    modality_keys: List[str]
+    individual_datasets: Optional[bool] = False
+    is_audio_video: Optional[bool] = False
     audio_encoder_config: Optional[AudioTransformerConfig] = None
     image_encoder_config: Optional[VisionTransformerConfig] = None
     video_encoder_config: Optional[VisionTransformerConfig] = None
@@ -125,7 +127,9 @@ class CoCa(NNModel):
         image_text_cls_prediction_key: Optional[str],
         video_cls_prediction_key: Optional[str],
         video_text_cls_prediction_key: Optional[str],
+        modality_keys: List[str],
         individual_datasets: Optional[bool],
+        is_audio_video: Optional[bool],
         audio_encoder_config: Optional[AudioTransformerConfig],
         image_encoder_config: Optional[VisionTransformerConfig],
         video_encoder_config: Optional[VisionTransformerConfig],
@@ -173,14 +177,15 @@ class CoCa(NNModel):
         self.image_text_cls_prediction_key = image_text_cls_prediction_key
         self.video_cls_prediction_key = video_cls_prediction_key
         self.video_text_cls_prediction_key = video_text_cls_prediction_key
+
+        self.modality_keys = modality_keys
         self.individual_datasets = individual_datasets
+        self.is_audio_video = is_audio_video
 
         self.n_pool_head = n_pool_head
         self.bias_attn_pool = bias_attn_pool
         self.epsilon_attn_pool = epsilon_attn_pool
         self.text_decoder_config = text_decoder_config
-
-        num_input_modalities = 0
 
         self.image_sample_key = None
         if image_encoder_config is not None:
@@ -190,7 +195,6 @@ class CoCa(NNModel):
                 image_encoder_config,
                 n_queries,
             )
-            num_input_modalities += 1
 
         self.video_sample_key = None
         if video_encoder_config is not None:
@@ -200,7 +204,6 @@ class CoCa(NNModel):
                 video_encoder_config,
                 n_queries,
             )
-            num_input_modalities += 1
 
         self.audio_sample_key = None
         if audio_encoder_config is not None:
@@ -210,7 +213,6 @@ class CoCa(NNModel):
                 audio_encoder_config,
                 n_queries,
             )
-            num_input_modalities += 1
 
         self.text_decoder = TextDecoder(
             sample_key=text_decoder_config.sample_key,
@@ -236,7 +238,7 @@ class CoCa(NNModel):
             n_head=text_decoder_config.n_head,
             n_embd=text_decoder_config.n_embd,
             ffn_hidden=text_decoder_config.ffn_hidden,
-            is_two_input_modalities=num_input_modalities == 2,
+            is_audio_video=self.is_audio_video,
             dropout=text_decoder_config.dropout,
             bias=text_decoder_config.bias,
             attention_config=text_decoder_config.attention_config,
@@ -306,26 +308,30 @@ class CoCa(NNModel):
         if self.individual_datasets:  # multiple modalities (from different datasets)
             start = 0
             modality_logits = []
-            if image_embd is not None:
-                image_text_cls_token = text_cls_token[: len(image_embd)]
-                output.update({self.image_text_cls_prediction_key: image_text_cls_token})
-                image_text_embd = text_embd[: len(image_embd)]
-                image_logits = self._forward_decode(image_text_embd, image_embd)
-                modality_logits.append(image_logits)
-                start = start + len(image_embd)
-            if audio_embd is not None:
-                audio_text_cls_token = text_cls_token[start : start + len(audio_embd)]
-                output.update({self.audio_text_cls_prediction_key: audio_text_cls_token})
-                audio_text_embd = text_embd[start : start + len(audio_embd)]
-                audio_logits = self._forward_decode(audio_text_embd, audio_embd)
-                modality_logits.append(audio_logits)
-                start = start + len(audio_embd)
-            if video_embd is not None:
-                video_text_cls_token = text_cls_token[start:]
-                output.update({self.video_text_cls_prediction_key: video_text_cls_token})
-                video_text_embd = text_embd[start:]
-                video_logits = self._forward_decode(video_text_embd, video_embd)
-                modality_logits.append(video_logits)
+            # this ensures that we select the text input_ids corresponding to each modality_key in the order
+            # they are stacked by the collator
+            for modality_key in self.modality_keys:
+                if modality_key == "images" and image_embd is not None:
+                    image_text_cls_token = text_cls_token[start : start + len(image_embd)]
+                    image_text_embd = text_embd[start : start + len(image_embd)]
+                    image_logits = self._forward_decode(image_text_embd, image_embd)
+                    output.update({self.image_text_cls_prediction_key: image_text_cls_token})
+                    modality_logits.append(image_logits)
+                    start = start + len(image_embd)
+                if modality_key == "audio" and audio_embd is not None:
+                    audio_text_cls_token = text_cls_token[start : start + len(audio_embd)]
+                    audio_text_embd = text_embd[start : start + len(audio_embd)]
+                    audio_logits = self._forward_decode(audio_text_embd, audio_embd)
+                    output.update({self.audio_text_cls_prediction_key: audio_text_cls_token})
+                    modality_logits.append(audio_logits)
+                    start = start + len(audio_embd)
+                if modality_key == "video" and video_embd is not None:
+                    video_text_cls_token = text_cls_token[start : start + len(video_embd)]
+                    video_text_embd = text_embd[start : start + len(video_embd)]
+                    video_logits = self._forward_decode(video_text_embd, video_embd)
+                    output.update({self.video_text_cls_prediction_key: video_text_cls_token})
+                    modality_logits.append(video_logits)
+                    start = start + len(video_embd)
             logits = torch.cat(modality_logits)
         elif audio_embd is not None and video_embd is not None:  # video dataset that contains audio
             modality_embd = {"audio": audio_embd, "video": video_embd}

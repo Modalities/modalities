@@ -565,13 +565,6 @@ class VideoTransform(Transform):
         return self.spatial_transform(video)
 
 
-class MultimodalWebDatasetBuilderConfig(BaseModel):
-    urls: Union[List[str], str]
-    modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
-    modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
-    num_samples: Annotated[int, Field(ge=1)]
-
-
 def decord_video(key, data):
     """Based on the torch_video decoder in webdataset
     https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L394
@@ -616,6 +609,14 @@ def torch_audio(key, data):
     return (audio, sample_rate)
 
 
+class MultimodalWebDatasetBuilderConfig(BaseModel):
+    urls: Union[List[str], str]
+    modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
+    modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
+    is_audio_video: Optional[bool] = False
+    num_samples: Annotated[int, Field(ge=1)]
+
+
 # @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
 class MultimodalWebDatasetBuilder:
     def __init__(
@@ -623,6 +624,7 @@ class MultimodalWebDatasetBuilder:
         urls: Union[List[str], str],
         modality_key_mapping: Dict[str, Tuple[str, str]],
         modality_transforms: Dict[str, Transform],
+        is_audio_video: bool,
         num_samples: int,
     ):
         """A multimodal dataset instance for the WebDataset.
@@ -633,8 +635,10 @@ class MultimodalWebDatasetBuilder:
                 For example: {ModalityEnum.IMAGE: ("jpg", "image"), ModalityEnum.TEXT: ("text", "caption")}}
             modality_transforms: The transforms for each modality.
             num_samples: The number of samples for each modality combination.
+            is_audio_video: Whether the dataset is a video dataset which contains audio
         """
         self.urls = urls
+        self.is_audio_video = is_audio_video
         self.modality_key_mapping = modality_key_mapping
         self.modality_transforms = modality_transforms
         # transforms should be specified for all modality_key mappings,
@@ -801,6 +805,12 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         """
         super().__init__()
         self.builders = builders
+
+        for builder in self.builders:
+            if builder.is_audio_video and len(self.builders) > 1:
+                raise NotImplementedError(
+                    "It is not yet possible to include a video-audio dataset with other types of modalities"
+                )
 
         # Build datasets
         [
