@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.dataloader.collate_fns.collator_wrapper import (
+from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
     LossMaskingCollateFnWrapper,
     LossMaskingCollateFnWrapperConfig,
     LossMaskingTokenConfig,

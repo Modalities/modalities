@@ -46,7 +46,8 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             wrapped_collate_fn (CollateFnIF): The wrapped collate function.
             target_keys_to_mask (List[str]): The list of target keys to mask.
             loss_ignore_index (int): The index to ignore in the loss calculation.
-            mask_tokens (MaskingTokenConfig): The configuration for masking tokens.
+            mask_tokens (MaskingTokenConfig): Entails begin and end tokens, which mark (exclusive) inclusion to the
+            loss.
             tokenizer (TokenizerWrapper): The tokenizer wrapper.
 
         Raises:
@@ -60,7 +61,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         self.e_mask_token_id = self.tokenizer.get_token_id(mask_tokens.e_include_to_loss_token)
         if self.b_mask_token_id == self.e_mask_token_id:
             raise ValueError(
-                "b_mask_token_id and e_mask_token_id of the " + "LossMaskingCollateFnWrapper must be different!"
+                "b_mask_token_id and e_mask_token_id of the LossMaskingCollateFnWrapper must be different!"
             )
 
     def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:

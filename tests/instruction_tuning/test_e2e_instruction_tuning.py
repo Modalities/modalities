@@ -8,6 +8,9 @@ from tests.conftest import _ROOT_DIR
 
 
 def test_e2e_instruction_tuning(monkeypatch, tmp_path):
+    """
+    Run the instruction-tuning training and verify that a model checkpoint was created.
+    """
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")

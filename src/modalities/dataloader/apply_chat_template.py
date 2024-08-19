@@ -34,16 +34,16 @@ def apply_chat_template(config_file_path: Path):
     # we want to have all files of the same hash in the same directory
     dst_path = Path(config.settings.dst_path)
     # similar to github only use the first 7 characters of the hash for readability
-    hash_str = _hash_sum_file_sha256(config_file_path)[:7]
+    hash_str = _get_hash_sum_sha256_of_file(config_file_path)[:7]
     dst_path = dst_path.parent / f"{config.settings.src_path.stem}_{hash_str}" / dst_path.name
     dst_path.parent.mkdir(parents=True, exist_ok=True)
 
-    _store_config_file_with_hash(config_file_path, dst_path, hash_str)
+    _store_config_file_with_hash_suffix(config_file_path, dst_path, hash_str)
     dst_path_with_uuid = dst_path.with_suffix(f".{hash_str}" + "".join(dst_path.suffixes))
     with dst_path_with_uuid.open("w", encoding="utf-8") as output_file:
         for entry in instruction_data:
             conversation = entry[config.settings.conversations_key]
-            conversation = _map_roles(conversation, config.instruction_data_transformation.role_mapping)
+            conversation = _map_conversation_roles(conversation, config.instruction_data_transformation.role_mapping)
             chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
             entry["chat"] = chat
             json.dump(entry, output_file, ensure_ascii=False)
@@ -51,7 +51,7 @@ def apply_chat_template(config_file_path: Path):
     print(f"Chat template applied and saved to {dst_path_with_uuid}")
 
 
-def _hash_sum_file_sha256(file_path: Path) -> str:
+def _get_hash_sum_sha256_of_file(file_path: Path) -> str:
     hash = hashlib.sha256()
     bytes = bytearray(128 * 1024)
     mem_view = memoryview(bytes)
@@ -61,7 +61,7 @@ def _hash_sum_file_sha256(file_path: Path) -> str:
     return hash.hexdigest()
 
 
-def _store_config_file_with_hash(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
+def _store_config_file_with_hash_suffix(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
     out_config_file_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
     shutil.copyfile(config_file_path, out_config_file_path)
 
@@ -74,7 +74,7 @@ def _get_chat_template(jinja2_chat_template: str) -> Template:
     return compiled_chat_template
 
 
-def _map_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
+def _map_conversation_roles(conversation: List[Dict[str, Any]], role_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
     new_conversation = []
     for turn in conversation:
         for key, value in turn.items():
@@ -91,7 +91,7 @@ def _stream_jsonl(src_file_path: str) -> Generator[Dict[str, Any], None, None]:
 
 
 def _compile_jinja_template(chat_template: str) -> Template:
-    """Code taken from
+    """Code adapted from
     https://github.com/huggingface/transformers/blob/v4.42.0/src/transformers/tokenization_utils_base.py#L1906
     """
 
