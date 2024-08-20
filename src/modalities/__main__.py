@@ -21,7 +21,7 @@ from modalities.config.instantiation_models import (
     InstructionTuningInstantiationModel,
     TrainingComponentsInstantiationModel,
 )
-from modalities.dataloader.apply_chat_template import apply_chat_template
+from modalities.dataloader.apply_chat_template import split_and_apply_chat_template
 from modalities.dataloader.create_index import create_raw_index
 from modalities.dataloader.create_packed_data import pack_encoded_data
 from modalities.dataloader.packed_data_generator import EmbeddedStreamData, join_embedded_stream_data
@@ -105,18 +105,18 @@ def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
     Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
     """
     config_dict = load_app_config_dict(config_file_path=config_file_path)
-    assert "split_config" in config_dict["settings"], "split_config must be defined in the config file."
-    assert (
-        sum(config_dict["settings"]["split_config"]["splitting"].values()) == 100
-    ), "The split_config values must sum up to 100."
-    partition_to_output_file_path_mapping = apply_chat_template(config_file_path)
+
+    # split and apply chat template
+    partition_to_output_file_path_mapping = split_and_apply_chat_template(config_file_path)
 
     config = InstructionTuningInstantiationModel(**config_dict)
     hash_suffix = list(partition_to_output_file_path_mapping.values())[0].suffixes[0]
     for partition, jsonl_data_out_file_path in partition_to_output_file_path_mapping.items():
+        # create the index
         idx_file_path = jsonl_data_out_file_path.with_suffix(".idx")
         create_raw_index(jsonl_data_out_file_path, idx_file_path)
 
+        # create pbin files
         pbin_config_file_path = jsonl_data_out_file_path.with_name(f"pbin_config_{partition}").with_suffix(
             f"{hash_suffix}.yaml"
         )
@@ -124,19 +124,10 @@ def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
         pbin_config = load_app_config_dict(config_file_path=pbin_config_file_path)
         pbin_config["settings"]["src_path"] = str(jsonl_data_out_file_path)
         pbin_config["settings"]["index_path"] = str(idx_file_path)
-        pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(f"{hash_suffix}.pbin"))
+        pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
         with open(pbin_config_file_path, "w") as f:
-            yaml.dump(pbin_config, f)
+            yaml.dump(pbin_config, f, allow_unicode=True)
         pack_encoded_data(pbin_config_file_path)
-
-
-@data.command(name="apply_chat_template")
-@config_file_path_option
-def entry_point_data_apply_chat_template(config_file_path: Path):
-    """
-    Utility for applying a chat template to a jsonl-file using a jinja2 tempalate defined in the config.
-    """
-    apply_chat_template(config_file_path=config_file_path)
 
 
 @data.command(name="create_raw_index")

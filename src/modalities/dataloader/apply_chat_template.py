@@ -14,7 +14,7 @@ from modalities.config.config import load_app_config_dict
 from modalities.config.instantiation_models import InstructionTuningInstantiationModel, SplitConfig
 
 
-def apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
+def split_and_apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
     """
     Applies a chat template to the given configuration file.
 
