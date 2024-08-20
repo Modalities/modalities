@@ -232,7 +232,6 @@ class ClipLoss(Loss):
         if world_size > 1 and self.local_loss:
             labels = labels + num_logits * rank
 
-        ## MODIFIED
         # Calculate loss
         losses = None
         for logits in logits_per_embeddings:
