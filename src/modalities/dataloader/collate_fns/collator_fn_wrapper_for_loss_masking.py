@@ -143,24 +143,17 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         mask[:, 1:] += torch.where(target != b_mask_token_id, 0, 1)[:, :-1]
         mask += torch.where(target != e_mask_token_id, 0, -1)
 
-        # in case -1 (end mask token indicator) is before 1 (begin mask token indicator) we need to
-        # include the first tokens to the loss
-        end_before_begin = torch.argmax(mask, dim=-1, keepdim=True) > torch.argmin(mask, dim=-1, keepdim=True)
-        if end_before_begin.any():
+        # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
+        # this includes the -1, but due to the shift above, we exclude both!
+        include_to_loss_mask = mask.cumsum(-1)
+        
+        # check that the sequence has alternating start and end mask token indicators starting with a start mask token
+        # we explicitly allow ending on a start mask token
+        if not ((0 <= include_to_loss_mask).all() and (include_to_loss_mask <= 1).all()):
             raise ValueError(
                 "end mask token indicator is before begin mask token indicator in the target. "
                 + "This is not supported by the LossMaskingCollateFnWrapper."
                 + "Make sure to use padding and truncation with the tokenizer for PackedMemMapDatasetContinuous"
-            )
-
-        # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
-        # this includes the -1, but due to the shift above, we exclude both!
-        include_to_loss_mask = mask.cumsum(-1)
-
-        if (mask > 1).any() or (mask < -1).any():
-            raise ValueError(
-                "Masking tokens are not alternating in the target. "
-                + "This is not supported by the LossMaskingCollateFnWrapper."
             )
 
         # apply mask: if mask is 1, keep the target, otherwise replace with loss_ignore_index
