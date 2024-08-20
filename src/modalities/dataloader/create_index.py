@@ -8,6 +8,25 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+
+
+def create_raw_index(src_path: Path, index_path: Path):
+    """
+    Utility for indexing a large jsonl-file's content.
+    Background is the ability to further process the respective file without loading it,
+    while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
+    It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
+    """
+    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
+    if index_path.exists():
+        raise ValueError("index already exists. delete it or specify different output folder.")
+
+    print(f"reading raw data from {src_path}")
+    print(f"writing index to {index_path}")
+    generator = IndexGenerator(src_path)
+    generator.create_index(index_path)
+
 
 class IndexGenerator:
     def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
