@@ -42,7 +42,8 @@ class GeneralModelFactory:
         return wrapped_model
 
     @deprecated(
-        "With version 0.3, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) instead.",
+        "With version 0.3, we upgraded FSDP to FSDP 2.0. "
+        "Use GeneralModelFactory.get_fsdp_2_wrapped_model(...) instead.",
         category=FutureWarning,
     )
     @staticmethod
