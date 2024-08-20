@@ -2,6 +2,13 @@ settings:
   src_path: data/lorem_ipsum_sft.jsonl
   dst_path: data/lorem_ipsum_sft_converted.jsonl
   conversations_key: conversations
+  pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
+  split_config:
+    splitting:
+      train: 80
+      val: 10
+      test: 10
+    seed: 1234
 
 instruction_data_transformation:
   role_mapping:

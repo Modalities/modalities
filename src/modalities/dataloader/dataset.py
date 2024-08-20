@@ -14,7 +14,7 @@ from transformers import BatchEncoding
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import EmbeddedStreamData
+from .packed_data_generator import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):

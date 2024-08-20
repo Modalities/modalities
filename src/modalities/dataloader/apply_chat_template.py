@@ -1,5 +1,6 @@
 import hashlib
 import json
+import random
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Tuple
@@ -10,10 +11,10 @@ from jinja2.exceptions import TemplateError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from modalities.config.config import load_app_config_dict
-from modalities.config.instantiation_models import InstructionTuningInstantiationModel
+from modalities.config.instantiation_models import InstructionTuningInstantiationModel, SplitConfig
 
 
-def apply_chat_template(config_file_path: Path):
+def apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
     """
     Applies a chat template to the given configuration file.
 
@@ -21,10 +22,10 @@ def apply_chat_template(config_file_path: Path):
         config_file_path (Path): The path to the configuration file.
 
     Returns:
-        None
+        Dict[str, Path]: A dictionary mapping the partition to the output file path.
 
     Raises:
-        None
+        Exception: If an error occurs during the application of the chat template.
     """
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     config = InstructionTuningInstantiationModel(**config_dict)
@@ -39,16 +40,51 @@ def apply_chat_template(config_file_path: Path):
     dst_path.parent.mkdir(parents=True, exist_ok=True)
 
     _store_config_file_with_hash_suffix(config_file_path, dst_path, hash_str)
-    dst_path_with_uuid = dst_path.with_suffix(f".{hash_str}" + "".join(dst_path.suffixes))
-    with dst_path_with_uuid.open("w", encoding="utf-8") as output_file:
-        for entry in instruction_data:
+
+    default_suffix = f".{hash_str}" + ".".join(dst_path.suffixes)
+
+    partition_to_out_file_mapping = {}
+
+    partition_to_output_file_path_mapping = {}
+    for partition, percentage in config.settings.split_config.splitting.model_dump().items():
+        if percentage == 0:
+            continue
+        out_file_path = dst_path.with_name(f"{dst_path.stem}_{partition}").with_suffix(default_suffix)
+        partition_to_output_file_path_mapping[partition] = out_file_path
+        partition_to_out_file_mapping[partition] = out_file_path.open("w")
+
+    try:
+        partitions_sampled = []
+        for entry, partition in _split_streaming_data(data=instruction_data, split_config=config.settings.split_config):
             conversation = entry[config.settings.conversations_key]
             conversation = _map_conversation_roles(conversation, config.instruction_data_transformation.role_mapping)
             chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
             entry["chat"] = chat
+            output_file = partition_to_out_file_mapping[partition]
+            partitions_sampled.append(partition)
             json.dump(entry, output_file, ensure_ascii=False)
             output_file.write("\n")
-    print(f"Chat template applied and saved to {dst_path_with_uuid}")
+        print(f"Chat template applied and saved to {list(partition_to_output_file_path_mapping.values())}")
+        return {
+            partition: path
+            for partition, path in partition_to_output_file_path_mapping.items()
+            if partitions_sampled.count(partition) > 0
+        }
+    except Exception as e:
+        raise e
+    finally:
+        for file in partition_to_out_file_mapping.values():
+            file.close()
+
+
+def _split_streaming_data(
+    data: Generator[Dict[str, Any], None, None], split_config: SplitConfig
+) -> Generator[Tuple[Dict[str, Any], str], None, None]:
+    random.seed(split_config.seed)
+    partitions, weights = list(zip(*split_config.splitting.model_dump().items()))
+    for entry in data:
+        partition = random.choices(partitions, weights=weights)[0]
+        yield (entry, partition)
 
 
 def _get_hash_sum_sha256_of_file(file_path: Path) -> str:

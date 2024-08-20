@@ -3,11 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import (
     PackedMemMapDatasetBase,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
+)
+from modalities.dataloader.packed_data_generator import (
+    EmbeddedStreamData,
+    PackedDataGenerator,
+    join_embedded_stream_data,
 )
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 
