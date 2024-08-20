@@ -18,49 +18,125 @@ from .create_packed_data import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):
+    """Dataset class."""
+
     def __init__(self, raw_data_path: Path, sample_key: str):
+        """
+        Initializes a Dataset object.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sample_key (str): The key used to access a sample in the dataset.
+        """
         self.raw_data_path = raw_data_path
         self.sample_key = sample_key
 
     def _check_if_inbounds(self, idx: int):
+        """
+        Check if the given index is within the bounds of the dataset.
+
+        Args:
+            idx (int): The index to check.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+        """
         if not 0 <= idx < len(self):
             raise IndexError
 
 
 class DummySampleDataType(str, Enum):
+    """
+    DummySampleDataType is an enumeration class that represents the data types for dummy samples.
+
+    Attributes:
+        FLOAT (str): Represents the float data type.
+        INT (str): Represents the int data type.
+    """
+
     FLOAT = "float"
     INT = "int"
 
 
 class DummySampleConfig(BaseModel):
+    """
+    DummySampleConfig class represents the configuration for a dummy sample.
+
+    Attributes:
+        sample_key (str): The key of the sample.
+        sample_shape (Tuple[int, ...]): The shape of the sample.
+        sample_type (DummySampleDataType): The type of the sample.
+
+    """
+
     sample_key: str
     sample_shape: Tuple[int, ...]
     sample_type: DummySampleDataType
 
 
 class DummyDatasetConfig(BaseModel):
+    """
+    DummyDatasetConfig is a configuration class for defining a dummy dataset.
+
+    Attributes:
+        num_samples (int): The number of samples in the dataset.
+        sample_definition (List[DummySampleConfig]): The list of sample definitions in the dataset.
+    """
+
     num_samples: int
     sample_definition: List[DummySampleConfig]
 
 
 class DummyDataset(Dataset):
+    """DummyDataset class."""
+
     def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
         """
-        :param num_samples: Number of samples the dataset should generate.
-        :param sample_definition: A list of tuples defining the dataset output.
-            Each touple contains the sample key, shape and data type.
+        Initializes a DummyDataset object.
+
+        Args:
+            num_samples (int): The number of samples in the dataset.
+            sample_definition (Tuple[DummySampleConfig]): A list of tuples defining the dataset output.
+                Each touple contains the sample key, shape and data type.
+
+        Returns:
+            None
         """
         super().__init__(raw_data_path=None, sample_key=None)
         self.num_samples = num_samples
         self.sample_definition = sample_definition
 
     def __len__(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        Returns:
+            int: The number of samples in the dataset.
+        """
         return self.num_samples
 
     def __getitem__(self, idx: int) -> Dict:
+        """
+        Retrieves an item from the dataset at the specified index.
+
+        Parameters:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            dict: A dictionary representing the retrieved item.
+
+        Note:
+            idx is not used. Instedam the method returns a random sample.
+        """
         return self._create_random_sample()
 
     def _create_random_sample(self):
+        """
+        Creates a random sample based on the sample definition.
+
+        Returns:
+            dict: A dictionary containing the randomly generated sample data.
+        """
         sample = dict()
         for s in self.sample_definition:
             if s.sample_type == DummySampleDataType.FLOAT:
@@ -83,18 +159,19 @@ class MemMapDataset(Dataset):
         jq_pattern: str = ".text",
     ):
         """
-        Pytorch Dataset with mmap support.
+        Initializes the MemMapDataset object that represents a PyTorch Dataset with mmap support.
 
-        :param raw_data_path: Path to a jsonl file, which holds text data
-        :param tokenizer: PretrainedTokenizer required to tokenize text data on the fly.
-        :param jq_pattern: jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed
-        :param index_path: Path to an index file, which indicates the start character/byte position
-                           and length of samples given in `raw_data_path`.
-                           If not defined, an index next to `raw_data_path` is picked,
-                           by replacing its suffix with ".idx".
-        :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
-                           TODO: If this setting should support multi-modal features using separately encoded inputs,
-                            this needs to get replaced with a list of sample keys!
+        Args:
+            raw_data_path (Path): Path to a JSONL file, which holds text data.
+            tokenizer (TokenizerWrapper): The tokenizer object that is required to tokenize text data.
+            sample_key (str): The key to access the sample in the BatchEncoding.
+            index_path (Optional[Path], optional): The path to the index file which indicates
+              the start character/byte position of documents. Defaults to None.
+            jq_pattern (str, optional): The jq pattern to filter the data. Results are afterwards tokenized and packed.
+              Defaults to ".text".
+
+        Returns:
+            None
         """
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
@@ -103,14 +180,34 @@ class MemMapDataset(Dataset):
         self.tokenizer = tokenizer
 
     def __len__(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        Returns:
+            int: The length of the dataset.
+        """
         return len(self.reader)
 
     def __getitem__(self, idx: int) -> BatchEncoding:
+        """
+        Retrieves the item at the given index.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            BatchEncoding: The tokenized representation of the item.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+        """
         self._check_if_inbounds(idx)
         return self.tokenizer.tokenize(text=self.jq_filter.input_text(self.reader[idx]).first())
 
 
 class PackedMemMapDatasetBase(Dataset):
+    """PackedMemMapDatasetBase class."""
+
     DATA_SECTION_LENGTH_IN_BYTES = EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES
     TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
     HEADER_SIZE_IN_BYTES = EmbeddedStreamData.HEADER_SIZE_IN_BYTES
@@ -123,17 +220,22 @@ class PackedMemMapDatasetBase(Dataset):
 
     def __init__(self, raw_data_path: Path, sample_key: str):
         """
-        Base class for packed memmapped datasets. The underlying dataset file has the structure:
-        | header | data | index |
-        The header contains information about the length of the subsequent data sequence and the amount of bytes
-        required to represent tokens in the data section. The index contains the tuple information (start, end) in terms
-         of byte positions.
+        Initializes the PackedMemMapDatasetBase object.
 
-        :param raw_data_path: Path to a packed binary file (*.pbin).
-                              Use `modalities data pack_encoded_data` to create one based on a jsonl-file.
-        :param sample_key: model-specific parameter to indicate where in the BatchEncoding the input_token_ids are.
-                           TODO: If this setting should support multi-modal features using separately encoded inputs,
-                            this needs to get replaced with a list of sample keys!
+        Args:
+            raw_data_path (Path): Path to a packed binary file (*.pbin).
+                Use `modalities data pack_encoded_data` to create one based on a JSONL-file.
+            sample_key (str): The key to access the sample in the BatchEncoding.
+
+        Raises:
+            RuntimeError: If the token representation with the given size is not supported.
+
+        Returns:
+            None
+
+        Note:
+            TODO: sample_key should support multi-modal features using separately encoded inputs,
+                  this needs to get replaced with a list of sample keys!
         """
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
         self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
@@ -149,13 +251,37 @@ class PackedMemMapDatasetBase(Dataset):
         self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
+        """
+        Generates the packing index for the dataset.
+
+        Returns:
+            A list of tuples representing the index, where each tuple contains the offset and length in bytes.
+        """
         # index is a tuple of offset and length in bytes
         return self._embedded_stream_data.index_base
 
     def __len__(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        Returns:
+            int: The length of the dataset.
+        """
         return len(self._index)
 
     def __getitem__(self, idx: int) -> BatchEncoding:
+        """
+        Retrieves the item at the given index.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            BatchEncoding: The retrieved item as a BatchEncoding object.
+
+        Raises:
+            ValueError: If the length of the sample in bytes is not a multiple of `self._token_size_in_bytes`.
+        """
         self._check_if_inbounds(idx)
         # offset and length in bytes
         offset_in_bytes, length_in_bytes = self._index[idx]
@@ -180,11 +306,31 @@ class PackedMemMapDatasetBase(Dataset):
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
+    """PackedMemMapDatasetContinuous class."""
+
     def __init__(self, raw_data_path: Path, sample_key: str, block_size: int):
+        """
+        Initializes the PackedMemMapDatasetContinuous object.
+
+        Args:
+            raw_data_path (Path): Path to a packed binary file (*.pbin).
+                Use `modalities data pack_encoded_data` to create one based on a JSONL-file.
+            sample_key (str): The key to access the sample in the BatchEncoding.
+            block_size (int): The size of the block.
+
+        Returns:
+            None
+        """
         self.block_size = block_size
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
+        """
+        Generates the packing index for the dataset.
+
+        Returns:
+            A list of tuples representing the index, where each tuple contains the offset and length in bytes.
+        """
         # get number of total tokens in file
         total_tokens = self._embedded_stream_data.data_len // self._token_size_in_bytes
         if total_tokens < self.block_size:
