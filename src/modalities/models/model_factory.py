@@ -30,7 +30,7 @@ from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWra
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
 
 
-class ModelFactory:
+class GeneralModelFactory:
     @staticmethod
     def get_checkpointed_model(
         checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, model: nn.Module
@@ -131,7 +131,6 @@ class ModelFactory:
 
             # Check if the module has the `reset_parameters` method
             if hasattr(module, "reset_parameters") and callable(getattr(module, "reset_parameters")):
-                # Call the `reset_parameters` method
                 module.reset_parameters()
 
         # initialize the weights if they are on a meta device
@@ -152,6 +151,7 @@ class ModelFactory:
             model = model.to_empty(device="cuda")
 
         # call reset_parameters on all nn.Modules that implement this function
+        # (normally all norms)
         reset_parameters_if_function_exists(module=model)
         model_initializer.initialize_in_place(model)
         return model
@@ -182,8 +182,10 @@ class ModelFactory:
 
         return model
 
+
+class GPT2ModelFactory:
     @staticmethod
-    def get_tensor_parallelized_model(
+    def get_tensor_parallelized_gpt2_model(
         model: GPT2LLM,
         device_mesh: DeviceMesh,
     ) -> nn.Module:

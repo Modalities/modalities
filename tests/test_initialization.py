@@ -15,7 +15,7 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
 from modalities.models.coca.coca_model import CoCa
 from modalities.models.gpt2.gpt2_model import GPT2LLM
-from modalities.models.model_factory import ModelFactory
+from modalities.models.model_factory import GeneralModelFactory
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
@@ -62,7 +62,7 @@ def _load_gpt2(initialization_type: str, std: float | str) -> FSDP:
     config_dict = _replace_config_dict(config_dict, initialization_type, std)
 
     gpt2_model = get_model_from_config(config_dict)
-    gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    gpt2_wrapped_model = GeneralModelFactory.get_fsdp_wrapped_model(
         gpt2_model,
         sync_module_states=True,
         block_names=["GPT2Block"],
@@ -79,7 +79,7 @@ def _load_coca(initialization_type: str, std: float | str) -> FSDP:
     config_dict = _replace_config_dict(config_dict, initialization_type, std)
 
     coca_model = get_model_from_config(config_dict)
-    coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    coca_wrapped_model = GeneralModelFactory.get_fsdp_wrapped_model(
         coca_model,
         sync_module_states=True,
         block_names=["TransformerBlock", "VisionTransformerBlock"],

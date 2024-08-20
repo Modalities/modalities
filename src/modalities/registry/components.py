@@ -69,7 +69,7 @@ from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.mamba.mamba_config import MambaLLMConfig
 from modalities.models.mamba.mamba_model import MambaLLM
-from modalities.models.model_factory import ModelFactory
+from modalities.models.model_factory import GeneralModelFactory, GPT2ModelFactory
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
@@ -108,20 +108,23 @@ class ComponentEntity:
 
 COMPONENTS = [
     # models
-    ComponentEntity("model", "gpt2", ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
-    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
-    ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
-    ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
-    ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
+    ComponentEntity("model", "checkpointed", GeneralModelFactory.get_checkpointed_model, CheckpointedModelConfig),
+    ComponentEntity("model", "fsdp_wrapped", GeneralModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "fsdp_2_wrapped", GeneralModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
+    ComponentEntity("model", "compiled", GeneralModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+        "model", "model_initialized", GeneralModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),
     ComponentEntity(
-        "model", "tensor_parallelized", ModelFactory.get_tensor_parallelized_model, TensorParallelizedModelConfig
+        "model",
+        "tensor_parallelized",
+        GPT2ModelFactory.get_tensor_parallelized_gpt2_model,
+        TensorParallelizedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # Device Mesh
