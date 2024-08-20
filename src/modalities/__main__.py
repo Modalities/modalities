@@ -124,7 +124,7 @@ def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
         pbin_config = load_app_config_dict(config_file_path=pbin_config_file_path)
         pbin_config["settings"]["src_path"] = str(jsonl_data_out_file_path)
         pbin_config["settings"]["index_path"] = str(idx_file_path)
-        pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(f"{hash_suffix}.pbin"))
+        pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
         with open(pbin_config_file_path, "w") as f:
             yaml.dump(pbin_config, f)
         pack_encoded_data(pbin_config_file_path)
