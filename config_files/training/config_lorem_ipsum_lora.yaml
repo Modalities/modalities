@@ -34,8 +34,8 @@ collate_fn:
       - ${settings.referencing_keys.target_key}
     loss_ignore_index: -100
     mask_tokens:
-      b_include_to_loss_token: ^
-      e_include_to_loss_token: $
+      b_include_to_loss_token: <|im_start|>
+      e_include_to_loss_token: <|im_end|>
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -46,7 +46,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_9cc8d41/ultrachat_200k_fastchat_converted.9cc8d41.pbin
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d5/ultrachat_200k_fastchat_converted.56696d5.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -97,7 +97,7 @@ val_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 2
+        batch_size: 16
         drop_last: true
         sampler:
           component_key: sampler
@@ -128,7 +128,7 @@ test_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 2
+        batch_size: 16
         drop_last: true
         sampler:
           component_key: sampler
@@ -240,9 +240,8 @@ tokenizer:
     truncation: false
     special_tokens:
       additional_special_tokens:
-        - "^"
-        - "$"
-        - "°"
+        - "<|im_start|>"
+        - "<|im_end|>"
 
 scheduler:
   component_key: scheduler
