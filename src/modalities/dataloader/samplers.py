@@ -7,13 +7,17 @@ class ResumableBatchSampler(Sampler):
     def __init__(
         self, start_index: int, underlying_batch_sampler: BatchSampler, max_num_elements: Optional[int] = None
     ):
-        """Sampler which starts at a specified batch index and continues sampling for
+        """
+        Sampler which starts at a specified batch index and continues sampling for
             for a given sampler. Works with normal samplers and BatchSamplers.
 
         Args:
             start_index (int): index to start sampling from
             existing_sampler (Sampler): Sampler from which we want to continue
             max_num_elements (Optional[int]): The maximum number of elements the sampler returns. Default None.
+
+        Returns:
+            None
         """
 
         self.start_index = start_index
@@ -28,11 +32,29 @@ class ResumableBatchSampler(Sampler):
             self.indices = self.indices[:max_num_elements]
 
     def __iter__(self):
+        """
+        Returns an iterator over the indices starting from the start_index.
+
+        Returns:
+            iterator: An iterator over the indices.
+        """
         return iter(self.indices[self.start_index :])
 
     def __len__(self):
+        """
+        Returns the length of the sampler, which is the number of indices minus the start index.
+
+        Returns:
+            int: The length of the sampler.
+        """
         return len(self.indices) - self.start_index
 
     @property
     def batch_size(self) -> int:
+        """
+        Returns the batch size of the underlying batch sampler.
+
+        Returns:
+            int: The batch size of the underlying batch sampler.
+        """
         return self.underlying_batch_sampler.batch_size
