@@ -31,7 +31,7 @@ def _get_theoretical_gpu_peak_performance_single(precision: torch.dtype, gpu_typ
           otherwise None.
     """
 
-    if precision in [torch.float16, torch.bfloat16] and gpu_type in PEAK_PERFORMANCE.keys():
+    if precision in [torch.float16, torch.bfloat16] and gpu_type in PEAK_PERFORMANCE:
         return PEAK_PERFORMANCE[gpu_type]
     else:
         return None
