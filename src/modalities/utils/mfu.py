@@ -50,7 +50,7 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
         (Number, optional): The accummulated theoretical peak performance of all GPUs,
           or None if it cannot be calculated.
     """
-    if torch.cuda.is_available() and torch.cuda.device_count() > 0:  # necessary for cpu-only tests
+    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
         precision = model.mixed_precision.param_dtype
         if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
             warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
@@ -92,7 +92,9 @@ def get_theoretical_flops_per_token(model: FSDP) -> Tuple[Optional[int], Optiona
             - Sequence length: The length of the input sequence. Needed to convert samples to tokens in compute_mfu.
             If CUDA is not available, returns (None, None).
     """
-    if torch.cuda.is_available() and torch.cuda.device_count() > 0:  # necessary for cpu-only tests
+    if (
+        torch.cuda.is_available() and torch.cuda.device_count() > 0
+    ):  # NOTE: This is a workaround to make cpu-only tests work
         N = get_total_number_of_trainable_parameters(model)
         try:
             L = model.module.n_layer
