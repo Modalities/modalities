@@ -23,7 +23,7 @@ COVERAGE=--no-cov
 
 #############
 ### TESTS ###
-#################
+#############
 # test_fsdp_to_disc_checkpointing
 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) checkpointing/test_fsdp_to_disc_checkpointing.py $COVERAGE
 
