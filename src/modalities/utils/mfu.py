@@ -53,7 +53,7 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:  # necessary for cpu-only tests
         precision = model.mixed_precision.param_dtype
         if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
-            warnings.warn("Could not get theoretical GPU peak performance for given mixed precision type.")
+            warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
             return None
         else:
             device_name = torch.cuda.get_device_name()
@@ -62,10 +62,13 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
             elif device_name.startswith("NVIDIA H100"):
                 single_gpu_peak_performance = _get_theoretical_gpu_peak_performance_single(precision, "H100")
             else:
-                warnings.warn(f"Could not get theoretical gpu peak performance for unknown device = {device_name}.")
+                warnings.warn(f"Could not get theoretical GPU peak performance for unknown device = {device_name}.")
                 return None
             if single_gpu_peak_performance is None:
-                warnings.warn(f"Could not get theoretical gpu peak performance for {device_name} and {precision}.")
+                warnings.warn(
+                    f"Could not get theoretical GPU peak performance for device = {device_name} "
+                    f"and mixed precision type = {precision}."
+                )
                 return None
             else:
                 return single_gpu_peak_performance * world_size
