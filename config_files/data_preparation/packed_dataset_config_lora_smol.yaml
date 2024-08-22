@@ -1,7 +1,7 @@
 settings:
-  src_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d5/ultrachat_200k_fastchat_converted.56696d5.jsonl
-  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d5/ultrachat_200k_fastchat_converted.56696d5.pbin
-  index_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d5/ultrachat_200k_fastchat_converted.56696d5.idx
+  src_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d6/ultrachat_200k_fastchat_converted.56696d5.jsonl
+  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d6/ultrachat_200k_fastchat_converted.56696d5.pbin
+  index_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d6/ultrachat_200k_fastchat_converted.56696d5.idx
   jq_pattern: .chat
   num_cpus: 100 # ${node_env:num_cpus}
   eod_token: <|endoftext|>

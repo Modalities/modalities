@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_c0905b1/ultrachat_200k_fastchat_converted_test.c0905b1.pbin
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_268f13b/ultrachat_200k_fastchat_converted_20240822_test.268f13b.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -233,7 +233,7 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name} #HuggingFaceTB/SmolLM-1.7B
+    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
     padding: false
     truncation: false
     special_tokens:

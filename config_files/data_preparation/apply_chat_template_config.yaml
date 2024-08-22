@@ -1,14 +1,14 @@
 settings:
   src_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat.jsonl
-  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_converted.jsonl
+  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_converted_20240822.jsonl
   conversations_key: conversations
-  pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
+  pbin_creation_config_file_path: config_files/data_preparation/packed_dataset_config_lora_smol.yaml
   split_config:
     splitting:
       train: 96
       val: 2
       test: 2
-    seed: 1234
+    seed: 42
 
 instruction_data_transformation:
   role_mapping:
