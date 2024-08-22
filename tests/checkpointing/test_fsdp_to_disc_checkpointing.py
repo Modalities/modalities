@@ -20,7 +20,7 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEn
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
-from modalities.models.model_factory import ModelFactory
+from modalities.models.model_factory import GeneralModelFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -72,7 +72,7 @@ class TestFSDPToDiscCheckpointing:
 
     @pytest.fixture
     def fsdp_wrapped_model(self, gpt2_model: GPT2LLM) -> FSDP:
-        wrapped_model: FSDP = ModelFactory.get_fsdp_wrapped_model(
+        wrapped_model: FSDP = GeneralModelFactory.get_fsdp_wrapped_model(
             gpt2_model,
             sync_module_states=True,
             block_names=["GPT2Block"],

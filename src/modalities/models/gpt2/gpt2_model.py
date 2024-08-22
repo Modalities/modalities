@@ -1,10 +1,11 @@
 import math
-from copy import deepcopy
 from enum import Enum
 from typing import Annotated, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
+
+from modalities.models.components.layer_norms import LayerNormConfig
 
 try:
     from flash_attn import flash_attn_func
@@ -13,7 +14,6 @@ except ModuleNotFoundError:
 
 from pydantic import BaseModel, Field, model_validator, validator
 
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
@@ -57,12 +57,16 @@ class RotaryTransform(QueryKeyValueTransform):
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
-        self.register_buffer("inv_freq", inv_freq)
+        self.inv_freq_tensor = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        self.register_buffer("inv_freq", self.inv_freq_tensor)
 
         self._seq_len_cached = None
         self._cos_cached = None
         self._sin_cached = None
+
+    def reset_parameters(self):
+        # self.register_buffer("inv_freq", self.inv_freq_tensor)
+        pass
 
     def rotate_half(self, x):
         x1, x2 = x.chunk(2, dim=-1)
@@ -134,6 +138,7 @@ class AttentionConfig(BaseModel):
 
 
 class GPT2LLMConfig(BaseModel):
+    use_meta_device: bool
     sample_key: str
     prediction_key: str
     poe_type: PositionTypes
@@ -151,9 +156,9 @@ class GPT2LLMConfig(BaseModel):
     attention_config: AttentionConfig
     attention_implementation: AttentionImplementation
     activation_type: ActivationType
-    attention_norm: PydanticPytorchModuleType
-    ffn_norm: PydanticPytorchModuleType
-    lm_head_norm: PydanticPytorchModuleType
+    attention_norm_config: LayerNormConfig
+    ffn_norm_config: LayerNormConfig
+    lm_head_norm_config: LayerNormConfig
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -332,7 +337,7 @@ class CausalSelfAttention(nn.Module):
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
-        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
+        y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
@@ -395,8 +400,13 @@ class GPT2Block(nn.Module):
             raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.attention_norm(x))
-        x = x + self.mlp(self.ffn_norm(x))
+        x_attn_normed = self.attention_norm(x)
+        x = x + self.attn(x_attn_normed)
+
+        x_ffn_normed = self.ffn_norm(x)
+        x_mlp = self.mlp(x_ffn_normed)
+
+        x = x + x_mlp
         return x
 
 
@@ -418,14 +428,14 @@ class GPT2LLM(NNModel):
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
         attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
+        attention_norm_config: LayerNormConfig,
+        ffn_norm_config: LayerNormConfig,
+        lm_head_norm_config: LayerNormConfig,
         seed: int = None,
     ):
         weight_decay_groups = {
             "linear": [".attn", ".mlp"],
-            "embedding": [".wte", ".wpe"],
+            "embedding": [".wte", ".wpe", "lm_head.weight"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
@@ -472,21 +482,21 @@ class GPT2LLM(NNModel):
                             attention_config=attention_config,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
-                            attention_norm=deepcopy(attention_norm),
-                            ffn_norm=deepcopy(ffn_norm),
+                            attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
+                            ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
                         )
                         for _ in range(n_layer)
                     ]
                 ),
-                lm_head_norm=lm_head_norm,
+                lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
+                lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
-        self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+        # self.transformer.wte.weight = self.transformer.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         input_ids = inputs[self.sample_key]
@@ -509,7 +519,7 @@ class GPT2LLM(NNModel):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.lm_head_norm(x)
-        logits = self.lm_head(x)
+        logits = self.transformer.lm_head(x)
         return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:

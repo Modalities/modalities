@@ -40,5 +40,5 @@ def test_run_cpu_only(
         evaluation_data_loaders=[],
         checkpoint_saving=checkpoint_saving_mock,
     )
-    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
+    nn_model_mock.assert_has_calls([call(b.samples) for b in batches])
     optimizer_mock.step.assert_called()

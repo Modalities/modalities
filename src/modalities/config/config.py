@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
@@ -17,6 +18,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticDeviceMeshIFType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -26,7 +28,12 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
-from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.running_env.env_utils import (
+    FSDP2MixedPrecisionSettings,
+    MixedPrecisionSettings,
+    PyTorchDtypes,
+    has_bfloat_support,
+)
 from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 
 
@@ -206,6 +213,50 @@ class CheckpointedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
 
 
+class FSDP2WrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: List[str]
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
+    reshard_after_forward: bool = True
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_mixed_precision_settings(self):
+        if not has_bfloat_support() and (
+            self.mixed_precision_settings.reduce_dtype == PyTorchDtypes.BF_16
+            or self.mixed_precision_settings.param_dtype == PyTorchDtypes.BF_16
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return self
+
+    @model_validator(mode="after")
+    def validate_dp_mesh_existence(self):
+        if "dp" not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Data parallelism key dp not in {self.device_mesh=}")
+        return self
+
+
+class TensorParallelizedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_tp_mesh_existence(self):
+        if "tp" not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Tensor parallelism key tp not in {self.device_mesh=}")
+        return self
+
+
+class CompiledModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: List[str]
+
+
+@deprecated(
+    "With version 0.3, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) "
+    "and FSDP2WrappedModelConfig instead.",
+    category=FutureWarning,
+)
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     sync_module_states: bool
