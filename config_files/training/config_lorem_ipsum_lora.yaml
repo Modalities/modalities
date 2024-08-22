@@ -40,13 +40,11 @@ collate_fn:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
 
-
-
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_56696d5/ultrachat_200k_fastchat_converted.56696d5.pbin
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_c0905b1/ultrachat_200k_fastchat_converted_test.c0905b1.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
