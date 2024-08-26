@@ -6,12 +6,12 @@ settings:
     target_key: target_ids
   training:
     training_log_interval_in_steps: 2
-    checkpointing_interval_in_steps: 4
-    evaluation_interval_in_steps: 2
+    checkpointing_interval_in_steps: 40
+    evaluation_interval_in_steps: 40
     global_num_seen_tokens: 0
-    activation_checkpointing_modules: [ LlamaDecoderLayer ]
-    gradient_acc_steps: 2
-    local_train_micro_batch_size: 1
+    activation_checkpointing_modules: [ ]
+    gradient_acc_steps: 16
+    local_train_micro_batch_size: 2
     sequence_length: 2048
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
@@ -44,7 +44,25 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_268f13b/ultrachat_200k_fastchat_converted_20240822_test.268f13b.pbin
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_74d2208/ultrachat_200k_fastchat_converted_train.74d2208.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_74d2208/ultrachat_200k_fastchat_converted_val.74d2208.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+  
+test_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_74d2208/ultrachat_200k_fastchat_converted_test.74d2208.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -89,13 +107,13 @@ val_dataloader:
     shuffle: false
     dataloader_tag: "val"
     dataset:
-      instance_key: train_dataset
+      instance_key: val_dataset
       pass_type: BY_REFERENCE
     batch_sampler:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 16
+        batch_size: 2
         drop_last: true
         sampler:
           component_key: sampler
@@ -105,7 +123,7 @@ val_dataloader:
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
             dataset:
-              instance_key: train_dataset
+              instance_key: val_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
@@ -120,13 +138,13 @@ test_dataloader:
     shuffle: false
     dataloader_tag: "test"
     dataset:
-      instance_key: train_dataset
+      instance_key: test_dataset
       pass_type: BY_REFERENCE
     batch_sampler:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: 16
+        batch_size: 2
         drop_last: true
         sampler:
           component_key: sampler
@@ -136,7 +154,7 @@ test_dataloader:
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
             dataset:
-              instance_key: train_dataset
+              instance_key: test_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
@@ -251,7 +269,7 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 16
+    total_steps: 57
     pct_start: 0.01
     anneal_strategy: cos
 

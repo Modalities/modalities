@@ -1,6 +1,6 @@
 settings:
   src_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat.jsonl
-  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_converted_20240822.jsonl
+  dst_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_converted.jsonl
   conversations_key: conversations
   pbin_creation_config_file_path: config_files/data_preparation/packed_dataset_config_lora_smol.yaml
   split_config:
