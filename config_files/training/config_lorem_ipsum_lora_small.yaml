@@ -75,6 +75,7 @@ train_dataloader:
     pin_memory: true
     shuffle: false
     dataloader_tag: train
+    fixed_num_batches: 20
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -269,9 +270,10 @@ scheduler:
     max_lr: 6e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 276
+    total_steps: 2
     pct_start: 0.01
     anneal_strategy: cos
+
 optimizer:
   component_key: optimizer
   variant_key: adam_w
