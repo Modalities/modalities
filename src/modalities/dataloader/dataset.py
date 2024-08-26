@@ -784,7 +784,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
         builders: List[MultimodalWebDatasetBuilder],
-        mixing_ratios: Optional[List[int]] = None,
+        mixing_ratios: Optional[List[float]] = None,
         shardshuffle: int = 100,
         repeat: bool = False,
         resample: bool = True,
