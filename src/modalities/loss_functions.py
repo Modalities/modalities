@@ -202,7 +202,7 @@ class ClipLoss(Loss):
         world_size = dist.get_world_size()
         rank = dist.get_rank()
 
-        gathered_embeddings = [[torch.zeros_like(embedding) for embedding in embeddings] for _ in range(world_size)]
+        gathered_embeddings = [[torch.zeros_like(embedding) for _ in range(world_size)] for embedding in embeddings]
 
         for gathered_embedding, embedding in zip(gathered_embeddings, embeddings):
             dist.all_gather(gathered_embedding, embedding)
