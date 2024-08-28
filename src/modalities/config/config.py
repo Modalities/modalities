@@ -109,6 +109,7 @@ class FSDPCheckpointSavingConfig(BaseModel):
 class TorchCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     experiment_id: str
+    submodule: Optional[str] = None
 
 
 class CheckpointSavingConfig(BaseModel):

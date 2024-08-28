@@ -13,12 +13,17 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
         self,
         checkpoint_path: Path,
         experiment_id: str,
+        submodule: str = None,
     ):
         self.checkpoint_path = checkpoint_path
         self.experiment_id = experiment_id
+        self.submodule = submodule
 
     def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, train_step_id: int):
-        model_state = model.state_dict()
+        if self.submodule:
+            model_state = getattr(model, self.submodule).state_dict()
+        else:
+            model_state = model.state_dict()
         model_checkpoint_path = self._get_checkpointing_path(
             experiment_id=self.experiment_id,
             train_step_id=train_step_id,
