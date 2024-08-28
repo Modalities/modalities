@@ -37,7 +37,7 @@ collate_fn:
     sample_keys:
       - images
       - ${settings.referencing_keys.sample_key}
-    n_modality_tokens: ${model.config.vision_projector_config.n_latents}
+    n_modality_tokens: ${image_projector_model.config.n_latents}
     text_sample_key: ${settings.referencing_keys.sample_key}
     text_target_key: ${settings.referencing_keys.target_key}
 
@@ -191,6 +191,24 @@ wrapped_model:
     precision: BF16
 
 
+image_projector_model:
+  component_key: model
+  variant_key: perceiver
+  config:
+    n_embd: 768
+    n_head: 8
+    n_layer: 6
+    n_self_attn_layers_per_block: 1
+    n_latents: 64
+    n_frames: 1
+    block_size: 49
+    ffn_hidden: 3072
+    bias: true
+    dropout: 0.1
+    attention_config:
+      attention_engine_type: default_attention
+    output_n_embd: 768
+
 model:
   component_key: model
   variant_key: anymal
@@ -213,20 +231,14 @@ model:
         prediction_key: ${settings.referencing_keys.prediction_key}
         huggingface_prediction_subscription_key: logits
         sample_key: ${settings.referencing_keys.sample_key}
-    vision_projector_config:
-      n_embd: 768
-      n_head: 8
-      n_layer: 6
-      n_self_attn_layers_per_block: 1
-      n_latents: 64
-      n_frames: 1
-      block_size: 49
-      ffn_hidden: 3072
-      bias: true
-      dropout: 0.1
-      attention_config:
-        attention_engine_type: default_attention
-      output_n_embd: 768
+    vision_projector:
+      component_key: model
+      variant_key: torch_model
+      config:
+        model:
+          instance_key: image_projector_model
+          pass_type: BY_REFERENCE
+        device: 'cpu'
     prediction_key: ${settings.referencing_keys.prediction_key}
     training_stage: MODALITY_ALIGNMENT
 

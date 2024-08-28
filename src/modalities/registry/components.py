@@ -103,7 +103,12 @@ from modalities.models.huggingface.huggingface_models import (
 # from modalities.models.mamba.mamba_config import MambaLLMConfig
 # from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
-from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
+from modalities.models.vision_transformer.vision_transformer_model import (
+    Perceiver,
+    PerceiverConfig,
+    VisionTransformer,
+    VisionTransformerConfig,
+)
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -141,6 +146,7 @@ COMPONENTS = [
     ComponentEntity("model", "torch_model", ModelFactory.get_torch_model, TorchModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     ComponentEntity("model", "anymal", AnyMAL, AnyMALConfig),
+    ComponentEntity("model", "perceiver", Perceiver, PerceiverConfig),
     ComponentEntity("model", "vit", VisionTransformer, VisionTransformerConfig),
     ComponentEntity("model", "aut", AudioTransformer, AudioTransformerConfig),
     # losses

@@ -47,7 +47,7 @@ class AnyMALConfig(BaseModel):
     text_decoder: PydanticPytorchModuleType
     prediction_key: str
     vision_encoder: PydanticPytorchModuleType = None
-    vision_projector_config: PerceiverConfig = None
+    vision_projector: PydanticPytorchModuleType = None
     audio_encoder: PydanticPytorchModuleType = None
     audio_encoder_n_embd: int = 512
     audio_projector_config: PerceiverConfig = None
@@ -64,8 +64,8 @@ class AnyMAL(NNModel):
         self,
         text_decoder: PydanticPytorchModuleType,
         prediction_key: str,
-        vision_encoder: PydanticPytorchModuleType,
-        vision_projector_config: PerceiverConfig = None,
+        vision_encoder: PydanticPytorchModuleType = None,
+        vision_projector: PydanticPytorchModuleType = None,
         audio_encoder: PydanticPytorchModuleType = None,
         audio_encoder_n_embd: int = 512,
         audio_projector_config: PerceiverConfig = None,
@@ -82,11 +82,11 @@ class AnyMAL(NNModel):
             raise ValueError("Either a vision or audio encoder should be specified.")
 
         if vision_encoder is not None:
-            if vision_projector_config is None:
+            if vision_projector is None:
                 raise ValueError("Vision projector should not be None.")
             self.modality_prediction_key = vision_encoder.prediction_key
             self.modality_encoder = vision_encoder
-            self.modality_projector = Perceiver(**dict(vision_projector_config))
+            self.modality_projector = vision_projector
         elif audio_encoder is not None:
             if audio_projector_config is None:
                 raise ValueError("Audio projector should not be None.")
@@ -132,6 +132,7 @@ class AnyMAL(NNModel):
             input_emb = proj_modality_emb
 
         pos = torch.arange(0, input_emb.shape[1], dtype=torch.long, device=input_emb.device)
+        pos = pos.unsqueeze(0)
         dec_inputs = {"input_ids": None}
         dec_inputs_kwargs = {"inputs_embeds": input_emb, "position_ids": pos}
 
