@@ -27,7 +27,7 @@ class CheckpointSavingExecutionABC(ABC):
     @abstractmethod
     def _delete_checkpoint(self, num_train_steps_done: int):
         """
-        Deletes the checkpoint.
+        Deletes the checkpoint based on the number of performed train steps.
 
         Args:
             num_train_steps_done (int): The number of training steps completed.
