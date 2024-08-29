@@ -63,17 +63,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         num_train_steps_done: int,
         entity_type: CheckpointingEntityType,
     ) -> Path:
-        """
-        Returns the path for saving the checkpoint file.
-
-        Args:
-            experiment_id (str): The ID of the experiment.
-            num_train_steps_done (int): The number of training steps completed.
-            entity_type (CheckpointingEntityType): The type of entity (model or optimizer) being checkpointed.
-
-        Returns:
-            Path: The path for saving the checkpoint file.
-        """
         num_tokens = self.get_num_tokens_from_num_steps_callable(num_train_steps_done)
         entity_file_name = self.CHECKPOINT_STRUCTURE.format(
             experiment_id=experiment_id,
@@ -86,17 +75,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         return full_path
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, num_train_steps_done: int):
-        """
-        Saves the model and optimizer checkpoints.
-
-        Args:
-            model (FSDP): The model to be saved.
-            optimizer (Optimizer): The optimizer to be saved.
-            num_train_steps_done (int): The number of training steps completed.
-
-        Returns:
-            None
-        """
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
@@ -137,15 +115,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         dist.barrier()
 
     def _get_paths_to_delete(self, num_train_steps_done: int) -> List[Path]:
-        """
-        Returns a list of paths to delete for checkpointing.
-
-        Args:
-            num_train_steps_done (int): The number of training steps completed.
-
-        Returns:
-            List[Path]: A list of paths to delete.
-        """
         return [
             self._get_checkpointing_path(
                 experiment_id=self.experiment_id, entity_type=entity_type, num_train_steps_done=num_train_steps_done
@@ -154,18 +123,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         ]
 
     def _delete_checkpoint(self, num_train_steps_done: int):
-        """
-        Deletes the checkpoint file.
-
-        Args:
-            num_train_steps_done (int): The number of train steps completed.
-
-        Raises:
-            CheckpointingError: If the checkpoint file could not be removed because it does not exist.
-
-        Returns:
-            None
-        """
         if self.global_rank != 0:
             return
 

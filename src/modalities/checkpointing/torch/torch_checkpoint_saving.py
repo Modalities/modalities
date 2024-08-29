@@ -54,33 +54,7 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
         raise NotImplementedError  # TODO Future work
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_sample_id: int):
-        """
-        Save the checkpoint of the model and optimizer.
-
-        Args:
-            model (FSDP): The model to be saved.
-            optimizer (Optimizer): The optimizer to be saved.
-            global_train_sample_id (int): The global train sample ID.
-
-        Returns:
-            None
-
-        Raises:
-            NotImplementedError: This method is not implemented yet. It is reserved for future work.
-        """
         raise NotImplementedError  # TODO Future work
 
     def _delete_checkpoint(self, global_train_sample_id: int):
-        """
-        Deletes the checkpoint for the given global train sample ID.
-
-        Args:
-            global_train_sample_id (int): The global train sample ID.
-
-        Returns:
-            None
-
-        Raises:
-            NotImplementedError: This method is not implemented yet. It is reserved for future work.
-        """
         raise NotImplementedError  # TODO Future work
