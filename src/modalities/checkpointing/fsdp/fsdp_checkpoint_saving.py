@@ -15,11 +15,21 @@ from modalities.exceptions import CheckpointingError
 
 
 class CheckpointingEntityType(Enum):
+    """
+    Enum class representing the types of entities that can be checkpointed.
+
+    Attributes:
+        MODEL (str): Represents the model entity.
+        OPTIMIZER (str): Represents the optimizer entity.
+    """
+
     MODEL = "model"
     OPTIMIZER = "optimizer"
 
 
 class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
+    """FSDPCheckpointSaving class for saving checkpoints of FSDP models and optimizers."""
+
     CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_steps_{num_train_steps}-num_tokens_{num_tokens}.bin"
 
     def __init__(
@@ -30,7 +40,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         get_num_tokens_from_num_steps_callable: Callable[[int], int],
     ):
         """
-        Implementation of checkpointing to disc via FSDP
+        Initializes the FSDPCheckpointSaving class.
 
         Args:
             checkpoint_path (Path): folder path to the checkpoint
@@ -38,6 +48,9 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             global_rank (int): global rank within the current process group
             get_num_tokens_from_num_steps_callable (Callable[[int], int]): callable to get the number
                 of tokens for a given number of train steps
+
+         Returns:
+            None
         """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
@@ -63,7 +76,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, num_train_steps_done: int):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
-        # TODO Need to check if LR schedulers also need checkpointing
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(
