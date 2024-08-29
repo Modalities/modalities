@@ -42,7 +42,7 @@ class IndexGenerator:
 
     def create_index(self, target_path_for_index_file: Path):
         """
-        Creates an index file where each sample in the index represents the start and end position of a
+        Creates an index file where each item in the index represents the start and length of a
         JSON document within a JSONL file.
 
         Args:
@@ -67,26 +67,15 @@ class IndexGenerator:
         target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
 
     def _indexer_thread(self):
-        """
-        This method is responsible for indexing the lines in the queue and parsing them as JSON.
-
-        It iterates over the lines in the queue and checks if each line is a valid JSON. If a line is valid,
-        it appends the line's start index and length to the index map. If a line is not valid, it either
-        skips the line or raises a ValueError, depending on the value of `drop_faulty_entries`.
-
-        Returns:
-            None
-        """
+        # This method is responsible for indexing the lines in the queue and parsing them as JSON.
+        # It iterates over the lines in the queue and checks if each line is a valid JSON. If a line is valid,
+        # it appends the line's start index and length to the index map. If a line is not valid, it either
+        # skips the line or raises a ValueError, depending on the value of `drop_faulty_entries`.
 
         def queue_generator():
-            """
-            Generator function that continuously yields lines
-            (i.e. JSON documents) from a queue until None is encountered.
+            # Generator function that continuously yields lines
+            # (i.e. JSON documents) from a queue until None is encountered.
 
-            Yields:
-                str: The next line (i.e. JSON document) from the queue.
-
-            """
             while True:
                 line = self._queue_of_raw_lines.get()
                 if line is None:
@@ -94,22 +83,9 @@ class IndexGenerator:
                 yield line
 
         def parse_line_as_json(line_start_idx: int, line: str):
-            """
-            Parses a line as JSON and appends the sample index, i.e., the line start index and length to the index map.
-
-            Args:
-                line_start_idx (int): The start index of the line.
-                line (str): The line to be parsed as JSON.
-
-            Raises:
-                ValueError: If the line is faulty and `drop_faulty_entries` is set to False.
-
-            Warnings:
-                If the line is faulty and `drop_faulty_entries` is set to True, a warning is issued.
-
-            Returns:
-                None
-            """
+            # Parses a line as JSON and appends the sample index, i.e.,
+            # the line start index and length to the index map.
+            # If the line is faulty and `drop_faulty_entries` is set to True, a warning is issued.
             try:  # check if line is a valid json
                 json.loads(line)
                 self._index_map.append((line_start_idx, len(line)))
@@ -128,16 +104,11 @@ class IndexGenerator:
             parse_line_as_json(line_start_idx, line)
 
     def _reader_thread(self):
-        """
-        Reads lines from the source file and puts them into a queue.
+        # Reads lines from the source file and puts them into a queue.
+        # This method is executed in a separate thread. It reads lines from the source file until
+        # the end of the file is reached. Each line is put into a queue along with its cursor position. If any
+        # errors are detected, the method returns immediately.
 
-        This method is executed in a separate thread. It reads lines from the source file until
-        the end of the file is reached. Each line is put into a queue along with its cursor position. If any
-        errors are detected, the method returns immediately.
-
-        Returns:
-            None
-        """
         with open(self.src_file, "r") as fin:
             while True:
                 cursor = fin.tell()
@@ -152,10 +123,5 @@ class IndexGenerator:
         self._queue_of_raw_lines.put(None)
 
     def _check_for_parallel_errors(self) -> bool:
-        """
-        Checks if there are any errors in the exception buffer.
-
-        Returns:
-            bool: True if there are errors, False otherwise.
-        """
+        # Checks if there are any errors in the exception buffer.
         return bool(self._exception_buffer)

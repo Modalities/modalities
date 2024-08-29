@@ -32,15 +32,7 @@ class Dataset(TorchdataSet):
         self.sample_key = sample_key
 
     def _check_if_inbounds(self, idx: int):
-        """
-        Check if the given index is within the bounds of the dataset.
-
-        Args:
-            idx (int): The index to check.
-
-        Raises:
-            IndexError: If the index is out of bounds.
-        """
+        # check if the provided index is within the bounds of the dataset.
         if not 0 <= idx < len(self):
             raise IndexError
 
@@ -130,13 +122,8 @@ class DummyDataset(Dataset):
         """
         return self._create_random_sample()
 
-    def _create_random_sample(self):
-        """
-        Creates a random sample based on the sample definition.
-
-        Returns:
-            dict: A dictionary containing the randomly generated sample data.
-        """
+    def _create_random_sample(self) -> Dict:
+        # creates a random sample based on the sample definition
         sample = dict()
         for s in self.sample_definition:
             if s.sample_type == DummySampleDataType.FLOAT:
@@ -251,13 +238,9 @@ class PackedMemMapDatasetBase(Dataset):
         self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
-        """
-        Generates the packing index for the dataset.
+        # Generates the packing index for the dataset.
+        # The index is list of tuples, where each tuple contains the offset and length in bytes.
 
-        Returns:
-            A list of tuples representing the index, where each tuple contains the offset and length in bytes.
-        """
-        # index is a tuple of offset and length in bytes
         return self._embedded_stream_data.index_base
 
     def __len__(self) -> int:
@@ -325,12 +308,9 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
-        """
-        Generates the packing index for the dataset.
+        # Generates the packing index for the dataset.
+        # A list of tuples representing the index, where each tuple contains the offset and length in bytes.
 
-        Returns:
-            A list of tuples representing the index, where each tuple contains the offset and length in bytes.
-        """
         # get number of total tokens in file
         total_tokens = self._embedded_stream_data.data_len // self._token_size_in_bytes
         if total_tokens < self.block_size:

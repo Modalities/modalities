@@ -32,7 +32,7 @@ class OpenGPTXDatasetWrapper(Dataset):
 
 
 class DatasetFactory:
-    """DatasetFactory class."""
+    """DatasetFactory for building the different dataset types."""
 
     @staticmethod
     def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:

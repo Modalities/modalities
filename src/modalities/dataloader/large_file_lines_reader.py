@@ -87,22 +87,12 @@ class LargeFileLinesReader(BaseReader):
 
         """
         if isinstance(key, slice):
-            return [self.__read_from_raw_file(*idx) for idx in self.index[key]]
+            return [self._read_from_raw_file(*idx) for idx in self.index[key]]
         offset, sample_length_in_bytes = self.index[key]
-        return self.__read_from_raw_file(offset, sample_length_in_bytes)
+        return self._read_from_raw_file(offset, sample_length_in_bytes)
 
-    def __read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
-        """
-        Reads a specified number of bytes from a raw file starting from a given offset.
-
-        Args:
-            offset (int): The offset in bytes from where to start reading the file.
-            sample_length_in_bytes (int): The number of bytes to read from the file.
-
-        Returns:
-            str: The content read from the file as a string.
-
-        """
+    def _read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str:
+        # Reads a specified number of bytes from a raw file starting from a given offset.
         f = self.raw_data_path.open()
         f.seek(offset)
         return f.read(sample_length_in_bytes)

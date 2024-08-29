@@ -24,6 +24,8 @@ class EmptySampleError(RuntimeError):
 
 
 class PackedDataGenerator:
+    """Reads in a JSONL file and the corresponding index file and packs the dataset for LLM training."""
+
     def __init__(
         self,
         src_path: FilePath,
@@ -38,7 +40,6 @@ class PackedDataGenerator:
     ):
         """
         Initializes a PackedDataGenerator object.
-        Reads in a JSONL file and the corresponding index file and packs the dataset for LLM training.
 
         Args:
             src_path (FilePath): Path to a JSONL file, which holds text data.
@@ -152,15 +153,9 @@ class PackedDataGenerator:
             raise self._exception_buffer[0]
 
     def _launch_parallelized_workers(self, dst_path: Path):
-        """
-        Launches workers in parallel for reading, writing, and processing data.
+        # Launches workers in parallel for reading, writing, and processing data.
+        # The data is stored in the provided destination path.
 
-        Args:
-            dst_path (Path): The destination path to save the packed data.
-
-        Returns:
-            None
-        """
         reader = multiprocessing.Process(target=self._reader_thread())
         reader.start()
 
@@ -177,18 +172,12 @@ class PackedDataGenerator:
         writer.join()
 
     def _stop_processing(self):
-        """
-        Stops the processing of samples by putting None in the processed_samples_queue.
-        """
+        # Stops the processing of samples by putting None in the processed_samples_queue.
         self.processed_samples_queue.put(None)
 
     def _generator_for_tokens_to_get_written(self):
-        """
-        Generator function that yields batches of processed samples.
+        # Generator function that yields batches of processed samples.
 
-        Yields:
-            batch: A batch of processed samples.
-        """
         while True:
             if self._check_for_parallel_errors():
                 return
@@ -198,29 +187,12 @@ class PackedDataGenerator:
             yield batch
 
     def _check_for_parallel_errors(self) -> bool:
-        """
-        Checks if there are any errors in the exception buffer.
-
-        Returns:
-            bool: True if there are errors, False otherwise.
-        """
+        # Checks if there are any errors in the exception buffer.
         return bool(self._exception_buffer)
 
     def _writer_thread(self, dst_path: Path) -> Callable:
-        """
-        Returns a callable writer function that writes a batch
-        received from the processed_samples_queue to the destination file.
-
-        Args:
-            dst_path (Path): The path to the destination file.
-
-        Returns:
-            Callable: The writer function.
-
-        Raises:
-            ValueError: If the line IDs are not consecutive.
-
-        """
+        # Returns a callable writer function that writes a batch
+        # received from the processed_samples_queue to the destination file.
 
         def writer():
             # writes a batch received from the processed_samples_queue to the destination file
@@ -274,13 +246,7 @@ class PackedDataGenerator:
         return writer
 
     def _reader_thread(self) -> Callable:
-        """
-        Returns a reader function that reads lines from the reader and puts them into a queue.
-
-        Returns:
-            Callable: A reader function that reads lines from the reader and puts them into a queue.
-        """
-
+        # returns a reader function that reads lines from the reader and puts them into a queue.
         def reader():
             batch = []
             for line_id, line in tqdm(enumerate(self._reader), desc="Reading jsonl", disable=True):
@@ -300,20 +266,7 @@ class PackedDataGenerator:
         return reader
 
     def _process_thread(self, process_id: int):
-        """
-        Process the lines in a batch and put the processed samples into the processed_samples_queue.
-
-        Args:
-            process_id (int): The ID of the process.
-
-        Returns:
-            None
-
-        Raises:
-            EmptySampleError: If an empty sample is encountered in a line of the file.
-            Exception: If an error occurs while processing a line.
-
-        """
+        # Process the lines in a batch and put the processed samples into the processed_samples_queue.
         if self._check_for_parallel_errors():
             return
 
@@ -341,17 +294,8 @@ class PackedDataGenerator:
                 )
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
-        """
-        Update the length of the data section in the pre-allocated header of the destination file.
-
-        Args:
-            dst_path (Path): The path to the destination file.
-            index_list (List[Tuple[int, int]]): A list of tuples representing
-            the start position and length of each data entry.
-
-        Returns:
-            None
-        """
+        # Update the length of the data section in the pre-allocated header of the destination file.
+        # The data segment length is sum of the starting position and the length of the last document.
         length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
         data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
             EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
@@ -361,20 +305,7 @@ class PackedDataGenerator:
             fout.write(data_section_length_in_bytes)
 
     def _process_line(self, line: str, process_id: int) -> bytes:
-        """
-        Process a line of text.
-
-        Args:
-            line (str): The input line of text.
-            process_id (int): The process ID.
-
-        Returns:
-            bytes: The processed line as bytes.
-
-        Raises:
-            ValueError: If jq was not able to find anything using the expression.
-            EmptySampleError: If the received sample is empty.
-        """
+        # extracts the text via the jq_filter and applies tokenization to the extract text
         jq_retrieved_text = self.jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able to find anything using the expression: {self.jq_filter}")
@@ -461,12 +392,7 @@ def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file
     num_entries = sum(len(d.index_base) for d in stream_data)
 
     def index_stream_generator() -> Iterator[Tuple[int, int]]:
-        """
-        Generates a stream of index offsets and segment lengths.
-
-        Yields:
-            Tuple[int, int]: A tuple containing the entry offset and segment length.
-        """
+        # generates a stream of index offsets and segment lengths.
         curr_offset = 0
         for embedded_stream_data in stream_data:
             for entry_offset, segment_length in embedded_stream_data.index_base:
