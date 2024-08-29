@@ -13,7 +13,7 @@ class ResumableBatchSampler(Sampler):
 
         Args:
             start_index (int): index to start sampling from
-            existing_sampler (Sampler): Sampler from which we want to continue
+            underlying_batch_sampler (BatchSampler): Sampler providing the batch ids.
             max_num_elements (Optional[int]): The maximum number of elements the sampler returns. Default None.
 
         Returns:
