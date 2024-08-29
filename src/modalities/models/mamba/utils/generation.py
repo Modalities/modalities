@@ -7,11 +7,23 @@ import torch
 from torch import Tensor
 from transformers.generation import GreedySearchDecoderOnlyOutput, SampleDecoderOnlyOutput, TextStreamer
 
+"""Inference parameters that are passed to the main model in order
+    to efficienly calculate and store the context during inference."""
+
 
 @dataclass
 class InferenceParams:
-    """Inference parameters that are passed to the main model in order
-    to efficienly calculate and store the context during inference."""
+    """
+    InferenceParams data class that represents the parameters for inference.
+
+    Attributes:
+        max_seqlen (int): The maximum sequence length.
+        max_batch_size (int): The maximum batch size.
+        seqlen_offset (Optional[int]): The sequence length offset. Defaults to 0.
+        batch_size_offset (Optional[int]): The batch size offset. Defaults to 0.
+        key_value_memory_dict (Optional[Dict]): A dictionary for key-value memory. Defaults to an empty dictionary.
+        lengths_per_sample (Optional[torch.Tensor]): The lengths per sample. Defaults to None.
+    """
 
     max_seqlen: int
     max_batch_size: int
@@ -21,6 +33,16 @@ class InferenceParams:
     lengths_per_sample: Optional[Tensor] = None
 
     def reset(self, max_seqlen, max_batch_size):
+        """
+        Reset max_seqlen, max_batch_size, and  seqlen_offset.
+
+        Args:
+            max_seqlen (int): The maximum sequence length.
+            max_batch_size (int): The maximum batch size.
+
+        Returns:
+            None
+        """
         self.max_seqlen = max_seqlen
         self.max_batch_size = max_batch_size
         self.seqlen_offset = 0
@@ -29,7 +51,17 @@ class InferenceParams:
 
 
 def modify_logits_for_min_p_filtering(logits, min_p):
-    """Set the logits for none min_p values to -inf. Done in-place."""
+    """
+    Set the logits for none min_p values to -inf.
+
+    Args:
+        logits (torch.Tensor): The input tensor of logits.
+        min_p (float): The minimum probability threshold. Values below this threshold will be masked.
+
+    Returns:
+        None: The function modifies the input tensor in-place.
+    """
+
     if min_p <= 0.0 or min_p >= 1.0:
         return
     indices_to_remove = logits < min_p
@@ -39,7 +71,16 @@ def modify_logits_for_min_p_filtering(logits, min_p):
 # https://github.com/NVIDIA/Megatron-LM/blob/0bb597b42c53355a567aba2a1357cc34b9d99ddd/megatron/text_generation/sampling.py
 # https://github.com/huggingface/transformers/blob/a44985b41cfa2de48a5e1de7f1f93b7483da25d1/src/transformers/generation/logits_process.py#L231
 def modify_logits_for_top_k_filtering(logits, top_k):
-    """Set the logits for none top-k values to -inf. Done in-place."""
+    """
+    Set the logits for none top-k values to -inf.
+
+    Args:
+        logits (torch.Tensor): The input logits tensor.
+        top_k (int): The number of elements to keep in the logits tensor.
+
+    Returns:
+        torch.Tensor: The modified logits tensor with top-k filtering applied. Done in-place.
+    """
     indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
     logits.masked_fill_(indices_to_remove, float("-Inf"))
 
@@ -162,6 +203,16 @@ def decode(
         inference_params = InferenceParams(max_seqlen=max_length, max_batch_size=batch_size)
 
     def get_logits(input_ids, inference_params):
+        """
+        Calculates the logits for the given input_ids.
+
+        Args:
+            input_ids (torch.Tensor): The input tensor.
+            inference_params: The parameters for inference.
+
+        Returns:
+            torch.Tensor: The logits tensor.
+        """
         decoding = inference_params.seqlen_offset > 0
         if decoding:
             position_ids = torch.full(
@@ -184,6 +235,17 @@ def decode(
         return logits[..., :vocab_size] if vocab_size is not None else logits
 
     def sample_tokens(logits, inference_params):
+        """
+        Samples tokens from the given logits.
+
+        Args:
+            logits (Tensor): The logits tensor.
+            inference_params: The inference parameters.
+
+        Returns:
+            Tensor: The sampled tokens.
+
+        """
         if teacher_outputs is None or teacher_output_len <= inference_params.seqlen_offset:
             token = sample(logits, top_k=top_k, top_p=top_p, min_p=min_p, temperature=temperature)
         else:
@@ -192,6 +254,16 @@ def decode(
         return token.unsqueeze(1)
 
     def should_stop(current_token, inference_params):
+        """
+        Determines whether the generation process should stop.
+
+        Args:
+            current_token (torch.Tensor): The current token being generated.
+            inference_params: The parameters for the inference process.
+
+        Returns:
+            bool: True if the generation process should stop, False otherwise.
+        """
         if inference_params.seqlen_offset == 0:
             return False
         if eos_token_id is not None and (current_token == eos_token_id).all():
@@ -230,7 +302,24 @@ def decode(
 
 
 class GenerationMixin:
+    """GenerationMixin class that provides methods for generating sequences."""
+
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+        """
+        Allocates the inference cache.
+
+        Parameters:
+        - batch_size (int): The batch size for the inference cache.
+        - max_seqlen (int): The maximum sequence length for the inference cache.
+        - dtype -: The data type of the inference cache. Defaults to None.
+        - **kwargs: Additional keyword arguments.
+
+        Raises:
+        - NotImplementedError: This method is not implemented and should be overridden in a subclass.
+
+        Returns:
+        - None
+        """
         raise NotImplementedError
 
     def generate(
@@ -245,6 +334,25 @@ class GenerationMixin:
         output_scores=False,
         **kwargs,
     ):
+        """
+        Generates sequences based on the given input_ids.
+
+        Args:
+            input_ids (torch.Tensor): The tensor containing the input IDs.
+            max_length (int): The maximum length of the generated sequences.
+            top_k (int, optional): The number of highest probability tokens to consider for each step. Defaults to 1.
+            top_p (float, optional): The cumulative probability threshold for generating sequences. Defaults to 0.0.
+            min_p (float, optional): The minimum probability threshold for generating sequences. Defaults to 0.0.
+            temperature (float, optional):
+            The temperature value for controlling the randomness of the generated sequences. Defaults to 1.0.
+            return_dict_in_generate (bool, optional): -.
+            output_scores (bool, optional): Whether to include the scores of the generated tokens. Defaults to False.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Union[Output, List[List[int]]]: The generated sequences or the output dictionary,
+            depending on the value of return_dict_in_generate.
+        """
         output = decode(
             input_ids, self, max_length, top_k=top_k, top_p=top_p, min_p=min_p, temperature=temperature, **kwargs
         )
@@ -255,6 +363,20 @@ class GenerationMixin:
 
 @dataclass
 class DecodingCGCache:
+    """
+    The DecodingCGCache class for storing decoding related parameters and objects.
+
+    Attributes:
+        max_batch_size (int): The maximum batch size for decoding.
+        max_seqlen (int): The maximum sequence length for decoding.
+        device: The device used for decoding.
+        dtype: The data type used for decoding.
+        callables (Dict): A dictionary of callables used for decoding.
+        mempool: The memory pool used for decoding.
+        inference_params (InferenceParams, optional): Optional inference parameters for decoding.
+        run (Callable, optional): Optional callable for running the decoding process.
+    """
+
     max_batch_size: int = 0
     max_seqlen: int = 0
     device = None
@@ -276,6 +398,23 @@ def update_graph_cache(
     dtype=None,
     n_warmups=2,
 ):
+    """
+    Update the graph cache.
+
+    Args:
+        model (nn.Module): The model for which the cache is being updated.
+        cache (DecodingCGCache, optional): The existing cache to be updated. If None, a new cache will be created.
+        batch_size (int): The batch size of the input data.
+        seqlen_og (int): The original sequence length.
+        max_seqlen (int): The maximum sequence length.
+        decoding_seqlens (Tuple, optional): The decoding sequence lengths to be cached. Defaults to (1,).
+        dtype (torch.dtype, optional): The data type of the cache.
+        If None, the data type of the model's parameters will be used.
+        n_warmups (int, optional): The number of warmup iterations for capturing the CUDA graph. Defaults to 2.
+
+    Returns:
+        DecodingCGCache: The updated cache.
+    """
     if cache is None:
         cache = DecodingCGCache()
     param_example = next(iter(model.parameters()))
@@ -328,6 +467,23 @@ def update_graph_cache(
 
 
 def capture_graph(model, inference_params, batch_size, max_seqlen, decoding_seqlen=1, mempool=None, n_warmups=2):
+    """
+    Captures the CUDA graph.
+
+    Args:
+        model (torch.nn.Module): The model to capture the graph for.
+        inference_params (InferenceParams): The parameters for inference.
+        batch_size (int): The batch size.
+        max_seqlen (int): The maximum sequence length.
+        decoding_seqlen (int, optional): The decoding sequence length. Defaults to 1.
+        mempool (torch.cuda.memory.MemoryPool, optional):
+        The memory pool to use for capturing the graph. Defaults to None.
+        n_warmups (int, optional): The number of warmup iterations. Defaults to 2.
+
+    Returns:
+        Callable.
+
+    """
     device = next(iter(model.parameters())).device
     input_ids = torch.full((batch_size, decoding_seqlen), 0, dtype=torch.long, device=device)
     position_ids = torch.full((batch_size, decoding_seqlen), 0, dtype=torch.long, device=device)
@@ -365,6 +521,18 @@ def capture_graph(model, inference_params, batch_size, max_seqlen, decoding_seql
         ).logits
 
     def run(new_input_ids, new_position_ids, seqlen):
+        # TODO: Update docstring
+        """
+
+        Args:
+            new_input_ids (Tensor): The new input IDs.
+            new_position_ids (Tensor): The new position IDs.
+            seqlen (int): The sequence length.
+
+        Returns:
+            Tensor: logits.
+
+        """
         inference_params.lengths_per_sample[:] = seqlen
         input_ids.copy_(new_input_ids)
         position_ids.copy_(new_position_ids)

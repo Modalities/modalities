@@ -16,6 +16,22 @@ from torch.cuda.amp import custom_bwd, custom_fwd
 
 
 def layer_norm_ref(x, weight, bias, residual=None, eps=1e-6, prenorm=False, upcast=False):
+    """
+    Apply layer normalization to the input tensor `x`.
+
+    Args:
+        x (torch.Tensor): The input tensor to be normalized.
+        weight (torch.Tensor): The weight tensor for the layer normalization.
+        bias (torch.Tensor): The bias tensor for the layer normalization.
+        residual (torch.Tensor, optional): The residual tensor to be added to the input tensor. Default is None.
+        eps (float, optional): A value added to the denominator for numerical stability. Default is 1e-6.
+        prenorm (bool, optional): If True, return a tuple of normalized tensor and the input tensor. Default is False.
+        upcast (bool, optional): If True, upcast the input tensor, weight, and bias to float. Default is False.
+
+    Returns:
+        torch.Tensor or Tuple[torch.Tensor, torch.Tensor]: The normalized tensor if `prenorm` is False,
+        otherwise a tuple of normalized tensor and the input tensor.
+    """
     dtype = x.dtype
     if upcast:
         weight = weight.float()
@@ -30,6 +46,26 @@ def layer_norm_ref(x, weight, bias, residual=None, eps=1e-6, prenorm=False, upca
 
 
 def rms_norm_ref(x, weight, bias, residual=None, eps=1e-6, prenorm=False, upcast=False):
+    """
+    Applies RMS normalization to the input tensor `x` using the provided `weight` and `bias` parameters.
+
+    Args:
+        x (torch.Tensor): The input tensor to be normalized.
+        weight (torch.Tensor): The weight tensor to be applied to the normalized input.
+        bias (torch.Tensor, optional): The bias tensor to be added to the normalized input. Default is None.
+        residual (torch.Tensor, optional): The residual tensor to be added to the input before normalization.
+        Default is None.
+        eps (float, optional): A small value added to the denominator for numerical stability.
+        Default is 1e-6.
+        prenorm (bool, optional): If True, returns a tuple containing the normalized output and the input tensor.
+        Default is False.
+        upcast (bool, optional): If True, upcasts the weight, bias, and input tensors to float before normalization.
+        Default is False.
+
+    Returns:
+        torch.Tensor or Tuple[torch.Tensor, torch.Tensor]: The normalized output tensor.
+        If `prenorm` is True, returns a tuple containing the normalized output and the input tensor.
+    """
     dtype = x.dtype
     if upcast:
         weight = weight.float()
@@ -60,26 +96,53 @@ def rms_norm_ref(x, weight, bias, residual=None, eps=1e-6, prenorm=False, upcast
 # @triton.heuristics({"HAS_RESIDUAL": lambda args: args["RESIDUAL"] is not None})
 @triton.jit
 def _layer_norm_fwd_1pass_kernel(
-    X,  # pointer to the input
-    Y,  # pointer to the output
-    W,  # pointer to the weights
-    B,  # pointer to the biases
-    RESIDUAL,  # pointer to the residual
-    RESIDUAL_OUT,  # pointer to the residual
-    Mean,  # pointer to the mean
-    Rstd,  # pointer to the 1/std
-    stride_x_row,  # how much to increase the pointer when moving by 1 row
+    X,
+    Y,
+    W,
+    B,
+    RESIDUAL,
+    RESIDUAL_OUT,
+    Mean,
+    Rstd,
+    stride_x_row,
     stride_y_row,
     stride_res_row,
     stride_res_out_row,
-    N,  # number of columns in X
-    eps,  # epsilon to avoid division by zero
+    N,
+    eps,
     IS_RMS_NORM: tl.constexpr,
     BLOCK_N: tl.constexpr,
     HAS_RESIDUAL: tl.constexpr,
     STORE_RESIDUAL_OUT: tl.constexpr,
     HAS_BIAS: tl.constexpr,
 ):
+    """
+    Compute layer normalization forward pass using a single kernel.
+
+    Args:
+        X: Pointer to the input.
+        Y: Pointer to the output.
+        W: Pointer to the weights.
+        B: Pointer to the biases.
+        RESIDUAL: Pointer to the residual.
+        RESIDUAL_OUT: Pointer to the residual.
+        Mean: Pointer to the mean.
+        Rstd: Pointer to the 1/std.
+        stride_x_row: Defines, how much to increase the pointer when moving by 1 row.
+        stride_y_row: Defines, how much to increase the pointer when moving by 1 row.
+        stride_res_row: How much to increase the pointer when moving by 1 row.
+        stride_res_out_row: How much to increase the pointer when moving by 1 row.
+        N: Number of columns in X.
+        eps: Epsilon to avoid division by zero.
+        IS_RMS_NORM: Boolean indicating whether it is RMS normalization.
+        BLOCK_N: Constant expression indicating the block size.
+        HAS_RESIDUAL: Constant expression indicating whether it has residual.
+        STORE_RESIDUAL_OUT: Constant expression indicating whether to store residual out.
+        HAS_BIAS: Constant expression indicating whether it has bias.
+
+    Returns:
+        None
+    """
     # Map the program id to the row of X and Y it should compute.
     row = tl.program_id(0)
     X += row * stride_x_row
@@ -118,6 +181,23 @@ def _layer_norm_fwd_1pass_kernel(
 
 
 def _layer_norm_fwd(x, weight, bias, eps, residual=None, out_dtype=None, residual_dtype=None, is_rms_norm=False):
+    """
+    Applies layer normalization to the input tensor.
+
+    Args:
+        x (torch.Tensor): The input tensor.
+        weight (torch.Tensor): The weight tensor.
+        bias (torch.Tensor): The bias tensor.
+        eps (float): A small value added to the denominator for numerical stability.
+        residual (torch.Tensor, optional): The residual tensor. Defaults to None.
+        out_dtype (torch.dtype, optional): The output tensor dtype. Defaults to None.
+        residual_dtype (torch.dtype, optional): The residual tensor dtype. Defaults to None.
+        is_rms_norm (bool, optional): Whether to perform RMS normalization. Defaults to False.
+
+    Returns:
+        Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
+    """
+
     if residual is not None:
         residual_dtype = residual.dtype
     M, N = x.shape
@@ -189,27 +269,27 @@ def _layer_norm_fwd(x, weight, bias, eps, residual=None, out_dtype=None, residua
 @triton.heuristics({"RECOMPUTE_OUTPUT": lambda args: args["Y"] is not None})
 @triton.jit
 def _layer_norm_bwd_kernel(
-    X,  # pointer to the input
-    W,  # pointer to the weights
-    B,  # pointer to the biases
-    Y,  # pointer to the output to be recomputed
-    DY,  # pointer to the output gradient
-    DX,  # pointer to the input gradient
-    DW,  # pointer to the partial sum of weights gradient
-    DB,  # pointer to the partial sum of biases gradient
+    X,
+    W,
+    B,
+    Y,
+    DY,
+    DX,
+    DW,
+    DB,
     DRESIDUAL,
     DRESIDUAL_IN,
-    Mean,  # pointer to the mean
-    Rstd,  # pointer to the 1/std
-    stride_x_row,  # how much to increase the pointer when moving by 1 row
+    Mean,
+    Rstd,
+    stride_x_row,
     stride_y_row,
     stride_dy_row,
     stride_dx_row,
     stride_dres_row,
     stride_dres_in_row,
-    M,  # number of rows in X
-    N,  # number of columns in X
-    eps,  # epsilon to avoid division by zero
+    M,
+    N,
+    eps,
     rows_per_program,
     IS_RMS_NORM: tl.constexpr,
     BLOCK_N: tl.constexpr,
@@ -218,6 +298,42 @@ def _layer_norm_bwd_kernel(
     HAS_BIAS: tl.constexpr,
     RECOMPUTE_OUTPUT: tl.constexpr,
 ):
+    """
+    Compute the backward pass of the layer normalization operation.
+
+    Args:
+        X: Pointer to the input.
+        W: Pointer to the weights.
+        B: Pointer to the biases.
+        Y: Pointer to the output to be recomputed.
+        DY: Pointer to the output gradient.
+        DX: Pointer to the input gradient.
+        DW: Pointer to the partial sum of weights gradient.
+        DB: Pointer to the partial sum of biases gradient.
+        DRESIDUAL: -
+        DRESIDUAL_IN: -
+        Mean: Pointer to the mean.
+        Rstd: Pointer to the 1/std.
+        stride_x_row: Defines, how much to increase the pointer when moving by 1 row.
+        stride_y_row: -
+        stride_dy_row: -
+        stride_dx_row: -
+        stride_dres_row: -
+        stride_dres_in_row: -
+        M: Number of rows in X.
+        N: Number of columns in X.
+        eps: Epsilon to avoid division by zero.
+        rows_per_program: -
+        IS_RMS_NORM: Whether it is RMS normalization or not.
+        BLOCK_N: -
+        HAS_DRESIDUAL: Whether it has residual or not.
+        STORE_DRESIDUAL: Whether to store residual or not.
+        HAS_BIAS: Whether it has bias or not.
+        RECOMPUTE_OUTPUT: Whether to recompute output or not.
+
+        Returns:
+            None
+    """
     # Map the program id to the elements of X, DX, and DY it should compute.
     row_block_id = tl.program_id(0)
     row_start = row_block_id * rows_per_program
@@ -299,6 +415,32 @@ def _layer_norm_bwd(
     x_dtype=None,
     recompute_output=False,
 ):
+    """
+    Backward pass for the layer normalization operation.
+
+    Args:
+        dy (torch.Tensor): The gradient of the output tensor with respect to the loss.
+        x (torch.Tensor): The input tensor.
+        weight (torch.Tensor): The weight tensor.
+        bias (torch.Tensor): The bias tensor.
+        eps (float): The epsilon value for numerical stability.
+        mean (torch.Tensor): The mean tensor computed during the forward pass.
+        rstd (torch.Tensor): The reciprocal standard deviation tensor computed during the forward pass.
+        dresidual (torch.Tensor, optional): The gradient of the residual tensor with respect to the loss.
+        Defaults to None.
+        has_residual (bool, optional): Indicates whether the residual tensor is present.
+        Defaults to False.
+        is_rms_norm (bool, optional): Indicates whether the operation is RMS normalization.
+        Defaults to False.
+        x_dtype (torch.dtype, optional): The data type of the input tensor.
+        Defaults to None.
+        recompute_output (bool, optional): Indicates whether to recompute the output tensor.
+        Defaults to False.
+
+    Returns:
+        Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]
+    """
     M, N = x.shape
     assert x.stride(-1) == 1
     assert dy.stride(-1) == 1
@@ -365,6 +507,8 @@ def _layer_norm_bwd(
 
 
 class LayerNormFn(torch.autograd.Function):
+    """LayerNormFn class."""
+
     @staticmethod
     def forward(
         ctx,
@@ -377,6 +521,26 @@ class LayerNormFn(torch.autograd.Function):
         residual_in_fp32=False,
         is_rms_norm=False,
     ):
+        """
+        Forward pass of the LayerNorm module.
+
+        Args:
+            ctx: -.
+            x (torch.Tensor): Input tensor.
+            weight (torch.Tensor): Weight tensor.
+            bias (torch.Tensor): Bias tensor.
+            residual (torch.Tensor, optional): Residual tensor. Defaults to None.
+            eps (float, optional): Epsilon value for numerical stability. Defaults to 1e-6.
+            prenorm (bool, optional): Flag indicating whether to apply pre-normalization. Defaults to False.
+            residual_in_fp32 (bool, optional): Flag indicating whether the residual tensor is in FP32 format.
+            Defaults to False.
+            is_rms_norm (bool, optional): Flag indicating whether to apply RMS normalization.
+            Defaults to False.
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+            Output tensor or tuple of output tensor and residual tensor.
+        """
         x_shape_og = x.shape
         # reshape input data into 2D tensor
         x = x.reshape(-1, x.shape[-1])
@@ -406,6 +570,27 @@ class LayerNormFn(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, dy, *args):
+        """
+        Backward pass of the layer normalization operation.
+
+        Args:
+            ctx: -.
+            dy (torch.Tensor): -.
+            *args: Additional arguments passed to the backward function.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, None, None, None, None]:
+            - dx (torch.Tensor): Tensor representing the gradient of the input with respect to the forward output.
+            - dw (torch.Tensor): Tensor representing the gradient of the weight with respect to the forward output.
+            - db (torch.Tensor): Tensor representing the gradient of the bias with respect to the forward output.
+            - dresidual_in (torch.Tensor or None):
+            Tensor representing the gradient of the residual input with respect to the forward output
+            if residual is present, otherwise None.
+            - None.
+            - None.
+            - None.
+            - None.
+        """
         x, weight, bias, mean, rstd = ctx.saved_tensors
         dy = dy.reshape(-1, dy.shape[-1])
         if dy.stride(-1) != 1:
@@ -454,15 +639,58 @@ def layer_norm_fn(
     residual_in_fp32=False,
     is_rms_norm=False,
 ):
+    """
+    Apply layer normalization to the input tensor `x`.
+
+    Args:
+        x (torch.Tensor): The input tensor to be normalized.
+        weight (torch.Tensor): The weight tensor for affine transformation.
+        bias (torch.Tensor): The bias tensor for affine transformation.
+        residual (torch.Tensor, optional): The residual tensor to be added after normalization. Default is None.
+        eps (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
+        prenorm (bool, optional): Whether to apply pre-normalization. Default is False.
+        residual_in_fp32 (bool, optional): Whether to convert the residual tensor to float32. Default is False.
+        is_rms_norm (bool, optional): Whether to apply root mean square normalization. Default is False.
+
+    Returns:
+        torch.Tensor: The normalized tensor.
+
+    """
     return LayerNormFn.apply(x, weight, bias, residual, eps, prenorm, residual_in_fp32, is_rms_norm)
 
 
 def rms_norm_fn(x, weight, bias, residual=None, prenorm=False, residual_in_fp32=False, eps=1e-6):
+    """
+    Apply root mean square normalization to the input tensor.
+
+    Args:
+        x (Tensor): The input tensor.
+        weight (Tensor): The weight tensor.
+        bias (Tensor): The bias tensor.
+        residual (Tensor, optional): The residual tensor. Defaults to None.
+        prenorm (bool, optional): Whether to apply pre-normalization. Defaults to False.
+        residual_in_fp32 (bool, optional): Whether the residual tensor is in FP32 format. Defaults to False.
+        eps (float, optional): The epsilon value. Defaults to 1e-6.
+
+    Returns:
+        Tensor: The normalized tensor.
+    """
     return LayerNormFn.apply(x, weight, bias, residual, eps, prenorm, residual_in_fp32, True)
 
 
 class RMSNorm(torch.nn.Module):
+    """RMNNorm class."""
+
     def __init__(self, hidden_size, eps=1e-5, device=None, dtype=None):
+        """
+        Initializes the RMSNorm object.
+
+        Args:
+            hidden_size (int): The size of the hidden state.
+            eps (float, optional): A value added to the denominator for numerical stability. Defaults to 1e-5.
+            device (torch.device, optional): The device on which the parameters are stored. Defaults to None.
+            dtype (torch.dtype, optional): The desired data type of the parameters. Defaults to None.
+        """
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.eps = eps
@@ -471,9 +699,33 @@ class RMSNorm(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """
+        Resets the parameters.
+
+        This method resets the weight parameters with ones.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         torch.nn.init.ones_(self.weight)
 
     def forward(self, x, residual=None, prenorm=False, residual_in_fp32=False):
+        """
+        Forward pass of the RMSNorm module.
+
+        Args:
+            x (Tensor): The input tensor.
+            residual (Tensor, optional): The residual tensor. Default is None.
+            prenorm (bool, optional): Whether to apply pre-normalization. Default is False.
+            residual_in_fp32 (bool, optional): Whether the residual tensor is in FP32 format. Default is False.
+
+        Returns:
+            Tensor: The output tensor after applying LayerNorm.
+
+        """
         return rms_norm_fn(
             x,
             self.weight,
@@ -486,6 +738,8 @@ class RMSNorm(torch.nn.Module):
 
 
 class LayerNormLinearFn(torch.autograd.Function):
+    """LayerNormLinearFn class."""
+
     @staticmethod
     @custom_fwd
     def forward(
@@ -501,6 +755,30 @@ class LayerNormLinearFn(torch.autograd.Function):
         residual_in_fp32=False,
         is_rms_norm=False,
     ):
+        """
+        Forward pass of the LayerNorm operation.
+
+        Args:
+            ctx: Context object.
+            x (torch.Tensor): Input tensor.
+            norm_weight (torch.Tensor): Normalization weight tensor.
+            norm_bias (torch.Tensor): Normalization bias tensor.
+            linear_weight (torch.Tensor): Linear weight tensor.
+            linear_bias (torch.Tensor): Linear bias tensor.
+            residual (torch.Tensor, optional): Residual tensor. Defaults to None.
+            eps (float, optional): Epsilon value for numerical stability. Defaults to 1e-6.
+            prenorm (bool, optional): Flag indicating whether to apply pre-normalization. Defaults to False.
+            residual_in_fp32 (bool, optional): Flag indicating whether the residual tensor is in FP32 format.
+            Defaults to False.
+            is_rms_norm (bool, optional): Flag indicating whether to use RMS normalization. Defaults to False.
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor,torch.Tensor]]
+
+        Raises:
+            AssertionError: If the shape of the residual tensor does not match the original shape of the input tensor.
+
+        """
         x_shape_og = x.shape
         # reshape input data into 2D tensor
         x = x.reshape(-1, x.shape[-1])
@@ -544,6 +822,28 @@ class LayerNormLinearFn(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, dout, *args):
+        """
+        Backward pass of the layer normalization operation.
+
+        Args:
+            ctx (torch.autograd.function._ContextMethodMixin): Autograd context.
+            dout (torch.Tensor): Gradient of the output tensor.
+            *args: Additional arguments.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+            torch.Tensor, torch.Tensor, None, None, None, None]:
+            - dx (torch.Tensor): Gradient of the input tensor.
+            - dnorm_weight (torch.Tensor): Gradient of the normalization weight.
+            - dnorm_bias (torch.Tensor): Gradient of the normalization bias.
+            - dlinear_weight (torch.Tensor): Gradient of the linear weight.
+            - dlinear_bias (torch.Tensor): Gradient of the linear bias.
+            - dresidual_in (torch.Tensor): Gradient of the residual input.
+            - None.
+            - None.
+            - None.
+            - None
+        """
         x, norm_weight, norm_bias, linear_weight, mean, rstd = ctx.saved_tensors
         dout = dout.reshape(-1, dout.shape[-1])
         dy = F.linear(dout, linear_weight.t())
@@ -600,6 +900,24 @@ def layer_norm_linear_fn(
     residual_in_fp32=False,
     is_rms_norm=False,
 ):
+    """
+    Apply layer normalization followed by a linear transformation to the input tensor `x`.
+
+    Args:
+        x (torch.Tensor): The input tensor.
+        norm_weight (torch.Tensor): The weight tensor for layer normalization.
+        norm_bias (torch.Tensor): The bias tensor for layer normalization.
+        linear_weight (torch.Tensor): The weight tensor for the linear transformation.
+        linear_bias (torch.Tensor): The bias tensor for the linear transformation.
+        residual (torch.Tensor, optional): The residual tensor to be added to the output. Defaults to None.
+        eps (float, optional): A small value added to the denominator for numerical stability. Defaults to 1e-6.
+        prenorm (bool, optional): Whether to apply pre-normalization. Defaults to False.
+        residual_in_fp32 (bool, optional): Whether the residual tensor is in FP32 format. Defaults to False.
+        is_rms_norm (bool, optional): Whether to apply RMS normalization. Defaults to False.
+
+    Returns:
+        torch.Tensor: The output tensor after applying layer normalization and linear transformation.
+    """
     return LayerNormLinearFn.apply(
         x,
         norm_weight,

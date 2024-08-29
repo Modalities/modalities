@@ -73,6 +73,65 @@ def _selective_scan_update_kernel(
     HAS_Z: tl.constexpr,
     BLOCK_SIZE_DSTATE: tl.constexpr,
 ):
+    """
+    Performs selective scan update on the given matrices and pointers.
+
+    Args:
+        state_ptr: Pointer to the state matrix.
+        x_ptr: Pointer to the x matrix.
+        dt_ptr: Pointer to the dt matrix.
+        dt_bias_ptr: Pointer to the dt_bias matrix.
+        A_ptr: Pointer to the A matrix.
+        B_ptr: Pointer to the B matrix.
+        C_ptr: Pointer to the C matrix.
+        D_ptr: Pointer to the D matrix.
+        z_ptr: Pointer to the z matrix.
+        out_ptr: Pointer to the out matrix.
+        batch: Matrix dimension - batch.
+        nheads: Matrix dimension - nheads.
+        dim: Matrix dimension - dim.
+        dstate: Matrix dimension - dstate.
+        nheads_ngroups_ratio: Ratio of nheads to ngroups.
+        stride_state_batch: -.
+        stride_state_head: -.
+        stride_state_dim: -.
+        stride_state_dstate: -.
+        stride_x_batch: -.
+        stride_x_head: -.
+        stride_x_dim: -.
+        stride_dt_batch: -.
+        stride_dt_head: -.
+        stride_dt_dim: -.
+        stride_dt_bias_head: -.
+        stride_dt_bias_dim: -.
+        stride_A_head: -.
+        stride_A_dim: -.
+        stride_A_dstate: -.
+        stride_B_batch: -.
+        stride_B_group: -.
+        stride_B_dstate: -.
+        stride_C_batch: -.
+        stride_C_group: -.
+        stride_C_dstate: -.
+        stride_D_head: -.
+        stride_D_dim: -.
+        stride_z_batch: -.
+        stride_z_head: -.
+        stride_z_dim: -.
+        stride_out_batch: -.
+        stride_out_head: -.
+        stride_out_dim: -.
+        DT_SOFTPLUS: Meta-parameter indicating whether to apply softplus to dt.
+        TIE_HDIM: Meta-parameter indicating whether to tie hdims.
+        BLOCK_SIZE_M: Meta-parameter indicating the block size for M.
+        HAS_DT_BIAS: Meta-parameter indicating whether dt_bias is present.
+        HAS_D: Meta-parameter indicating whether D is present.
+        HAS_Z: Meta-parameter indicating whether z is present.
+        BLOCK_SIZE_DSTATE: Meta-parameter indicating the block size for dstate.
+
+    Returns:
+        None
+    """
     pid_m = tl.program_id(axis=0)
     pid_b = tl.program_id(axis=1)
     pid_h = tl.program_id(axis=2)

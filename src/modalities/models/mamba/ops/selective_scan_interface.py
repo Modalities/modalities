@@ -16,8 +16,30 @@ except ImportError:
 
 
 class SelectiveScanFn(torch.autograd.Function):
+    """SelectiveScanFn class."""
+
     @staticmethod
     def forward(ctx, u, delta, A, B, C, D=None, z=None, delta_bias=None, delta_softplus=False, return_last_state=False):
+        """
+        Forward pass of SelectiveScanFn.
+
+        Args:
+            ctx: Context object.
+            u: Input tensor u.
+            delta: Input tensor delta.
+            A: -.
+            B: -.
+            C: -.
+            D: - (default: None).
+            z: - (default: None).
+            delta_bias: Input tensor delta_bias (default: None).
+            delta_softplus: Boolean flag indicating whether to apply softplus to delta (default: False).
+            return_last_state: Boolean flag indicating whether to return the last state (default: False).
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+            Output tensor or tuple of output tensor and last state.
+        """
         if u.stride(-1) != 1:
             u = u.contiguous()
         if delta.stride(-1) != 1:
@@ -50,6 +72,17 @@ class SelectiveScanFn(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, dout, *args):
+        """
+        Backward pass of SelectiveScanFn.
+
+        Args:
+            ctx: Context object.
+            dout (torch.Tensor): The gradient of the output tensor.
+            *args: Additional arguments.
+
+        Returns:
+            Tuple[torch.Tensor, ... , None, None]: Tuple containing the gradients and None, None.
+        """
         if not ctx.has_z:
             u, delta, A, B, C, D, delta_bias, x = ctx.saved_tensors
             z = None
@@ -175,6 +208,8 @@ def selective_scan_ref(
 
 
 class MambaInnerFn(torch.autograd.Function):
+    """MambaInnerFn class."""
+
     @staticmethod
     @custom_fwd
     def forward(
@@ -283,6 +318,19 @@ class MambaInnerFn(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, dout):
+        """
+        Backward pass of the selective scan interface.
+
+        Args:
+            ctx (torch.autograd.function._ContextMethodMixin): Autograd context.
+            dout (torch.Tensor): Gradient of the output tensor.
+
+        Returns:
+            Tuple[torch.Tensor, ... , None]: Tuple containing the gradients.
+
+        Raises:
+            AssertionError: If causal_conv1d_cuda is not available.
+        """
         # dout: (batch, seqlen, dim)
         assert causal_conv1d_cuda is not None, "causal_conv1d_cuda is not available. Please install causal-conv1d."
         (
@@ -406,6 +454,29 @@ def mamba_inner_fn(
     C_proj_bias=None,
     delta_softplus=True,
 ):
+    """
+    Apply the Mamba inner function to the given inputs.
+
+    Args:
+        xz (torch.Tensor): The input tensor.
+        conv1d_weight (torch.Tensor): The weight tensor for the 1D convolution operation.
+        conv1d_bias (torch.Tensor): The bias tensor for the 1D convolution operation.
+        x_proj_weight (torch.Tensor): The weight tensor for the projection operation on x.
+        delta_proj_weight (torch.Tensor): The weight tensor for the projection operation on delta.
+        out_proj_weight (torch.Tensor): The weight tensor for the projection operation on the output.
+        out_proj_bias (torch.Tensor): The bias tensor for the projection operation on the output.
+        A (torch.Tensor): The A tensor.
+        B (torch.Tensor, optional): The B tensor. Defaults to None.
+        C (torch.Tensor, optional): The C tensor. Defaults to None.
+        D (torch.Tensor, optional): The D tensor. Defaults to None.
+        delta_bias (torch.Tensor, optional): The bias tensor for delta. Defaults to None.
+        B_proj_bias (torch.Tensor, optional): The bias tensor for B projection. Defaults to None.
+        C_proj_bias (torch.Tensor, optional): The bias tensor for C projection. Defaults to None.
+        delta_softplus (bool, optional): Whether to apply softplus activation on delta. Defaults to True.
+
+    Returns:
+        torch.Tensor: The result of applying the Mamba inner function.
+    """
     return MambaInnerFn.apply(
         xz,
         conv1d_weight,
@@ -442,6 +513,30 @@ def mamba_inner_ref(
     C_proj_bias=None,
     delta_softplus=True,
 ):
+    """
+    Applies the Mamba inner reference operation to the input.
+
+    Args:
+        xz (torch.Tensor): Input tensor.
+        conv1d_weight (torch.Tensor): Weight tensor for the 1D convolution layer.
+        conv1d_bias (torch.Tensor): Bias tensor for the 1D convolution layer.
+        x_proj_weight (torch.Tensor): Weight tensor for the projection layer.
+        delta_proj_weight (torch.Tensor): Weight tensor for the delta projection layer.
+        out_proj_weight (torch.Tensor): Weight tensor for the output projection layer.
+        out_proj_bias (torch.Tensor): Bias tensor for the output projection layer.
+        A (torch.Tensor): Tensor A.
+        B (torch.Tensor, optional): Tensor B. Defaults to None.
+        C (torch.Tensor, optional): Tensor C. Defaults to None.
+        D (torch.Tensor, optional): Tensor D. Defaults to None.
+        delta_bias (torch.Tensor, optional): Bias tensor for delta. Defaults to None.
+        B_proj_bias (torch.Tensor, optional): Bias tensor for tensor B projection. Defaults to None.
+        C_proj_bias (torch.Tensor, optional): Bias tensor for tensor C projection. Defaults to None.
+        delta_softplus (bool, optional): Whether to apply softplus activation to delta. Defaults to True.
+
+    Returns:
+        torch.Tensor: Output tensor.
+    """
+
     assert causal_conv1d_fn is not None, "causal_conv1d_fn is not available. Please install causal-conv1d."
     L = xz.shape[-1]
     delta_rank = delta_proj_weight.shape[1]

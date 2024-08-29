@@ -28,6 +28,8 @@ except ImportError:
 
 
 class MambaBlock(nn.Module):
+    """MambaBlock class."""
+
     def __init__(
         self,
         d_model: int,
@@ -47,6 +49,27 @@ class MambaBlock(nn.Module):
         device: Optional[str],
         dtype: Optional[str],
     ):
+        """
+        Initializes an MambaBlock object.
+
+        Args:
+            d_model (int): The dimensionality of the feature vectors.
+            d_state (int): The dimensionality of the state vectors.
+            d_conv (int): The number of output channels of the 1D convolutional layer.
+            expand (int): The expansion factor for the inner dimension.
+            dt_rank (str): -.
+            dt_min (float): -.
+            dt_max (float): -.
+            dt_init (str): -.
+            dt_scale (float): -.
+            dt_init_floor (float): -.
+            conv_bias (bool): Whether to include a bias term in the convolutional layer.
+            bias (bool): Whether to include a bias term in the linear layers.
+            use_fast_path (bool): -.
+            layer_idx (int): The index of the layer.
+            device (str, optional): The device to be used for computation. Defaults to None.
+            dtype (str, optional): The data type to be used for computation. Defaults to None.
+        """
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.d_model = d_model
@@ -206,6 +229,18 @@ class MambaBlock(nn.Module):
     def step(
         self, hidden_states: torch.Tensor, conv_state: torch.Tensor, ssm_state: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Perform a step in the Mamba block.
+
+        Args:
+            hidden_states (torch.Tensor): The hidden states tensor.
+            conv_state (torch.Tensor): The convolutional state tensor.
+            ssm_state (torch.Tensor): The SSM state tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The output tensor, updated convolutional state tensor,
+            and updated SSM state tensor.
+        """
         dtype = hidden_states.dtype
         assert hidden_states.shape[1] == 1, "Only support decoding with 1 token at a time for now"
         xz = self.in_proj(hidden_states.squeeze(1))  # (B 2D)
@@ -257,6 +292,19 @@ class MambaBlock(nn.Module):
     def allocate_inference_cache(
         self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Allocates and returns the inference cache for the MambaBlock model.
+
+        Args:
+            batch_size (int): The batch size.
+            max_seqlen (int): The maximum sequence length.
+            dtype (str, optional): The data type of the cache tensors. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the convolutional state tensor
+            and the state space model state tensor.
+        """
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
         conv_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype)
@@ -268,6 +316,17 @@ class MambaBlock(nn.Module):
     def _get_states_from_cache(
         self, inference_params: Optional[dict], batch_size: int, initialize_states: bool = False
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Retrieves the states from the cache.
+
+        Args:
+            inference_params (dict, optional): The dictionary containing the inference parameters.
+            batch_size (int): The size of the batch.
+            initialize_states (bool, optional): Whether to initialize the states or not. Defaults to False.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the convolutional state and the SSM state.
+        """
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
             conv_state = torch.zeros(
@@ -296,6 +355,8 @@ class MambaBlock(nn.Module):
 
 
 class Block(nn.Module):
+    """Block class."""
+
     def __init__(
         self,
         d_model: int,
@@ -356,4 +417,16 @@ class Block(nn.Module):
         return hidden_states, residual
 
     def allocate_inference_cache(self, batch_size: int, max_seqlen: int, dtype: Optional[str] = None, **kwargs) -> dict:
+        """
+        Allocates an inference cache for the Mamba block.
+
+        Args:
+            batch_size (int): The batch size of the input data.
+            max_seqlen (int): The maximum sequence length.
+            dtype (str, optional): The data type of the cache. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: The allocated inference cache.
+        """
         return self.mixer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
