@@ -106,6 +106,13 @@ class FSDPCheckpointSavingConfig(BaseModel):
     experiment_id: str
 
 
+class DDPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+    submodule: Optional[str] = None
+
+
 class TorchCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     experiment_id: str
@@ -231,6 +238,12 @@ class FSDPWrappedModelConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class DDPWrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    local_rank: int
+    precision: Optional[PrecisionEnum] = None
 
 
 class TorchModelConfig(BaseModel):

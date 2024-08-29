@@ -175,22 +175,22 @@ checkpoint_saving:
         k: 1 # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: torch
+      variant_key: ddp
       config:
         checkpoint_path: ${settings.paths.checkpointing_path}
         experiment_id: ${settings.experiment_id}
+        global_rank: ${settings.cuda_env.global_rank}
         submodule: modality_projector
 
 wrapped_model:
   component_key: model
-  variant_key: torch_model
+  variant_key: ddp_wrapped
   config:
     model:
       instance_key: model
       pass_type: BY_REFERENCE
-    device: 0
     precision: BF16
-
+    local_rank: ${settings.cuda_env.local_rank}
 
 image_projector_model:
   component_key: model

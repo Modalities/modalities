@@ -12,6 +12,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.checkpointing.ddp.ddp_checkpoint_saving import DDPCheckpointSaving
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
@@ -29,6 +30,8 @@ from modalities.config.config import (
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     CosineAnnealingWithWarmupLRSchedulerConfig,
+    DDPCheckpointSavingConfig,
+    DDPWrappedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -143,6 +146,7 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "ddp_wrapped", ModelFactory.get_ddp_wrapped_model, DDPWrappedModelConfig),
     ComponentEntity("model", "torch_model", ModelFactory.get_torch_model, TorchModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     ComponentEntity("model", "anymal", AnyMAL, AnyMALConfig),
@@ -239,6 +243,7 @@ COMPONENTS = [
     # checkpoint saving execution
     ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
     ComponentEntity("checkpoint_saving_execution", "torch", TorchCheckpointSaving, TorchCheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "ddp", DDPCheckpointSaving, DDPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
