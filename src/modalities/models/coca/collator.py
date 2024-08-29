@@ -30,7 +30,7 @@ class CoCaCollatorFn(CollateFnIF):
 
     def __init__(self, sample_keys: List[str], target_keys: List[str], text_sample_key: str, text_target_key: str):
         """
-        Initializes the CollatorFn object.
+        Initializes the CoCaCollatorFn object.
 
         Args:
             sample_keys (List[str]): List of samples keys.

@@ -12,7 +12,8 @@ from modalities.nn.mlp import MLP
 
 class VisionTransformerConfig(BaseModel):
     """
-    Configuration class for the VisionTransformer model.
+    Configuration class for the VisionTransformer.
+
 
     Args:
         sample_key (str): The key for the input sample.
@@ -59,7 +60,8 @@ class ImagePatchEmbedding(nn.Module):
         add_cls_token: bool = True,
     ) -> None:
         """
-        Initializes the VisionTransformerModel.
+        Initializes an ImagePatchEmbedding object.
+
 
         Args:
             n_img_channels (int): Number of image channels. Defaults to 3.
@@ -89,7 +91,8 @@ class ImagePatchEmbedding(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the VisionTransformer model.
+        Forward pass of the ImagePatchEmbedding.
+
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -118,7 +121,7 @@ class VisionTransformerBlock(nn.Module):
         attention_config: AttentionConfig = None,
     ) -> None:
         """
-        Initializes a VisionTransformerModel object.
+        Initializes a VisionTransformerBlock object.
 
         Args:
             n_embd (int, optional): The dimensionality of the embedding layer. Defaults to 768.

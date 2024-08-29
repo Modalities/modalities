@@ -12,7 +12,8 @@ class AttentionPooling(nn.Module):
         Initializes an instance of the AttentionPooling class.
 
         Args:
-            n_embd (int): The size of the input embeddings.
+            n_embd (int): The size of the embeddings.
+
             n_head (int): The number of attention heads.
             bias (bool): Flag indicating whether to include bias in the layer normalization.
             epsilon (float): A small value to avoid division by zero in layer normalization.

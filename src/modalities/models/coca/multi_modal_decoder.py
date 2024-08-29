@@ -31,7 +31,7 @@ class TransformerBlock(nn.Module):
         Initializes the TransformerBlock object.
 
         Args:
-            n_embd (int): The size of the input embeddings.
+            n_embd (int): The size of the embeddings.
             bias (bool): Flag indicating whether to include bias terms.
             epsilon (float): Small value to avoid division by zero in LayerNorm.
             activation (ActivationType): The type of activation function to use.

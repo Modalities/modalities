@@ -15,7 +15,8 @@ from modalities.nn.attention import AttentionConfig
 
 class TextDecoderConfig(BaseModel):
     """
-    Configuration class for the TextDecoder model.
+    Configuration class for the TextDecoder.
+
 
     Args:
         sample_key (str): The key for the samples.
@@ -56,10 +57,10 @@ class CoCaConfig(BaseModel):
 
     Args:
         prediction_key (str): The key for the predictions.
-        vision_embd_prediction_key (str): -.
-        text_embd_prediction_key (str): -.
-        vision_cls_prediction_key (str): -.
-        text_cls_prediction_key (str): -.
+        vision_embd_prediction_key (str): The key for the vision embeddings.
+        text_embd_prediction_key (str): The key for the text embeddings.
+        vision_cls_prediction_key (str): The key for the vision cls token.
+        text_cls_prediction_key (str): The key for the text cls token.
         vision_encoder_config (VisionTransformerConfig): Configuration for the vision encoder.
         text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
         n_pool_head (int): Number of attention heads for pooling.
@@ -112,10 +113,11 @@ class CoCa(NNModel):
 
         Args:
             prediction_key (str): The key for the predictions.
-            vision_cls_prediction_key (str): -.
-            text_cls_prediction_key (str): -.
-            vision_embd_prediction_key (str): -.
-            text_embd_prediction_key (str): -.
+            vision_cls_prediction_key (str): The key for the vision cls token.
+            text_cls_prediction_key (str): The key for the text cls token.
+            vision_embd_prediction_key (str): The key for the vision embeddings.
+            text_embd_prediction_key (str): The key for the text embeddings.
+
             n_vision_queries (int): The number of vision queries.
             n_pool_head (int): The number of pool heads.
             bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
@@ -181,7 +183,7 @@ class CoCa(NNModel):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
-        Forward pass of the COCA model.
+        Forward pass of the CoCa model.
 
         Args:
             inputs (dict[str, torch.Tensor]): Input dictionary containing the tensors.
@@ -200,7 +202,7 @@ class CoCa(NNModel):
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass for encoding vision inputs.
+        Encodes the input image using the vision encoder.
 
         Args:
             inputs (dict[str, torch.Tensor]): Dictionary containing vision inputs.
