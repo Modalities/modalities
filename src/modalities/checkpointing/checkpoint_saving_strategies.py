@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Dict, Optional
 
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
@@ -12,7 +12,7 @@ class CheckpointSavingStrategyIF(ABC):
     def get_checkpoint_instruction(
         self,
         num_train_steps_done: int,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: Optional[Dict[str, EvaluationResultBatch]] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
