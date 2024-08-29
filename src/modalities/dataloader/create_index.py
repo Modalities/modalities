@@ -10,26 +10,22 @@ from tqdm import tqdm
 
 
 class IndexGenerator:
-    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
+    def __init__(self, src_file: Path, drop_faulty_entries: bool = False):
         """
         Reads in a JSON file as a binary file, iterates character by character und builds up
         the sample index (char-wise start and end position for each JSON sample) via "\n" character positions.
 
         :param src_file: Path to a jsonl-file.
-        :param chunksize: defines the size of byte chunks that are processed via a producer-consumer approach.
-                          The producer reads chunks from the `src_file`, while the consumer creates index entries.
         :param drop_faulty_entries: Allow broken json entries in `src_file` by just skipping them.
                                     Otherwise, the index generation fails with an exception.
         """
         self.src_file = src_file
-        self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
         with self.src_file.open(mode="r") as fin:
             # Move the cursor to the end of the file
             fin.seek(0, os.SEEK_END)
             # Get number of characters in the file
             self._total_num_chars = fin.tell()
-        self.num_chunks = self._total_num_chars // self.chunksize
         self._queue_of_raw_lines = queue.Queue()
         self._index_map = []
         self._exception_buffer = []
