@@ -94,20 +94,50 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
 
 
 @dataclass
+class ResultItem:
+    value: torch.Tensor
+    decimal_places: int
+
+
+@dataclass
 class EvaluationResultBatch(Batch):
     """Data class for storing the results of a single or multiple batches.
     Also entire epoch results are stored in here."""
 
     dataloader_tag: str
     num_train_steps_done: int
-    losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    throughput_metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
+    losses: Dict[str, ResultItem] = field(default_factory=dict)
+    metrics: Dict[str, ResultItem] = field(default_factory=dict)
+    throughput_metrics: Dict[str, ResultItem] = field(default_factory=dict)
 
     def __str__(self) -> str:
         eval_str = f"Dataloader: {self.dataloader_tag} | "
         eval_str = f"step: {self.num_train_steps_done} | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.throughput_metrics.items()]) + " | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()]) + " | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()]) + " | "
+        eval_str += (
+            " | ".join(
+                [
+                    f"{k}: {round(item.value.mean().item(), item.decimal_places):.{item.decimal_places}f}"
+                    for k, item in self.throughput_metrics.items()
+                ]
+            )
+            + " | "
+        )
+        eval_str += (
+            " | ".join(
+                [
+                    f"{k}: {round(item.value.mean().item(), item.decimal_places):.{item.decimal_places}f}"
+                    for k, item in self.losses.items()
+                ]
+            )
+            + " | "
+        )
+        eval_str += (
+            " | ".join(
+                [
+                    f"{k}: {round(item.value.mean().item(), item.decimal_places):.{item.decimal_places}f}"
+                    for k, item in self.metrics.items()
+                ]
+            )
+            + " | "
+        )
         return eval_str
