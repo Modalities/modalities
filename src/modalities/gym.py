@@ -15,7 +15,17 @@ from modalities.util import print_rank_0
 
 
 class Gym:
+    """Class to perform the model training, including evaluation and checkpointing."""
+
     def __init__(self, trainer: Trainer, evaluator: Evaluator, loss_fun: Loss, num_ranks: int) -> None:
+        """Initializes the Gym class.
+
+        Args:
+            trainer (Trainer): Trainer object to perform the training.
+            evaluator (Evaluator): Evaluator object to perform the evaluation.
+            loss_fun (Loss): Loss function applied during training and evaluation.
+            num_ranks (int): Number of ranks used for distributed training.
+        """
         self.trainer = trainer
         self.evaluator = evaluator
         self.loss_fun = loss_fun
@@ -33,15 +43,19 @@ class Gym:
         evaluation_data_loaders: List[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
     ):
-        # self._run_evaluation(
-        #     model=model,
-        #     # here, fast_forward_sample_id points to the next sample_id that we would
-        #     # perform forward over. Therefore, -1 one for the current sample_id.
-        #     local_train_sample_id=train_data_loader.fast_forward_sample_id - 1,
-        #     local_evaluation_interval_in_samples=local_evaluation_interval_in_samples,
-        #     evaluation_data_loaders=evaluation_data_loaders,
-        #     checkpoint_saving=checkpoint_saving,
-        # )
+        """Runs the model training, including evaluation and checkpointing.
+
+        Args:
+            model (nn.Module): Model to be trained.
+            optimizer (Optimizer): Optimizer used for training.
+            scheduler (LRScheduler): Scheduler used for training.
+            training_log_interval_in_steps (int): Interval in steps to log training progress.
+            checkpointing_interval_in_steps (int): Interval in steps to save checkpoints.
+            evaluation_interval_in_steps (int): Interval in steps to perform evaluation.
+            train_data_loader (LLMDataLoader): Data loader with the training data.
+            evaluation_data_loaders (List[LLMDataLoader]): List of data loaders with the evaluation data.
+            checkpoint_saving (CheckpointSaving): Routine for saving checkpoints.
+        """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
             model=model,
