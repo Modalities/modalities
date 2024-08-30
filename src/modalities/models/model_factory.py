@@ -32,6 +32,8 @@ class ModelFactory:
         block_names: List[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
+        compile: bool,
+        compile_debug: bool,
     ) -> FSDP:
         print(
             f"Unsharded number of parameters on rank {dist.get_rank()}: "
@@ -40,6 +42,10 @@ class ModelFactory:
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
+
+        if compile:
+            options = {"trace.enabled": True} if compile_debug else {}
+            model = torch.compile(model, options=options)
 
         # model is on CPU before input to FSDP
         fsdp_model = FSDP(

@@ -10,8 +10,8 @@ settings:
     evaluation_interval_in_steps: 48
     global_num_seen_tokens: 0
     do_apply_activation_checkpointing: false
-    gradient_acc_steps: 1
-    local_train_micro_batch_size: 8
+    gradient_acc_steps: 2
+    local_train_micro_batch_size: 4
     sequence_length: 512
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
@@ -37,34 +37,40 @@ train_dataset:
 
 train_dataloader:
   component_key: data_loader
-  variant_key: default
+  variant_key: repeating_data_loader
   config:
-    num_workers: 2
-    pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
-    dataset:
-      instance_key: train_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
+    reshuffle_after_epoch: false
+    num_epochs: 5
+    dataloader:
+      component_key: data_loader
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
+        num_workers: 2
+        pin_memory: true
+        shuffle: false
+        dataloader_tag: "train"
+        dataset:
+          instance_key: train_dataset
+          pass_type: BY_REFERENCE
+        batch_sampler:
+          component_key: batch_sampler
+          variant_key: default
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            dataset:
-              instance_key: train_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
+            batch_size: ${settings.training.local_train_micro_batch_size}
+            drop_last: true
+            sampler:
+              component_key: sampler
+              variant_key: distributed_sampler
+              config:
+                rank: ${settings.cuda_env.global_rank}
+                num_replicas: ${settings.cuda_env.world_size}
+                shuffle: true
+                dataset:
+                  instance_key: train_dataset
+                  pass_type: BY_REFERENCE
+        collate_fn:
+          instance_key: collate_fn
+          pass_type: BY_REFERENCE
 
 val_dataset:
   component_key: dataset
@@ -152,6 +158,8 @@ wrapped_model:
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
+    compile: false
+    compile_debug: false
 
 model: 
   component_key: model
@@ -219,13 +227,11 @@ model_raw:
 
 scheduler:
   component_key: scheduler
-  variant_key: step_lr
+  variant_key: dummy_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    step_size: 1
-    gamma: 0.1
 
 optimizer:  
   component_key: optimizer
