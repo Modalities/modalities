@@ -16,7 +16,7 @@ class CheckpointConversion:
         Initializes the CheckpointConversion object.
 
         Args:
-            config_file_path (Path): The path to the configuration file.
+            config_file_path (Path): The path to the configuration file containing the pytorch model configuration.
             output_hf_checkpoint_dir (Path): The path to the output Hugging Face checkpoint directory.
 
         Raises:
