@@ -360,13 +360,13 @@ class RichResultSubscriberConfig(BaseModel):
 def load_app_config_dict(config_file_path: Path) -> Dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
-    modalities-specific variables.
+    Modalities-specific variables.
 
     Args:
-        config_file_path (Path): YAML config file
+        config_file_path (Path): YAML config file.
 
     Returns:
-        Dict: Dictionary representation of the config file
+        Dict: Dictionary representation of the config file.
     """
 
     def cuda_env_resolver_fun(var_name: str) -> int:

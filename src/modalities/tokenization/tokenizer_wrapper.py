@@ -9,7 +9,7 @@ class TokenizerWrapper(ABC):
     """Abstract interface for tokenizers."""
 
     def tokenize(self, text: str) -> List[int]:
-        """Tokenizes a text into a list of token ids.
+        """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
@@ -18,15 +18,15 @@ class TokenizerWrapper(ABC):
             NotImplementedError: Must be implemented by a subclass.
 
         Returns:
-            List[int]: List of token ids.
+            List[int]: List of token IDs.
         """
         raise NotImplementedError
 
     def decode(self, input_ids: List[int]) -> str:
-        """Decodes a list of token ids into the original text.
+        """Decodes a list of token IDs into the original text.
 
         Args:
-            input_ids (List[int]): List of token ids.
+            input_ids (List[int]): List of token IDs.
 
         Raises:
             NotImplementedError: Must be implemented by a subclass.
@@ -49,16 +49,16 @@ class TokenizerWrapper(ABC):
         raise NotImplementedError("Tokenizer must be implemented by a subclass.")
 
     def get_token_id(self, token: str) -> int:
-        """Returns the token id for a given token.
+        """Returns the token ID for a given token.
 
         Args:
-            token (str): Token to get the id for.
+            token (str): Token to get the ID for.
 
         Raises:
             NotImplementedError: Must be implemented by a subclass.
 
         Returns:
-            int: Token id.
+            int: Token ID.
         """
         raise NotImplementedError
 
@@ -80,8 +80,8 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             pretrained_model_name_or_path (str): Name or path of the pretrained model.
             truncation (bool, optional): Flag whether to apply truncation. Defaults to False.
             padding (bool | str, optional): Defines the padding strategy. Defaults to False.
-            max_length (Optional[int], optional): Maximum length of the tokenization output. Defaults to None.
-            special_tokens (Optional[Dict[str, str]], optional): Added token keys should be in the list
+            max_length (int, optional): Maximum length of the tokenization output. Defaults to None.
+            special_tokens (Dict[str, str], optional): Added token keys should be in the list
                 of predefined special attributes: [bos_token, eos_token, unk_token, sep_token, pad_token,
                 cls_token, mask_token, additional_special_tokens].
                 Example: {"pad_token": "[PAD]"}
@@ -122,13 +122,13 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         return self.tokenizer.special_tokens_map
 
     def tokenize(self, text: str) -> List[int]:
-        """Tokenizes a text into a list of token ids.
+        """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
 
         Returns:
-            List[int]: List of token ids.
+            List[int]: List of token IDs.
         """
         tokens = self.tokenizer.__call__(
             text,
@@ -139,10 +139,10 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         return tokens
 
     def decode(self, token_ids: List[int]) -> str:
-        """Decodes a list of token ids into the original text.
+        """Decodes a list of token IDs into the original text.
 
         Args:
-            input_ids (List[int]): List of token ids.
+            input_ids (List[int]): List of token IDs.
 
         Returns:
             str: Decoded text.
@@ -151,16 +151,16 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         return decoded_text
 
     def get_token_id(self, token: str) -> int:
-        """Returns the token id for a given token.
+        """Returns the token ID for a given token.
 
         Args:
-            token (str): Token to get the id for.
+            token (str): Token to get the ID for.
 
         Raises:
-            ValueError: If the token cannot be represented by a single token id.
+            ValueError: If the token cannot be represented by a single token ID.
 
         Returns:
-            int: Token id.
+            int: Token ID.
         """
         token_id = self.tokenizer.convert_tokens_to_ids(token)
         if isinstance(token_id, list):
@@ -181,22 +181,22 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         self.tokenizer.Load(tokenizer_model_file)
 
     def tokenize(self, text: str) -> List[int]:
-        """Tokenizes a text into a list of token ids.
+        """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
 
         Returns:
-            List[int]: List of token ids.
+            List[int]: List of token IDs.
         """
         tokens = self.tokenizer.encode(text)
         return tokens
 
     def decode(self, token_ids: List[int]) -> str:
-        """Decodes a list of token ids into the original text.
+        """Decodes a list of token IDs into the original text.
 
         Args:
-            input_ids (List[int]): List of token ids.
+            input_ids (List[int]): List of token IDs.
 
         Returns:
             str: Decoded text.
@@ -214,16 +214,16 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         return self.tokenizer.vocab_size()
 
     def get_token_id(self, token: str) -> int:
-        """Returns the token id for a given token.
+        """Returns the token ID for a given token.
 
         Args:
-            token (str): Token to get the id for.
+            token (str): Token to get the ID for.
 
         Raises:
-            ValueError: If the token cannot be represented by a single token id.
+            ValueError: If the token cannot be represented by a single token ID.
 
         Returns:
-            int: Token id.
+            int: Token ID.
         """
         piece_id = self.tokenizer.PieceToId(token)
         if piece_id == self.tokenizer.unk_id():

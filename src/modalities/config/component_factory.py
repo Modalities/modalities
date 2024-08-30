@@ -20,12 +20,12 @@ class ComponentFactory:
         self.registry = registry
 
     def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
-        """Builds the components from a config dictionary. All compoennts specified in `components_model_type`
+        """Builds the components from a config dictionary. All components specified in `components_model_type`
         are built from the config dictionary in a recursive manner.
 
         Args:
             config_dict (Dict): Dictionary with the configuration of the components.
-            components_model_type (Type[BaseModelChild]): Basemodel type defining the components to be build.
+            components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.
 
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.

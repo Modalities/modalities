@@ -15,7 +15,7 @@ class Registry:
         """Initializes the Registry class with an optional list of components.
 
         Args:
-            components (Optional[List[ComponentEntity]], optional): List of components to
+            components (List[ComponentEntity], optional): List of components to
                 intialize the registry with . Defaults to None.
         """
         # maps component_key -> variant_key -> entity = (component, config)
@@ -28,9 +28,10 @@ class Registry:
         self, component_key: str, variant_key: str, component_type: Type, component_config_type: Type[BaseModel]
     ) -> None:
         """Adds a component to the registry.
+        
         The registry has a two-level dictionary structure, where the first level is the component_key
         and the second level is the variant_key. The component_key is used to identify the component type,
-        wheras the variant_key is used to identify the component variant. For instance, for a GPT 2 model the
+        whereas the variant_key is used to identify the component variant. For instance, for a GPT 2 model the
         component key could be "model" and the variant key could be "gpt2".
 
         Args:

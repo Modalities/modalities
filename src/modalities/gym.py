@@ -18,7 +18,7 @@ class Gym:
     """Class to perform the model training, including evaluation and checkpointing."""
 
     def __init__(self, trainer: Trainer, evaluator: Evaluator, loss_fun: Loss, num_ranks: int) -> None:
-        """Initializes the Gym class.
+        """Initializes a Gym object.
 
         Args:
             trainer (Trainer): Trainer object to perform the training.

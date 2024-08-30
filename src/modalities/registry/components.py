@@ -98,7 +98,7 @@ from modalities.utils.number_conversion import (
 class ComponentEntity:
     """Dataclass to store the component entity.
     The component entity stores the component key, the variant key, the component type and the component config type.
-    The component key is used to identify the component type, wheras the variant key is used to identify the component.
+    The component key is used to identify the component type, whereas the variant key is used to identify the component.
     An example of a component entity is the GPT2 model with the component key "model" and the variant key "gpt2".
 
     Args:
