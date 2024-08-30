@@ -5,14 +5,31 @@ from pydantic import BaseModel
 from modalities.registry.registry import Registry
 from modalities.util import print_rank_0
 
+BaseModelChild = TypeVar("BaseModelChild", bound=BaseModel)
+
 
 class ComponentFactory:
+    """Factory class to build the components from a config dictionary."""
+
     def __init__(self, registry: Registry) -> None:
+        """Initializes the ComponentFactory with a registry.
+
+        Args:
+            registry (Registry): Registry object to get the component and config classes.
+        """
         self.registry = registry
 
-    BaseModelChild = TypeVar("BaseModelChild", bound=BaseModel)
-
     def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
+        """Builds the components from a config dictionary. All components specified in `components_model_type`
+        are built from the config dictionary in a recursive manner.
+
+        Args:
+            config_dict (Dict): Dictionary with the configuration of the components.
+            components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.
+
+        Returns:
+            BaseModelChild: Instance of the components_model_type with the built components.
+        """
         component_names = list(components_model_type.model_fields.keys())
         component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
         print_rank_0(component_dict)
@@ -157,12 +174,12 @@ class ComponentFactory:
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
         component_type: Type = self.registry.get_component(component_key, variant_key)
-        component_config_dict = self.base_model_to_dict(component_config)
+        component_config_dict = self._base_model_to_dict(component_config)
         component = component_type(**component_config_dict)
         return component
 
     @staticmethod
-    def base_model_to_dict(base_model: BaseModel) -> Dict:
+    def _base_model_to_dict(base_model: BaseModel) -> Dict:
         # converts top level structure of base_model into dictionary while maintaining substructure
         output = {}
         for name, _ in base_model.model_fields.items():

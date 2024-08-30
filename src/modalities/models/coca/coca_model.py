@@ -14,6 +14,27 @@ from modalities.nn.attention import AttentionConfig
 
 
 class TextDecoderConfig(BaseModel):
+    """
+    Configuration class for the TextDecoder.
+
+
+    Args:
+        sample_key (str): The key for the samples.
+        prediction_key (str): The key for the predictions.
+        block_size (int): The block size. Must be greater than or equal to 1.
+        vocab_size (int): The vocabulary size. Must be greater than or equal to 1.
+        n_layer_text (int): The number of layers for processing text. Must be greater than or equal to 1.
+        n_layer_multimodal_text (int): -. Must be greater than or equal to 1.
+        n_head (int): The number of attention heads. Must be greater than or equal to 1.
+        n_embd (int): The embedding size. Must be greater than or equal to 1.
+        ffn_hidden (int): The hidden size for the feed-forward network. Must be greater than or equal to 1.
+        dropout (float): The dropout rate. Must be greater than or equal to 0.0.
+        bias (bool): Flag indicating whether to include bias in the model.
+        attention_config (AttentionConfig): The attention configuration.
+        activation (ActivationType): The activation type.
+        epsilon (float): The epsilon value. Must be greater than or equal to 0.0.
+    """
+
     sample_key: str
     prediction_key: str
     block_size: Annotated[int, Field(ge=1)]
@@ -31,6 +52,24 @@ class TextDecoderConfig(BaseModel):
 
 
 class CoCaConfig(BaseModel):
+    """
+    Configuration class for CoCa model.
+
+    Args:
+        prediction_key (str): The key for the predictions.
+        vision_embd_prediction_key (str): The key for the vision embeddings.
+        text_embd_prediction_key (str): The key for the text embeddings.
+        vision_cls_prediction_key (str): The key for the vision cls token.
+        text_cls_prediction_key (str): The key for the text cls token.
+        vision_encoder_config (VisionTransformerConfig): Configuration for the vision encoder.
+        text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
+        n_pool_head (int): Number of attention heads for pooling.
+        n_vision_queries (int): Number of vision queries.
+        bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
+        epsilon_attn_pool (float): Epsilon value for attention pooling.
+
+    """
+
     prediction_key: str = "logits"
     vision_embd_prediction_key: str  # same key as vision encoder
     text_embd_prediction_key: str
@@ -45,7 +84,8 @@ class CoCaConfig(BaseModel):
 
 
 class CoCa(NNModel):
-    """CoCa
+    """
+    CoCa model
 
     The Contrastive Captioner (CoCa) is an encoder-decoder model that integrates the concepts of CLIP
     and generative models such as SimVLM by using contrastive and captioning losses for training.
@@ -68,6 +108,26 @@ class CoCa(NNModel):
         vision_encoder_config: VisionTransformerConfig,
         text_decoder_config: TextDecoderConfig,
     ) -> None:
+        """
+        Initializes the CocaModel object.
+
+        Args:
+            prediction_key (str): The key for the predictions.
+            vision_cls_prediction_key (str): The key for the vision cls token.
+            text_cls_prediction_key (str): The key for the text cls token.
+            vision_embd_prediction_key (str): The key for the vision embeddings.
+            text_embd_prediction_key (str): The key for the text embeddings.
+
+            n_vision_queries (int): The number of vision queries.
+            n_pool_head (int): The number of pool heads.
+            bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
+            epsilon_attn_pool (float): The epsilon value for attention pooling.
+            vision_encoder_config (VisionTransformerConfig): The configuration for the vision encoder.
+            text_decoder_config (TextDecoderConfig): The configuration for the text decoder.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.prediction_key = prediction_key
         self.vision_cls_prediction_key = vision_cls_prediction_key
@@ -122,6 +182,15 @@ class CoCa(NNModel):
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass of the CoCa model.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): Input dictionary containing the tensors.
+
+        Returns:
+            dict[str, torch.Tensor]: Output dictionary.
+        """
         vision_embd, vision_cls_token = self._forward_encode_vision(inputs)
         text_embd, text_cls_token = self._forward_encode_text(inputs)
         logits = self._forward_decode(text_embd, vision_embd)
@@ -132,6 +201,15 @@ class CoCa(NNModel):
         }
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encodes the input image using the vision encoder.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): Dictionary containing vision inputs.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
+        """
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.attn_pool(queries, context=vision_embd)
@@ -139,11 +217,31 @@ class CoCa(NNModel):
         return vision_embd, vision_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encodes the input text using the text decoder.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
+            and the classification token tensor.
+        """
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]
         text_embd, text_cls_token = text_embd[:, :-1, :], text_embd[:, -1:, :]
         return text_embd, text_cls_token
 
     def _forward_decode(self, text_embd: torch.Tensor, vision_embd: torch.Tensor) -> torch.Tensor:
+        """
+        Perform forward decoding using the given text and vision embeddings.
+
+        Args:
+            text_embd (torch.Tensor): The text embeddings.
+            vision_embd (torch.Tensor): The vision embeddings.
+
+        Returns:
+            torch.Tensor: The logits obtained from the multimodal decoder.
+        """
         decoder_inputs = {
             self.text_embd_prediction_key: text_embd,
             "context": vision_embd,

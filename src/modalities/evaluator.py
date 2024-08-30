@@ -15,11 +15,19 @@ from modalities.util import Aggregator, TimeRecorder
 
 
 class Evaluator:
+    """Evaluator class which is responsible for evaluating the model on a set of datasets"""
+
     def __init__(
         self,
         batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
     ) -> None:
+        """Initializes the Evaluator class.
+
+        Args:
+            batch_progress_publisher (MessagePublisher[BatchProgressUpdate]): Publisher for batch progress updates
+            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Publisher for evaluation results
+        """
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
 
@@ -28,7 +36,17 @@ class Evaluator:
         batch: DatasetBatch,
         model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-    ):
+    ) -> torch.Tensor:
+        """Evaluate a single batch by forwarding it through the model and calculating the loss.
+
+        Args:
+            batch (DatasetBatch): The batch to evaluate
+            model (nn.Module): The model to evaluate
+            loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
+
+        Returns:
+            torch.Tensor: The loss of the batch
+        """
         with torch.no_grad():
             result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
@@ -41,6 +59,17 @@ class Evaluator:
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
     ) -> Dict[str, EvaluationResultBatch]:
+        """Evaluate the model on a set of datasets.
+
+        Args:
+            model (nn.Module): The model to evaluate
+            data_loaders (List[LLMDataLoader]): List of dataloaders to evaluate the model on
+            loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
+            num_train_steps_done (int): The number of training steps done so far for logging purposes
+
+        Returns:
+            Dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
+        """
         result_dict: Dict[str, EvaluationResultBatch] = {}
         model.eval()
 

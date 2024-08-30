@@ -7,6 +7,8 @@ from modalities.dataloader.samplers import ResumableBatchSampler
 
 
 class LLMDataLoader(DataLoader[T_co]):
+    """LLMDataLoader is a custom DataLoader class that extends the PyTorch DataLoader class."""
+
     def __init__(
         self,
         dataloader_tag: str,
@@ -28,6 +30,34 @@ class LLMDataLoader(DataLoader[T_co]):
         persistent_workers: bool = False,
         pin_memory_device: str = "",
     ):
+        """
+        Initializes a DataLoader object.
+
+        Args:
+            dataloader_tag (str): The tag for the dataloader.
+            batch_sampler (ResumableBatchSampler): The batch sampler used for sampling batches.
+            dataset (Dataset[T_co]): The dataset to load the data from.
+            batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
+            shuffle (Optional[bool], optional): Flag indicating whether to shuffle the data. Defaults to None.
+            sampler (Union[Sampler, Iterable, None], optional): The sampler used for sampling data. Defaults to None.
+            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
+            collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
+              Defaults to None.
+            pin_memory (bool, optional): Flag indicating whether to pin the memory. Defaults to False.
+            drop_last (bool, optional): Flag indicating whether to drop the last incomplete batch. Defaults to False.
+            timeout (float, optional): The timeout value for collecting a batch from workers. Defaults to 0.
+            worker_init_fn (Optional[_worker_init_fn_t], optional): The function used to initialize worker processes.
+              Defaults to None.
+            multiprocessing_context ([type], optional): The multiprocessing context to use. Defaults to None.
+            generator ([type], optional): The random number generator. Defaults to None.
+            prefetch_factor (Optional[int], optional): The number of batches to prefetch. Defaults to None.
+            persistent_workers (bool, optional): Flag indicating whether to keep the workers alive
+              between data loading iterations. Defaults to False.
+            pin_memory_device (str, optional): The device to pin the memory to. Defaults to "".
+
+        Returns:
+            None
+        """
         assert batch_sampler is not None and batch_size == 1
         super().__init__(
             dataset=dataset,
@@ -53,37 +83,77 @@ class LLMDataLoader(DataLoader[T_co]):
 
     @property
     def dataloader_tag(self) -> str:
+        """
+        Returns the dataloader tag.
+
+        Returns:
+            str: The dataloader tag.
+        """
         return self._dataloader_tag
 
     @property
     def batch_size(self) -> int:
-        # The parent Dataloader class has already a batch_size property defined which is originally used
-        # when the batch_sampler is not specified. Since the  LLMDataLoader enforces to always use a BatchSampler,
-        # we defined/ override the property batch_size to return the actual batch size used in the dataloder.
-        # BatchSampler is required, as we must seek forward in the dataloder during a warm start and
-        # we don't want to load all the data during the fast-forward.
+        """
+        Returns the batch size used in the dataloader.
+        The batch size is the number of samples in each batch of data.
+
+        Returns:
+            int: The batch size used in the dataloader.
+
+        Note:
+            The parent Dataloader class has already a batch_size property defined which is originally used
+            when the batch_sampler is not specified. Since the  LLMDataLoader enforces to always use a BatchSampler,
+            we defined/ override the property batch_size to return the actual batch size used in the dataloder.
+            BatchSampler is required, as we must seek forward in the dataloder during a warm start and
+            we don't want to load all the data during the fast-forward.
+        """
         return self._batch_size
 
     @batch_size.setter
     def batch_size(self, value: int):
+        """
+        Set the batch size for the dataloader.
+
+        Parameters:
+            value (int): The batch size to be set.
+
+        Returns:
+            None
+        """
         self._batch_size = value
 
     @property
     def fast_forward_batch_id(self) -> int:
-        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+        """
+        The batch ID until which we fast-forward, as specified in the ResumableBatchSampler.
 
         Returns:
-            int: fast forward batch id
+            int: fast forward batch ID
         """
         return self.batch_sampler.start_index
 
 
 class RepeatingDataLoader(LLMDataLoader[T_co]):
-    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
-        """Wraps an iterator to allow for infinite iteration. This is especially useful
-        for DataLoader types that we wish to automatically restart upon completion.
+    """
+    RepeatingDataLoader is a custom DataLoader class that repeats the given dataloader
+      for the specified number of epochs."""
 
-        Based on: https://github.com/microsoft/DeepSpeed/blob/99951caa3d2155a3bb84109a0828543793e088cc/deepspeed/runtime/dataloader.py#L17
+    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
+        """
+        Initializes a RepeatingDataLoader object that repeats the given dataloader for the specified number of epochs.
+        This is especially useful for DataLoader types that we wish to automatically restart upon completion.
+
+        Args:
+            dataloader (LLMDataLoader[T_co]): The dataloader to be wrapped.
+            num_epochs (int): The number of epochs to iterate over the dataloader.
+            reshuffle_after_epoch (bool, optional): Flag indicating whether to reshuffle the dataloader
+              after each epoch. Defaults to False.
+
+        Returns:
+            None
+
+        Note:
+            Based on: https://github.com/microsoft/DeepSpeed/blob/99951caa3d2155a3bb84109a0828543793e088cc/deepspeed/runtime/dataloader.py#L17
         """
         self.dataloader = dataloader
         self.data_iter = iter(self.dataloader)
@@ -92,9 +162,21 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         self.num_epochs = num_epochs
 
     def __iter__(self):
+        """
+        Returns an iterator object for the DataLoader.
+        """
         return self
 
     def __next__(self):
+        """
+        Returns the next batch of data from the DataLoader.
+
+        Raises:
+            StopIteration: If there are no more batches of data to return.
+
+        Returns:
+            batch: The next batch of data.
+        """
         try:
             batch = next(self.data_iter)
         except StopIteration as e:
@@ -124,15 +206,28 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
 
     @property
     def dataloader_tag(self) -> str:
+        """
+        Returns the dataloader tag.
+
+        Returns:
+            str: The dataloader tag.
+        """
         return self.dataloader.dataloader_tag
 
     @property
     def batch_size(self) -> int:
+        """
+        Returns the batch size used by the dataloader.
+
+        Returns:
+            int: The batch size used by the dataloader.
+        """
         return self.dataloader.batch_size
 
     @property
     def fast_forward_batch_id(self) -> int:
-        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+        """
+        The batch ID until which we fast-forward, as specified in the ResumableBatchSampler.
 
         Returns:
             int: fast forward batch id
@@ -140,4 +235,10 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
         return self.dataloader.fast_forward_batch_id
 
     def __len__(self) -> int:
+        """
+        Returns the total number of steps in the dataloader.
+
+        Returns:
+            int: The total number of steps.
+        """
         return self.num_epochs * len(self.dataloader)

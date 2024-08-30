@@ -32,8 +32,21 @@ class OpenGPTXDatasetWrapper(Dataset):
 
 
 class DatasetFactory:
+    """DatasetFactory for building the different dataset types."""
+
     @staticmethod
     def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:
+        """
+        Returns a DummyDataset object.
+
+        Args:
+            num_samples (int): The number of samples the dataset should generate.
+            sample_definition (Tuple[DummySampleConfig]): A list of tuples defining the dataset output.
+                Each tuple contains the sample key, shape and data type.
+
+        Returns:
+            DummyDataset: The generated DummyDataset object.
+        """
         dataset = DummyDataset(num_samples=num_samples, sample_definition=sample_definition)
         return dataset
 
@@ -46,6 +59,21 @@ class DatasetFactory:
         index_path: Optional[Path] = None,
         jq_pattern: str = ".text",
     ) -> MemMapDataset:
+        """
+        Returns a MemMapDataset object.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sequence_length (int): The length of each sequence.
+            tokenizer (PreTrainedTokenizer): The tokenizer used to tokenize the data.
+            sample_key (str): The key used to retrieve the samples from the dataset.
+            index_path (Optional[Path], optional): The path to the index file. Defaults to None.
+            jq_pattern (str, optional): The pattern used to extract the text from the data. Defaults to ".text".
+
+        Returns:
+            MemMapDataset: The MemMapDataset object.
+
+        """
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
             block_size=sequence_length + 1,
@@ -60,6 +88,18 @@ class DatasetFactory:
     def get_packed_mem_map_dataset_continuous(
         raw_data_path: Path, sequence_length: int, sample_key: str
     ) -> PackedMemMapDatasetContinuous:
+        """
+        Returns a PackedMemMapDatasetContinuous object.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sequence_length (int): The length of each sequence.
+            sample_key (str): The key used to retrieve the samples from the dataset.
+
+        Returns:
+            PackedMemMapDatasetContinuous: The packed memory-mapped dataset.
+
+        """
         dataset = PackedMemMapDatasetContinuous(
             raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
         )
