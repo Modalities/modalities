@@ -123,15 +123,7 @@ class RotaryTransform(QueryKeyValueTransform):
         return torch.cat((-x2, x1), dim=-1)
 
     def _update_cos_sin_tables(self, x):
-        """
-        Update the cosine and sine tables.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the updated cosine and sine tables.
-        """
+        # Update the cosine and sine tables.
         seq_len = x.shape[self.seq_length_dim]
 
         # Reset the tables if the sequence length has changed,

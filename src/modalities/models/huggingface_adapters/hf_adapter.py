@@ -51,16 +51,7 @@ class HFModelAdapterConfig(PretrainedConfig):
     def _convert_posixpath_to_str(
         self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
     ) -> Union[Dict[str, Any], List[Any], PosixPath, Any]:
-        """
-        Recursively converts any PosixPath objects within a nested data structure to strings.
-
-        Args:
-            data_to_be_formatted (Union[Dict[str, Any], List[Any], PosixPath, Any]): The data structure to be formatted.
-
-        Returns:
-            Union[Dict[str, Any], List[Any], PosixPath, Any]:
-            The formatted data structure with PosixPath objects converted to strings.
-        """
+        # Recursively converts any PosixPath objects within a nested data structure to strings.
 
         if isinstance(data_to_be_formatted, dict):
             for key, value in data_to_be_formatted.items():

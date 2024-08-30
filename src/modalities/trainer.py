@@ -283,15 +283,9 @@ class Trainer:
             forward_backward_time_recorder.start()
 
     def _reset_tracked_losses(self):
-        """
-        Resets the tracked losses.
+        # Initializes and returns a tensor representing the cumulated loss and gradient norm.
+        # The tensor is initialized with zeros and its device is set based on the availability of CUDA.
 
-        This method initializes and returns a tensor representing the cumulated loss and gradient norm.
-        The tensor is initialized with zeros and its device is set based on the availability of CUDA.
-
-        Returns:
-            torch.Tensor: The tensor representing the cumulated loss and gradient norm.
-        """
         cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
             cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device("cuda"))
@@ -305,18 +299,8 @@ class Trainer:
         num_train_steps_done: int,
         dataloader_tag: str,
     ):
-        """
-        Publishes the progress of the training.
+        # Publishes the progress of the training, i.e., number of training steps done.
 
-        Args:
-            batch_progress_publisher (MessagePublisher[BatchProgressUpdate]):
-                The publisher used to send the progress update.
-            num_train_steps_done (int): The number of training steps completed.
-            dataloader_tag (str): The tag of the dataloader.
-
-        Returns:
-            None
-        """
         payload = BatchProgressUpdate(
             num_steps_done=num_train_steps_done,
             experiment_status=ExperimentStatus.TRAIN,
@@ -329,17 +313,8 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         evaluation_result: EvaluationResultBatch,
     ):
-        """
-        Publishes the evaluation result.
+        # Publishes the evaluation result.
 
-        Args:
-            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):
-                The publisher used to publish the evaluation result.
-            evaluation_result (EvaluationResultBatch): The evaluation result to be published.
-
-        Returns:
-            None
-        """
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )

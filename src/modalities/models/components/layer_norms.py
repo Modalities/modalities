@@ -36,16 +36,8 @@ class RMSLayerNorm(nn.Module):
             self.bias = None
 
     def _norm(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Applies layer normalization to the input tensor.
+        # Applies layer normalization to the input tensor.
 
-        Args:
-            x (torch.Tensor): The input tensor.
-
-        Returns:
-            torch.Tensor: The normalized tensor.
-
-        """
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.epsilon)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

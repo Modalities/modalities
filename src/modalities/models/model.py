@@ -107,15 +107,8 @@ class SwiGLU(nn.Module):
 
     @staticmethod
     def _get_hidden_dim(n_embd: int) -> int:
-        """
-        Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
+        # Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
 
-        Args:
-            n_embd (int): The embedding dimension.
-
-        Returns:
-            int: The calculated hidden dimension for the SwiGLU module.
-        """
         # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
         # To ensure that the number of parameters in the SwiGLU module with its additional
         # linear layer are equivalent to the TransformerMLP, we need to adapt the SwiGLU hidden dimension as follows:
