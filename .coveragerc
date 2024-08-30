@@ -1,0 +1,17 @@
+[run]
+parallel = True
+branch = True
+source = src/modalities
+
+
+[report]
+exclude_lines =
+    # Exclude lines that match the following patterns
+    pragma: no cover
+    if __name__ == .__main__.:
+
+omit =
+    /tmp/*
+    /usr/*
+    */tests/*
+    # Add more patterns if necessary
