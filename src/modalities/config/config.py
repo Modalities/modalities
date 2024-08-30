@@ -286,13 +286,6 @@ class MMapIndexedDatasetConfig(BaseModel):
     skip_warmup: bool
 
 
-class OpenGPTXMMapDatasetConfig(BaseModel):
-    num_samples: Annotated[int, Field(strict=True, ge=1)]
-    path: FilePath
-    sample_key: str
-    sequence_len: PositiveInt
-
-
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]

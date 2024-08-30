@@ -35,7 +35,6 @@ from modalities.config.config import (
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
-    OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
@@ -164,9 +163,6 @@ COMPONENTS = [
         "packed_mem_map_dataset_megatron",
         DatasetFactory.get_packed_mem_map_dataset_megatron,
         PackedMemMapDatasetMegatronConfig,
-    ),
-    ComponentEntity(
-        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers
