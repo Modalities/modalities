@@ -778,6 +778,8 @@ class GPT2LLM(NNModel):
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.sequence_length = sequence_length
+        self.n_embd = n_embd
+        self.n_layer = n_layer
         self.poe_type = poe_type
 
         assert vocab_size is not None

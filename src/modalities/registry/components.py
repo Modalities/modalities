@@ -64,8 +64,6 @@ from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNo
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
-from modalities.models.mamba.mamba_config import MambaLLMConfig
-from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
@@ -117,7 +115,6 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
-    ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
