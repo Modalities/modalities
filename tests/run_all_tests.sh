@@ -31,13 +31,13 @@ cd "$SCRIPT_DIR/.."
 
 coverage erase
 
-mkdir -p .coverage
+mkdir -p .coverage_reports
 
-COVERAGE_FILE=.coverage/.coverage.part0 python -m pytest tests/ --cov=src/modalities 
+COVERAGE_FILE=.coverage_reports/.coverage.part0 python -m pytest tests/
 
 sh tests/run_distributed_tests.sh $DEV0 $DEV1 --cov
 
 # combine test coverage reports
-cd .coverage
+cd .coverage_reports
 coverage combine --keep
 coverage report
