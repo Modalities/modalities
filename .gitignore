@@ -162,3 +162,4 @@ noteboks/*
 
 tests/tmp/*
 .coverage/*
+wandb_storage/
