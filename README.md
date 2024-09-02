@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
   <a href="https://coveralls.io/github/Modalities/modalities">
-    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg" alt="Coverage Status">
+    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg?branch=main" alt="Coverage Status">
   </a>
  <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
