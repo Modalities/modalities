@@ -22,7 +22,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        apt-get install git
+        sudo apt-get install git
         python -m pip install torch 
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install -e .[tests]
