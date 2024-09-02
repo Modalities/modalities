@@ -20,6 +20,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        sudo apt-get install curl -y       # required by coveralls
         sudo apt-get install git -y
         python -m pip install torch
         python -m pip install --upgrade pip setuptools wheel
@@ -32,7 +33,7 @@ jobs:
     - name: Coveralls
       uses: coverallsapp/github-action@v2
       with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 #    - name: Upload coverage data to coveralls.io
 #      run: |
 #        python -m pip install coveralls[toml]
