@@ -6,9 +6,6 @@
 # todo
 # add comments for everything not obvious
 # readme
-# docstrings
-# shorten functions
-# replace all asserts by throwing exceptions
 
 # write tests
 # write e2e test
@@ -31,7 +28,7 @@ import torch.nn.functional as F
 
 class LoRALayer:
     """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    Parent Class for Lora Embedding and Lora Linear Layer with main functionalities.
     """
 
     def __init__(
@@ -55,10 +52,9 @@ class LoRALayer:
 
 class LoRAEmbedding(nn.Embedding, LoRALayer):
     """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    Converted Embedding Layer.
     """
 
-    # LoRA implemented in a dense layer
     def __init__(
         self,
         num_embeddings: int,
@@ -89,16 +85,23 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """ """
+        """
+        Initialize A and B and reset the Embedding Layer parameters.
+        Initialize A the same way as the default for nn.Linear and B to zero.
+        """
+
         # init weights as normal distribution and set all padding_idx tokens to zero vectors
         nn.Embedding.reset_parameters(self)
         # we need this since the super.__init__() calls are also calling this function
         if hasattr(self, "lora_A"):
-            # initialize A the same way as the default for nn.Linear and B to zero
             nn.init.normal_(self.lora_A)
             nn.init.zeros_(self.lora_B)
 
     def train(self, training_mode: bool = True):
+        """
+        Put the Layer into train / eval mode. Depending on training_mode param.
+        During eval mode, we merge the weights. During training we do not.
+        """
         # put embedding layer to training (True) or evaluation (False) mode
         nn.Embedding.train(self, mode=training_mode)
         if training_mode:
@@ -117,6 +120,9 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
                 self.merged = True
 
     def forward(self, x: torch.Tensor):
+        """
+        ... # todo
+        """
         if self.r > 0 and not self.merged:
             result = nn.Embedding.forward(self, x)
             after_A = F.embedding(
@@ -136,10 +142,9 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
 
 class LoRALinear(nn.Linear, LoRALayer):
     """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    Converted Linear Layer.
     """
 
-    # LoRA implemented in a dense layer
     def __init__(
         self,
         in_features: int,
@@ -168,24 +173,35 @@ class LoRALinear(nn.Linear, LoRALayer):
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
+        else:
+            raise ValueError("r should be > 0")
         self.reset_parameters()
         if fan_in_fan_out:
+            # transpose the layer weights
             self.weight.data = self.weight.data.transpose(0, 1)
 
     def reset_parameters(self):
+        """
+        Initialize A and B and reset the Embedding Layer parameters.
+        Initialize A the same way as the default for nn.Linear and B to zero.
+        """
         nn.Linear.reset_parameters(self)
         if hasattr(self, "lora_A"):
-            # initialize B the same way as the default for nn.Linear and A to zero
             # this is different than what is described in the paper but should not affect performance
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
-    def train(self, mode: bool = True):
+    def train(self, training_mode: bool = True):
+        """
+        Put the Layer into train / eval mode. Depending on training_mode param.
+        During eval mode, we merge the weights. During training we do not.
+        """
+
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
-        nn.Linear.train(self, mode)
-        if mode:
+        nn.Linear.train(self, mode=training_mode)
+        if training_mode:
             if self.merge_weights and self.merged:
                 # Make sure that the weights are not merged
                 if self.r > 0:
@@ -199,23 +215,34 @@ class LoRALinear(nn.Linear, LoRALayer):
                 self.merged = True
 
     def forward(self, x: torch.Tensor):
+        """
+        Compute forward pass, depending on if weights have been merged or not.
+        """
+
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
-        if self.r > 0 and not self.merged:
+        if not self.merged:
+            # If A and B are not merged to the weights, we do y = linear(x) + dropout(x) * A * B * scaling
             result = F.linear(x, T(self.weight), bias=self.bias)
             result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
             return result
         else:
+            # A and B have already been added to weights
             return F.linear(x, T(self.weight), bias=self.bias)
 
 
-class LoRADenseLayer(nn.Linear, LoRALayer):
+class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
     """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    If e.g. q, k and v matrix are merged in one linear layer, we need to use this class to convert the layer.
+    # This ...
+        q_proj = lora.Linear(d_model, d_model, r=8)
+        k_proj = nn.Linear(d_model, d_model)
+        v_proj = lora.Linear(d_model, d_model, r=8)
+    # is then equivalent to ...
+        qkv_proj = lora.MergedLinear(d_model, 3*d_model, r=8, enable_lora=[True, False, True])
     """
 
-    # LoRA implemented in a dense layer
     def __init__(
         self,
         in_features: int,
@@ -223,7 +250,7 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        enable_lora: List[bool] = [False],
+        enable_lora: List[bool] = [False],  # define which of the matrices are converted.
         fan_in_fan_out: bool = False,
         merge_weights: bool = True,
         **kwargs,
@@ -236,7 +263,8 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
-        assert out_features % len(enable_lora) == 0, "The length of enable_lora must divide out_features"
+        if not out_features % len(enable_lora) == 0:
+            raise ValueError("The length of enable_lora must divide out_features")
         self.enable_lora = enable_lora
         self.fan_in_fan_out = fan_in_fan_out
         # Actual trainable parameters
@@ -263,7 +291,7 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
-    def zero_pad(self, x):
+    def zero_pad(self, x: torch.Tensor):
         result = x.new_zeros((len(self.lora_ind), *x.shape[1:]))
         result[self.lora_ind] = x
         return result
@@ -279,12 +307,12 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
         ).squeeze(0)
         return T(self.zero_pad(delta_w))
 
-    def train(self, mode: bool = True):
+    def train(self, training_mode: bool = True):
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
-        nn.Linear.train(self, mode)
-        if mode:
+        nn.Linear.train(self, mode=training_mode)
+        if training_mode:
             if self.merge_weights and self.merged:
                 # Make sure that the weights are not merged
                 if self.r > 0 and any(self.enable_lora):
@@ -312,23 +340,25 @@ class LoRADenseLayer(nn.Linear, LoRALayer):
 
 class ConvLoRA(nn.Module, LoRALayer):
     """
-    Taken from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py and modified
+    Parent Class for convolutional LoRA layers.
     """
 
     def __init__(
         self,
-        conv_module,
-        in_channels,
-        out_channels,
-        kernel_size,
-        r=0,
-        lora_alpha=1,
-        lora_dropout=0.0,
-        merge_weights=True,
+        conv_module: nn.Module,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
         **kwargs,
     ):
+        # super calls to parent classes
         super(ConvLoRA, self).__init__()
         self.conv = conv_module(in_channels, out_channels, kernel_size, **kwargs)
+        # init lora layer
         LoRALayer.__init__(
             self,
             r=r,
@@ -336,12 +366,6 @@ class ConvLoRA(nn.Module, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
-
-        if not isinstance(kernel_size, int):
-            if len(set(kernel_size)) == 1:
-                kernel_size = kernel_size[0]
-            else:
-                raise ValueError(f"We do not support different kernel sizes per dimension such as {kernel_size}")
 
         # Actual trainable parameters
         if r > 0:
@@ -352,19 +376,28 @@ class ConvLoRA(nn.Module, LoRALayer):
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.conv.weight.requires_grad = False
+        else:
+            raise ValueError("r should be > 0")
         self.reset_parameters()
         self.merged = False
 
     def reset_parameters(self):
+        """
+        Initialize A and B.
+        """
         self.conv.reset_parameters()
         if hasattr(self, "lora_A"):
             # initialize A the same way as the default for nn.Linear and B to zero
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
-    def train(self, mode=True):
-        super(ConvLoRA, self).train(mode)
-        if mode:
+    def train(self, training_mode: bool = True):
+        """
+        Put the Layer into train / eval mode. Depending on training_mode param.
+        During eval mode, we merge the weights. During training we do not.
+        """
+        super(ConvLoRA, self).train(mode=training_mode)
+        if training_mode:
             if self.merge_weights and self.merged:
                 if self.r > 0:
                     # Make sure that the weights are not merged
@@ -377,38 +410,33 @@ class ConvLoRA(nn.Module, LoRALayer):
                     self.conv.weight.data += (self.lora_B @ self.lora_A).view(self.conv.weight.shape) * self.scaling
                 self.merged = True
 
-    def forward(self, x):
-        if self.r > 0 and not self.merged:
+    def forward(self, x: torch.Tensor):
+        """
+        Forward pass depending on if A and B have been merged.
+        """
+        if self.merged:
+            return self.conv(x)
+        else:
             return self.conv._conv_forward(
                 x,
                 self.conv.weight + (self.lora_B @ self.lora_A).view(self.conv.weight.shape) * self.scaling,
                 self.conv.bias,
             )
-        return self.conv(x)
 
 
 class LoRAConv1d(ConvLoRA):
-    """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
-    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv1d, self).__init__(nn.Conv1d, *args, **kwargs)
 
 
 class LoRAConv2d(ConvLoRA):
-    """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
-    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv2d, self).__init__(nn.Conv2d, *args, **kwargs)
 
 
 class LoRAConv3d(ConvLoRA):
-    """
-    Copied from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
-    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv3d, self).__init__(nn.Conv3d, *args, **kwargs)

@@ -68,13 +68,13 @@ class ModelFactory:
         model: nn.Module,
         r: int,
         alpha: int,
-        target_layer_class_names: List[str],
+        target_layers: List[str],
     ) -> nn.Module:
         convert_to_lora(
             model=model,
             r=r,
             alpha=alpha,
-            target_layer_class_names=target_layer_class_names,
+            target_layers=target_layers,
         )
         return model
 

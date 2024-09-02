@@ -228,10 +228,12 @@ lora_model:
   variant_key: lora
   config:
     alpha: 1
-    r: 8
-    target_layer_class_names:
-      - LlamaSdpaAttention
-      # - Embedding # todo fix that on cuda:0 with FSDP the A and B matrix are not correct
+    r: 2
+    target_layers:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
     model:
       instance_key: checkpointed_model
       pass_type: BY_REFERENCE

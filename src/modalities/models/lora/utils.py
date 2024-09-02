@@ -36,11 +36,11 @@ def convert_to_lora(
     model: nn.Module,
     r: int,
     alpha: int,
-    target_layer_class_names: List[str],
+    target_layers: List[str],
 ):
-    recursive_layer_conversion(model, r, alpha, target_layer_class_names)
+    recursive_layer_conversion(model, r, alpha, target_layers)
     mark_only_lora_as_trainable(model=model)
-    logging.info(f"All layers of type {target_layer_class_names} were converted.")
+    logging.info(f"All layers of type {target_layers} were converted.")
     return model
 
 
@@ -48,17 +48,17 @@ def recursive_layer_conversion(
     module: nn.Module,
     r: int,
     alpha: int,
-    target_layer_class_names: List[str],
+    target_layers: List[str],
 ):
     for name, child in module.named_children():
-        # If it's a leaf module (i.e., has no children), replace it with Linear
+        # If it's a leaf module (i.e., has no children), replace it with LoRALayer
         if len(list(child.children())) == 0:
-            if type(child).__name__ in target_layer_class_names or type(module).__name__ in target_layer_class_names:
+            if name in target_layers:
                 converted_child = convert_layer(child, r=r, alpha=alpha)
                 setattr(module, name, converted_child)
         else:
             # Recursively apply to child modules
-            recursive_layer_conversion(child, r, alpha, target_layer_class_names)
+            recursive_layer_conversion(child, r, alpha, target_layers)
 
 
 def convert_layer(layer: nn.Module, r: int, alpha: int) -> nn.Module:

@@ -209,7 +209,7 @@ class CheckpointedModelConfig(BaseModel):
 class LoraConfig(BaseModel):
     alpha: int
     r: int
-    target_layer_class_names: List[str]
+    target_layers: List[str]
     model: PydanticPytorchModuleType
 
 

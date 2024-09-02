@@ -33,9 +33,7 @@ def set_env():
 
 @pytest.fixture()
 def config_file_path() -> Path:
-    config_file_path = _ROOT_DIR / Path(
-        "tests/fine_tuning/test_configs/" + "config_lorem_ipsum_lora_conversion.yaml"
-    )
+    config_file_path = _ROOT_DIR / Path("tests/fine_tuning/test_configs/" + "config_lorem_ipsum_lora_conversion.yaml")
     return config_file_path
 
 
@@ -60,7 +58,7 @@ def alpha():
 
 
 @pytest.fixture()
-def layer_types():
+def layers():
     return ["attn"]
 
 
@@ -143,38 +141,17 @@ def test_attribute_copying(r, alpha):
 
 
 @pytest.mark.parametrize(
-    "list_allowed_conversion_types",
+    "list_allowed_conversion_layers",
     [
-        ["Linear"],
-        ["Embedding"],
+        ["q_proj"],
+        ["v_proj"],
     ],
 )
-def test_layer_conversion(model, r, alpha, list_allowed_conversion_types):
-    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
-    assert not list_allowed_conversion_types[0] in [
+def test_layer_conversion(model, r, alpha, list_allowed_conversion_layers):
+    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_layers)
+    assert not list_allowed_conversion_layers[0] in [
         type(i).__name__ for i in model.modules()
     ], "The layer type shouldn't be present in the whole model anymore."
-
-
-def test_attention_layer_conversion(model, r, alpha):
-    def find_causal_self_attention_module(model: nn.Module):
-        result = []
-        for name, module in model.named_modules():
-            if isinstance(module, CausalSelfAttention):
-                result.append(module)
-        return result
-
-    list_allowed_conversion_types = ["CausalSelfAttention"]
-    recursive_layer_conversion(model, r, alpha, list_allowed_conversion_types)
-    attention_layers_after = find_causal_self_attention_module(model)
-    for attention_layer in attention_layers_after:
-        types = [type(i).__name__ for i in attention_layer.modules()]
-        assert (
-            "Linear" not in types
-        ), "There shouldn't be any layers of type 'Linear' anymore."
-        assert (
-            "LoRALinear" in types
-        ), "There should only be layers of type 'LoraLinear'."
 
 
 def test_no_layer_conversion(model, r, alpha):
@@ -187,38 +164,3 @@ def test_no_layer_conversion(model, r, alpha):
     assert (
         module_types_before == module_types_after
     ), "If I don't give any layers for conversion the model should be the same after."
-
-
-@pytest.fixture
-def list_allowed_conversion_types():
-    return [
-        "CausalSelfAttention",
-        "Linear",
-        "Embedding",
-        "Conv1d",
-        "Conv2d",
-        "Conv3d",
-    ]
-
-
-def test_replace_modules_in_attention(model, r, alpha, list_allowed_conversion_types):
-    percentage_trainable_params_before_lora = compute_trainable_num_parameters(
-        model=model
-    )
-    assert isinstance(model.transformer.h[0].attn.c_proj, nn.Linear)
-
-    converted = convert_to_lora(model, r, alpha, list_allowed_conversion_types)
-    percentage_trainable_params_after_lora = compute_trainable_num_parameters(
-        model=model
-    )
-
-    assert isinstance(converted, nn.Module)
-    # Checking the percentage of trainable weights before and after conversion.
-    assert (
-        percentage_trainable_params_before_lora > percentage_trainable_params_after_lora
-    ), "Percentage of trainable weights should be greater before lora."
-
-    # Checking if the conversion from nn.Linear to LoRALinear actually happened.
-    assert isinstance(
-        model.transformer.h[0].attn.c_proj, LoRALinear
-    ), "After conversion nn.Linear should be a LoRALinear."
