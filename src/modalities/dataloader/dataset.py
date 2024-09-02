@@ -15,6 +15,7 @@ import webdataset as wds
 from pydantic import BaseModel, Field
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from torch.utils.data import IterableDataset
 from torch.utils.data.dataset import Dataset as TorchdataSet
 from torchvision.transforms import v2 as transforms
 from tqdm import tqdm
@@ -609,6 +610,46 @@ def torch_audio(key, data):
     return (audio, sample_rate)
 
 
+def fixed_ratio_round_robin(*sources, samples_per_batch):
+    sources = list(sources)
+    remaining_samples_in_batch = samples_per_batch.copy()
+    i = 0
+    while len(sources) > 0:
+        try:
+            sample = next(sources[i])
+            remaining_samples_in_batch[i] -= 1
+
+            # reset
+            if sum(remaining_samples_in_batch) == 0:
+                remaining_samples_in_batch = samples_per_batch.copy()
+
+            # go to next source which has some remaining samples
+            i = (i + 1) % len(sources)
+            while remaining_samples_in_batch[i] == 0:
+                i = (i + 1) % len(sources)
+            yield sample
+        except StopIteration:
+            del sources[i]
+
+
+class FixedRatioRoundRobinMix(IterableDataset):
+    """
+    returns an iterator for a list of datasets; samples are yielded in a round robin manner
+    with a fixed ratio of samples per dataset. There is no random sampling, so the number of
+    samples per modality is guaranteed to be fixed per batch.
+    """
+
+    def __init__(self, datasets, mixing_ratios, batch_size):
+        self.datasets = datasets
+        self.samples_per_batch = [int(batch_size * ratio) for ratio in mixing_ratios]
+        self.samples_per_batch[0] += batch_size - sum(self.samples_per_batch)
+
+    def __iter__(self):
+        """Return an iterator over the sources."""
+        sources = [iter(d) for d in self.datasets]
+        return fixed_ratio_round_robin(*sources, samples_per_batch=self.samples_per_batch)
+
+
 class MultimodalWebDatasetBuilderConfig(BaseModel):
     urls: Union[List[str], str]
     modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
@@ -772,7 +813,8 @@ PydanticMultimodalWebDatasetBuilderIFType = Annotated[
 
 class MultimodalWebDatasetConfig(BaseModel):
     builders: List[PydanticMultimodalWebDatasetBuilderIFType]
-    mixing_ratios: Optional[List[int]] = None
+    batch_size: int
+    mixing_ratios: Optional[List[float]] = None
     shardshuffle: int = 100
     repeat: bool = False
     resample: bool = True
@@ -784,6 +826,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
         builders: List[MultimodalWebDatasetBuilder],
+        batch_size: int,
         mixing_ratios: Optional[List[float]] = None,
         shardshuffle: int = 100,
         repeat: bool = False,
@@ -829,7 +872,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
             datasets = []
             for b in self.builders:
                 datasets.append(b.web_dataset)
-            dataset = wds.RandomMix(datasets, self.mixing_ratios)  # Apply mixing at sample level
+            dataset = FixedRatioRoundRobinMix(datasets, self.mixing_ratios, batch_size)  # Apply mixing at sample level
             self.pipeline.append(dataset)
         else:
             self.pipeline.extend(self.builders[0].web_dataset.pipeline)

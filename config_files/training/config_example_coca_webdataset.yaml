@@ -109,6 +109,8 @@ train_dataset:
     repeat: true
     resample: true
     shuffle_buffer: 10_000
+    mixing_ratios: [0.35, 0.65]
+    batch_size: ${settings.training.local_train_micro_batch_size}
 
 val_dataset:
   component_key: dataset
@@ -121,6 +123,8 @@ val_dataset:
     repeat: true
     resample: true
     shuffle_buffer: 10_000
+    mixing_ratios: [0.35, 0.65]
+    batch_size: ${settings.training.local_train_micro_batch_size}
 
 train_dataloader:
   component_key: data_loader
