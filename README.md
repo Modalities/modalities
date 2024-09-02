@@ -25,24 +25,63 @@ Also, see our Wiki and API reference documentation: https://modalities.github.io
 
 ## Installation
 
-Create conda environment and activate it via 
-```
+There are two ways to install modalities. If you want to use the latest version, or if you want to modify the code base itself, you can install modalities directly from source. 
+
+If you want to use modalities as a library and potentially register your custom components with modalities, you can install it directly via pip.
+
+
+### Installation from source
+
+
+Create a conda environment and activate it via 
+
+```sh
 conda create -n modalities python=3.10
 conda activate modalities
 ```
-
-then, install the repository via
-
+Either clone the repository via
+```sh
+git clone git@github.com:Modalities/modalities.git
 ```
+or download the repository as a zip file and extract it.
+```
+wget https://github.com/Modalities/modalities/archive/refs/heads/main.zip
+unzip main.zip
+```
+
+
+Currently, the flash attention dependency cannot be installed without torch being installed beforehand.
+Until they fix this, we have to run
+
+```sh
+pip install torch
+```
+
+Now modalities can be installed the repository via
+
+```sh
+cd modalities
 pip install -e . 
 ```
 
 If you want to contribute, have a look at `CONTRIBUTING.md`.
 
+### Installation via pip
+
+To install modalities via pip, run
+
+```sh
+pip install torch
+pip install modalities
+```
+
+Note, that also here, torch has to be installed before installing modalities.
 
 
 ## Usage
-For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 src/modalities/__main__.py run --config_file_path config_files/config.yaml`.
+For running the training endpoint on multiple GPUs run `CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 modalities run --config_file_path config_files/config.yaml`.
+
+In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file.
 
 Or, if you are a VsCode user, add this to your `launch.json`:
 ```json
@@ -86,9 +125,15 @@ In the following, we list the already implemented, planned and in-progress featu
 | Memmap for efficient data loading     | supported        | Optimizes the data pipeline to reduce I/O bottlenecks. |
 | Activation Checkpointing              | supported        | Saves intermediate activations to memory only at certain points during the forward pass and recomputes them during the backward pass, reducing memory usage at the cost of additional computation. |
 | Flash Attention                       | supported        | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models. |
+| Tensor Parallelism                    | prototype       | Implementing vertical model sharding, as an efficient model parallelism technique|
+| Sequence Parallelism                  | prototype       | Variant of Tensor Parallelism that shard on the sequence dimension |
+| Sequence Parallelism                  | prototype       | Variant of Tensor Parallelism that shard on the sequence dimension |
+| FSDP 2                                | prototype       | Improved version of the original FSDP |
+| Torch Compile                         | prototype       | Speeds up tensor operations by JIT compiling tensor operations into optimized kernels |
+| Deferred Initialisation               | prototype       | Instead of instantiating the model in CPU RAM, the modules are instantiated as fake tensors and operations are recorded. Once sharded (e.g., via FSDP), each rank only instantiates the local tensors by replaying the tensor operations.|
 | Adaptive Batch Size Exploration       | planned         | Dynamically increases the training batch size during the training process to identify the maximum batch size that can be accommodated by a given GPU setup without causing memory overflow or performance degradation. |
 | Node Failure Recovery                 | planned         | Implements mechanisms to automatically detect and recover from failures (e.g., node or GPU failures) in distributed training environments, ensuring that training can continue with minimal interruption even if one or more nodes / GPUs in the cluster fail. |
-
+| Loss Parallelism                      | planned       | Reduces memory footprint and communication overhead by computing the loss locally on each rank. |
 
 
 ### Downstream Performance Features
@@ -108,6 +153,17 @@ In the following, we list the already implemented, planned and in-progress featu
 | Knowledge Distillation         | planned  | Transfers knowledge from a larger, complex model to a smaller, more efficient model, improving the smaller model's performance without the computational cost of the larger model.|
 | Hyperparameter Optimization    | planned          | Grid search for various hyperparameter such as LR, Optimizer arguments etc. Also the integration of µP might be interesting |
 
+## Tutorials
+Even though modalities significantly simplifies LLM training, there is still some technical complexity left. We provide a series of tutorials to help you get started with training and evaluating models using modalities.
+
+- [Getting Started](examples/getting_started/README.md)</br>
+  Brief overview on how to get started with modalities by training a small GPT model on a tiny subset of the Redpajama V2 dataset.
+
+- [Library Usage](examples/library_usage/README.md)</br>
+  How to use modalities as a library and register custom components with modalities.
+
+- [Modalities in 15mins] </br>
+  Jupyter notebook will be added soon
 
 ## Entry Points
 
