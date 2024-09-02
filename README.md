@@ -127,7 +127,6 @@ In the following, we list the already implemented, planned and in-progress featu
 | Flash Attention                       | supported        | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models. |
 | Tensor Parallelism                    | prototype       | Implementing vertical model sharding, as an efficient model parallelism technique|
 | Sequence Parallelism                  | prototype       | Variant of Tensor Parallelism that shard on the sequence dimension |
-| Sequence Parallelism                  | prototype       | Variant of Tensor Parallelism that shard on the sequence dimension |
 | FSDP 2                                | prototype       | Improved version of the original FSDP |
 | Torch Compile                         | prototype       | Speeds up tensor operations by JIT compiling tensor operations into optimized kernels |
 | Deferred Initialisation               | prototype       | Instead of instantiating the model in CPU RAM, the modules are instantiated as fake tensors and operations are recorded. Once sharded (e.g., via FSDP), each rank only instantiates the local tensors by replaying the tensor operations.|
