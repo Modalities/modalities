@@ -57,7 +57,7 @@ val_dataset:
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
-  
+
 test_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
@@ -231,6 +231,7 @@ lora_model:
     r: 8
     target_layer_class_names:
       - LlamaSdpaAttention
+      # - Embedding # todo fix that on cuda:0 with FSDP the A and B matrix are not correct
     model:
       instance_key: checkpointed_model
       pass_type: BY_REFERENCE
@@ -322,7 +323,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: OFFLINE
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: "."
     config_file_path: ${settings.config_file_path}
