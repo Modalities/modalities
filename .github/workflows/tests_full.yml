@@ -23,8 +23,9 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get install git -y
-        python -m pip install torch 
+        python -m pip install torch
         python -m pip install --upgrade pip setuptools wheel
+        export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
         python -m pip install -e .[tests]
     - name: Run tests
       run: |
