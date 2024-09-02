@@ -44,7 +44,10 @@ def test_coca():
     assert out["text_cls"].shape == (1, 1, 768)
 
 
-@pytest.mark.skip(reason="Skipping this test for now")
+@pytest.mark.skip(
+    reason="The test itself is fine, but it is not working in the CI pipeline, as the infrastructure"
+    "does not have enough GPU RAM."
+)
 # @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This e2e test requires 1 GPU.")
 def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
     monkeypatch.setenv("RANK", "0")

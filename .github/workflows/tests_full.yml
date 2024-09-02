@@ -29,7 +29,8 @@ jobs:
         python -m pip install -e .[tests]
     - name: Run tests
       run: |
-        sh tests/run_all_tests.sh 0 1
+        pytest
+        # sh tests/run_all_tests.sh 0 1
     - name: Upload coverage data to coveralls.io
       run: |
         python -m pip install coveralls[toml]
