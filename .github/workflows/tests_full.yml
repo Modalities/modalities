@@ -1,0 +1,41 @@
+name: Tests Full
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  pull_request:
+    types: [review_requested, ready_for_review, auto_merge_enabled]
+
+jobs:
+  build:
+    runs-on: arc-runner-set
+    strategy:
+      matrix:
+        python-version: ["3.11"] # ["3.10", "3.11"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        sudo apt-get install git -y
+        python -m pip install torch
+        python -m pip install --upgrade pip setuptools wheel
+        export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
+        python -m pip install -e .[tests]
+    - name: Run tests
+      run: |
+        pytest
+        # sh tests/run_all_tests.sh 0 1
+    - name: Upload coverage data to coveralls.io
+      run: |
+        python -m pip install coveralls[toml]
+        COVERALLS_INPUT=.coverage_reports/.coverage coveralls --service=github
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        
