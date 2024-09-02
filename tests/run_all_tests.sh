@@ -29,9 +29,8 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 cd "$SCRIPT_DIR/.."
 
 
-coverage erase
-
 mkdir -p .coverage_reports
+rm -f .coverage_reports/*
 
 COVERAGE_FILE=.coverage_reports/.coverage.part0 python -m pytest tests/
 

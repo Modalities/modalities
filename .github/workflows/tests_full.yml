@@ -29,11 +29,11 @@ jobs:
         python -m pip install -e .[tests]
     - name: Run tests
       run: |
-        pytest
+        sh tests/run_all_tests.sh 
     - name: Upload coverage data to coveralls.io
       run: |
         python -m pip install coveralls[toml]
-        coveralls --service=github
+        COVERALLS_INPUT=.coverage_reports/.coverage coveralls --service=github
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
