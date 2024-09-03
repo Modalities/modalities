@@ -234,8 +234,8 @@ class Main:
     def add_custom_component(
         self, component_key: str, variant_key: str, custom_component: Type, custom_config: Type
     ) -> None:
-        """Add a custom component to the registry. 
-        
+        """Add a custom component to the registry.
+
         This method comes in especially handy
         when Modalities is used as a library and the user wants to add custom components
         (e.g., custom model or custom loss function) to the registry.
@@ -255,7 +255,7 @@ class Main:
 
     def build_components(self, components_model_type: Type[BaseModel]) -> BaseModel:
         """Given a pydantic basemodel, this method builds the components specified in the config file.
-        
+
         Depending on the use case (e.g., training, inference, etc.), the user can pass different pydantic base models.
         For instance, for tokenization, the basemodel would only have the tokenization-related components specified.
 
@@ -272,8 +272,8 @@ class Main:
         return components
 
     def run(self, components: TrainingComponentsInstantiationModel):
-        """Entrypoint fo running the training process. 
-        
+        """Entrypoint fo running the training process.
+
         We pass in a TrainingComponentsInstantiationModel,
         which is a pydantic model that contains all the components needed for the training process.
 
@@ -355,7 +355,7 @@ class Main:
         local_rank: int,
     ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate]]:
         """Returns the logging publishers for the training.
-        
+
         These publishers are used to pass the evaluation results and the batch progress updates to the message broker.
         The message broker is then used to pass the messages to the subscribers, such as WandB.
 
