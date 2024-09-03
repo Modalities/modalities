@@ -198,7 +198,7 @@ In a first step, we explored a **limited** set of different configurations (batc
 | 6.7 | 128 | 131.59 | 1 | 2 | 256 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6086 |
 | 6.7 | 256 | 225.24 | 1 | 2 | 512 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5209 |
 
-Further scaling results can be found at [Leonardo Booster Scaling Experiments](https://github.com/Modalities/modalities/data/scaling_experiments/scaling_leonardo.md)
+Further scaling results can be found at [Leonardo Booster Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/data/scaling_experiments/scaling_leonardo.md)
 
 ## MareNostrum5 - NVIDIA H100 64GB
 |  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
@@ -229,9 +229,9 @@ Further scaling results can be found at [Leonardo Booster Scaling Experiments](h
 | 28 | 1024 | 162.16 | 1 | 1 | 1024 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2622 |
 | 28 | 2048 | 297.0 | 1 | 1 | 2048 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2401 |
 
-Further scaling results can be found at [MareNostrum5 Scaling Experiments](https://github.com/Modalities/modalities/data/scaling_experiments/scaling_mn5.md)
+Further scaling results can be found at [MareNostrum5 Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/data/scaling_experiments/scaling_mn5.md)
 
-![Scaling Plot for a 28B model with a sequence length of 8192 tokens](https://github.com/Modalities/modalities/data/scaling_experiments/scaling_28B_mbs_1_ac_True.png)
+![Scaling Plot for a 28B model with a sequence length of 8192 tokens](https://github.com/Modalities/modalities/blob/scaling_experiments/data/scaling_experiments/scaling_28B_mbs_1_ac_True.png)
 
 
 ## Contributing
