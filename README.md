@@ -200,7 +200,7 @@ In a first step, we explored a **limited** set of different configurations (batc
 
 Further scaling results can be found at [Leonardo Booster Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/data/scaling_experiments/scaling_leonardo.md)
 
-## MareNostrum5 - NVIDIA H100 64GB
+## MareNostrum 5 - NVIDIA H100 64GB
 |  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2.7 | 4 | 15.06 | 1 | 2 | 8 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2983 |
