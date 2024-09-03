@@ -167,7 +167,7 @@ Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_p
 
 In the following, you can find the results of our scaling experiments performed on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5). 
 
-In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize performance.
+In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize throughput.
 
 
 ## Leonardo Booster  - NVIDIA A100 64GB
