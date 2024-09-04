@@ -99,7 +99,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
         assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
         command_end_to_end_tests = (
-            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]}"
+            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]} --no-cov"
         )
         print(command_end_to_end_tests)
         subprocess.run(command_end_to_end_tests, shell=True, capture_output=False, text=True)
