@@ -170,7 +170,7 @@ In the following, you can find the results of our scaling experiments performed 
 In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize throughput.
 
 
-## Leonardo Booster  - NVIDIA A100 64GB
+### Leonardo Booster  - NVIDIA A100 64GB
 |  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2.7 | 8 | 18.63 | 1 | 2 | 16 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5847 |
