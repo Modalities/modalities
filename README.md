@@ -163,7 +163,7 @@ in our `pyproject.toml`, we can start only main with `modalities` (which does no
 
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
-# Scaling Experiments
+## Scaling Experiments
 
 In the following, you can find the results of our scaling experiments performed on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5). 
 
