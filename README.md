@@ -163,11 +163,11 @@ in our `pyproject.toml`, we can start only main with `modalities` (which does no
 
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
-# Scaling Experiments
+## Scaling Experiments
 
 In the following, you can find the results of our scaling experiments performed on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5). 
 
-In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize performance.
+In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize throughput.
 
 
 ## Leonardo Booster  - NVIDIA A100 64GB
@@ -200,7 +200,7 @@ In a first step, we explored a **limited** set of different configurations (batc
 
 Further scaling results can be found at [Leonardo Booster Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/docs/scaling_experiments/scaling_leonardo.md)
 
-## MareNostrum5 - NVIDIA H100 64GB
+## MareNostrum 5 - NVIDIA H100 64GB
 |  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2.7 | 4 | 15.06 | 1 | 2 | 8 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2983 |
