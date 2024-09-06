@@ -161,3 +161,4 @@ pyenv*
 noteboks/*
 
 tests/tmp/*
+*wandb_storage*
