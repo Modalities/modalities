@@ -2,7 +2,6 @@ from abc import ABC
 from typing import Dict, List, Optional
 
 import sentencepiece as spm
-import torch
 from transformers import AutoTokenizer
 
 
@@ -100,7 +99,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
                 special_tokens_dict=special_tokens,
                 replace_additional_special_tokens=False,
             )
-        self.max_length = max_length if max_length is not None else torch.inf
+        self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
 
