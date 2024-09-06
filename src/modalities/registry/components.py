@@ -35,7 +35,6 @@ from modalities.config.config import (
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
-    OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
@@ -94,6 +93,18 @@ from modalities.utils.number_conversion import (
 
 @dataclass
 class ComponentEntity:
+    """Dataclass to store the component entity.
+    The component entity stores the component key, the variant key, the component type and the component config type.
+    The component key is used to identify the component type, whereas the variant key is used to identify the component.
+    An example of a component entity is the GPT2 model with the component key "model" and the variant key "gpt2".
+
+    Args:
+        component_key (str): Key to identify the component type.
+        variant_key (str): Variant key to identify the component.
+        component_type (Type | Callable): Type of the component.
+        component_config_type (Type[BaseModel]): Type of the component config.
+    """
+
     component_key: str
     variant_key: str
     component_type: Type | Callable
@@ -152,9 +163,6 @@ COMPONENTS = [
         "packed_mem_map_dataset_megatron",
         DatasetFactory.get_packed_mem_map_dataset_megatron,
         PackedMemMapDatasetMegatronConfig,
-    ),
-    ComponentEntity(
-        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers

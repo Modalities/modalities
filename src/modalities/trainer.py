@@ -35,6 +35,22 @@ class Trainer:
         global_num_tokens_per_train_step: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
+        """
+        Initializes the Trainer object.
+
+        Args:
+            global_rank (int): The global rank to which operates the trainer object.
+            batch_progress_publisher (MessagePublisher[BatchProgressUpdate]): The publisher for batch progress
+                updates.
+            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):
+                The publisher for evaluation result batches.
+            gradient_acc_steps (int): The number of gradient accumulation steps.
+            global_num_tokens_per_train_step (int): The number of global tokens per training step.
+            gradient_clipper (GradientClipperIF): The gradient clipper.
+
+        Returns:
+            None
+        """
         self.global_rank = global_rank
         self.batch_progress_publisher = batch_progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
@@ -44,6 +60,16 @@ class Trainer:
 
     @staticmethod
     def _get_num_train_steps_done(micro_batch_id: int, gradient_acc_steps: int) -> int:
+        """
+        Calculates the number of training steps done based on the micro batch ID and gradient accumulation steps.
+
+        Args:
+            micro_batch_id (int): The ID of the current micro batch.
+            gradient_acc_steps (int): The number of gradient accumulation steps.
+
+        Returns:
+            int: The number of training steps done.
+        """
         return (micro_batch_id + 1) // gradient_acc_steps
 
     def _train_batch(
@@ -54,7 +80,27 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
+        """
+        Conducts a training step on batch of data.
+
+        Args:
+            batch (DatasetBatch): The input batch of data.
+            model (FSDP): The model to train.
+            optimizer (Optimizer): The optimizer used for training.
+            scheduler (LRScheduler): The learning rate scheduler.
+            loss_fun (Loss): The loss function used for training.
+            micro_batch_id (int): The ID of the micro batch.
+
+        Returns:
+            Tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+                A tuple containing the following:
+                    - step_performed (bool): Indicates whether a training step was performed.
+                    - num_train_steps_done (int): The number of training steps done.
+                    - loss (torch.Tensor): The computed loss.
+                    - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
+                        if a training step was performed otherwise return None.
+        """
         result_batch = model_predict_batch(model=model, batch=batch)
         loss = loss_fun(result_batch)
         (loss / self.gradient_acc_steps).backward()
@@ -85,6 +131,22 @@ class Trainer:
         evaluation_callback: Callable[[int], None],
         checkpointing_callback: Callable[[int], None],
     ):
+        """
+        Trains the model.
+
+        Args:
+            model (nn.Module): The model to be trained.
+            train_loader (LLMDataLoader): The data loader containing the training data.
+            optimizer (Optimizer): The optimizer used for gradient updates.
+            scheduler (LRScheduler): The learning rate scheduler.
+            loss_fun (Loss): The loss function used for training.
+            training_log_interval_in_steps (int): The interval at which training progress is logged.
+            evaluation_callback (Callable[[int], None]): A callback function for evaluation.
+            checkpointing_callback (Callable[[int], None]): A callback function for checkpointing.
+
+        Returns:
+            None
+        """
         model.train()
         cumulated_losses = self._reset_tracked_losses()
 
@@ -221,8 +283,9 @@ class Trainer:
             forward_backward_time_recorder.start()
 
     def _reset_tracked_losses(self):
-        # TODO: we should handle the device assignment more centrally.
-        # summed lcoal losses, loss of last local batch, number of local batches (i.e., number of steps)
+        # Initializes and returns a tensor representing the cumulated loss and gradient norm.
+        # The tensor is initialized with zeros and its device is set based on the availability of CUDA.
+
         cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
             cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device("cuda"))
@@ -236,6 +299,8 @@ class Trainer:
         num_train_steps_done: int,
         dataloader_tag: str,
     ):
+        # Publishes the progress of the training, i.e., number of training steps done.
+
         payload = BatchProgressUpdate(
             num_steps_done=num_train_steps_done,
             experiment_status=ExperimentStatus.TRAIN,
@@ -248,6 +313,8 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         evaluation_result: EvaluationResultBatch,
     ):
+        # Publishes the evaluation result.
+
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )

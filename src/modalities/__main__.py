@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple, Type
+from typing import List, Tuple, Type
 
 import click
 import click_pathlib
@@ -51,6 +51,11 @@ def main() -> None:
     help="Path to a file with the YAML config file.",
 )
 def entry_point_run_modalities(config_file_path: Path):
+    """Entrpoint to run the model training.
+
+    Args:
+        config_file_path (Path): Path to the YAML config file.
+    """
     main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
@@ -65,6 +70,11 @@ def entry_point_run_modalities(config_file_path: Path):
     help="Path to a file with the YAML config file.",
 )
 def entry_point_generate_text(config_file_path: FilePath):
+    """Inference entrypoint to generate text with a given model.
+
+    Args:
+        config_file_path (FilePath): Path to the YAML config file.
+    """
     generate_text(config_file_path)
 
 
@@ -90,6 +100,16 @@ def entry_point_generate_text(config_file_path: FilePath):
 def entry_point_convert_pytorch_to_hf_checkpoint(
     config_file_path: Path, output_hf_checkpoint_dir: Path, prediction_key: str
 ) -> HFModelAdapter:
+    """Entrypoint to convert a PyTorch checkpoint to a Hugging Face checkpoint.
+
+    Args:
+        config_file_path (Path): Path to the config that generated the pytorch checkpoint.
+        output_hf_checkpoint_dir (Path): Path to the output directory for the converted HF checkpoint.
+        prediction_key (str): The key in the models output where one can find the predictions of interest.
+
+    Returns:
+        HFModelAdapter: The Hugging Face model adapter.
+    """
     cp = CheckpointConversion(config_file_path, output_hf_checkpoint_dir)
     hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
     print(f"Model was successfully converted and saved to {output_hf_checkpoint_dir}")
@@ -112,13 +132,20 @@ def data():
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_data_create_raw_index(src_path, index_path):
-    """
-    Utility for indexing a large jsonl-file's content.
+def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
+    """Utility CMD IF for indexing the confent of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
     It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
+
+    Args:
+        src_path (Path): The path to the jsonl-file.
+        index_path (Path): The path to the index file, that will be created.
+
+    Raises:
+        ValueError: If the index file already exists.
     """
+
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
@@ -132,13 +159,15 @@ def entry_point_data_create_raw_index(src_path, index_path):
 @data.command(name="pack_encoded_data")
 @click.argument("config_path", type=FilePath)
 def entry_point_pack_encoded_data(config_path: FilePath):
-    """
-    Utility to encode an indexed, large jsonl-file.
-
+    """Utility to encode an indexed, large jsonl-file.
     (see also `create_index` for more information)
     Returns .pbin-file, which can be inserted into a training process directly
     and does not require its original jsonl-file or the respective index file anymore.
+
+    Args:
+        config_path (FilePath): Path to the config file describing the tokenization setup.
     """
+
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
     #  we can currently not rely on the existing class resolver.
     #  This is based on its connection to the overall `AppConfig`.
@@ -169,14 +198,17 @@ def entry_point_pack_encoded_data(config_path: FilePath):
 @data.command(name="merge_packed_data")
 @click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
 @click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
-def entry_point_merge_packed_data(src_paths, target_path):
-    """
-    Utility for merging different pbin-files into one.
+def entry_point_merge_packed_data(src_paths: List[Path], target_path: Path):
+    """Utility for merging different pbin-files into one.
     This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
     that the overall process was done in chunks.
     It is important that the same tokenizer got used for all chunks.
 
     Specify an arbitrary amount of pbin-files and/or directory containing such as input.
+
+    Args:
+        src_paths (List[Path]): List of paths to the pbin-files or directories containing such.
+        target_path (Path): The path to the merged pbin-file, that will be created.
     """
     input_files = []
     for p in src_paths:
@@ -190,6 +222,8 @@ def entry_point_merge_packed_data(src_paths, target_path):
 
 
 class Main:
+    """Main class that orchestrates the training process."""
+
     def __init__(self, config_path: Path) -> None:
         self.config_dict = load_app_config_dict(config_path)
         self.config_path = config_path
@@ -197,7 +231,21 @@ class Main:
         self.registry = Registry(COMPONENTS)
         self.component_factory = ComponentFactory(registry=self.registry)
 
-    def add_custom_component(self, component_key: str, variant_key: str, custom_component, custom_config) -> None:
+    def add_custom_component(
+        self, component_key: str, variant_key: str, custom_component: Type, custom_config: Type
+    ) -> None:
+        """Add a custom component to the registry.
+
+        This method comes in especially handy
+        when Modalities is used as a library and the user wants to add custom components
+        (e.g., custom model or custom loss function) to the registry.
+
+        Args:
+            component_key (str): Key of the component to be added to the registry
+            variant_key (str): Key of the variant to be added to the registry
+            custom_component (Type): The class type of the custom component
+            custom_config (Type): The pydantic config type of the custom component
+        """
         self.registry.add_entity(
             component_key=component_key,
             variant_key=variant_key,
@@ -206,12 +254,32 @@ class Main:
         )
 
     def build_components(self, components_model_type: Type[BaseModel]) -> BaseModel:
+        """Given a pydantic basemodel, this method builds the components specified in the config file.
+
+        Depending on the use case (e.g., training, inference, etc.), the user can pass different pydantic base models.
+        For instance, for tokenization, the basemodel would only have the tokenization-related components specified.
+
+        Args:
+            components_model_type (Type[BaseModel]): The pydantic basemodel type that should be
+                used to build the components.
+
+        Returns:
+            BaseModel: The components built based on the config file.
+        """
         components = self.component_factory.build_components(
             config_dict=self.config_dict, components_model_type=components_model_type
         )
         return components
 
     def run(self, components: TrainingComponentsInstantiationModel):
+        """Entrypoint fo running the training process.
+
+        We pass in a TrainingComponentsInstantiationModel,
+        which is a pydantic model that contains all the components needed for the training process.
+
+        Args:
+            components (TrainingComponentsInstantiationModel): The components needed for the training process.
+        """
         print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
@@ -285,7 +353,22 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate],]:
+    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate]]:
+        """Returns the logging publishers for the training.
+
+        These publishers are used to pass the evaluation results and the batch progress updates to the message broker.
+        The message broker is then used to pass the messages to the subscribers, such as WandB.
+
+        Args:
+            progress_subscriber (MessageSubscriberIF[BatchProgressUpdate]): The progress subscriber
+            results_subscriber (MessageSubscriberIF[EvaluationResultBatch]): The results subscriber
+            global_rank (int): The global rank of the current process
+            local_rank (int): The local rank of the current process on the current node
+
+        Returns:
+            Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate]]: The evaluation
+                result publisher and the batch processed publisher
+        """
         message_broker = MessageBroker()
         batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
             message_broker=message_broker,

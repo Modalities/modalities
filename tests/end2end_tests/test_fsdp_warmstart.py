@@ -72,7 +72,7 @@ class TestWarmstart:
             gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path)
 
             # adopt the checkpoint path
-            checkpoint_path = temp_dir  # "/raid/s3/opengptx/max_lue/modalities/data/checkpoints/test"
+            checkpoint_path = temp_dir
             experiment_id_0 = "0"
             gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"

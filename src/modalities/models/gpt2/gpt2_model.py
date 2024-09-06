@@ -22,38 +22,82 @@ from modalities.util import parse_enum_by_name
 
 
 class PositionTypes(str, Enum):
+    """
+    Enum class representing different position types.
+
+    Attributes:
+        ABSOLUTE (str): Represents the absolute position type.
+        NOPE (str): Represents the nope (no postional emebddigns) position type.
+    """
+
     ABSOLUTE = "ABSOLUTE"
     NOPE = "NOPE"
 
 
 class QueryKeyValueTransform(nn.Module):
+    """Query Key Value Transform base class."""
+
     def forward(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Perform forward pass for transforming queries/keys/values.
+
+        Args:
+            q (torch.Tensor): The query tensor.
+            k (torch.Tensor): The key tensor.
+            v (torch.Tensor): The value tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
+        """
         pass
 
 
 class IdentityTransform(QueryKeyValueTransform):
+    """IdentityTransform class which does not apply any transform."""
+
     def forward(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the IdentityTransform which does not apply any transform.
+
+        Args:
+            q (torch.Tensor): The query tensor.
+            k (torch.Tensor): The key tensor.
+            v (torch.Tensor): The value tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
+        """
         return q, k, v
 
 
 class RotaryTransform(QueryKeyValueTransform):
-    """Implementation of Rotary Positioanl Embeddings
+    """
+    RotaryTransform class which implements rotary positional embeddings.
+
     Source: https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py
-    We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the
-    XFormers implementation and removed in this implementation.
+            We added the corresponding code here, becauase there is a conflict with "@torch.jit.script" used in the
+            XFormers implementation and removed in this implementation.#
     """
 
     def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
+        """
+        Initializes the RotaryTransform object.
+
+        Args:
+            n_embd (int): The size of the embedding dimension.
+            n_head (int): The number of attention heads.
+            seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
+        """
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
@@ -65,10 +109,21 @@ class RotaryTransform(QueryKeyValueTransform):
         self._sin_cached = None
 
     def rotate_half(self, x):
+        """
+        Rearange tentor elements.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+
+        """
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
 
     def _update_cos_sin_tables(self, x):
+        # Update the cosine and sine tables.
         seq_len = x.shape[self.seq_length_dim]
 
         # Reset the tables if the sequence length has changed,
@@ -84,6 +139,17 @@ class RotaryTransform(QueryKeyValueTransform):
         return self._cos_cached, self._sin_cached
 
     def apply_rotary_pos_emb(self, x, cos, sin):
+        """
+        Applies rotary positional embedding to the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            cos (torch.Tensor): Cosine values for rotary positional embedding.
+            sin (torch.Tensor): Sine values for rotary positional embedding.
+
+        Returns:
+            torch.Tensor: Tensor after applying rotary positional embedding.
+        """
         # NOTE: This could probably be moved to Triton
 
         # Handle a possible sequence length mismatch in between q and k
@@ -95,6 +161,18 @@ class RotaryTransform(QueryKeyValueTransform):
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the RotaryTransform module.
+
+        Args:
+            q (torch.Tensor): Query tensor.
+            k (torch.Tensor): Key tensor.
+            v (torch.Tensor): Value tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            Tuple containing the modified query tensor, key tensor, and value tensor.
+        """
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
         k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
@@ -103,28 +181,82 @@ class RotaryTransform(QueryKeyValueTransform):
 
 
 class QueryKeyValueTransformType(Enum):
+    """
+    Enum class representing different types of query-key-value transform.
+
+    Attributes:
+        IdentityTransform: Represents the identity transform.
+        RotaryTransform: Represents the rotary transform.
+    """
+
     IdentityTransform = IdentityTransform
     RotaryTransform = RotaryTransform
 
 
 class AttentionImplementation(str, Enum):
+    """
+    Enum class representing different implementations of attention.
+
+    Attributes:
+        MANUAL (str): Manual attention implementation.
+        PYTORCH_FLASH (str): PyTorch's flash attention implementation.
+        DAO_FLASH (str): DAO's flash attention implementation.
+    """
+
     MANUAL = "manual"
     PYTORCH_FLASH = "pytorch_flash"
     DAO_FLASH = "dao_flash"
 
 
 class AttentionConfig(BaseModel):
+    """
+    Configuration class for attention mechanism.
+
+    Attributes:
+        qkv_transforms (List[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.
+    """
+
     class QueryKeyValueTransformConfig(BaseModel):
+        """
+        Configuration class for QueryKeyValueTransform.
+
+        Attributes:
+            type_hint (QueryKeyValueTransformType): The type hint for the transform.
+            config (Union[RotaryTransformConfig, IdentityTransformConfig]): The configuration for the transform.
+        """
+
         class IdentityTransformConfig(BaseModel):
+            """IdentityTransformConfig class."""
+
             pass
 
         class RotaryTransformConfig(BaseModel):
+            """
+            Configuration class for RotaryTransform.
+
+            Attributes:
+                n_embd (int): Number of embeddings.
+                n_head (int): Number of attention heads.
+                seq_length_dim (int): Dimension of the sequence length.
+
+            """
+
             n_embd: Annotated[int, Field(strict=True, ge=0)]
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
+            """
+            Parses a QueryKeyValueTransform by its name.
+
+            Args:
+                name (str): The name of the sharding strategy.
+
+            Returns:
+                QueryKeyValueTransformType: The parsed sharding strategy.
+
+            """
             return parse_enum_by_name(name=name, enum_type=QueryKeyValueTransformType)
 
         type_hint: QueryKeyValueTransformType
@@ -134,6 +266,30 @@ class AttentionConfig(BaseModel):
 
 
 class GPT2LLMConfig(BaseModel):
+    """
+    Configuration class for GPT2LLM model.
+
+    Args:
+        sample_key (str): The key for the samples.
+        prediction_key (str): The key for the predictions.
+        poe_type (PositionTypes): The type of position encoding.
+        sequence_length (int): The length of the sequence.
+        vocab_size (int): The size of the vocabulary.
+        n_layer (int): The number of layers.
+        n_head_q (int): The number of attention heads for queries.
+        n_head_kv (int): The number of attention heads for keys and values.
+        n_embd (int): The embedding size.
+        ffn_hidden (int): The hidden size of the feed-forward network.
+        dropout (float): The dropout rate.
+        bias (bool): Whether to use bias in Linears.
+        attention_config (AttentionConfig): The attention configuration.
+        attention_implementation (AttentionImplementation): The attention implementation.
+        activation_type (ActivationType): The activation type.
+        attention_norm (PydanticPytorchModuleType): The normalization type for attention.
+        ffn_norm (PydanticPytorchModuleType): The normalization type for feed-forward network.
+        lm_head_norm (PydanticPytorchModuleType): The normalization type for the language model head.
+    """
+
     sample_key: str
     prediction_key: str
     poe_type: PositionTypes
@@ -157,12 +313,30 @@ class GPT2LLMConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
+        """
+        Check if the value of n_head_q is divisible by n_head_kv.
+
+        Raises:
+            ValueError: If n_head_q is not divisible by n_head_kv.
+
+        Returns:
+            GPT2LLMConfig: The current instance of GPT2LLMConfig.
+        """
         if self.n_head_q % self.n_head_kv != 0:
             raise ValueError("n_head_q must be divisible by n_head_kv")
         return self
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "GPT2LLMConfig":
+        """
+        Validates the sizes of the GPT2 model parameters.
+
+        Returns:
+            GPT2LLMConfig: The current instance of GPT2LLMConfig object.
+
+        Raises:
+            ValueError: If any of the parameters (ffn_hidden, vocab_size, n_embd) is not divisible by 128.
+        """
         for param, param_name in zip(
             [self.ffn_hidden, self.vocab_size, self.n_embd], ["ffn_hidden", "vocab_size", "n_embd"]
         ):
@@ -173,6 +347,8 @@ class GPT2LLMConfig(BaseModel):
 
 
 class CausalSelfAttention(nn.Module):
+    """Causal Self Attention class."""
+
     def __init__(
         self,
         n_head_q: int,
@@ -183,6 +359,21 @@ class CausalSelfAttention(nn.Module):
         bias: bool,
         dropout: float,
     ):
+        """
+        Initializes the CausalSelfAttention object.
+
+        Args:
+            n_head_q (int): Number of attention heads for queries.
+            n_head_kv (int): Number of attention heads for keys and values.
+            n_embd (int): Size of the embedding dimension.
+            attention_config (AttentionConfig): The attention configuration.
+            attention_impl (AttentionImplementation): The attention implementation.
+            bias (bool): Whether to include bias in linear layers.
+            dropout (float): Dropout rate.
+
+        Returns:
+            None
+        """
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
         assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
@@ -232,6 +423,15 @@ class CausalSelfAttention(nn.Module):
         )
 
     def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Applies projections to the input tensor to get queries, keys, and values.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.
+        """
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
 
@@ -239,6 +439,20 @@ class CausalSelfAttention(nn.Module):
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Applies a series of transformations to the query, key, and value tensors.
+
+        Args:
+            q (torch.Tensor): The query tensors.
+            k (torch.Tensor): The key tensors
+            v (torch.Tensor): The value tensors.
+            qkv_transforms (nn.ModuleList): A list of transformation modules to be applied to q, k, and v.
+            n_head_q (int): The number of heads for the query tensors.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            A tuple containing the transformed query, key, and value tensors.
+        """
         batch_size, sequence_length, embedding_dim = q.size()
         # hidden dimension of single head
         # Note, that number of heads does not change the overall parameters of the networks
@@ -257,9 +471,19 @@ class CausalSelfAttention(nn.Module):
     @staticmethod
     def _repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
         """
-        Source code adopted from
-        https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
-        Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
+        Repeat the key-value tensor along the second dimension.
+
+        Args:
+            x (torch.Tensor): The input tensor of shape (B, nh_kv, T, hs).
+            n_rep (int): The number of times to repeat the tensor along the second dimension.
+
+        Returns:
+            torch.Tensor: The repeated tensor of shape (B, nh_kv * n_rep, T, hs).
+
+        Note:
+            Source code adopted from
+            https://github.com/facebookresearch/llama/blob/9a001c7a0987afd7b8de94e538916eff8950a73a/llama/model.py#L164
+            Adapted ordered dimensions and namings: bs=B, n_kv_heads=nh_kv, slen=T, head_dim=hs
         """
         B, nh_kv, T, hs = x.shape
         if n_rep == 1:
@@ -268,6 +492,18 @@ class CausalSelfAttention(nn.Module):
 
     @classmethod
     def repeat_kv_heads(cls, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
+        """
+        Repeats the key-value (k, v) heads if the number of query (q) heads is different.
+
+        Args:
+            cls (class): The class object.
+            q (torch.Tensor): The query tensor of shape (B, nh_q, T, hs).
+            k (torch.Tensor): The key tensor of shape (B, nh_kv, T, hs).
+            v (torch.Tensor): The value tensor of shape (B, nh_kv, T, hs).
+
+        Returns:
+            tuple: A tuple containing the repeated key tensor (k) and the repeated value tensor (v).
+        """
         # repeat k/v heads if self.n_rep > 1
         n_head_q = q.shape[1]
         n_head_kv = k.shape[1]
@@ -286,6 +522,23 @@ class CausalSelfAttention(nn.Module):
         dropout: float,
         attention_impl: AttentionImplementation,
     ) -> torch.Tensor:
+        """
+        Executes attention mechanism based on the specified implementation.
+
+        Args:
+            cls (object): The class object.
+            q (torch.Tensor): The query tensor.
+            k (torch.Tensor): The key tensor.
+            v (torch.Tensor): The value tensor.
+            dropout (float): The dropout rate.
+            attention_impl (AttentionImplementation): The attention implementation to use.
+
+        Returns:
+            torch.Tensor: The output tensor.
+
+        Raises:
+            NotImplementedError: If the specified attention implementation is not supported.
+        """
         if attention_impl == AttentionImplementation.MANUAL:
             k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
             y = manual_scaled_dot_product_attention(
@@ -326,6 +579,15 @@ class CausalSelfAttention(nn.Module):
         return y  # (B, T, nh_q, hd)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the CausalSelfAttention module.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, T, n_embd)
+
+        Returns:
+            torch.Tensor: Output tensor of shape (B, T, n_embd), representing the output projection.
+        """
         B, T, _ = x.size()  # batch size (B), sequence length (T), embedding dimensionality (self.n_embd)
         q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd // n_rep), v: (B, T, n_embd // n_rep)
 
@@ -337,7 +599,21 @@ class CausalSelfAttention(nn.Module):
 
 
 class TransformerMLP(nn.Module):
+    """TransformerMLP class."""
+
     def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, dropout: float):
+        """
+        Initializes the TransformerMLP class.
+
+        Args:
+            n_embd (int): The size of the input embedding.
+            ffn_hidden (int): The size of the hidden layer in the feed-forward network.
+            bias (bool): Whether to include bias terms in the linear layers.
+            dropout (float): The dropout probability.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.c_fc = nn.Linear(
             in_features=n_embd,
@@ -353,6 +629,15 @@ class TransformerMLP(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the TransformerMLP module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = self.c_fc(x)
         x = self.gelu(x)
         x = self.c_proj(x)
@@ -361,6 +646,8 @@ class TransformerMLP(nn.Module):
 
 
 class GPT2Block(nn.Module):
+    """GPT2Block class."""
+
     def __init__(
         self,
         n_embd: int,
@@ -375,6 +662,22 @@ class GPT2Block(nn.Module):
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
     ):
+        """
+        Initializes the GPT2Block.
+
+        Args:
+            n_embd (int): The embedding dimension.
+            bias (bool): Whether to include bias in the model.
+            n_head_q (int): The number of attention heads for queries.
+            n_head_kv (int): The number of attention heads for keys and values.
+            activation_type (ActivationType): The type of activation function to use.
+            attention_impl (AttentionImplementation): The implementation of attention mechanism.
+            attention_config (AttentionConfig): The configuration for attention mechanism.
+            dropout (float): The dropout rate.
+            ffn_hidden (int): The size of the hidden layer in the feed-forward network.
+            attention_norm (nn.Module): The normalization layer for attention.
+            ffn_norm (nn.Module): The normalization layer for feed-forward network.
+        """
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
@@ -395,12 +698,23 @@ class GPT2Block(nn.Module):
             raise NotImplementedError("unimplemented activation")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the GPT2Block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = x + self.attn(self.attention_norm(x))
         x = x + self.mlp(self.ffn_norm(x))
         return x
 
 
 class GPT2LLM(NNModel):
+    """GPT2LLM class."""
+
     def __init__(
         self,
         sample_key: str,
@@ -423,6 +737,30 @@ class GPT2LLM(NNModel):
         lm_head_norm: nn.Module,
         seed: int = None,
     ):
+        """
+        Initializes the GPT2LLM object.
+
+        Args:
+            sample_key (str): The sample key.
+            prediction_key (str): The prediction key.
+            poe_type (PositionTypes): The position type.
+            sequence_length (int): The sequence length.
+            vocab_size (int): The vocabulary size.
+            n_layer (int): The number of layers.
+            n_head_q (int): The number of query heads.
+            n_head_kv (int): The number of key-value heads.
+            n_embd (int): The embedding dimension.
+            ffn_hidden (int): The hidden dimension of the feed-forward network.
+            dropout (float): The dropout rate.
+            bias (bool): Whether to include bias in linear layers.
+            activation_type (ActivationType): The activation type.
+            attention_implementation (AttentionImplementation): The attention implementation.
+            attention_config (AttentionConfig): The attention configuration.
+            attention_norm (nn.Module): The attention normalization module.
+            ffn_norm (nn.Module): The feed-forward network normalization module.
+            lm_head_norm (nn.Module): The language model head normalization module.
+            seed (int, optional): The random seed. Defaults to None.
+        """
         weight_decay_groups = {
             "linear": [".attn", ".mlp"],
             "embedding": [".wte", ".wpe"],
@@ -489,6 +827,17 @@ class GPT2LLM(NNModel):
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass implementation of the GPT2LLM module.
+
+        Args:
+            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+                - sample_key (str): Key for the input tensor containing token ids.
+
+        Returns:
+            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+                - prediction_key (str): Key for the output tensor containing logits.
+        """
         input_ids = inputs[self.sample_key]
         device = input_ids.device
         _, t = input_ids.size()  # batch size, sequence length
@@ -513,6 +862,17 @@ class GPT2LLM(NNModel):
         return {self.prediction_key: logits}
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass of the GPT2LLM module.
+
+        Args:
+            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+                - sample_key (str): Key for the input tensor containing token ids.
+
+        Returns:
+            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+                - prediction_key (str): Key for the output tensor containing logits.
+        """
         return self.forward_impl(inputs)
 
 
@@ -520,7 +880,23 @@ def manual_scaled_dot_product_attention(
     query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
 ) -> torch.Tensor:
     """
-    taken from https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+    Compute scaled dot product attention.
+
+    Args:
+        query (torch.Tensor): The query tensor of shape (batch_size, num_queries, query_dim).
+        key (torch.Tensor): The key tensor of shape (batch_size, num_keys, key_dim).
+        value (torch.Tensor): The value tensor of shape (batch_size, num_values, value_dim).
+        attn_mask (torch.Tensor, optional): The attention mask tensor of shape (num_queries, num_keys).
+            Defaults to None.
+        dropout_p (float, optional): The dropout probability. Defaults to 0.0.
+        is_causal (bool, optional): Whether the attention is causal or not. Defaults to False.
+        scale (float, optional): The scaling factor. Defaults to None.
+
+    Returns:
+        torch.Tensor: The attention weights tensor of shape (batch_size, num_queries, num_keys).
+
+    Note:
+        Taken from https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     """
     L, S = query.size(-2), key.size(-2)
     scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale

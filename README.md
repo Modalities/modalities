@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
   <a href="https://coveralls.io/github/Modalities/modalities">
-    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg" alt="Coverage Status">
+    <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg?branch=main" alt="Coverage Status">
   </a>
  <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
@@ -20,8 +20,7 @@
 
 
 ## Getting Started
-For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/getting_started_example.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
-Also, see our Wiki and API reference documentation: https://modalities.github.io/modalities/
+For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
 
 ## Installation
 
@@ -162,6 +161,76 @@ modalities = "modalities.__main__:main"
 in our `pyproject.toml`, we can start only main with `modalities` (which does nothing), or a specific sub-entrypoint e.g. `modalities do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
 
 Alternatively, directly use `src/modalities/__main__.py do_stuff --config_file_path config_files/config.yaml --my_cli_argument 3537`.
+
+## Scaling Experiments
+
+In the following, you can find the results of our scaling experiments performed on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5). 
+
+In a first step, we explored a **limited** set of different configurations (batch size, gradient accumulation steps, etc.) to get our baseline results. In a second step, we will focus on optimizing these configurations to maximize throughput.
+
+
+### Leonardo Booster  - NVIDIA A100 64GB
+|  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2.7 | 8 | 18.63 | 1 | 2 | 16 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5847 |
+| 2.7 | 8 | 18.43 | 1 | 2 | 16 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.5786 |
+| 2.7 | 16 | 36.68 | 1 | 2 | 32 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.5757 |
+| 2.7 | 16 | 36.96 | 1 | 2 | 32 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.58 |
+| 2.7 | 32 | 72.63 | 1 | 2 | 64 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.5699 |
+| 2.7 | 32 | 73.76 | 1 | 2 | 64 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5788 |
+| 2.7 | 64 | 146.12 | 1 | 2 | 128 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5733 |
+| 2.7 | 64 | 145.31 | 1 | 2 | 128 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.5701 |
+| 2.7 | 128 | 285.64 | 1 | 2 | 256 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.5603 |
+| 2.7 | 128 | 205.96 | 1 | 2 | 256 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.404 |
+| 2.7 | 256 | 495.44 | 1 | 2 | 512 | 4096 | BF_16 | HYBRID_SHARD | False |  A100  | 0.4859 |
+| 2.7 | 256 | 303.17 | 1 | 2 | 512 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.2974 |
+| 2.7 | 8 | 19.94 | 1 | 4 | 32 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.626 |
+| 2.7 | 16 | 39.68 | 1 | 4 | 64 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.6227 |
+| 2.7 | 32 | 78.3 | 1 | 4 | 128 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.6144 |
+| 2.7 | 64 | 155.21 | 1 | 4 | 256 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.6089 |
+| 2.7 | 128 | 303.76 | 1 | 4 | 512 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.5959 |
+| 2.7 | 256 | 506.08 | 1 | 4 | 1024 | 4096 | BF_16 | FULL_SHARD | False |  A100 | 0.4964 |
+| 6.7 | 8 | 9.28 | 1 | 2 | 16 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6867 |
+| 6.7 | 16 | 18.35 | 1 | 2 | 32 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6789 |
+| 6.7 | 32 | 36.65 | 1 | 2 | 64 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6782 |
+| 6.7 | 64 | 72.72 | 1 | 2 | 128 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6727 |
+| 6.7 | 128 | 131.59 | 1 | 2 | 256 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.6086 |
+| 6.7 | 256 | 225.24 | 1 | 2 | 512 | 4096 | BF_16 | FULL_SHARD | False |  A100  | 0.5209 |
+
+Further scaling results can be found at [Leonardo Booster Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/docs/scaling_experiments/scaling_leonardo.md)
+
+### MareNostrum 5 - NVIDIA H100 64GB
+|  # Params (B) | #GPUs | Samples/s | GradAccm | MBS | GBS | Sequence Length | Precision | Sharding | AC | GPU Type | MFU |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2.7 | 4 | 15.06 | 1 | 2 | 8 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2983 |
+| 2.7 | 4 | 15.14 | 1 | 2 | 8 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2998 |
+| 2.7 | 8 | 29.6 | 1 | 2 | 16 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2931 |
+| 2.7 | 8 | 29.75 | 1 | 2 | 16 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2946 |
+| 2.7 | 16 | 58.7 | 1 | 2 | 32 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2906 |
+| 2.7 | 16 | 59.61 | 1 | 2 | 32 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2951 |
+| 2.7 | 32 | 117.07 | 1 | 2 | 64 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2898 |
+| 2.7 | 32 | 117.62 | 1 | 2 | 64 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2912 |
+| 2.7 | 64 | 235.96 | 1 | 2 | 128 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.292 |
+| 2.7 | 64 | 234.65 | 1 | 2 | 128 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2904 |
+| 2.7 | 128 | 455.87 | 1 | 2 | 256 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2821 |
+| 2.7 | 256 | 883.07 | 1 | 2 | 512 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2732 |
+| 2.7 | 512 | 1831.71 | 1 | 2 | 1024 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2834 |
+| 2.7 | 512 | 1365.31 | 1 | 2 | 1024 | 4096 | BF_16 | FULL_SHARD | False |  H100 | 0.2112 |
+| 2.7 | 1024 | 1105.99 | 1 | 2 | 2048 | 8192 | BF_16 | FULL_SHARD | False |  H100 | 0.2071 |
+| 2.7 | 1024 | 3618.0 | 1 | 2 | 2048 | 4096 | BF_16 | HYBRID_SHARD | False |  H100 | 0.2799 |
+| 28 | 16 | 2.9 | 1 | 1 | 16 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2998 |
+| 28 | 32 | 5.53 | 1 | 1 | 32 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2863 |
+| 28 | 64 | 11.61 | 1 | 1 | 64 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.3003 |
+| 28 | 128 | 22.95 | 1 | 1 | 128 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2968 |
+| 28 | 256 | 44.22 | 1 | 1 | 256 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.286 |
+| 28 | 512 | 87.36 | 1 | 1 | 512 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2825 |
+| 28 | 512 | 87.56 | 1 | 1 | 512 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2831 |
+| 28 | 1024 | 162.16 | 1 | 1 | 1024 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2622 |
+| 28 | 2048 | 297.0 | 1 | 1 | 2048 | 8192 | BF_16 | FULL_SHARD | True |  H100  | 0.2401 |
+
+Further scaling results can be found at [MareNostrum5 Scaling Experiments](https://github.com/Modalities/modalities/blob/scaling_experiments/docs/scaling_experiments/scaling_mn5.md)
+
+![Scaling Plot for a 28B model with a sequence length of 8192 tokens](https://github.com/Modalities/modalities/blob/scaling_experiments/docs/scaling_experiments/scaling_28B_mbs_1_ac_True.png)
 
 
 ## Contributing

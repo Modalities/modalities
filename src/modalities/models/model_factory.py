@@ -13,10 +13,24 @@ from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWra
 
 
 class ModelFactory:
+    """Model factory class to create models."""
+
     @staticmethod
     def get_checkpointed_model(
         checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, model: nn.Module
     ) -> nn.Module:
+        """
+        Loads a checkpointed model from the given checkpoint path.
+
+        Args:
+            checkpoint_loading (CheckpointLoadingIF): The checkpoint loading approach used to load the model checkpoint.
+            checkpoint_path (Path): The path to the checkpoint file.
+            model (nn.Module): The model to be loaded with the checkpoint.
+
+        Returns:
+            nn.Module: The loaded wrapped model.
+
+        """
         wrapped_model = checkpoint_loading.load_model_checkpoint(
             file_path=checkpoint_path,
             model=model,
@@ -31,6 +45,23 @@ class ModelFactory:
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
     ) -> FSDP:
+        """
+        Get the FSDP-wrapped model.
+
+        Args:
+            model (nn.Module): The original model to be wrapped.
+            sync_module_states (bool): Whether to synchronize module states across ranks.
+            block_names (List[str]): List of block names.
+            mixed_precision_settings (MixedPrecisionSettings): Mixed precision settings.
+            sharding_strategy (ShardingStrategy): Sharding strategy.
+
+        Returns:
+            FSDP: The FSDP-wrapped model.
+
+        Note:
+            'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
+            Different auto wrap policies may be supported in the future.
+        """
         # print(
         #     f"Unsharded number of parameters on rank {dist.get_rank()}: "
         #     f"{get_local_number_of_trainable_parameters(model)}"
@@ -58,5 +89,15 @@ class ModelFactory:
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+        """
+        Initializes the given model with weights using the provided model initializer.
+
+        Args:
+            model (nn.Module): The model to be initialized with weights.
+            model_initializer (ModelInitializationIF): The model initializer object.
+
+        Returns:
+            nn.Module: The initialized model.
+        """
         model_initializer.initialize_in_place(model)
         return model
