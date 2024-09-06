@@ -91,9 +91,6 @@ class ComponentFactory:
                     # so that we don't instantiate it again when we reach the respective component config
                     # in the subsequent config traversal
                     top_level_components[referenced_entity_key] = materialized_referenced_component
-                # msg = "Resolved dependency: " + " -> ".join(traversal_path) +
-                # f"--ref--> {type(top_level_components[referenced_entity_key])}"
-                # print_rank_0(msg)
                 return top_level_components[referenced_entity_key], top_level_components
 
             return materialized_component_config, top_level_components
