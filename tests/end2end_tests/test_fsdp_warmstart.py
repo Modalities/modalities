@@ -56,7 +56,7 @@ class TrainDataloaderInstantiationModel(BaseModel):
 class TestWarmstart:
     @staticmethod
     def get_loss_scores(messages: List[Message[EvaluationResultBatch]], loss_key: str) -> List[float]:
-        return [message.payload.losses[loss_key].item() for message in messages]
+        return [message.payload.losses[loss_key].value.item() for message in messages]
 
     def test_warm_start(self):
         # We want to verify that the training continues after starting from checkpoint (i.e, warm start)
