@@ -19,7 +19,6 @@ fi
 #################
 DEV0=$1 
 DEV1=$2
-COVERAGE=$3 # --cov or  --no-cov
 
 #############
 ### TESTS ###
