@@ -85,7 +85,7 @@ For running the training endpoint on multiple GPUs run
 CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 modalities run --config_file_path config_files/config.yaml
 ```
 
-In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file.
+In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimize, etc.), making training fully reproducible. A full list of all the components already available in modalities an be found [here](docs/components/components.md).
 
 Or, if you are a VSCode user, add this to your `launch.json`
 ```json
