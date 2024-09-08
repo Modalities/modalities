@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
@@ -10,6 +11,7 @@ from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
+from modalities.util import get_local_number_of_trainable_parameters
 
 
 class ModelFactory:
@@ -62,10 +64,10 @@ class ModelFactory:
             'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
             Different auto wrap policies may be supported in the future.
         """
-        # print(
-        #     f"Unsharded number of parameters on rank {dist.get_rank()}: "
-        #     f"{get_local_number_of_trainable_parameters(model)}"
-        # )
+        print(
+            f"Unsharded number of parameters on rank {dist.get_rank()}: "
+            f"{get_local_number_of_trainable_parameters(model)}"
+        )
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
@@ -80,10 +82,10 @@ class ModelFactory:
             sync_module_states=sync_module_states,
             use_orig_params=True,
         )
-        # print(
-        #     f"Sharded number of parameters on rank {dist.get_rank()}:"
-        #     f"{get_local_number_of_trainable_parameters(fsdp_model)}"
-        # )
+        print(
+            f"Sharded number of parameters on rank {dist.get_rank()}:"
+            f"{get_local_number_of_trainable_parameters(fsdp_model)}"
+        )
 
         return fsdp_model
 
