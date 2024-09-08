@@ -146,7 +146,7 @@ first and then divides it into chunks of size context-length.
 ## 2. Training & Evaluation
 
 ### Config File
-In modalities, we describe the entire training and evaluation setup (i.e., components such as model, trainer, evaluator, dataloder etc.) within a single config file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. A full list of all the components already available in modalities an be found [here](../../docs/components/components.md).
+In Modalities, we describe the entire training and evaluation setup (i.e., components such as model, trainer, evaluator, dataloder etc.) within a single configuration file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. A full list of all the components already available in modalities an be found [here](../../docs/components/components.md).
 
 The example config file for this experiment can be found in `examples/getting_started/example_config.yaml`. 
 

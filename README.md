@@ -16,11 +16,11 @@
   </a>
 </div>
 
-Modalities is a pytorch-native framework for distributed training of Large Language Models (LLMs) and Foundation Models (FMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs and FMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP), mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
+Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) and Foundation Models (FMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs and FMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP), mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
 
-We successfully scaled modalities up tp 2048 GPUs on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5), featuring Nvidia A100 and H100 GPUs, respectively. The results of our scaling experiments can be found [here](#scaling-experiments).
+We successfully scaled Modalities up to 2048 GPUs on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5), featuring Nvidia A100 and H100 GPUs, respectively. The results of our scaling experiments can be found [here](#scaling-experiments).
 
-Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within in modalities at runtime. 
+Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using Modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within in Modalities at runtime. 
 
 ## Getting Started
 For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
@@ -29,7 +29,7 @@ For training and evaluation a model, feel free to checkout [this](https://github
 
 There are two ways to install modalities. If you want to use the latest nightly version, or if you want to modify the code base itself, we recommend installing modalities directly from source. 
 
-If you want to use modalities as a library and potentially register your custom components with modalities, you can install it directly via pip which provides you with the latest stable version.
+If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
 
 ### Option 1: Installation from source
@@ -60,7 +60,7 @@ pip install torch
 ```
 beforehand.
 
-Afterwards, modalities can be installed via
+Afterwards, Modalities can be installed via
 
 ```sh
 cd modalities
@@ -76,7 +76,7 @@ pip install torch
 pip install modalities
 ```
 
-Note, that also here, torch has to be installed before installing modalities due to flash attention's dependency management.
+Note, that also here, torch has to be installed before installing Modalities due to flash attention's dependency management.
 
 
 ## Usage
@@ -85,7 +85,7 @@ For running the training endpoint on multiple GPUs run
 CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 modalities run --config_file_path config_files/config.yaml
 ```
 
-In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimize, etc.), making training fully reproducible. A full list of all the components already available in modalities an be found [here](docs/components/components.md).
+In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimize, etc.), making training fully reproducible. A full list of all the components already available in Modalities can be found [here](docs/components/components.md).
 
 Or, if you are a VSCode user, add this to your `launch.json`
 ```json
@@ -158,13 +158,13 @@ In the following, we list the already implemented, planned and in-progress featu
 | Hyperparameter Optimization    | planned          | Grid search for various hyperparameter such as LR, Optimizer arguments etc. Also the integration of µP might be interesting |
 
 ## Tutorials
-Even though modalities significantly simplifies LLM training, there is still some technical complexity left. We provide a series of tutorials to help you get started with training and evaluating models using modalities.
+Even though Modalities significantly simplifies LLM training, there is still some technical complexity left. We provide a series of tutorials to help you get started with training and evaluating models using Modalities.
 
 - [Getting Started](examples/getting_started/README.md)</br>
-  Brief overview on how to get started with modalities by training a small GPT model on a tiny subset of the Redpajama V2 dataset.
+  Brief overview on how to get started with Modalities by training a small GPT model on a tiny subset of the Redpajama V2 dataset.
 
 - [Library Usage](examples/library_usage/README.md)</br>
-  How to use modalities as a library and register custom components with modalities.
+  How to use Modalities as a library and register custom components with Modalities.
 
 - [Modalities in 15mins] </br>
   Jupyter notebook will be added soon
@@ -175,7 +175,7 @@ Modalities provides several entry points to interact with the framework. The fol
 
 ### Model training
 
-For model pretraining, we have to pass a configuration file that specifies the model architecture, optimizer, dataset, dataloader, and other training components. Additionall, we specify the number of nodes, the number of processes per node, and the rendezvous endpoint. 
+For model pretraining, we have to pass a configuration file that specifies the model architecture, optimizer, dataset, dataloader, and other training components. Additionally, we specify the number of nodes, the number of processes per node, and the rendezvous endpoint. 
 
 Example:
 ```sh
@@ -197,7 +197,7 @@ Explanation:
 
 * `--nproc_per_node 4`: This argument tells torchrun how many processes to launch on each node. In this case, 4 processes are launched per node, corresponding to the 4 GPUs (IDs 0, 1, 2, 3) specified by CUDA_VISIBLE_DEVICES.
 
-* `$(which modalities) run`: This part dynamically finds the path to the modalities executable and runs it. The run command triggers the main process to start the training.
+* `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
 * `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In this example, the configuration is provided in configs/pretraining_config.yaml, which includes settings like model architecture, optimizer, dataset, dataloader and other training components. An example config file can be found [here](examples/getting_started/example_config.yaml).
 
