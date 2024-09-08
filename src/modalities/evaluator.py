@@ -4,7 +4,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 
-from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
+from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch, ResultItem
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
 from modalities.logging_broker.publisher import MessagePublisher
@@ -120,9 +120,11 @@ class Evaluator:
             num_samples_per_second = synced_num_samples / synced_forward_backward_time
 
             evaluation_result = EvaluationResultBatch(
-                losses={loss_fun.tag: total_loss},
+                losses={loss_fun.tag: ResultItem(total_loss, decimal_places=2)},
                 # TODO: hardcoded metric key
-                throughput_metrics={"evaluation_num_samples_per_second": num_samples_per_second},
+                throughput_metrics={
+                    "evaluation_num_samples_per_second": ResultItem(num_samples_per_second, decimal_places=1)
+                },
                 dataloader_tag=data_loader.dataloader_tag,
                 num_train_steps_done=num_train_steps_done,
             )
