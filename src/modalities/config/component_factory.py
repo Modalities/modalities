@@ -84,7 +84,7 @@ class ComponentFactory:
                 component = self._instantiate_component(
                     component_key=component_key, variant_key=variant_key, component_config=current_component_config
                 )
-                print_rank_0(f"Instantiated {type(component)}: " + " -> ".join(traversal_path))
+                print_rank_0(f"Instantiated {type(component)}: {' -> '.join(traversal_path)}")
 
                 # if the component is a top level component, then we add it to the top level components dictionary
                 # to make sure that we don't build it again. Building it again would mean that we work by-value
