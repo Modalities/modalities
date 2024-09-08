@@ -84,7 +84,8 @@ class DummyDataset(Dataset):
 
     def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
         """
-        Initializes a DummyDataset object.
+        Initializes a DummyDataset object with the given number of samples and sample definition.
+        When calling the __getitem__ method, the dataset will return a random sample based on the sample definition.
 
         Args:
             num_samples (int): The number of samples in the dataset.

@@ -22,7 +22,7 @@ class CheckpointEntityType(Enum):
 
 
 class CheckpointSaving:
-    """Class for saving checkpoints based on a strategy and execution."""
+    """Class for saving checkpoints based on a savig and execution strategy."""
 
     def __init__(
         self,
