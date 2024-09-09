@@ -18,7 +18,7 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     monkeypatch.setenv("MASTER_PORT", "9949")
 
     # Load config
-    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum_sft.yaml")
+    dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_sft.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
 
     checkpointing_path = tmp_path / "sft_checkpoints/"
