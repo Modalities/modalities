@@ -1,5 +1,5 @@
 # Releasing in Modalitites
-This tutorial describes the procedure to release a new version of the Modalitites package.
+This tutorial describes the procedure to release a new version of the Modalities package.
 
 ## Release Types
 We follow the release types as defined by [Semantic Versioning](https://semver.org/). The version number is defined as `MAJOR.MINOR.PATCH` where:
