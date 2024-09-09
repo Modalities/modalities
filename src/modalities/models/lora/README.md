@@ -8,12 +8,20 @@ fine-tune large neural networks efficiently by restricting the updates during tr
 LLMs have billions of parameters and require substantial computational resources for fine-tuning.
 LoRA addresses this challenge by decomposing the weight update matrices into low-rank matrices, significantly reducing
 the computational overhead while maintaining performance.
-The paper can be found [here](https://arxiv.org/abs/2106.09685).
 
 <figure>
     <img alt="LoRA figure" src="/docs/source/lora_figure.png" width="30%" height="auto"/>
     <figcaption>Image source: <a href="https://arxiv.org/abs/2106.09685">Citation Link</a></figcaption>
 </figure>
+
+
+Basically, the weight matrix W is frozen during training. 
+It is decomposed into matrices A and B with a lower rank than W.
+These matrices store (among others) delta(W), i.e. the weight updates.
+Then, W' = W + A*B. 
+During evaluation, the weights are again merged for inference. 
+
+The paper can be found [here](https://arxiv.org/abs/2106.09685).
 
 ## Configuration
 
