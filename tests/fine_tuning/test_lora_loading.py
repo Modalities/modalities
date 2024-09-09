@@ -39,10 +39,10 @@ def initialized_model(set_env, config_dict_without_checkpoint_path: dict) -> NNM
 
 @pytest.fixture()
 def config_dict_with_checkpoint_path(
-    tmp_path: Path,
-    initialized_model: NNModel,
-    config_dict_without_checkpoint_path: dict,
-):
+        tmp_path: Path,
+        initialized_model: NNModel,
+        config_dict_without_checkpoint_path: dict,
+) -> dict:
     model_file_path = tmp_path / "pytorch_model.bin"
     torch.save(initialized_model.state_dict(), model_file_path)
 
@@ -61,11 +61,9 @@ def lora_model(set_env, config_dict_with_checkpoint_path: dict) -> NNModel:
     )
 
 
-def test_load_lora_model(lora_model, config_dict_without_checkpoint_path):
+def test_load_lora_model(lora_model: NNModel, config_dict_without_checkpoint_path: dict):
     target_layer_class_names = config_dict_without_checkpoint_path["lora_model"][
         "config"
     ]["target_layer_class_names"]
     for module in list(lora_model.modules()):
         assert type(module).__name__ not in target_layer_class_names
-
-
