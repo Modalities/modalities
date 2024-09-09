@@ -18,7 +18,6 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
-    PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
     InstructionTuningInstantiationModel,
 )

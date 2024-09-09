@@ -4,11 +4,9 @@
 #  ------------------------------------------------------------------------------------------
 import logging
 # todo
-# readme
 # add readme link to components.md
 
 # write e2e test
-# merge main
 
 # check FSDP warnings
 # check error with activation checkpointing
