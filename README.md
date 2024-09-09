@@ -79,43 +79,6 @@ pip install modalities
 Note, that also here, torch has to be installed before installing Modalities due to flash attention's dependency management.
 
 
-## Usage
-To train on multiple GPUs, run 
-```sh 
-CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 modalities run --config_file_path config_files/config.yaml
-```
-
-In the example above, we use `torchrun` to train on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. A full list of all the components already available in Modalities can be found [here](docs/components/components.md).
-
-If you are a VSCode user, add this to your `launch.json`:
-```json
-
-        {
-            "name": "Torchrun Main",
-            "type": "python",
-            "request": "launch",
-            "module": "torch.distributed.run",
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "2,3"
-            },
-            "args": [
-                "--nnodes",
-                "1",
-                "--nproc_per_node",
-                "2",
-                "--rdzv-endpoint=0.0.0.0:29503",
-                "src/modalities/__main__.py",
-                "run",
-                "--config_file_path",
-                "config_files/config.yaml",
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "envFile": "${workspaceFolder}/.env"
-        }
-```
-This will allow you to run the training endpoint directly from VSCode and debug it.
-
 ## Supported Features
 In the following, we list the most important features of Modalities.
 
@@ -169,7 +132,7 @@ Even though Modalities significantly simplifies LLM training, there is still som
 - [Modalities in 15mins] </br>
   Jupyter notebook will be added soon
 
-## Entry Points
+## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
 
 
@@ -187,19 +150,48 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --rdzv-endpoint localhost:29515 \
 
 Explanation:
 
-* `CUDA_VISIBLE_DEVICES=0,1,2,3`: This environment variable specifies which GPUs will be used for the job. In this case, GPUs with IDs 0, 1, 2, 3 are selected for training.
+* `CUDA_VISIBLE_DEVICES=0,1,2,3`: This environment variable specifies which GPUs will be used for the job. In the example above, the four GPUs with IDs 0, 1, 2, 3 are selected for training.
 
 * `torchrun`: This is a utility from PyTorch used to launch distributed training. It automatically manages multiple processes for distributed training.
 
 * `--rdzv-endpoint localhost:29515`: Specifies the rendezvous endpoint. Here, localhost is the machine's address, and 29515 is the port. The rendezvous endpoint coordinates the processes involved in distributed training.
 
-* `--nnodes 1`: Specifies the number of nodes to be used in the distributed setup. Since this is a single-node setup, 1 is used.
+* `--nnodes 1`: Specifies the number of nodes to be used in the distributed setup. In the example above, a single-node setup is used.
 
-* `--nproc_per_node 4`: This argument tells torchrun how many processes to launch on each node. In this case, 4 processes are launched per node, corresponding to the 4 GPUs (IDs 0, 1, 2, 3) specified by CUDA_VISIBLE_DEVICES.
+* `--nproc_per_node 4`: This argument tells torchrun how many processes to launch on each node. In the example above, 4 processes are launched per node, corresponding to the 4 GPUs (IDs 0, 1, 2, 3) specified by CUDA_VISIBLE_DEVICES.
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In this example, the configuration is provided in configs/pretraining_config.yaml, which includes settings like model architecture, optimizer, dataset, dataloader and other training components. An example config file can be found [here](examples/getting_started/example_config.yaml).
+* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `configs/pretraining_config.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](examples/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+
+If you are a VSCode user, you may want to add this to your `launch.json`:
+```json
+
+        {
+            "name": "Torchrun Main",
+            "type": "python",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0,1,2,3"
+            },
+            "args": [
+                "--nnodes",
+                "1",
+                "--nproc_per_node",
+                "2",
+                "--rdzv-endpoint=0.0.0.0:29515",
+                "src/modalities/__main__.py",
+                "run",
+                "--config_file_path",
+                "config_files/pretraining_config.yaml",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "envFile": "${workspaceFolder}/.env"
+        }
+```
+It will allow you to run the training endpoint directly from VSCode and debug it.
 
 ### Raw Training Dataset Indexation
 
