@@ -21,7 +21,8 @@ class DataloaderFactory:
         skip_num_batches: Optional[int] = 0,
         fixed_num_batches: Optional[int] = None,
     ) -> LLMDataLoader:
-        """Factory method for the instantiation of LLMDataLoader
+        """
+        Factory method for the instantiation of LLMDataLoader.
 
         Args:
             dataloader_tag (str): Tag for the dataloader
@@ -29,9 +30,9 @@ class DataloaderFactory:
             batch_sampler (BatchSampler): batch sampler for batch-wise sampling from the dataset
             collate_fn (Callable): Callable for shaping the batch
             num_workers (int): Number of workers for the dataloader
-            pin_memory (bool): Boolean flag for pinning memory
-            shuffle (bool): Boolean flag for shuffling the dataset
-            skip_num_batches (Optional[int], optional): Defines the number of batches to skip.
+            pin_memory (bool): Flag indicating whether to pin memory
+            shuffle (bool): Flag indicating whether to shuffle the dataset
+            skip_num_batches (int, optional): Defines the number of batches to skip.
               NOTE: The checkpoints are indexed with training steps (i.e., number of optimizer steps).
               skip_num_batches must not be confused with the number of optimizer steps!
               skip_num_batches = num optimizer steps * gradient accumulation steps
@@ -75,5 +76,19 @@ class DataloaderFactory:
     def get_repeating_dataloader(
         dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False
     ) -> RepeatingDataLoader:
+        """
+        Returns a RepeatingDataLoader object that repeats the given dataloader
+          for the specified number of epochs.
+
+        Parameters:
+            dataloader (LLMDataLoader): The dataloader to be repeated.
+            num_epochs (int): The number of times the dataloader should be repeated.
+            reshuffle_after_epoch (bool, optional): Flag indicating whether to reshuffle
+              the data after each epoch. Defaults to False.
+
+        Returns:
+            RepeatingDataLoader: A RepeatingDataLoader object that repeats the given dataloader
+              for the specified number of epochs.
+        """
         dataloader = RepeatingDataLoader(dataloader, num_epochs, reshuffle_after_epoch)
         return dataloader
