@@ -1,6 +1,6 @@
 [project]
 name = "modalities"
-version = "0.2.1"
+version = "0.2.2"
 requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
 readme = "README.md"
