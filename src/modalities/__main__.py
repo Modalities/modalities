@@ -160,8 +160,7 @@ def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
     help="output path for index. will use parent directory of src_path if none.",
 )
 def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
-    """
-    Utility for indexing a large jsonl-file's content.
+    """Utility CMD IF for indexing the content of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
     It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
@@ -193,19 +192,10 @@ def entry_point_pack_encoded_data(config_file_path: FilePath):
 
 
 @data.command(name="merge_packed_data")
-@click.argument(
-    "src_paths",
-    type=click.types.Path(exists=True, path_type=Path),
-    nargs=-1,
-    required=True,
-)
-@click.argument(
-    "target_path",
-    type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path),
-)
-def entry_point_merge_packed_data(src_paths, target_path):
-    """
-    Utility for merging different pbin-files into one.
+@click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
+@click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
+def entry_point_merge_packed_data(src_paths: List[Path], target_path: Path):
+    """Utility for merging different pbin-files into one.
     This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
     that the overall process was done in chunks.
     It is important that the same tokenizer got used for all chunks.

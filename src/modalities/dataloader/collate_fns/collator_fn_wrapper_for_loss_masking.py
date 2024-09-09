@@ -146,7 +146,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         # mark all tokens beween 1 (begin mask token indicator) and -1 (end mask token indicator) with 1
         # this includes the -1, but due to the shift above, we exclude both!
         include_to_loss_mask = mask.cumsum(-1)
-        
+
         # check that the sequence has alternating start and end mask token indicators starting with a start mask token
         # we explicitly allow ending on a start mask token
         if not ((0 <= include_to_loss_mask).all() and (include_to_loss_mask <= 1).all()):

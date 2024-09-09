@@ -1,0 +1,25 @@
+settings:
+  dst_path: data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_train.7e71e5e.pbin
+  eod_token: <|endoftext|>
+  index_path: data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_train.7e71e5e.idx
+  jq_pattern: .chat
+  num_cpus: 1
+  processed_samples_queue_size: 300
+  processing_batch_size: 5
+  raw_samples_queue_size: 300
+  sequence_length: 2048
+  src_path: data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_train.7e71e5e.jsonl
+tokenizer:
+  component_key: tokenizer
+  config:
+    max_length: 2048
+    padding: max_length
+    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    special_tokens:
+      additional_special_tokens:
+      - ^
+      - $
+      - °
+      pad_token: <|endoftext|>
+    truncation: true
+  variant_key: pretrained_hf_tokenizer
