@@ -64,6 +64,6 @@ def lora_model(set_env, config_dict_with_checkpoint_path: dict) -> NNModel:
 def test_load_lora_model(lora_model: NNModel, config_dict_without_checkpoint_path: dict):
     target_layer_class_names = config_dict_without_checkpoint_path["lora_model"][
         "config"
-    ]["target_layer_class_names"]
+    ]["target_layers"]
     for module in list(lora_model.modules()):
         assert type(module).__name__ not in target_layer_class_names
