@@ -54,7 +54,7 @@ checkpointed_model:
       variant_key: torch
       config:
         device: 0
-        precision: BF16
+        precision: FP_32
     model:
       instance_key: model
       pass_type: BY_REFERENCE
@@ -66,9 +66,11 @@ lora_model:
   config:
     alpha: 1
     r: 8
-    target_layer_class_names:
-      - Embedding
-      - Linear
+    target_layers:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
     model:
       instance_key: checkpointed_model
       pass_type: BY_REFERENCE
