@@ -1,6 +1,6 @@
 # LoRA: Low-Rank Adaptation of Large Language Models
 
-This rirectory contains an implementation of LoRA: Low-Rank Adaptation of Large Language Models. LoRA is a technique to
+This directory contains an implementation of LoRA: Low-Rank Adaptation of Large Language Models. LoRA is a technique to
 fine-tune large neural networks efficiently by restricting the updates during training to low-rank matrices.
 
 ## Introduction
