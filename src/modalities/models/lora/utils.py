@@ -87,10 +87,7 @@ def convert_embedding(embedding_layer: nn.Embedding, r: int, alpha: int) -> LoRA
 
 def convert_linear(linear_layer: nn.Linear, r: int, alpha: int) -> LoRALinear:
     lora_linear = LoRALinear(
-        in_features=linear_layer.in_features,
-        out_features=linear_layer.out_features,
-        r=r,
-        lora_alpha=alpha,
+        in_features=linear_layer.in_features, out_features=linear_layer.out_features, r=r, lora_alpha=alpha
     )
     lora_linear.weight = copy.deepcopy(linear_layer.weight)
     lora_linear.bias = copy.deepcopy(linear_layer.bias)

@@ -2,14 +2,13 @@
 #  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
-
+import logging
 # todo
-# add comments for everything not obvious
 # readme
-# add all arguments, return values and exceptions to function docstrings
+# add readme link to components.md
 
-# write tests
 # write e2e test
+# merge main
 
 # check FSDP warnings
 # check error with activation checkpointing
@@ -30,6 +29,12 @@ import torch.nn.functional as F
 class LoRALayer:
     """
     Parent Class for Lora Embedding and Lora Linear Layer with main functionalities.
+
+    Args:
+        r (int): Rank of the low-rank approximation.
+        lora_alpha (int): Scaling factor for the low-rank approximation.
+        lora_dropout (float): Dropout rate for LoRA.
+        merge_weights (bool): Flag to merge weights during evaluation.
     """
 
     def __init__(
@@ -54,13 +59,23 @@ class LoRALayer:
 class LoRAEmbedding(nn.Embedding, LoRALayer):
     """
     Converted Embedding Layer.
+
+    Args:
+        num_embeddings (int): Number of embeddings.
+        embedding_dim (int): Dimension of each embedding.
+        r (int, optional): Rank of the low-rank approximation. Default is 0.
+        lora_alpha (int, optional): Scaling factor for the low-rank approximation. Default is 1.
+        merge_weights (bool, optional): Flag to merge weights during evaluation. Default is True.
+
+    Raises:
+        ValueError: If r <= 0.
     """
 
     def __init__(
         self,
         num_embeddings: int,
         embedding_dim: int,
-        r: int = 0,
+        r: int,
         lora_alpha: int = 1,
         merge_weights: bool = True,
         **kwargs,
@@ -100,8 +115,10 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
 
     def train(self, training_mode: bool = True):
         """
-        Put the Layer into train / eval mode. Depending on training_mode param.
-        During eval mode, we merge the weights. During training we do not.
+        Put the Layer into train/eval mode.
+
+        Args:
+            training_mode (bool): If True, set to training mode; else, set to evaluation mode.
         """
         # put embedding layer to training (True) or evaluation (False) mode
         nn.Embedding.train(self, mode=training_mode)
@@ -122,7 +139,13 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
 
     def forward(self, x: torch.Tensor):
         """
-        ... # todo
+        Forward pass for LoRAEmbedding.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
         """
         if self.r > 0 and not self.merged:
             result = nn.Embedding.forward(self, x)
@@ -144,16 +167,28 @@ class LoRAEmbedding(nn.Embedding, LoRALayer):
 class LoRALinear(nn.Linear, LoRALayer):
     """
     Converted Linear Layer.
+
+    Args:
+        in_features (int): Size of each input sample.
+        out_features (int): Size of each output sample.
+        r (int, optional): Rank of the low-rank approximation. Default is 0.
+        lora_alpha (int, optional): Scaling factor for the low-rank approximation. Default is 1.
+        lora_dropout (float, optional): Dropout rate for LoRA. Default is 0.0.
+        fan_in_fan_out (bool, optional): If True, the layer stores weight like (fan_in, fan_out). Default is False.
+        merge_weights (bool, optional): Flag to merge weights during evaluation. Default is True.
+
+    Raises:
+        ValueError: If r <= 0.
     """
 
     def __init__(
         self,
         in_features: int,
         out_features: int,
-        r: int = 0,
+        r: int,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+        fan_in_fan_out: bool = False,
         merge_weights: bool = True,
         **kwargs,
     ):
@@ -194,8 +229,10 @@ class LoRALinear(nn.Linear, LoRALayer):
 
     def train(self, training_mode: bool = True):
         """
-        Put the Layer into train / eval mode. Depending on training_mode param.
-        During eval mode, we merge the weights. During training we do not.
+        Put the Layer into train/eval mode.
+
+        Args:
+            training_mode (bool): If True, set to training mode; else, set to evaluation mode.
         """
 
         def T(w):
@@ -217,7 +254,13 @@ class LoRALinear(nn.Linear, LoRALayer):
 
     def forward(self, x: torch.Tensor):
         """
-        Compute forward pass, depending on if weights have been merged or not.
+        Compute forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
         """
 
         def T(w):
@@ -235,13 +278,26 @@ class LoRALinear(nn.Linear, LoRALayer):
 
 class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
     """
-    If e.g. q, k and v matrix are merged in one linear layer, we need to use this class to convert the layer.
+    If q, k, and v matrix are merged in one linear layer, use this class to convert the layer.
     # This ...
         q_proj = lora.Linear(d_model, d_model, r=8)
         k_proj = nn.Linear(d_model, d_model)
         v_proj = lora.Linear(d_model, d_model, r=8)
     # is then equivalent to ...
         qkv_proj = lora.MergedLinear(d_model, 3*d_model, r=8, enable_lora=[True, False, True])
+
+    Args:
+        in_features (int): Size of each input sample.
+        out_features (int): Size of each output sample.
+        r (int, optional): Rank of the low-rank approximation. Default is 0.
+        lora_alpha (int, optional): Scaling factor for the low-rank approximation. Default is 1.
+        lora_dropout (float, optional): Dropout rate for LoRA. Default is 0.0.
+        enable_lora (List[bool], optional): Define which of the matrices are converted. Default is [False].
+        fan_in_fan_out (bool, optional): If True, the layer stores weight like (fan_in, fan_out). Default is False.
+        merge_weights (bool, optional): Flag to merge weights during evaluation. Default is True.
+
+    Raises:
+        ValueError: If len(enable_lora) does not divide out_features.
     """
 
     def __init__(
@@ -286,6 +342,9 @@ class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
             self.weight.data = self.weight.data.transpose(0, 1)
 
     def reset_parameters(self):
+        """
+        Initialize A and B.
+        """
         nn.Linear.reset_parameters(self)
         if hasattr(self, "lora_A"):
             # initialize A the same way as the default for nn.Linear and B to zero
@@ -293,11 +352,27 @@ class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
             nn.init.zeros_(self.lora_B)
 
     def zero_pad(self, x: torch.Tensor):
+        """
+        Zero-pad the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Zero-padded tensor.
+        """
         result = x.new_zeros((len(self.lora_ind), *x.shape[1:]))
         result[self.lora_ind] = x
         return result
 
     def merge_AB(self):
+        """
+        Merge matrices A and B.
+
+        Returns:
+            torch.Tensor: Merged tensor.
+        """
+
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
@@ -309,6 +384,13 @@ class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
         return T(self.zero_pad(delta_w))
 
     def train(self, training_mode: bool = True):
+        """
+        Put the Layer into train/eval mode.
+
+        Args:
+            training_mode (bool): If True, set to training mode; else, set to evaluation mode.
+        """
+
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
@@ -327,6 +409,16 @@ class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
                 self.merged = True
 
     def forward(self, x: torch.Tensor):
+        """
+        Compute forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
@@ -342,6 +434,19 @@ class LoRAMergedLinearLayer(nn.Linear, LoRALayer):
 class ConvLoRA(nn.Module, LoRALayer):
     """
     Parent Class for convolutional LoRA layers.
+
+    Args:
+        conv_module (nn.Module): Convolutional module to be transformed.
+        in_channels (int): Number of channels in the input.
+        out_channels (int): Number of channels in the output.
+        kernel_size (int): Size of the convolving kernel.
+        r (int, optional): Rank of the low-rank approximation. Default is 0.
+        lora_alpha (int, optional): Scaling factor for the low-rank approximation. Default is 1.
+        lora_dropout (float, optional): Dropout rate for LoRA. Default is 0.0.
+        merge_weights (bool, optional): Flag to merge weights during evaluation. Default is True.
+
+    Raises:
+        ValueError: If r <= 0.
     """
 
     def __init__(
@@ -367,6 +472,10 @@ class ConvLoRA(nn.Module, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
+
+        if not isinstance(kernel_size, int):
+            logging.info(f"Kernel_size {kernel_size} was transformed into {kernel_size[0]}.")
+            kernel_size = kernel_size[0]
 
         # Actual trainable parameters
         if r > 0:
@@ -394,8 +503,10 @@ class ConvLoRA(nn.Module, LoRALayer):
 
     def train(self, training_mode: bool = True):
         """
-        Put the Layer into train / eval mode. Depending on training_mode param.
-        During eval mode, we merge the weights. During training we do not.
+        Put the Layer into train/eval mode.
+
+        Args:
+            training_mode (bool): If True, set to training mode; else, set to evaluation mode.
         """
         super(ConvLoRA, self).train(mode=training_mode)
         if training_mode:
@@ -414,6 +525,12 @@ class ConvLoRA(nn.Module, LoRALayer):
     def forward(self, x: torch.Tensor):
         """
         Forward pass depending on if A and B have been merged.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
         """
         if self.merged:
             return self.conv(x)
@@ -426,18 +543,39 @@ class ConvLoRA(nn.Module, LoRALayer):
 
 
 class LoRAConv1d(ConvLoRA):
+    """
+    LoRA Convolutional Layer for 1D convolutions.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv1d, self).__init__(nn.Conv1d, *args, **kwargs)
 
 
 class LoRAConv2d(ConvLoRA):
+    """
+    LoRA Convolutional Layer for 2D convolutions.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv2d, self).__init__(nn.Conv2d, *args, **kwargs)
 
 
 class LoRAConv3d(ConvLoRA):
+    """
+    LoRA Convolutional Layer for 3D convolutions.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
 
     def __init__(self, *args, **kwargs):
         super(LoRAConv3d, self).__init__(nn.Conv3d, *args, **kwargs)
