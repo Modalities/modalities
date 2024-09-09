@@ -20,14 +20,14 @@ Modalities is a PyTorch-native framework for distributed training of Large Langu
 
 We successfully scaled Modalities up to 2048 GPUs on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5), featuring Nvidia A100 and H100 GPUs, respectively. The results of our scaling experiments can be found [here](#scaling-experiments).
 
-Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using Modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within in Modalities at runtime. 
+Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using Modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within Modalities at runtime. 
 
 ## Getting Started
-For training and evaluation a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
+For training and evaluation of a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
 
 ## Installation
 
-There are two ways to install modalities. If you want to use the latest nightly version, or if you want to modify the code base itself, we recommend installing modalities directly from source. 
+There are two ways to install Modalities. If you want to use the latest nightly version, or if you want to modify the code base itself, we recommend installing Modalities directly from source. 
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
@@ -69,7 +69,7 @@ pip install -e .
 
 ### Option 2: Installation via pip
 
-To install modalities via pip, run
+To install Modalities via pip, run
 
 ```sh
 pip install torch
@@ -80,14 +80,14 @@ Note, that also here, torch has to be installed before installing Modalities due
 
 
 ## Usage
-For running the training endpoint on multiple GPUs run 
+To train on multiple GPUs, run 
 ```sh 
 CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29502 modalities run --config_file_path config_files/config.yaml
 ```
 
-In the example above, we use `torchrun` to run the training endpoint on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimize, etc.), making training fully reproducible. A full list of all the components already available in Modalities can be found [here](docs/components/components.md).
+In the example above, we use `torchrun` to train on two GPUs. The `--nnodes` argument specifies the number of nodes in the cluster, `--nproc_per_node` specifies the number of processes per node, and `--rdzv-endpoint` specifies the rendezvous endpoint. The `modalities run` command specifies the training endpoint, and `--config_file_path` specifies the path to the configuration file. The configuraton file contains the exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. A full list of all the components already available in Modalities can be found [here](docs/components/components.md).
 
-Or, if you are a VSCode user, add this to your `launch.json`
+If you are a VSCode user, add this to your `launch.json`:
 ```json
 
         {
@@ -96,7 +96,7 @@ Or, if you are a VSCode user, add this to your `launch.json`
             "request": "launch",
             "module": "torch.distributed.run",
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "2,3"
             },
             "args": [
                 "--nnodes",
@@ -114,10 +114,10 @@ Or, if you are a VSCode user, add this to your `launch.json`
             "envFile": "${workspaceFolder}/.env"
         }
 ```
-which will allow you to run the training endpoint directly from VSCode and debug it.
+This will allow you to run the training endpoint directly from VSCode and debug it.
 
 ## Supported Features
-In the following, we list the already implemented, planned and in-progress features w.r.t. to improving downstream performance, throughput, multi-modality, and alignment. 
+In the following, we list the most important features of Modalities.
 
 ### Throughput Features
 
@@ -173,7 +173,7 @@ Even though Modalities significantly simplifies LLM training, there is still som
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
 
 
-### Model training
+### Model Training
 
 For model pretraining, we have to pass a configuration file that specifies the model architecture, optimizer, dataset, dataloader, and other training components. Additionally, we specify the number of nodes, the number of processes per node, and the rendezvous endpoint. 
 
