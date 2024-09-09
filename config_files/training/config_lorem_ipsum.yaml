@@ -41,7 +41,6 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
     dataloader_tag: train
     dataset:
       instance_key: train_dataset
@@ -72,7 +71,6 @@ val_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
     dataloader_tag: "val"
     dataset:
       instance_key: train_dataset
@@ -103,7 +101,6 @@ test_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
     dataloader_tag: "test"
     dataset:
       instance_key: train_dataset
@@ -178,7 +175,7 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-model: 
+model:
   component_key: model
   variant_key: model_initialized
   config:

@@ -309,7 +309,6 @@ class LLMDataLoaderConfig(BaseModel):
     collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
-    shuffle: bool
     skip_num_batches: Optional[int] = 0
     fixed_num_batches: Optional[int] = None
 
