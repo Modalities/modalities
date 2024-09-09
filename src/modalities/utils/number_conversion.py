@@ -46,12 +46,12 @@ class NumberConversion:
         skip when resuming a dataloader during warmstart.
 
         Args:
-            num_ranks (int): _description_
-            global_num_samples (int): _description_
-            local_micro_batch_size (int): _description_
+            num_ranks (int): Global number of ranks.
+            global_num_samples (int): Global number of samples.
+            local_micro_batch_size (int): Local micro batch size on single rank.
 
         Returns:
-            int: _description_
+            int: Number of local batches for single rank.
         """
         return (global_num_samples) // (num_ranks * local_micro_batch_size)
 
@@ -64,12 +64,12 @@ class NumberConversion:
         This helper function is primarily used to calculate a dataloader's number of batches (total and to skip)
 
         Args:
-            num_ranks (int): _description_
-            global_num_tokens (int): _description_
-            sequence_length (int): _description_
-            local_micro_batch_size (int): _description_
+            num_ranks (int): Global number of ranks.
+            global_num_tokens (int): Global number of tokens.
+            sequence_length (int): Sequence length of the model.
+            local_micro_batch_size (int): Local micro batch size on single rank.
         Returns:
-            int: _description_
+            int: Number of local batches for single rank.
         """
         global_num_samples = global_num_tokens // sequence_length
         return NumberConversion.get_local_num_batches_from_num_samples(
@@ -82,12 +82,12 @@ class NumberConversion:
         number of samples, local micro batch size and number of ranks.
 
         Args:
-            num_ranks (int): _description_
-            local_micro_batch_size (int): _description_
-            global_num_samples (int): _description_
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            global_num_samples (int): Global number of samples.
 
         Returns:
-            int: _description_
+            int: Number of steps.
         """
         return global_num_samples // (num_ranks * local_micro_batch_size)
 
@@ -101,13 +101,13 @@ class NumberConversion:
         skip when resuming a dataloader during warmstart.
 
         Args:
-            num_ranks (int): _description_
-            local_micro_batch_size (int): _description_
-            global_num_tokens (int): _description_
-            sequence_length (int): _description_
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            global_num_tokens (int): Global number of tokens.
+            sequence_length (int): Sequence length of the model.
 
         Returns:
-            int: _description_
+            int: Number of steps.
         """
         global_num_samples = global_num_tokens // sequence_length
         return NumberConversion.get_num_steps_from_num_samples(
@@ -118,4 +118,14 @@ class NumberConversion:
     def get_num_tokens_from_num_steps_callable(
         num_ranks: int, local_micro_batch_size: int, sequence_length: int
     ) -> Callable[[int], int]:
+        """Returns a callable that calculates the number of global tokens given the number of steps done.
+
+        Args:
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            sequence_length (int): Sequence length of the model.
+
+        Returns:
+            Callable[[int], int]: Callable that calculates the number of global tokens.
+        """
         return lambda num_steps_done: num_steps_done * num_ranks * local_micro_batch_size * sequence_length

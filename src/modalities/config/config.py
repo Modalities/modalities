@@ -287,13 +287,6 @@ class MMapIndexedDatasetConfig(BaseModel):
     skip_warmup: bool
 
 
-class OpenGPTXMMapDatasetConfig(BaseModel):
-    num_samples: Annotated[int, Field(strict=True, ge=1)]
-    path: FilePath
-    sample_key: str
-    sequence_len: PositiveInt
-
-
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
@@ -359,6 +352,17 @@ class RichResultSubscriberConfig(BaseModel):
 
 
 def load_app_config_dict(config_file_path: Path) -> Dict:
+    """Load the application configuration from the given YAML file.
+    The function defines custom resolvers for the OmegaConf library to resolve environment variables and
+    Modalities-specific variables.
+
+    Args:
+        config_file_path (Path): YAML config file.
+
+    Returns:
+        Dict: Dictionary representation of the config file.
+    """
+
     def cuda_env_resolver_fun(var_name: str) -> int:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)

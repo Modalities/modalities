@@ -35,7 +35,6 @@ from modalities.config.config import (
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
-    OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
@@ -68,8 +67,6 @@ from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNo
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
-from modalities.models.mamba.mamba_config import MambaLLMConfig
-from modalities.models.mamba.mamba_model import MambaLLM
 from modalities.models.model_factory import ModelFactory
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
@@ -100,6 +97,18 @@ from modalities.utils.number_conversion import (
 
 @dataclass
 class ComponentEntity:
+    """Dataclass to store the component entity.
+    The component entity stores the component key, the variant key, the component type and the component config type.
+    The component key is used to identify the component type, whereas the variant key is used to identify the component.
+    An example of a component entity is the GPT2 model with the component key "model" and the variant key "gpt2".
+
+    Args:
+        component_key (str): Key to identify the component type.
+        variant_key (str): Variant key to identify the component.
+        component_type (Type | Callable): Type of the component.
+        component_config_type (Type[BaseModel]): Type of the component config.
+    """
+
     component_key: str
     variant_key: str
     component_type: Type | Callable
@@ -109,7 +118,6 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
-    ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -159,9 +167,6 @@ COMPONENTS = [
         "packed_mem_map_dataset_megatron",
         DatasetFactory.get_packed_mem_map_dataset_megatron,
         PackedMemMapDatasetMegatronConfig,
-    ),
-    ComponentEntity(
-        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     # samplers

@@ -1,8 +1,9 @@
 [project]
 name = "modalities"
-version = "0.1.0"
+version = "0.2.1"
 requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
+readme = "README.md"
 dependencies = [
     "numpy<2.0",
     "torch>=2.3",
@@ -26,6 +27,10 @@ dependencies = [
     "jsonlines",
     "Jinja2>=3.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Modalities/modalities"
+Issues = "https://github.com/Modalities/modalities/issues"
 
 [project.optional-dependencies]
 linting = ["pre-commit"]
