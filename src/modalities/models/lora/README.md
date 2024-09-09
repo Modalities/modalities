@@ -43,7 +43,7 @@ checkpointed_model:
     model:
       instance_key: huggingface_smol_llm_model
       pass_type: BY_REFERENCE
-    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B_saved/model.bin
+    checkpoint_path: .../SmolLM-1.7B_saved/model.bin
 ```
 
 To cast the model into a lora_model, you need the following setting in the config file:
