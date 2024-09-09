@@ -10,7 +10,7 @@ LoRA addresses this challenge by decomposing the weight update matrices into low
 the computational overhead while maintaining performance.
 The paper can be found [here](https://arxiv.org/abs/2106.09685).
 
-<img alt="LoRA figure" height="10" src="/docs/source/lora_figure.png" width="10"/>
+<img alt="LoRA figure" src="/docs/source/lora_figure.png" width="100%" height="auto"/>
 
 ## Configuration
 
