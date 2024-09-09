@@ -1,3 +1,5 @@
+import re
+from pathlib import Path
 from typing import Annotated, Callable
 
 from pydantic import BaseModel, Field
@@ -33,6 +35,19 @@ class NumTokensFromNumStepsConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
+
+
+class LastStepFromCheckpointPathConfig(BaseModel):
+    checkpoint_path: Path
+
+
+class GlobalNumSeenTokensFromCheckpointPathConfig(BaseModel):
+    checkpoint_path: Path
+
+
+class NumStepsFromNumTokensAndCheckpointPathConfig(BaseModel):
+    checkpoint_path: Path
+    global_num_tokens: Annotated[int, Field(strict=True, ge=0)]
 
 
 class NumberConversion:
@@ -129,3 +144,55 @@ class NumberConversion:
             Callable[[int], int]: Callable that calculates the number of global tokens.
         """
         return lambda num_steps_done: num_steps_done * num_ranks * local_micro_batch_size * sequence_length
+
+    @staticmethod
+    def get_last_step_from_checkpoint_path(checkpoint_path: Path) -> int:
+        """Returns the last step from the checkpoint path.
+
+        Args:
+            checkpoint_path (Path): Path to the checkpoint file.
+
+        Returns:
+            int: Last step from the checkpoint path.
+        """
+        # Regex pattern to match 'num_steps_' followed by digits
+        pattern = r"num_steps_(\d+)"
+        match = re.search(pattern, str(checkpoint_path))
+
+        # Extract the number of steps if a match is found
+        if match:
+            num_steps = int(match.group(1))  # Group 1 contains the digits after 'num_steps_'
+        else:
+            raise ValueError(f"No match found for pattern {pattern} in {checkpoint_path}")
+        return num_steps - 1
+
+    @staticmethod
+    def get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path: Path) -> int:
+        """Returns the global num seen tokens from the checkpoint path.
+
+        Args:
+            checkpoint_path (Path): Path to the checkpoint file.
+
+        Returns:
+            int: Num seen tokens from the checkpoint path.
+        """
+        # Regex pattern to match 'num_steps_' followed by digits
+        pattern = r"num_tokens_(\d+)"
+        match = re.search(pattern, str(checkpoint_path))
+
+        # Extract the number of steps if a match is found
+        if match:
+            num_tokens = int(match.group(1))  # Group 1 contains the digits after 'num_tokens_'
+        else:
+            raise ValueError(f"No match found for pattern {pattern} in {checkpoint_path}")
+        return num_tokens
+
+    @staticmethod
+    def get_num_steps_from_num_tokens_and_checkpoint_path(checkpoint_path: Path, global_num_tokens: int) -> int:
+        tokens_per_step = NumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path) / (
+            NumberConversion.get_last_step_from_checkpoint_path(checkpoint_path) + 1
+        )
+        num_steps = global_num_tokens // tokens_per_step
+        if isinstance(num_steps, float) and not num_steps.is_integer():
+            raise ValueError(f"Number of steps calculated is not an integer. {num_steps}")
+        return int(num_steps)

@@ -82,10 +82,13 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPGradientClipperConfig,
 )
 from modalities.utils.number_conversion import (
+    GlobalNumSeenTokensFromCheckpointPathConfig,
+    LastStepFromCheckpointPathConfig,
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
     NumberConversion,
     NumStepsFromNumSamplesConfig,
+    NumStepsFromNumTokensAndCheckpointPathConfig,
     NumStepsFromNumTokensConfig,
     NumTokensFromNumStepsConfig,
 )
@@ -262,5 +265,23 @@ COMPONENTS = [
         "num_tokens_from_num_steps_callable",
         NumberConversion.get_num_tokens_from_num_steps_callable,
         NumTokensFromNumStepsConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "last_step_from_checkpoint_path",
+        NumberConversion.get_last_step_from_checkpoint_path,
+        LastStepFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_seen_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
+        GlobalNumSeenTokensFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_tokens_and_checkpoint_path",
+        NumberConversion.get_num_steps_from_num_tokens_and_checkpoint_path,
+        NumStepsFromNumTokensAndCheckpointPathConfig,
     ),
 ]
