@@ -40,6 +40,6 @@ chat_template_data:
   system_instruction: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages."
   # Currently only works with HF tokenizers, as the special tokens are added to the tokenizer
   special_tokens:
-      b_include_to_loss_token: <|im_start|>
-      e_include_to_loss_token: <|im_end|>
-      e_assistant_token: <|end_assistant|>
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
+      e_assistant_token: °
