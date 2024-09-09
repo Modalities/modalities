@@ -1,21 +1,18 @@
-settings:
+settings:  
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
-    prediction_key: logits
   training:
-    callback_interval_in_samples: 32768
-    global_num_training_samples: 2048
-    global_num_seen_steps: 0
-    activation_checkpointing_modules: []
-    gradient_acc_steps: 1
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 2
+    evaluation_interval_in_steps: 2
+    global_num_seen_tokens: 0
+    activation_checkpointing_modules: [GPT2Block]
+    gradient_acc_steps: 2
     local_train_micro_batch_size: 1
-    sequence_length: 256
-    global_training_log_interval_in_steps: 8
-    global_checkpointing_interval_in_steps: 8
-    global_evaluation_interval_in_steps: 8
+    sequence_length: 2048
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
@@ -23,20 +20,34 @@ settings:
   paths:
     checkpointing_path: data/checkpoints
 
-collate_fn:
+collate_fn:  
   component_key: collate_fn
-  variant_key: gpt_2_llm_collator
+  variant_key: mask_loss_collator_wrapper
   config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    target_key: ${settings.referencing_keys.target_key}
+    wrapped_collate_fn:  
+      component_key: collate_fn
+      variant_key: gpt_2_llm_collator
+      config:
+        sample_key: ${settings.referencing_keys.sample_key}
+        target_key: ${settings.referencing_keys.target_key}
+    target_keys_to_mask:
+      - ${settings.referencing_keys.target_key}
+    loss_ignore_index: -100
+    mask_tokens:
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
 
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/lorem_ipsum.pbin
-    block_size: ${settings.training.sequence_length}
+    raw_data_path: ./tests/test_data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_test.7e71e5e.pbin
+    sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
 
 train_dataloader:
   component_key: data_loader
@@ -45,7 +56,7 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     shuffle: false
-    dataloader_tag: "train"
+    dataloader_tag: train
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -135,7 +146,7 @@ eval_dataloaders:
   - instance_key: val_dataloader
     pass_type: BY_REFERENCE
   - instance_key: test_dataloader
-    pass_type: BY_REFERENCE
+    pass_type: BY_REFERENCE 
 
 checkpoint_saving:
   component_key: checkpoint_saving
@@ -153,14 +164,21 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            sequence_length: ${settings.training.sequence_length} 
 
 # resolving class types via different enums sucks...
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
   config:
-    target_key: ${settings.referencing_keys.target_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
+    target_key: target_ids
+    prediction_key: logits
 
 wrapped_model:
   component_key: model
@@ -172,43 +190,84 @@ wrapped_model:
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [ MambaBlock ]
+    block_names: [GPT2Block]
 
-model:
+model: 
   component_key: model
-  variant_key: mamba
+  variant_key: model_initialized
   config:
-    d_model: 768
-    n_layer: 24
-    vocab_size: 50257
-    rms_norm: true
-    residual_in_fp32: true
-    fused_add_norm: true
-    pad_vocab_size_multiple: 8
-    tie_embeddings: true
-    prediction_key: ${settings.referencing_keys.prediction_key}
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
     sample_key: ${settings.referencing_keys.sample_key}
-    seed: null
-    dtype: null
-    initializer_cfg: {}
-    num_last_tokens: 0
-    inference_params: {}
-    mixer_model_config:
-      norm_epsilon: 1e-5
-      device: null
-      mamba_block_config:
-        d_state: 16
-        d_conv: 4
-        expand: 2
-        dt_rank: auto
-        dt_min: 0.001
-        dt_max: 0.1
-        dt_init: random
-        dt_scale: 1.0
-        dt_init_floor: 1e-4
-        conv_bias: true
-        bias: false
-        use_fast_path: true
+    poe_type: NOPE
+    sequence_length: ${settings.training.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 2
+    n_head_q: 8
+    n_head_kv: 4
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+    attention_implementation: manual
+    activation_type: swiglu
+    attention_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    padding: false
+    truncation: false
+    special_tokens:
+      additional_special_tokens: 
+        - "^"
+        - "$"
+        - "°"
 
 scheduler:
   component_key: scheduler
@@ -224,7 +283,7 @@ scheduler:
     pct_start: 0.01
     anneal_strategy: cos
 
-optimizer:
+optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -232,7 +291,8 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
-    wrapped_model:
+    weight_decay_groups_excluded: [embedding, layernorm]
+    wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
 
@@ -250,8 +310,16 @@ batch_progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.local_rank}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
+    global_rank: ${settings.cuda_env.global_rank}
+    global_num_seen_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        sequence_length: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
     train_dataloader:
       instance_key: train_dataloader
       pass_type: BY_REFERENCE
@@ -259,14 +327,13 @@ batch_progress_subscriber:
         instance_key: eval_dataloaders
         pass_type: BY_REFERENCE
 
-
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.local_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     project: modalities_lorem_ipsum
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: "."
     config_file_path: ${settings.config_file_path}

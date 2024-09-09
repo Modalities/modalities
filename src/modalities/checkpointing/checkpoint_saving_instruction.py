@@ -5,7 +5,11 @@ from typing import List
 @dataclass
 class CheckpointingInstruction:
     """
-    Instruction to save and delete checkpoints.
+    Represents a checkpointing instruction (i.e., saving and deleting).
+
+    Attributes:
+        save_current (bool): Indicates whether to save the current checkpoint.
+        checkpoints_to_delete (List[int]): List of checkpoint IDs to delete.
     """
 
     save_current: bool = False

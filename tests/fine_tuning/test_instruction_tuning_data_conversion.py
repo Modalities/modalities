@@ -1,4 +1,3 @@
-# from modalities.dataloader.apply_chat_template import split_and_apply_chat_template
 import json
 import os
 from pathlib import Path
@@ -8,6 +7,7 @@ from transformers import GPT2Tokenizer
 
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.apply_chat_template import split_and_apply_chat_template
 from tests.conftest import _ROOT_DIR
 
 
@@ -18,7 +18,7 @@ def tokenizer_path() -> str:
 
 @pytest.fixture
 def apply_chat_template_config_path() -> str:
-    return _ROOT_DIR / Path("config_files/data_preparation/apply_chat_template_config.yaml")
+    return _ROOT_DIR / Path("tests/fine_tuning/test_configs/apply_chat_template_config.yaml")
 
 
 @pytest.fixture
@@ -33,12 +33,12 @@ def pbin_config_path() -> str:
 
 @pytest.fixture
 def jsonl_file_path_before_applying_chat_template() -> Path:
-    return "/raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat.jsonl"
+    return "/raid/s3/opengptx/alexj/llm_gym/modalities/modalities/tests/fine_tuning/test_data/sampled_dataset.jsonl"
 
 
 @pytest.fixture
 def jsonl_file_path_after_applying_chat_template() -> str:
-    return "/raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_74d2208/ultrachat_200k_fastchat_converted_train.74d2208.jsonl"
+    return "/raid/s3/opengptx/alexj/llm_gym/modalities/modalities/tests/fine_tuning/test_data/sampled_dataset_c63ef47/ultrachat_200k_fastchat_sampled_converted_train.c63ef47.jsonl"
 
 
 def test_if_include_to_loss_tokens_are_only_one_token(tokenizer_path: str):

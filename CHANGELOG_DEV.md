@@ -55,3 +55,13 @@ This [PR](https://github.com/Modalities/modalities/pull/154) adds a manual SwiGL
 
 **Breaking changes:** 
 * renaming of `fused_swiglu` to `swiglu` in `ActivationType` (see [here](https://github.com/Modalities/modalities/pull/154/commits/90fb3bd06a407333423cffeab486711e26ef8ddf) for the respective config changes)
+
+## PR #236 Remove code related to Mamba
+
+This [PR](https://github.com/Modalities/modalities/pull/236) removes all code related to Mamba. The latest state of main with Mamba can be found in the branch main_with_mamba.
+
+**General changes:**
+* Removes Mamba-related code
+
+**Breaking changes:** 
+* None

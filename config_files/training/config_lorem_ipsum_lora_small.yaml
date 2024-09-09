@@ -9,7 +9,7 @@ settings:
     checkpointing_interval_in_steps: 25
     evaluation_interval_in_steps: 40
     global_num_seen_tokens: 0
-    activation_checkpointing_modules: [ ]
+    activation_checkpointing_modules: [LlamaDecoderLayer]
     gradient_acc_steps: 10
     local_train_micro_batch_size: 2
     sequence_length: 2048
@@ -230,8 +230,11 @@ lora_model:
   config:
     alpha: 1
     r: 8
-    target_layer_class_names:
-      - LlamaSdpaAttention
+    target_layers:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
     model:
       instance_key: checkpointed_model
       pass_type: BY_REFERENCE

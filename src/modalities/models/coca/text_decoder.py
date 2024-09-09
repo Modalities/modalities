@@ -10,6 +10,8 @@ from modalities.nn.attention import AttentionConfig, AttentionType
 
 
 class TextDecoder(NNModel):
+    """TextDecoder class."""
+
     def __init__(
         self,
         sample_key: str,
@@ -26,6 +28,24 @@ class TextDecoder(NNModel):
         epsilon: float,
         attention_config: AttentionConfig = None,
     ):
+        """
+        Initializes the TextDecoder class.
+
+        Args:
+            sample_key (str): The key for the samples.
+            prediction_key (str): The key for the predictions.
+            block_size (int): The block size.
+            vocab_size (int): The size of the vocabulary.
+            n_layer (int): The number of layers.
+            n_head (int): The number of attention heads.
+            n_embd (int): The embedding dimension.
+            ffn_hidden (int): The hidden dimension of the feed-forward network.
+            dropout (float): The dropout rate.
+            bias (bool): Flag indicating whether to include bias terms.
+            activation (ActivationType): The activation function to use.
+            epsilon (float): Small value to avoid division by zero in LayerNorm.
+            attention_config (AttentionConfig, optional): The attention configuration. Defaults to None.
+        """
         super().__init__()
         self.sample_key = sample_key
         self.prediction_key = prediction_key
@@ -58,6 +78,15 @@ class TextDecoder(NNModel):
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass of the TextDecoder module.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): Input dictionary.
+
+        Returns:
+            dict[str, torch.Tensor]: Output dictionary containing the predictions.
+        """
         input_ids = inputs[self.sample_key]
         device = input_ids.device
         B, T = input_ids.size()

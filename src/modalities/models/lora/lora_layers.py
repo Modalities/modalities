@@ -2,12 +2,11 @@
 #  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
-
+import logging
 # todo
 # add readme link to components.md
 
 # write e2e test
-# merge main
 
 # check FSDP warnings
 # check error with activation checkpointing
@@ -471,6 +470,10 @@ class ConvLoRA(nn.Module, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
+
+        if not isinstance(kernel_size, int):
+            logging.info(f"Kernel_size {kernel_size} was transformed into {kernel_size[0]}.")
+            kernel_size = kernel_size[0]
 
         # Actual trainable parameters
         if r > 0:

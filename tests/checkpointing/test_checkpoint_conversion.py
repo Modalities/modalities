@@ -35,7 +35,7 @@ def component_factory() -> ComponentFactory:
     return component_factory
 
 
-@pytest.fixture(params=["gpt2_config_test.yaml", "mamba_config_test.yaml"])
+@pytest.fixture(params=["gpt2_config_test.yaml"])
 def config_file_name(request) -> str:
     return request.param
 

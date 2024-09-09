@@ -18,9 +18,10 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     monkeypatch.setenv("MASTER_PORT", "9949")
 
     # Load config
-    dummy_config_path = _ROOT_DIR / Path("config_files/training/config_lorem_ipsum_sft.yaml")
+    dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_sft.yaml")
     config_dict = load_app_config_dict(dummy_config_path)
 
+    # Adapt config for test
     checkpointing_path = tmp_path / "sft_checkpoints/"
     config_dict["settings"]["paths"]["checkpointing_path"] = checkpointing_path.__str__()
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
@@ -40,12 +41,8 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)
 
-    assert (
-        sum(
-            [
-                "model" in path.name or "optimizer" in path.name or path.suffix == ".yaml"
-                for path in list(checkpointing_path.glob("*"))[0].glob("*")
-            ]
-        )
-        == 3
-    ), "Output of the test i.e. a model checkpoint was not created!"
+    checkpoint_files = [
+        "model" in path.name or "optimizer" in path.name or path.suffix == ".yaml"
+        for path in list(checkpointing_path.glob("*"))[0].glob("*")
+    ]
+    assert sum(checkpoint_files) == 3, "Output of the test i.e. a model checkpoint was not created!"
