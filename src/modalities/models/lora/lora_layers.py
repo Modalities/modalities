@@ -6,6 +6,7 @@
 # todo
 # add comments for everything not obvious
 # readme
+# add all arguments, return values and exceptions to function docstrings
 
 # write tests
 # write e2e test

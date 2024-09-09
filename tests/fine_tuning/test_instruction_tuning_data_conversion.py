@@ -9,6 +9,8 @@ from modalities.dataloader.apply_chat_template import apply_chat_template
 from pydantic import FilePath
 import json
 
+# todo remove hard coded paths
+
 
 @pytest.fixture
 def tokenizer_path() -> str:
