@@ -813,7 +813,7 @@ PydanticMultimodalWebDatasetBuilderIFType = Annotated[
 
 class MultimodalWebDatasetConfig(BaseModel):
     builders: List[PydanticMultimodalWebDatasetBuilderIFType]
-    batch_size: int
+    batch_size: Optional[int] = None
     mixing_ratios: Optional[List[float]] = None
     shardshuffle: int = 100
     repeat: bool = False
@@ -826,7 +826,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
         builders: List[MultimodalWebDatasetBuilder],
-        batch_size: int,
+        batch_size: int = None,
         mixing_ratios: Optional[List[float]] = None,
         shardshuffle: int = 100,
         repeat: bool = False,
@@ -869,6 +869,8 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         assert len(self.mixing_ratios) == len(self.builders)
 
         if len(self.builders) > 1:
+            if batch_size is None:
+                raise ValueError("batch_size cannot be None if multiple builders are used")
             datasets = []
             for b in self.builders:
                 datasets.append(b.web_dataset)
