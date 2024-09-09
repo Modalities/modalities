@@ -4,7 +4,6 @@
 #  ------------------------------------------------------------------------------------------
 
 # todo
-# readme
 # add readme link to components.md
 
 # write e2e test
