@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
+from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
@@ -46,6 +47,7 @@ class ModelFactory:
         block_names: List[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
+        activation_checkpointing_modules: List[str],
     ) -> FSDP:
         """
         Get the FSDP-wrapped model.
@@ -86,6 +88,12 @@ class ModelFactory:
             f"Sharded number of parameters on rank {dist.get_rank()}:"
             f"{get_local_number_of_trainable_parameters(fsdp_model)}"
         )
+
+        if len(activation_checkpointing_modules) > 0:
+            apply_activation_checkpointing_inplace(
+                model=fsdp_model,
+                activation_checkpointing_modules=activation_checkpointing_modules,
+            )
 
         return fsdp_model
 

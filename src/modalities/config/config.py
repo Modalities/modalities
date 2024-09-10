@@ -212,6 +212,7 @@ class FSDPWrappedModelConfig(BaseModel):
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
     block_names: List[str]
+    activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
@@ -326,7 +327,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 class RichProgressSubscriberConfig(BaseModel):
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
-    global_num_seen_steps: int
+    num_seen_steps: int
     global_rank: int
     gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
 
