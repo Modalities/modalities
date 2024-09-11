@@ -21,31 +21,26 @@ from modalities.config.pydanctic_if_types import (
 from modalities.config.utils import parse_torch_device
 
 
-class CudaEnvSettings(BaseModel):
-    local_rank: Annotated[int, Field(strict=True, ge=0)]
-    world_size: Annotated[int, Field(strict=True, ge=1)]
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
-
-
 class TrainingComponentsInstantiationModel(BaseModel):
-    class TrainingSettings(BaseModel):
-        class Intervals:
+    class Settings(BaseModel):
+        class CudaEnvSettings(BaseModel):
+            local_rank: Annotated[int, Field(strict=True, ge=0)]
+            world_size: Annotated[int, Field(strict=True, ge=1)]
+            global_rank: Annotated[int, Field(strict=True, ge=0)]
+
+        class Intervals(BaseModel):
             training_log_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
 
-        class TrainingProfile(BaseModel):
-            num_training_tokens: Annotated[int, Field(strict=True, ge=1)]
+        class TrainingTarget(BaseModel):
+            num_target_tokens: Annotated[int, Field(strict=True, ge=1)]
             num_target_steps: Annotated[int, Field(strict=True, ge=1)]
 
         class StepProfile(BaseModel):
             gradient_accumulation_steps: Annotated[int, Field(strict=True, ge=1)]
             local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
             sequence_length: Annotated[int, Field(strict=True, ge=1)]
-
-        class Training(BaseModel):
-            training_profile: "TrainingComponentsInstantiationModel.TrainingSettings.TrainingProfile"
-            step_profile: "TrainingComponentsInstantiationModel.TrainingSettings.StepProfile"
 
         class Paths(BaseModel):
             checkpoint_saving_path: Path
@@ -54,55 +49,51 @@ class TrainingComponentsInstantiationModel(BaseModel):
             class TrainingProgress(BaseModel):
                 global_num_seen_tokens: Annotated[int, Field(strict=True, ge=1)]
                 num_seen_steps: Annotated[int, Field(strict=True, ge=1)]
-                skip_num_batches: Annotated[int, Field(strict=True, ge=0)]
+                local_num_seen_batches: Annotated[int, Field(strict=True, ge=0)]
                 last_step: Annotated[int, Field(strict=True, ge=0)]
 
             class CheckpointPaths(BaseModel):
                 model_checkpoint_path: Path
                 optimizer_checkpoint_path: Path
 
-            enforce_tokens_per_step_conistency: bool = True
-            step_profile: "TrainingComponentsInstantiationModel.TrainingSettings.StepProfile"
-            training_profile: "TrainingComponentsInstantiationModel.TrainingSettings.TrainingProfile"
             training_progress: TrainingProgress
             checkpoint_paths: CheckpointPaths
 
         experiment_id: str
+        config_file_path: FilePath
         referencing_keys: Dict[str, str]
-        intervals: Intervals
-        training: Optional[Training] = None
-        warmstart: Optional[Warmstart] = None
         cuda_env: CudaEnvSettings
         paths: Paths
+        intervals: Intervals
+        enforce_tokens_per_step_conistency: bool = True
+        step_profile: StepProfile
+        training_target: TrainingTarget
+        warmstart: Optional[Warmstart] = None
 
         @model_validator(mode="after")
-        def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.TrainingSettings":
-            # Check if the number of tokens per step are consistent in initial training run and warmstart
-            if self.warmstart is not None:
-                previous_num_tokens_per_step = self.training.num_training_tokens / self.training.num_target_steps
-                current_num_tokens_per_step = (
-                    self.training.local_train_micro_batch_size
-                    * self.training.sequence_length
-                    * self.training.gradient_acc_steps
-                    * self.cuda_env.world_size
+        def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
+            # Check if the number of target steps and target tokens are consistent with the step profile
+            required_num_tokens_per_step = (
+                self.training_target.num_target_tokens / self.training_target.num_target_steps
+            )
+            step_profile_num_tokens_per_step = (
+                self.step_profile.local_train_micro_batch_size
+                * self.step_profile.sequence_length
+                * self.step_profile.gradient_accumulation_steps
+                * self.cuda_env.world_size
+            )
+            if required_num_tokens_per_step != step_profile_num_tokens_per_step:
+                warning_message = (
+                    f"Required number of tokens per step is ({required_num_tokens_per_step}) "
+                    f"which does not match the number of tokens per step ({step_profile_num_tokens_per_step}) "
+                    "from the step profile."
                 )
-                if previous_num_tokens_per_step != current_num_tokens_per_step:
-                    warning_message = (
-                        f"Number of tokens per step in previous run ({previous_num_tokens_per_step}) "
-                        f"and current warmstart ({current_num_tokens_per_step}) do not match."
-                    )
-                    if self.warmstart.enforce_tokens_per_step_conistency:
-                        raise ValueError(warning_message)
-                    warnings.warn(warning_message)
+                if self.enforce_tokens_per_step_conistency:
+                    raise ValueError(warning_message)
+                warnings.warn(warning_message)
             return self
 
-        @model_validator(mode="after")
-        def _check_training_or_warmstart_set(self) -> "TrainingComponentsInstantiationModel.TrainingSettings":
-            # Check if either training or warmstart settings are provided
-            if self.warmstart is None and self.training is None:
-                raise ValueError("Either training or warmstart settings must be provided.")
-            return self
-
+    settings: Settings
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
@@ -113,7 +104,6 @@ class TrainingComponentsInstantiationModel(BaseModel):
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
-    settings: TrainingSettings
 
 
 class PackedDatasetComponentsInstantiationModel(BaseModel):
