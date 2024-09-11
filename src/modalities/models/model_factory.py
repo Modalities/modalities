@@ -20,7 +20,9 @@ class ModelFactory:
 
     @staticmethod
     def get_checkpointed_model(
-        checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, model: nn.Module
+        checkpoint_loading: CheckpointLoadingIF,
+        checkpoint_path: Path,
+        model: nn.Module,
     ) -> nn.Module:
         """
         Loads a checkpointed model from the given checkpoint path.
@@ -47,7 +49,6 @@ class ModelFactory:
         block_names: List[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
-        activation_checkpointing_modules: List[str],
     ) -> FSDP:
         """
         Get the FSDP-wrapped model.
@@ -89,12 +90,6 @@ class ModelFactory:
             f"{get_local_number_of_trainable_parameters(fsdp_model)}"
         )
 
-        if len(activation_checkpointing_modules) > 0:
-            apply_activation_checkpointing_inplace(
-                model=fsdp_model,
-                activation_checkpointing_modules=activation_checkpointing_modules,
-            )
-
         return fsdp_model
 
     @staticmethod
@@ -110,4 +105,31 @@ class ModelFactory:
             nn.Module: The initialized model.
         """
         model_initializer.initialize_in_place(model)
+        return model
+
+    @staticmethod
+    def get_activation_checkpointed_model(model: FSDP, activation_checkpointing_modules: List[str]) -> FSDP:
+        """Apply activation checkpointing to the given model (in-place operation).
+
+        Args:
+            model (FSDP): The FSDP-wrapped model to apply activation checkpointing to.
+            activation_checkpointing_modules (List[str]): List of module names to apply activation checkpointing to.
+
+        Raises:
+            ValueError: Activation checkpointing can only be applied to FSDP-wrapped models!
+
+        Returns:
+            FSDP: The model with activation checkpointing applied.
+        """
+        if len(activation_checkpointing_modules) > 0:
+            if isinstance(model, FSDP):
+                apply_activation_checkpointing_inplace(
+                    model=model,
+                    activation_checkpointing_modules=activation_checkpointing_modules,
+                )
+            else:
+                raise ValueError(
+                    "Activation checkpointing can only be applied to FSDP-wrapped models! "
+                    f"Current model type: {type(model)}"
+                )
         return model

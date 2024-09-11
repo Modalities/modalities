@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -212,7 +213,6 @@ class FSDPWrappedModelConfig(BaseModel):
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
     block_names: List[str]
-    activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
@@ -238,6 +238,11 @@ class WeightInitializedModelConfig(BaseModel):
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
     model_config = ConfigDict(protected_namespaces=())
+
+
+class ActivationCheckpointedModelConfig(BaseModel):
+    model: PydanticFSDPModuleType
+    activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

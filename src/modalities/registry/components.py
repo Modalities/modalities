@@ -15,6 +15,7 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpoint
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
+    ActivationCheckpointedModelConfig,
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
@@ -82,13 +83,11 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPGradientClipperConfig,
 )
 from modalities.utils.number_conversion import (
-    GlobalNumSeenTokensFromCheckpointPathConfig,
-    LastStepFromCheckpointPathConfig,
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
     NumberConversion,
+    NumberConversionFromCheckpointPathConfig,
     NumStepsFromNumSamplesConfig,
-    NumStepsFromNumTokensAndCheckpointPathConfig,
     NumStepsFromNumTokensConfig,
     NumTokensFromNumStepsConfig,
 )
@@ -124,6 +123,12 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_model,
+        ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # weight initializers
@@ -270,18 +275,30 @@ COMPONENTS = [
         "number_conversion",
         "last_step_from_checkpoint_path",
         NumberConversion.get_last_step_from_checkpoint_path,
-        LastStepFromCheckpointPathConfig,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_seen_steps_from_checkpoint_path",
+        NumberConversion.get_num_seen_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
         "number_conversion",
         "global_num_seen_tokens_from_checkpoint_path",
         NumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
-        GlobalNumSeenTokensFromCheckpointPathConfig,
+        NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
         "number_conversion",
-        "num_steps_from_num_tokens_and_checkpoint_path",
-        NumberConversion.get_num_steps_from_num_tokens_and_checkpoint_path,
-        NumStepsFromNumTokensAndCheckpointPathConfig,
+        "num_target_steps_from_checkpoint_path",
+        NumberConversion.get_num_target_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_target_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_target_tokens_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
     ),
 ]
