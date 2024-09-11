@@ -7,6 +7,7 @@ from torch.optim import Optimizer
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
+from modalities.training.training_progress import TrainingProgress
 
 
 class CheckpointEntityType(Enum):
@@ -41,7 +42,7 @@ class CheckpointSaving:
 
     def save_checkpoint(
         self,
-        num_train_steps_done: int,
+        training_progress: TrainingProgress,
         evaluation_result: Dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
@@ -51,7 +52,7 @@ class CheckpointSaving:
         Saves a checkpoint of the model and optimizer.
 
         Args:
-            num_train_steps_done (int): The number of training steps completed.
+            training_progress (TrainingProgress): The training progress.
             evaluation_result (Dict[str, EvaluationResultBatch]): The evaluation result.
             model (nn.Module): The model to be saved.
             optimizer (Optimizer): The optimizer to be saved.
@@ -59,14 +60,14 @@ class CheckpointSaving:
             Whether the early stopping criterion is fulfilled. Defaults to False.
         """
         checkpointing_instruction = self.checkpoint_saving_strategy.get_checkpoint_instruction(
-            num_train_steps_done=num_train_steps_done,
+            training_progress=training_progress,
             evaluation_result=evaluation_result,
             early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
         )
 
         self.checkpoint_saving_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
-            num_train_steps_done=num_train_steps_done,
+            training_progress=training_progress,
             model=model,
             optimizer=optimizer,
         )
