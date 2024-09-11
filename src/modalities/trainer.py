@@ -187,8 +187,9 @@ class Trainer:
         checkpointing_callback(training_progress=training_progress)
 
         num_steps_todo = self.num_target_steps - self.num_seen_train_steps
+        num_batches_todo = num_steps_todo * self.gradient_acc_steps
         # Because we might resume training, we add the starting batch id of the data loader
-        for _, (micro_batch_id, batch) in zip(range(num_steps_todo), enumerate(train_loader)):
+        for _, (micro_batch_id, batch) in zip(range(num_batches_todo), enumerate(train_loader)):
             # Train single batch
             (
                 step_performed,
