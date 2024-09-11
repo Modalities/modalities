@@ -182,7 +182,7 @@ def progress_publisher_mock():
 def trainer(progress_publisher_mock, gradient_clipper_mock):
     return Trainer(
         global_rank=int(os.getenv("RANK")),
-        batch_progress_publisher=progress_publisher_mock,
+        progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
         gradient_acc_steps=1,
         gradient_clipper=gradient_clipper_mock,

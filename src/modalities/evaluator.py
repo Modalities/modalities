@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
+from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
@@ -19,16 +19,16 @@ class Evaluator:
 
     def __init__(
         self,
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
+        progress_publisher: MessagePublisher[ProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
     ) -> None:
         """Initializes the Evaluator class.
 
         Args:
-            batch_progress_publisher (MessagePublisher[BatchProgressUpdate]): Publisher for batch progress updates
+            progress_publisher (MessagePublisher[ProgressUpdate]): Publisher for progress updates
             evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Publisher for evaluation results
         """
-        self.batch_progress_publisher = batch_progress_publisher
+        self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
 
     def evaluate_batch(
@@ -79,7 +79,7 @@ class Evaluator:
             cumulated_loss = torch.zeros(3).to(device)
 
             Evaluator._publish_progress(
-                batch_progress_publisher=self.batch_progress_publisher,
+                progress_publisher=self.progress_publisher,
                 num_eval_steps_done=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
@@ -98,7 +98,7 @@ class Evaluator:
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
                     Evaluator._publish_progress(
-                        batch_progress_publisher=self.batch_progress_publisher,
+                        progress_publisher=self.progress_publisher,
                         num_eval_steps_done=batch_id + 1,
                         dataloader_tag=data_loader.dataloader_tag,
                     )
@@ -138,16 +138,16 @@ class Evaluator:
 
     @staticmethod
     def _publish_progress(
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
+        progress_publisher: MessagePublisher[ProgressUpdate],
         num_eval_steps_done: int,
         dataloader_tag: str,
     ):
-        payload = BatchProgressUpdate(
+        payload = ProgressUpdate(
             num_steps_done=num_eval_steps_done,
             experiment_status=ExperimentStatus.EVALUATION,
             dataloader_tag=dataloader_tag,
         )
-        batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
+        progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
 
     @staticmethod
     def _publish_evaluation_result(

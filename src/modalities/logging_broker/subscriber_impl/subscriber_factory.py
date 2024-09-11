@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
+from modalities.logging_broker.subscriber_impl.progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
