@@ -11,7 +11,6 @@ import click
 import click_pathlib
 from pydantic import BaseModel, FilePath
 
-from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
@@ -27,7 +26,7 @@ from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.inference.inference import generate_text
 from modalities.logging_broker.message_broker import MessageBroker
-from modalities.logging_broker.messages import BatchProgressUpdate, MessageTypes
+from modalities.logging_broker.messages import MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
@@ -283,11 +282,11 @@ class Main:
         print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
-            experiment_path = components.settings.paths.checkpointing_path / components.settings.experiment_id
+            experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-        evaluation_result_publisher, batch_processed_publisher = self.get_logging_publishers(
+        evaluation_result_publisher, process_publisher = self.get_logging_publishers(
             progress_subscriber=components.batch_progress_subscriber,
             results_subscriber=components.evaluation_subscriber,
             global_rank=components.settings.cuda_env.global_rank,
@@ -296,23 +295,31 @@ class Main:
 
         # Trainer
         global_num_tokens_per_train_step = (
-            components.settings.training.local_train_micro_batch_size
-            * components.settings.training.sequence_length
-            * components.settings.training.gradient_acc_steps
+            components.settings.step_profile.local_train_micro_batch_size
+            * components.settings.step_profile.sequence_length
+            * components.settings.step_profile.gradient_accumulation_steps
             * components.settings.cuda_env.world_size
         )
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
-            batch_progress_publisher=batch_processed_publisher,
+            progress_publisher=process_publisher,
+            num_target_steps=components.settings.training_target.num_target_steps,
+            num_target_tokens=components.settings.training_target.num_target_tokens,
+            num_seen_train_steps=components.settings.warmstart.training_progress.num_seen_steps
+            if components.settings.warmstart is not None
+            else 0,
+            global_num_seen_tokens=components.settings.warmstart.training_progress.global_num_seen_tokens
+            if components.settings.warmstart is not None
+            else 0,
             evaluation_result_publisher=evaluation_result_publisher,
-            gradient_acc_steps=components.settings.training.gradient_acc_steps,
+            gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
         )
 
         # Evaluator
         evaluator = Evaluator(
-            batch_progress_publisher=batch_processed_publisher,
+            progress_publisher=process_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
         )
 
@@ -328,11 +335,6 @@ class Main:
         components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
-        if len(components.settings.training.activation_checkpointing_modules) > 0:
-            apply_activation_checkpointing_inplace(
-                model=wrapped_model,
-                activation_checkpointing_modules=components.settings.training.activation_checkpointing_modules,
-            )
         print_rank_0(f"Model initialized at {datetime.now()}.")
 
         gym.run(
@@ -342,35 +344,35 @@ class Main:
             model=wrapped_model,
             optimizer=components.optimizer,
             scheduler=components.scheduler,
-            checkpointing_interval_in_steps=components.settings.training.checkpointing_interval_in_steps,
-            evaluation_interval_in_steps=components.settings.training.evaluation_interval_in_steps,
-            training_log_interval_in_steps=components.settings.training.training_log_interval_in_steps,
+            checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
+            evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
+            training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
         )
 
     def get_logging_publishers(
         self,
-        progress_subscriber: MessageSubscriberIF[BatchProgressUpdate],
+        progress_subscriber: MessageSubscriberIF[ProgressUpdate],
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate]]:
+    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]:
         """Returns the logging publishers for the training.
 
-        These publishers are used to pass the evaluation results and the batch progress updates to the message broker.
+        These publishers are used to pass the evaluation results and the progress updates to the message broker.
         The message broker is then used to pass the messages to the subscribers, such as WandB.
 
         Args:
-            progress_subscriber (MessageSubscriberIF[BatchProgressUpdate]): The progress subscriber
+            progress_subscriber (MessageSubscriberIF[ProgressUpdate]): The progress subscriber
             results_subscriber (MessageSubscriberIF[EvaluationResultBatch]): The results subscriber
             global_rank (int): The global rank of the current process
             local_rank (int): The local rank of the current process on the current node
 
         Returns:
-            Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[BatchProgressUpdate]]: The evaluation
-                result publisher and the batch processed publisher
+            Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]: The evaluation
+                result publisher and the progress publisher
         """
         message_broker = MessageBroker()
-        batch_processed_publisher = MessagePublisher[BatchProgressUpdate](
+        progress_publisher = MessagePublisher[ProgressUpdate](
             message_broker=message_broker,
             global_rank=global_rank,
             local_rank=local_rank,
@@ -387,7 +389,7 @@ class Main:
             subscriber=progress_subscriber,
         )
 
-        return evaluation_result_publisher, batch_processed_publisher
+        return evaluation_result_publisher, progress_publisher
 
 
 if __name__ == "__main__":
