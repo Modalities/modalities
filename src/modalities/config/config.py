@@ -330,11 +330,11 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 
 class RichProgressSubscriberConfig(BaseModel):
-    train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
-    num_seen_steps: int
-    global_rank: int
-    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
+    train_dataloader_tag: str
+    num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
+    num_target_steps: Annotated[int, Field(strict=True, gt=0)]
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):
