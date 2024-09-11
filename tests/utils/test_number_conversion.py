@@ -32,46 +32,73 @@ def test_get_local_num_batches_from_num_tokens(
 
 
 @pytest.mark.parametrize(
-    "num_ranks,local_micro_batch_size,global_num_samples,expected",
-    [(2, 2, 10, 2), (2, 2, 11, 2), (2, 2, 12, 3)],
+    "num_ranks,local_micro_batch_size,global_num_samples,gradient_accumulation_steps,expected",
+    [(2, 2, 10, 1, 2), (2, 2, 11, 1, 2), (2, 2, 12, 1, 3), (2, 2, 20, 2, 2), (2, 2, 22, 2, 2), (2, 2, 48, 4, 3)],
 )
 def test_get_num_steps_from_num_samples(
-    num_ranks: int, local_micro_batch_size: int, global_num_samples: int, expected: int
+    num_ranks: int,
+    local_micro_batch_size: int,
+    global_num_samples: int,
+    gradient_accumulation_steps: int,
+    expected: int,
 ):
     assert (
-        NumberConversion.get_num_steps_from_num_samples(num_ranks, local_micro_batch_size, global_num_samples)
+        NumberConversion.get_num_steps_from_num_samples(
+            num_ranks, local_micro_batch_size, global_num_samples, gradient_accumulation_steps
+        )
         == expected
     )
 
 
 @pytest.mark.parametrize(
-    "num_ranks,local_micro_batch_size,global_num_tokens,sequence_length,expected",
-    [(2, 2, 20, 2, 2), (2, 2, 21, 2, 2), (2, 2, 22, 2, 2), (2, 2, 24, 2, 3)],
+    "num_ranks,local_micro_batch_size,global_num_tokens,sequence_length,gradient_accumulation_steps,expected",
+    [
+        (2, 2, 20, 2, 1, 2),
+        (2, 2, 21, 2, 1, 2),
+        (2, 2, 22, 2, 1, 2),
+        (2, 2, 24, 2, 1, 3),
+        (2, 2, 40, 2, 2, 2),
+        (2, 2, 42, 2, 2, 2),
+        (2, 2, 88, 2, 4, 2),
+        (2, 2, 48, 2, 2, 3),
+    ],
 )
 def test_get_num_steps_from_num_tokens(
-    num_ranks: int, local_micro_batch_size: int, global_num_tokens: int, sequence_length: int, expected: int
+    num_ranks: int,
+    local_micro_batch_size: int,
+    global_num_tokens: int,
+    sequence_length: int,
+    gradient_accumulation_steps: int,
+    expected: int,
 ):
     assert (
         NumberConversion.get_num_steps_from_num_tokens(
-            num_ranks, local_micro_batch_size, global_num_tokens, sequence_length
+            num_ranks, local_micro_batch_size, global_num_tokens, sequence_length, gradient_accumulation_steps
         )
         == expected
     )
 
 
 @pytest.mark.parametrize(
-    "num_ranks,local_micro_batch_size,sequence_length,num_steps_done,expected",
+    "num_ranks,local_micro_batch_size,sequence_length,num_steps_done,gradient_accumulation_steps,expected",
     [
-        (2, 2, 2, 2, 16),
-        (2, 2, 2, 3, 24),
+        (2, 2, 2, 2, 1, 16),
+        (2, 2, 2, 3, 1, 24),
+        (2, 2, 2, 2, 2, 32),
+        (2, 2, 2, 3, 4, 96),
     ],
 )
 def test_get_num_tokens_from_num_steps_callable(
-    num_ranks: int, local_micro_batch_size: int, sequence_length: int, num_steps_done: int, expected: int
+    num_ranks: int,
+    local_micro_batch_size: int,
+    sequence_length: int,
+    num_steps_done: int,
+    gradient_accumulation_steps: int,
+    expected: int,
 ):
     assert (
-        NumberConversion.get_num_tokens_from_num_steps_callable(num_ranks, local_micro_batch_size, sequence_length)(
-            num_steps_done
-        )
+        NumberConversion.get_num_tokens_from_num_steps_callable(
+            num_ranks, local_micro_batch_size, sequence_length, gradient_accumulation_steps
+        )(num_steps_done)
         == expected
     )
