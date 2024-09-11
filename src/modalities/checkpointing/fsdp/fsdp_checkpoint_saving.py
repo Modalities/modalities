@@ -133,8 +133,8 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
                 entity_type=entity_type,
-                num_seen_steps=training_progress.num_seen_steps,
-                num_seen_tokens=training_progress.num_seen_tokens,
+                num_seen_steps=training_progress.num_seen_steps_total,
+                num_seen_tokens=training_progress.num_seen_tokens_total,
                 num_target_steps=training_progress.num_target_steps,
                 num_target_tokens=training_progress.num_target_tokens,
             )

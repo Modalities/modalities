@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.training.training_progress import TrainingProgress
 from modalities.utils.number_conversion import NumberConversion
 
 
@@ -29,23 +30,41 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
         global_rank=0,
         get_num_tokens_from_num_steps_callable=lambda _: 0,
     )
-    files_paths_to_delete = checkpointing._get_paths_to_delete(num_train_steps_done=101)
+    trining_progress = TrainingProgress(
+        num_seen_tokens_current_run=5, num_seen_steps_current_run=10, num_target_tokens=40, num_target_steps=20
+    )
+
+    files_paths_to_delete = checkpointing._get_paths_to_delete(training_progress=trining_progress)
     assert len(files_paths_to_delete) == 2
 
 
 def test_delete_checkpoint(tmpdir):
     experiment_id = "2022-05-07__14-31-22"
+    training_progress = TrainingProgress(
+        num_seen_tokens_current_run=5, num_seen_steps_current_run=10, num_target_tokens=40, num_target_steps=20
+    )
     directory = Path(tmpdir)
 
     (directory / experiment_id).mkdir(exist_ok=True)
-
-    optimizer_path = directory / experiment_id / f"eid_{experiment_id}-optimizer-num_steps_101-num_tokens_4848.bin"
+    optimizer_file_name = (
+        f"eid_{experiment_id}-optimizer-seen_steps_{training_progress.num_seen_steps_total}"
+        f"-seen_tokens_{training_progress.num_seen_tokens_total}"
+        f"-target_steps_{training_progress.num_target_steps}"
+        f"-target_tokens_{training_progress.num_target_tokens}.bin"
+    )
+    optimizer_path = directory / experiment_id / optimizer_file_name
     optimizer_path.write_text(CONTENT)
 
-    model_path = directory / experiment_id / f"eid_{experiment_id}-model-num_steps_101-num_tokens_4848.bin"
+    model_file_name = (
+        f"eid_{experiment_id}-model-seen_steps_{training_progress.num_seen_steps_total}"
+        f"-seen_tokens_{training_progress.num_seen_tokens_total}"
+        f"-target_steps_{training_progress.num_target_steps}"
+        f"-target_tokens_{training_progress.num_target_tokens}.bin"
+    )
+    model_path = directory / experiment_id / model_file_name
     model_path.write_text(CONTENT)
     get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
-        num_ranks=2, local_micro_batch_size=4, sequence_length=6
+        num_ranks=2, local_micro_batch_size=4, sequence_length=6, gradient_accumulation_steps=1
     )
     checkpoint_saving = FSDPCheckpointSaving(
         checkpoint_path=directory,
@@ -53,5 +72,5 @@ def test_delete_checkpoint(tmpdir):
         global_rank=0,
         get_num_tokens_from_num_steps_callable=get_num_tokens_from_num_steps_callable,
     )
-    checkpoint_saving._delete_checkpoint(num_train_steps_done=101)
+    checkpoint_saving._delete_checkpoint(training_progress=training_progress)
     assert is_empty_directory((directory / experiment_id).__str__())
