@@ -4,6 +4,8 @@ from typing import Annotated, Callable
 
 from pydantic import BaseModel, Field
 
+from modalities.dataloader.dataset_factory import DatasetFactory
+
 
 class LocalNumBatchesFromNumSamplesConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
@@ -44,6 +46,14 @@ class NumberConversionFromCheckpointPathConfig(BaseModel):
     checkpoint_path: Path
 
 
+class NumTokensFromPackedMemMapDatasetContinuous(BaseModel):
+    dataset_path: Path
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    num_ranks: Annotated[int, Field(strict=True, gt=0)]
+    local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
+    gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
+
+
 class NumberConversion:
     @staticmethod
     def _get_checkpoint_parameter_value(pattern: str, string: str) -> int:
@@ -73,7 +83,7 @@ class NumberConversion:
         Returns:
             int: Number of local batches for single rank.
         """
-        return (global_num_samples) // (num_ranks * local_micro_batch_size)
+        return (global_num_samples) // num_ranks // local_micro_batch_size
 
     @staticmethod
     def get_local_num_batches_from_num_tokens(
@@ -112,7 +122,7 @@ class NumberConversion:
         Returns:
             int: Number of steps.
         """
-        return global_num_samples // (num_ranks * local_micro_batch_size * gradient_accumulation_steps)
+        return global_num_samples // num_ranks // local_micro_batch_size // gradient_accumulation_steps
 
     @staticmethod
     def get_num_steps_from_num_tokens(
@@ -144,6 +154,30 @@ class NumberConversion:
         )
 
     @staticmethod
+    def get_num_tokens_from_num_steps(
+        num_steps: int,
+        num_ranks: int,
+        local_micro_batch_size: int,
+        sequence_length: int,
+        gradient_accumulation_steps: int,
+    ) -> int:
+        """Calculates the number of global tokens given the number of steps, number of ranks, local micro batch size,
+            sequence length and gradient accumulation steps.
+
+        Args:
+            num_steps (int): Number of steps.
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            sequence_length (int): Sequence length of the model.
+            gradient_accumulation_steps (int): Number of gradient accumulation steps.
+
+        Returns:
+            int: Number of global tokens.
+        """
+        num_tokens = num_steps * num_ranks * local_micro_batch_size * sequence_length * gradient_accumulation_steps
+        return num_tokens
+
+    @staticmethod
     def get_num_tokens_from_num_steps_callable(
         num_ranks: int, local_micro_batch_size: int, sequence_length: int, gradient_accumulation_steps: int
     ) -> Callable[[int], int]:
@@ -158,12 +192,12 @@ class NumberConversion:
         Returns:
             Callable[[int], int]: Callable that calculates the number of global tokens.
         """
-        return (
-            lambda num_steps_done: num_steps_done
-            * num_ranks
-            * local_micro_batch_size
-            * sequence_length
-            * gradient_accumulation_steps
+        return lambda num_steps_done: NumberConversion.get_num_tokens_from_num_steps(
+            num_steps=num_steps_done,
+            num_ranks=num_ranks,
+            local_micro_batch_size=local_micro_batch_size,
+            sequence_length=sequence_length,
+            gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
     @staticmethod
@@ -238,3 +272,54 @@ class NumberConversion:
         if isinstance(num_target_steps, float) and not num_target_steps.is_integer():
             raise ValueError(f"Number of steps calculated is not an integer. {num_target_steps}")
         return int(num_target_steps)
+
+    @staticmethod
+    def get_num_tokens_from_packed_mem_map_dataset_continuous(
+        dataset_path: Path,
+        sequence_length: int,
+        num_ranks: int,
+        local_micro_batch_size: int,
+        gradient_accumulation_steps: int,
+    ) -> int:
+        """Get the number of tokens in a tokenized dataset that will be effectively used during training.
+            Due to the way the data is packed, batched and distributed, the number of tokens used during training
+            might not the same as the number of tokens in the dataset.
+
+            The number of tokens that are used during training is calculated as follows:
+                num_steps = num_dataset_tokens // sequence_length// num_ranks //
+                            local_micro_batch_size // gradient_accumulation_steps
+                global_num_tokens = num_steps * sequence_length * num_ranks *
+                                    local_micro_batch_size * gradient_accumulation_steps
+
+
+        Args:
+            dataset_path (Path): Path to the tokenized dataset.
+            sequence_length (int): Sequence length of the model.
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            gradient_accumulation_steps (int): Number of gradient accumulation steps.
+
+        Returns:
+            int: Number of tokens that will be effectively used during training.
+        """
+
+        dataset = DatasetFactory.get_packed_mem_map_dataset_continuous(
+            raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text"
+        )
+        global_num_tokens_dataset = len(dataset) * sequence_length
+        num_steps = NumberConversion.get_num_steps_from_num_tokens(
+            num_ranks=num_ranks,
+            local_micro_batch_size=local_micro_batch_size,
+            global_num_tokens=global_num_tokens_dataset,
+            sequence_length=sequence_length,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+        )
+
+        global_num_tokens_actual = NumberConversion.get_num_tokens_from_num_steps(
+            num_ranks=num_ranks,
+            local_micro_batch_size=local_micro_batch_size,
+            sequence_length=sequence_length,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            num_steps=num_steps,
+        )
+        return global_num_tokens_actual

@@ -90,6 +90,7 @@ from modalities.utils.number_conversion import (
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
     NumTokensFromNumStepsConfig,
+    NumTokensFromPackedMemMapDatasetContinuous,
 )
 
 
@@ -300,5 +301,11 @@ COMPONENTS = [
         "global_num_target_tokens_from_checkpoint_path",
         NumberConversion.get_global_num_target_tokens_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_tokens_from_packed_mem_map_dataset_continuous",
+        NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
+        NumTokensFromPackedMemMapDatasetContinuous,
     ),
 ]
