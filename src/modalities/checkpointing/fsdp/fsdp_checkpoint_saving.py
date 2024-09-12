@@ -1,6 +1,6 @@
 from enum import Enum
 from pathlib import Path
-from typing import Callable, List
+from typing import List
 
 import torch
 import torch.distributed as dist
@@ -41,7 +41,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
-        get_num_tokens_from_num_steps_callable: Callable[[int], int],
     ):
         """
         Initializes the FSDPCheckpointSaving class.
@@ -50,8 +49,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
-            get_num_tokens_from_num_steps_callable (Callable[[int], int]): callable to get the number
-                of tokens for a given number of train steps
 
          Returns:
             None
@@ -59,7 +56,6 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.experiment_id = experiment_id
-        self.get_num_tokens_from_num_steps_callable = get_num_tokens_from_num_steps_callable
 
     def _get_checkpointing_path(
         self,

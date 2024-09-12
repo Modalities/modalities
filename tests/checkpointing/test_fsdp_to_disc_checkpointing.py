@@ -26,7 +26,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.utils.number_conversion import NumberConversion
+from modalities.training.training_progress import TrainingProgress
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
@@ -199,16 +199,15 @@ class TestFSDPToDiscCheckpointing:
     ):
         experiment_id = "0"
         num_train_steps_done = 1
-
+        num_ranks = 2
+        local_micro_batch_size = 4
+        gradient_accumulation_steps = 1
         sequence_length = gpt2_model_config_dict["model_raw"]["config"]["sequence_length"]
-        get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
-            num_ranks=2, local_micro_batch_size=4, sequence_length=sequence_length
-        )
+
         checkpoint_saving = FSDPCheckpointSaving(
             checkpoint_path=temporary_checkpoint_folder_path,
             experiment_id=experiment_id,
             global_rank=dist.get_rank(),
-            get_num_tokens_from_num_steps_callable=get_num_tokens_from_num_steps_callable,
         )
 
         checkpoint_loading = FSDPCheckpointLoading(
@@ -234,15 +233,33 @@ class TestFSDPToDiscCheckpointing:
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
+        training_progress = TrainingProgress(
+            num_seen_steps_current_run=num_train_steps_done,
+            num_seen_tokens_current_run=num_train_steps_done
+            * local_micro_batch_size
+            * sequence_length
+            * num_ranks
+            * gradient_accumulation_steps,
+            num_target_steps=num_train_steps_done * 2,
+            num_target_tokens=num_train_steps_done
+            * local_micro_batch_size
+            * sequence_length
+            * num_ranks
+            * gradient_accumulation_steps
+            * 2,
+        )
         checkpoint_saving._save_checkpoint(
-            model=fsdp_wrapped_model, optimizer=optimizer, num_train_steps_done=num_train_steps_done
+            model=fsdp_wrapped_model, optimizer=optimizer, training_progress=training_progress
         )
 
         # load the model checkpoint
         model_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            num_seen_steps=num_train_steps_done,
             entity_type=CheckpointingEntityType.MODEL,
+            num_seen_steps=training_progress.num_seen_steps_total,
+            num_seen_tokens=training_progress.num_seen_tokens_total,
+            num_target_steps=training_progress.num_target_steps,
+            num_target_tokens=training_progress.num_target_tokens,
         )
         fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint(
             model=gpt2_model_2, file_path=model_checkpointing_path
@@ -252,8 +269,11 @@ class TestFSDPToDiscCheckpointing:
 
         optimizer_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            num_seen_steps=num_train_steps_done,
             entity_type=CheckpointingEntityType.OPTIMIZER,
+            num_seen_steps=training_progress.num_seen_steps_total,
+            num_seen_tokens=training_progress.num_seen_tokens_total,
+            num_target_steps=training_progress.num_target_steps,
+            num_target_tokens=training_progress.num_target_tokens,
         )
         checkpoint_loading.load_optimizer_checkpoint(
             optimizer=optimizer_2, model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path

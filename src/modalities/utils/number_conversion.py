@@ -302,7 +302,6 @@ class NumberConversion:
         Returns:
             int: Number of tokens that will be effectively used during training.
         """
-
         dataset = DatasetFactory.get_packed_mem_map_dataset_continuous(
             raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text"
         )

@@ -1,23 +1,69 @@
 settings:  
   experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
-  training:
-    training_log_interval_in_steps: 1
-    checkpointing_interval_in_steps: 4
-    evaluation_interval_in_steps: 1
-    global_num_seen_tokens:  2048 # 4 steps * 256 tokens per step * 2 ranks
-    do_apply_activation_checkpointing: false
-    gradient_acc_steps: 1
-    local_train_micro_batch_size: 1
-    sequence_length: 256
+    prediction_key: logits
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: tmp/checkpoints
+    checkpoint_saving_path: tmp/checkpoints
+    train_dataset_path: tests/end2end_tests/lorem_ipsum.pbin
+  intervals:
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 4
+    evaluation_interval_in_steps: 1
+  consistency_enforcement:
+    enforce_tokens_per_step_conistency: true
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile: 
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 1
+    sequence_length: 256
+  training_target:
+    num_target_tokens:
+      component_key: number_conversion
+      variant_key: global_num_target_tokens_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    num_target_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_target_steps_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+  training_progress: 
+    global_num_seen_tokens:   # used below
+      component_key: number_conversion
+      variant_key: global_num_seen_tokens_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    num_seen_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_seen_steps_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    local_num_seen_batches:   # for the dataloader
+      component_key: number_conversion
+      variant_key: local_num_batches_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        global_num_tokens: ${settings.training_progress.global_num_seen_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    last_step:  # for the scheduler
+      component_key: number_conversion
+      variant_key: last_step_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+  warmstart_checkpoint_paths:
+    # we pass in the checkpoint paths as filenames such that the num_target_tokens and num_target_steps can be calculated and correctly passed to the training loop
+    # Within the test is replaced with the actual path to the checkpoint.
+    model_checkpoint_path: eid_0-model-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin   
+    optimizer_checkpoint_path: eid_0-optimizer-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin
 
 collate_fn:  
   component_key: collate_fn
@@ -30,8 +76,8 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: lorem_ipsum.pbin
-    sequence_length: ${settings.training.sequence_length}
+    raw_data_path: ${settings.paths.train_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
@@ -40,16 +86,8 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
-    skip_num_batches:
-      component_key: number_conversion
-      variant_key: local_num_batches_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        global_num_tokens: ${settings.training.global_num_seen_tokens}
-        sequence_length: ${settings.training.sequence_length}
-        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+    dataloader_tag: train
+    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -57,7 +95,7 @@ train_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
         drop_last: true
         sampler:
           component_key: sampler
@@ -66,6 +104,8 @@ train_dataloader:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: true
+            drop_last: true
+            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
@@ -97,24 +137,16 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: fsdp
       config:
-        checkpoint_path: ${settings.paths.checkpointing_path} # TODO <replaced_in_test>
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
-        experiment_id: ${settings.experiment_id} 
-        get_num_tokens_from_num_steps_callable:
-          component_key: number_conversion
-          variant_key: num_tokens_from_num_steps_callable
-          config:
-            num_ranks: ${settings.cuda_env.world_size}
-            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            sequence_length: ${settings.training.sequence_length}        
+        experiment_id: ${settings.experiment_id}
 
-# resolving class types via different enums sucks...
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss
   config:
-    target_key: target_ids
-    prediction_key: logits
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
 
 wrapped_model:
   component_key: model
@@ -126,7 +158,7 @@ wrapped_model:
     checkpoint_loading:
       instance_key: checkpoint_loading
       pass_type: BY_REFERENCE
-    checkpoint_path: must_be_set_in_test_impl
+    checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
 
 model:
   component_key: model
@@ -151,7 +183,7 @@ model_raw:
   config:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    sequence_length: ${settings.training.sequence_length}
+    sequence_length: ${settings.step_profile.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
@@ -194,11 +226,18 @@ model_raw:
 
 scheduler:
   component_key: scheduler
-  variant_key: dummy_lr
+  variant_key: onecycle_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.01
+    anneal_strategy: cos
+    last_epoch: ${settings.training_progress.last_step}
 
 optimizer:
   component_key: optimizer
@@ -213,7 +252,7 @@ optimizer:
     checkpoint_loading:
       instance_key: checkpoint_loading
       pass_type: BY_REFERENCE
-    checkpoint_path: must_be_set_in_test_impl
+    checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
 
 optimizer_original:  
   component_key: optimizer
@@ -223,7 +262,7 @@ optimizer_original:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
-    weight_decay_groups_excluded: ["embedding", "layernorm"]
+    weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -243,21 +282,13 @@ batch_progress_subscriber:
   variant_key: rich
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    global_num_seen_steps:
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training.global_num_seen_tokens}
-        sequence_length: ${settings.training.sequence_length}
-    gradient_acc_steps: ${settings.training.gradient_acc_steps}
-    train_dataloader:
-      instance_key: train_dataloader
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
       pass_type: BY_REFERENCE
-    eval_dataloaders: []
 
-    
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: save_all

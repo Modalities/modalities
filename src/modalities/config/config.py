@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
@@ -112,7 +112,6 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
-    get_num_tokens_from_num_steps_callable: Callable[[int], int]
 
 
 class CheckpointSavingConfig(BaseModel):

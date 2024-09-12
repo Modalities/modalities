@@ -1,4 +1,4 @@
-# NOTE, settings is not type checked in the instantiation model, as the settings are not used in the pydantic model.
+# NOTE, settings is not type checked in the instantiation model (specified within the test), as the settings are not used in the pydantic model.
 # Therefore, we can place arbitrary values in the settings field.
 
 settings:  
