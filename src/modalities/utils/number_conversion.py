@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Annotated, Callable
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -176,29 +176,6 @@ class NumberConversion:
         """
         num_tokens = num_steps * num_ranks * local_micro_batch_size * sequence_length * gradient_accumulation_steps
         return num_tokens
-
-    @staticmethod
-    def get_num_tokens_from_num_steps_callable(
-        num_ranks: int, local_micro_batch_size: int, sequence_length: int, gradient_accumulation_steps: int
-    ) -> Callable[[int], int]:
-        """Returns a callable that calculates the number of global tokens given the number of steps done.
-
-        Args:
-            num_ranks (int): Global number of ranks.
-            local_micro_batch_size (int): Local micro batch size on single rank.
-            sequence_length (int): Sequence length of the model.
-            gradient_accumulation_steps (int): Number of gradient accumulation steps.
-
-        Returns:
-            Callable[[int], int]: Callable that calculates the number of global tokens.
-        """
-        return lambda num_steps_done: NumberConversion.get_num_tokens_from_num_steps(
-            num_steps=num_steps_done,
-            num_ranks=num_ranks,
-            local_micro_batch_size=local_micro_batch_size,
-            sequence_length=sequence_length,
-            gradient_accumulation_steps=gradient_accumulation_steps,
-        )
 
     @staticmethod
     def get_last_step_from_checkpoint_path(checkpoint_path: Path) -> int:

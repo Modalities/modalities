@@ -6,7 +6,6 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.training.training_progress import TrainingProgress
-from modalities.utils.number_conversion import NumberConversion
 
 
 @pytest.mark.skip
@@ -28,7 +27,6 @@ def test_get_paths_to_delete(tmp_path):  # pytest temp path
         checkpoint_path=tmp_path,
         experiment_id=str(1),
         global_rank=0,
-        get_num_tokens_from_num_steps_callable=lambda _: 0,
     )
     trining_progress = TrainingProgress(
         num_seen_tokens_current_run=5, num_seen_steps_current_run=10, num_target_tokens=40, num_target_steps=20
@@ -63,14 +61,11 @@ def test_delete_checkpoint(tmpdir):
     )
     model_path = directory / experiment_id / model_file_name
     model_path.write_text(CONTENT)
-    get_num_tokens_from_num_steps_callable = NumberConversion.get_num_tokens_from_num_steps_callable(
-        num_ranks=2, local_micro_batch_size=4, sequence_length=6, gradient_accumulation_steps=1
-    )
+
     checkpoint_saving = FSDPCheckpointSaving(
         checkpoint_path=directory,
         experiment_id=experiment_id,
         global_rank=0,
-        get_num_tokens_from_num_steps_callable=get_num_tokens_from_num_steps_callable,
     )
     checkpoint_saving._delete_checkpoint(training_progress=training_progress)
     assert is_empty_directory((directory / experiment_id).__str__())

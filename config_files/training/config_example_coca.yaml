@@ -143,13 +143,7 @@ checkpoint_saving:
         checkpoint_path: ${settings.paths.checkpointing_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-        get_num_tokens_from_num_steps_callable:
-          component_key: number_conversion
-          variant_key: num_tokens_from_num_steps_callable
-          config:
-            num_ranks: ${settings.cuda_env.world_size}
-            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
-            sequence_length: ${settings.training.sequence_length}
+
 loss_fn:
   component_key: loss
   variant_key: clm_cross_entropy_loss

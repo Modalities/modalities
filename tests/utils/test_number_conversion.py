@@ -77,28 +77,3 @@ def test_get_num_steps_from_num_tokens(
         )
         == expected
     )
-
-
-@pytest.mark.parametrize(
-    "num_ranks,local_micro_batch_size,sequence_length,num_steps_done,gradient_accumulation_steps,expected",
-    [
-        (2, 2, 2, 2, 1, 16),
-        (2, 2, 2, 3, 1, 24),
-        (2, 2, 2, 2, 2, 32),
-        (2, 2, 2, 3, 4, 96),
-    ],
-)
-def test_get_num_tokens_from_num_steps_callable(
-    num_ranks: int,
-    local_micro_batch_size: int,
-    sequence_length: int,
-    num_steps_done: int,
-    gradient_accumulation_steps: int,
-    expected: int,
-):
-    assert (
-        NumberConversion.get_num_tokens_from_num_steps_callable(
-            num_ranks, local_micro_batch_size, sequence_length, gradient_accumulation_steps
-        )(num_steps_done)
-        == expected
-    )

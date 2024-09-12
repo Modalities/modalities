@@ -89,7 +89,6 @@ from modalities.utils.number_conversion import (
     NumberConversionFromCheckpointPathConfig,
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
-    NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuous,
 )
 
@@ -265,12 +264,6 @@ COMPONENTS = [
         "num_steps_from_num_tokens",
         NumberConversion.get_num_steps_from_num_tokens,
         NumStepsFromNumTokensConfig,
-    ),
-    ComponentEntity(
-        "number_conversion",
-        "num_tokens_from_num_steps_callable",
-        NumberConversion.get_num_tokens_from_num_steps_callable,
-        NumTokensFromNumStepsConfig,
     ),
     ComponentEntity(
         "number_conversion",
