@@ -305,12 +305,8 @@ class Main:
             progress_publisher=process_publisher,
             num_target_steps=components.settings.training_target.num_target_steps,
             num_target_tokens=components.settings.training_target.num_target_tokens,
-            num_seen_train_steps=components.settings.warmstart.training_progress.num_seen_steps
-            if components.settings.warmstart is not None
-            else 0,
-            global_num_seen_tokens=components.settings.warmstart.training_progress.global_num_seen_tokens
-            if components.settings.warmstart is not None
-            else 0,
+            num_seen_train_steps=components.settings.training_progress.num_seen_steps,
+            global_num_seen_tokens=components.settings.training_progress.global_num_seen_tokens,
             evaluation_result_publisher=evaluation_result_publisher,
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,

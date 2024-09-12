@@ -1,9 +1,8 @@
 import os
-import warnings
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
@@ -19,6 +18,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
+from modalities.util import warn_rank_0
 
 
 class TrainingComponentsInstantiationModel(BaseModel):
@@ -33,6 +33,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
             checkpointing_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
             evaluation_interval_in_steps: Annotated[int, Field(strict=True, ge=1)]
 
+        class ConsistencyEnforcement(BaseModel):
+            enforce_tokens_per_step_conistency: bool = True
+            enforce_last_step_evaluated: bool = True
+            enforce_last_step_checkpointed: bool = True
+
         class TrainingTarget(BaseModel):
             num_target_tokens: Annotated[int, Field(strict=True, ge=1)]
             num_target_steps: Annotated[int, Field(strict=True, ge=1)]
@@ -43,21 +48,29 @@ class TrainingComponentsInstantiationModel(BaseModel):
             sequence_length: Annotated[int, Field(strict=True, ge=1)]
 
         class Paths(BaseModel):
-            checkpoint_saving_path: Path
+            checkpoint_saving_path: Path  # Explicitly defined field
 
-        class Warmstart(BaseModel):
-            class TrainingProgress(BaseModel):
-                global_num_seen_tokens: Annotated[int, Field(strict=True, ge=1)]
-                num_seen_steps: Annotated[int, Field(strict=True, ge=1)]
-                local_num_seen_batches: Annotated[int, Field(strict=True, ge=0)]
-                last_step: Annotated[int, Field(strict=True, ge=0)]
+            class Config:
+                extra = "allow"
 
-            class CheckpointPaths(BaseModel):
-                model_checkpoint_path: Path
-                optimizer_checkpoint_path: Path
+            @root_validator(pre=True)
+            def _validate_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+                for field_name, value in values.items():
+                    if isinstance(value, str):  # If a value is a string, convert it to Path
+                        values[field_name] = Path(value)
+                    elif not isinstance(value, Path):
+                        raise TypeError(f"Field '{field_name}' must be of type Path, but got {type(value)} instead.")
+                return values
 
-            training_progress: TrainingProgress
-            checkpoint_paths: CheckpointPaths
+        class TrainingProgress(BaseModel):
+            global_num_seen_tokens: Annotated[int, Field(strict=True, ge=0)]
+            num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
+            local_num_seen_batches: Annotated[int, Field(strict=True, ge=0)]
+            last_step: Annotated[int, Field(strict=True, ge=-1)]
+
+        class WarmstartCheckpointPaths(BaseModel):
+            model_checkpoint_path: Path
+            optimizer_checkpoint_path: Path
 
         experiment_id: str
         config_file_path: FilePath
@@ -65,10 +78,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
         cuda_env: CudaEnvSettings
         paths: Paths
         intervals: Intervals
-        enforce_tokens_per_step_conistency: bool = True
+        consistency_enforcement: ConsistencyEnforcement
         step_profile: StepProfile
         training_target: TrainingTarget
-        warmstart: Optional[Warmstart] = None
+        training_progress: TrainingProgress
+        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
@@ -88,9 +102,39 @@ class TrainingComponentsInstantiationModel(BaseModel):
                     f"which does not match the number of tokens per step ({step_profile_num_tokens_per_step}) "
                     "from the step profile."
                 )
-                if self.enforce_tokens_per_step_conistency:
+                if self.consistency_enforcement.enforce_tokens_per_step_conistency:
                     raise ValueError(warning_message)
-                warnings.warn(warning_message)
+                warn_rank_0(warning_message)
+            return self
+
+        @model_validator(mode="after")
+        def _check_last_step_evaluated(self) -> "TrainingComponentsInstantiationModel.Settings":
+            # Check if the model is evaluated after the last step
+            if self.training_target.num_target_steps % self.intervals.evaluation_interval_in_steps != 0:
+                warning_message = (
+                    "Last step will not be evaluated. Since num_target_steps "
+                    f"({self.training_target.num_target_steps}) "
+                    "is not a multiple of evaluation_interval_in_steps "
+                    f"({self.intervals.evaluation_interval_in_steps})"
+                )
+                if self.consistency_enforcement.enforce_last_step_evaluated:
+                    raise ValueError(warning_message)
+                warn_rank_0(warning_message)
+            return self
+
+        @model_validator(mode="after")
+        def _check_last_step_checkpointed(self) -> "TrainingComponentsInstantiationModel.Settings":
+            # Check if the model is evaluated after the last step
+            if self.training_target.num_target_steps % self.intervals.checkpointing_interval_in_steps != 0:
+                warning_message = (
+                    "Last step will not be checkpointed. Since num_target_steps "
+                    "({self.training_target.num_target_steps}) "
+                    "is not a multiple of checkpointing_interval_in_steps "
+                    f"({self.intervals.checkpointing_interval_in_steps})"
+                )
+                if self.consistency_enforcement.enforce_last_step_checkpointed:
+                    raise ValueError(warning_message)
+                warn_rank_0(warning_message)
             return self
 
     settings: Settings
