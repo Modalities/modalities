@@ -241,7 +241,7 @@ class TestFSDPToDiscCheckpointing:
         # load the model checkpoint
         model_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            num_train_steps_done=num_train_steps_done,
+            num_seen_steps=num_train_steps_done,
             entity_type=CheckpointingEntityType.MODEL,
         )
         fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint(
@@ -252,7 +252,7 @@ class TestFSDPToDiscCheckpointing:
 
         optimizer_checkpointing_path = checkpoint_saving._get_checkpointing_path(
             experiment_id=experiment_id,
-            num_train_steps_done=num_train_steps_done,
+            num_seen_steps=num_train_steps_done,
             entity_type=CheckpointingEntityType.OPTIMIZER,
         )
         checkpoint_loading.load_optimizer_checkpoint(
