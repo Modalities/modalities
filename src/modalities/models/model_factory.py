@@ -7,11 +7,11 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
-from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
+from modalities.training.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.util import get_local_number_of_trainable_parameters
 
 

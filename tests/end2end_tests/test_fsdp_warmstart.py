@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-import debugpy
 import pytest
 import torch
 import torch.distributed as dist
@@ -18,16 +17,6 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
-
-# Get the rank of the process (0 or 1 in this case)
-rank = int(os.getenv("RANK"))
-
-# Use a different port for each process
-port = 9875 + rank
-debugpy.listen(("0.0.0.0", port))  # Listening on all interfaces to allow debugger to attach
-print(f"Rank {rank}: Waiting for debugger to attach on port {port}...")
-debugpy.wait_for_client()  # Pause here until the debugger attaches
-
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
