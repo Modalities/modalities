@@ -35,13 +35,6 @@ class NumStepsFromNumTokensConfig(BaseModel):
     gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
-class NumTokensFromNumStepsConfig(BaseModel):
-    num_ranks: Annotated[int, Field(strict=True, gt=0)]
-    local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
-    sequence_length: Annotated[int, Field(strict=True, gt=0)]
-    gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
-
-
 class NumberConversionFromCheckpointPathConfig(BaseModel):
     checkpoint_path: Path
 
@@ -57,14 +50,19 @@ class NumTokensFromPackedMemMapDatasetContinuous(BaseModel):
 class NumberConversion:
     @staticmethod
     def _get_checkpoint_parameter_value(pattern: str, string: str) -> int:
-        match = re.search(pattern, string)
+        matches = re.findall(pattern, string)
 
         # Extract the number of steps if a match is found
-        if match:
-            value = int(match.group(1))  # Group 1 contains the digits'
+        if len(matches) == 1:
+            value = int(matches[0])
+            return value
+        elif len(matches) > 1:
+            raise ValueError(
+                f"Expected a single group in the match. Got {len(matches)} matches: {matches}. "
+                f"Pattern: {pattern}, String: {string}"
+            )
         else:
             raise ValueError(f"No match found for pattern {pattern} in {string}")
-        return value
 
     @staticmethod
     def get_local_num_batches_from_num_samples(
