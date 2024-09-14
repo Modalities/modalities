@@ -8,7 +8,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from modalities.batch import DatasetBatch, EvaluationResultBatch
+from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
@@ -255,15 +255,15 @@ class Trainer:
                     reduced_losses[1],
                 )
                 losses = {
-                    "train loss avg": train_loss_avg,
-                    "train loss last": train_loss_last_batch,
+                    "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
+                    "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
 
                 consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
                 metrics = {
-                    "consumed tokens": consumed_tokens,
-                    "grad norm avg": torch.mean(torch.Tensor(gradient_norm_scores)),
-                    "grad norm last": torch.tensor(gradient_norm_scores[-1]),
+                    "consumed tokens": ResultItem(consumed_tokens, 0),
+                    "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
+                    "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
                 }
                 gradient_norm_scores = []
 
@@ -278,9 +278,9 @@ class Trainer:
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
-                        "train samples/s": synced_num_samples_per_second,
-                        "train mfu": mfu,
-                        "lr mean": torch.tensor(scheduler.get_last_lr()).mean(),
+                        "train samples/s": ResultItem(synced_num_samples_per_second, 1),
+                        "train mfu": ResultItem(mfu, 2),
+                        "lr mean": ResultItem(torch.tensor(scheduler.get_last_lr()).mean()),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,

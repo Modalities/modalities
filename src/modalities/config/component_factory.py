@@ -32,7 +32,6 @@ class ComponentFactory:
         """
         component_names = list(components_model_type.model_fields.keys())
         component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
-        print_rank_0(component_dict)
         components = components_model_type(**component_dict)
         return components
 
@@ -85,7 +84,8 @@ class ComponentFactory:
                 component = self._instantiate_component(
                     component_key=component_key, variant_key=variant_key, component_config=current_component_config
                 )
-                print_rank_0(f"{' -> '.join(traversal_path)}: {component}")
+                print_rank_0(f"Instantiated {type(component)}: {' -> '.join(traversal_path)}")
+
                 # if the component is a top level component, then we add it to the top level components dictionary
                 # to make sure that we don't build it again. Building it again would mean that we work by-value
                 # instead of by reference.
@@ -108,7 +108,6 @@ class ComponentFactory:
                     # so that we don't instantiate it again when we reach the respective component config
                     # in the subsequent config traversal
                     top_level_components[referenced_entity_key] = materialized_referenced_component
-                print_rank_0(f"{' -> '.join(traversal_path)}: --ref--> {top_level_components[referenced_entity_key]}")
                 return top_level_components[referenced_entity_key], top_level_components
 
             return materialized_component_config, top_level_components
