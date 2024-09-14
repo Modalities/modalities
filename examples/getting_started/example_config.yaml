@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
@@ -12,6 +12,7 @@ settings:
   paths:
     checkpoint_saving_path: ./checkpoints
     train_dataset_path: ./data/mem_map/redpajama_v2_samples_512_train.pbin
+    val_dataset_path: ./data/mem_map/redpajama_v2_samples_512_test.pbin
   intervals:
     training_log_interval_in_steps: 48
     checkpointing_interval_in_steps: 48
@@ -49,7 +50,7 @@ settings:
     local_num_seen_batches: 0
     last_step: -1
 
-collate_fn:  
+collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
@@ -70,7 +71,7 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    dataloader_tag: "train"
+    dataloader_tag: train
     skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
@@ -100,7 +101,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ./data/mem_map/redpajama_v2_samples_512_test.pbin
+    raw_data_path: ${settings.paths.val_dataset_path}
     sequence_length: ${settings.step_profile.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
@@ -110,7 +111,7 @@ val_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    dataloader_tag: "val"
+    dataloader_tag: val
     dataset:
       instance_key: val_dataset
       pass_type: BY_REFERENCE
@@ -127,6 +128,8 @@ val_dataloader:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
+            drop_last: true
+
             dataset:
               instance_key: val_dataset
               pass_type: BY_REFERENCE
@@ -174,7 +177,7 @@ wrapped_model:
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-model: 
+model:
   component_key: model
   variant_key: model_initialized
   config:
@@ -248,7 +251,7 @@ scheduler:
     step_size: 1
     gamma: 0.1
 
-optimizer:  
+optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -256,7 +259,7 @@ optimizer:
     betas: [0.9, 0.95]
     eps: 1e-8
     weight_decay: 1e-1
-    weight_decay_groups_excluded: ["embedding", "layernorm"]
+    weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -283,7 +286,6 @@ batch_progress_subscriber:
       instance_key: eval_dataloaders
       pass_type: BY_REFERENCE
 
-    
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb

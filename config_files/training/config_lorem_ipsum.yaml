@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
@@ -49,7 +49,7 @@ settings:
     local_num_seen_batches: 0
     last_step: -1
 
-collate_fn:  
+collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
@@ -134,7 +134,7 @@ test_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    dataloader_tag: "test"
+    dataloader_tag: test
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
