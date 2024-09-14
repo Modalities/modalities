@@ -89,7 +89,9 @@ from modalities.utils.number_conversion import (
     NumberConversionFromCheckpointPathConfig,
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
-    NumTokensFromPackedMemMapDatasetContinuous,
+    NumStepsFromRawDatasetIndexConfig,
+    NumTokensFromNumStepsConfig,
+    NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 
 
@@ -267,6 +269,12 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "number_conversion",
+        "num_tokens_from_num_steps",
+        NumberConversion.get_num_tokens_from_num_steps,
+        NumTokensFromNumStepsConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
         "last_step_from_checkpoint_path",
         NumberConversion.get_last_step_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
@@ -299,6 +307,12 @@ COMPONENTS = [
         "number_conversion",
         "num_tokens_from_packed_mem_map_dataset_continuous",
         NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
-        NumTokensFromPackedMemMapDatasetContinuous,
+        NumTokensFromPackedMemMapDatasetContinuousConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_raw_dataset_index",
+        NumberConversion.get_num_steps_from_raw_dataset_index,
+        NumStepsFromRawDatasetIndexConfig,
     ),
 ]

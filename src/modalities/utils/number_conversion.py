@@ -35,13 +35,28 @@ class NumStepsFromNumTokensConfig(BaseModel):
     gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
+class NumTokensFromNumStepsConfig(BaseModel):
+    num_steps: Annotated[int, Field(strict=True, ge=0)]
+    num_ranks: Annotated[int, Field(strict=True, gt=0)]
+    local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
+
+
 class NumberConversionFromCheckpointPathConfig(BaseModel):
     checkpoint_path: Path
 
 
-class NumTokensFromPackedMemMapDatasetContinuous(BaseModel):
+class NumTokensFromPackedMemMapDatasetContinuousConfig(BaseModel):
     dataset_path: Path
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    num_ranks: Annotated[int, Field(strict=True, gt=0)]
+    local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
+    gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
+
+
+class NumStepsFromRawDatasetIndexConfig(BaseModel):
+    raw_index_path: Path
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
     gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
@@ -297,3 +312,35 @@ class NumberConversion:
             num_steps=num_steps,
         )
         return global_num_tokens_actual
+
+    @staticmethod
+    def get_num_steps_from_raw_dataset_index(
+        raw_index_path: Path,
+        num_ranks: int,
+        local_micro_batch_size: int,
+        gradient_accumulation_steps: int,
+    ) -> int:
+        """Get the number of steps from the raw index, number of ranks, local micro batch size
+        and gradient accumulation steps. The index is a list of tuples where each tuple contains
+        the offset and length of a sample in the raw data.
+        Note, the index is not packed and the number of samples in respective raw JSONL
+        file is the same as the length of the index.
+
+        Args:
+            raw_index_path (Path): Path to the raw index file of the JSONL dataset.
+            num_ranks (int): Global number of ranks.
+            local_micro_batch_size (int): Local micro batch size on single rank.
+            gradient_accumulation_steps (int): Number of gradient accumulation steps.
+
+        Returns:
+            int: Number of steps.
+        """
+        index = DatasetFactory.get_raw_index(raw_index_path=raw_index_path)
+        num_samples = len(index)
+        num_steps = NumberConversion.get_num_steps_from_num_samples(
+            num_ranks=num_ranks,
+            local_micro_batch_size=local_micro_batch_size,
+            global_num_samples=num_samples,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+        )
+        return num_steps

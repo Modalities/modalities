@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import pytest
@@ -343,4 +344,40 @@ def test_get_num_tokens_from_packed_mem_map_dataset_continuous(
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
         == effective_num_tokens
+    )
+
+
+@pytest.mark.parametrize(
+    "num_ranks,local_micro_batch_size,gradient_accumulation_steps",
+    [
+        (2, 3, 2),
+        (2, 3, 2),
+        (3, 4, 2),
+        (3, 4, 2),
+    ],
+)
+def test_num_steps_from_raw_dataset_index(
+    num_ranks: int, local_micro_batch_size: int, gradient_accumulation_steps: int
+):
+    working_dir = Path(__file__).parent
+    raw_dataset_path = working_dir / "../data/datasets/lorem_ipsum_long.jsonl"
+    raw_index_path = working_dir / "../data/datasets/lorem_ipsum_long.idx"
+
+    with open(raw_dataset_path, "r") as f:
+        num_samples = len(f.readlines())
+
+    with open(raw_index_path, "rb") as f:
+        index_length = len(pickle.load(f))
+
+    num_steps_from_number_conversion = NumberConversion.get_num_steps_from_raw_dataset_index(
+        raw_index_path=raw_index_path,
+        num_ranks=num_ranks,
+        local_micro_batch_size=local_micro_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+    )
+
+    assert num_samples == index_length
+    assert (
+        num_steps_from_number_conversion
+        == index_length // num_ranks // local_micro_batch_size // gradient_accumulation_steps
     )
