@@ -128,7 +128,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             if self.training_target.num_target_steps % self.intervals.checkpointing_interval_in_steps != 0:
                 warning_message = (
                     "Last step will not be checkpointed. Since num_target_steps "
-                    "({self.training_target.num_target_steps}) "
+                    f"({self.training_target.num_target_steps}) "
                     "is not a multiple of checkpointing_interval_in_steps "
                     f"({self.intervals.checkpointing_interval_in_steps})"
                 )
