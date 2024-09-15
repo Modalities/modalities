@@ -344,7 +344,7 @@ class Main:
             training_progress=components.settings.training_progress,
         ).get_report()
 
-        print(report)
+        print_rank_0(report)
 
         gym.run(
             train_data_loader=components.train_dataloader,

@@ -11,11 +11,11 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: data/preprocessed/fineweb_edu_num_docs_483606.pbin
+    train_dataset_path: ../modalities_in_15_mins/data/preprocessed/fineweb_edu_num_docs_483606.pbin
   intervals:
     training_log_interval_in_steps: 5
-    checkpointing_interval_in_steps: 50
-    evaluation_interval_in_steps: 50
+    checkpointing_interval_in_steps: 500
+    evaluation_interval_in_steps: 500
   consistency_enforcement:
     enforce_tokens_per_step_conistency: true
     enforce_last_step_logged: false
@@ -28,27 +28,41 @@ settings:
   training_target:
     num_target_tokens:
       component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+      variant_key: global_num_target_tokens_from_checkpoint_path
       config:
-        dataset_path: ${settings.paths.train_dataset_path}
-        sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
+      variant_key: num_target_steps_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+  training_progress: 
+    global_num_seen_tokens:   # used below
+      component_key: number_conversion
+      variant_key: global_num_seen_tokens_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    num_seen_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_seen_steps_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    local_num_seen_batches:   # for the dataloader
+      component_key: number_conversion
+      variant_key: local_num_batches_from_num_tokens
       config:
         num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
+        global_num_tokens: ${settings.training_progress.global_num_seen_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
-    global_num_seen_tokens: 0
-    num_seen_steps: 0
-    local_num_seen_batches: 0
-    last_step: -1
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    last_step:  # for the scheduler
+      component_key: number_conversion
+      variant_key: last_step_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+  warmstart_checkpoint_paths: 
+    model_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/examples/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-model-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
+    optimizer_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/examples/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-optimizer-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
 
 collate_fn:
   component_key: collate_fn
@@ -100,6 +114,15 @@ train_dataloader:
 
 eval_dataloaders: []
 
+checkpoint_loading:
+  component_key: checkpoint_loading
+  variant_key: fsdp
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    block_names: [GPT2Block]
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+
 checkpoint_saving:
   component_key: checkpoint_saving
   variant_key: default
@@ -126,15 +149,15 @@ loss_fn:
 
 wrapped_model:
   component_key: model
-  variant_key: fsdp_wrapped
+  variant_key: checkpointed
   config:
     model:
       instance_key: model
       pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    checkpoint_loading:
+      instance_key: checkpoint_loading
+      pass_type: BY_REFERENCE
+    checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
 
 model:
   component_key: model
@@ -217,6 +240,21 @@ scheduler:
 
 optimizer:
   component_key: optimizer
+  variant_key: checkpointed
+  config:
+    optimizer:
+      instance_key: optimizer_original
+      pass_type: BY_REFERENCE
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    checkpoint_loading:
+      instance_key: checkpoint_loading
+      pass_type: BY_REFERENCE
+    checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
+
+optimizer_original:  
+  component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
@@ -240,15 +278,22 @@ gradient_clipper:
 
 batch_progress_subscriber:
   component_key: progress_subscriber
-  variant_key: dummy
-  config: {}
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
 
 evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: ai_24_demo
+    project: warmstart_tutorial
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage

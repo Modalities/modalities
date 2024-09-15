@@ -97,8 +97,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
             # Check if the number of target steps and target tokens are consistent with the step profile
             required_num_tokens_per_step = (
-                self.training_target.num_target_tokens - self.training_progress.num_seen_steps
-            ) / self.training_target.num_target_steps
+                self.training_target.num_target_tokens - self.training_progress.global_num_seen_tokens
+            ) / (self.training_target.num_target_steps - self.training_progress.num_seen_steps)
             step_profile_num_tokens_per_step = (
                 self.step_profile.local_train_micro_batch_size
                 * self.step_profile.sequence_length
@@ -282,15 +282,16 @@ class TrainingReportGenerator:
             * self.cuda_env.world_size
             * self.training_target.num_target_steps
         )
-
+        # Check if the number of target tokens and (number of tokens per step * num steps) are consistent
         if self.training_target.num_target_tokens != num_tokens:
             missing_percentage = (1 - num_tokens / self.training_target.num_target_tokens) * 100
             issue_warnings.append(
                 f"Number of target tokens ({self.training_target.num_target_tokens}) "
-                f"does not match the number of tokens per step ({num_tokens})."
+                f"does not match the number of tokens per step * num steps ({num_tokens})."
                 f"Missing {missing_percentage:.2f}% of target tokens."
             )
 
+        # Check if the number of tokens in the dataset and the number of target tokens are consistent
         tokens_in_dataset = len(self.train_dataset) * self.step_profile.sequence_length
         if tokens_in_dataset != self.training_target.num_target_tokens:
             missing_percentage = (1 - num_tokens / tokens_in_dataset) * 100
@@ -300,6 +301,7 @@ class TrainingReportGenerator:
                 f"Missing {missing_percentage:.2f}% of tokens in the dataset."
             )
 
+        # Check if the training is logged after the last step
         remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
         if remaining_steps % self.intervals.training_log_interval_in_steps != 0:
             issue_warnings.append(
@@ -309,6 +311,7 @@ class TrainingReportGenerator:
                 f"({self.intervals.training_log_interval_in_steps})."
             )
 
+        # Check if the model is evaluated after the last step
         if remaining_steps % self.intervals.evaluation_interval_in_steps != 0:
             issue_warnings.append(
                 f"Last step will not be evaluated. Since remaining_steps "
@@ -316,7 +319,7 @@ class TrainingReportGenerator:
                 "is not a multiple of evaluation_interval_in_steps "
                 f"({self.intervals.evaluation_interval_in_steps})."
             )
-
+        # Check if the model is checkpointed after the last step
         if remaining_steps % self.intervals.checkpointing_interval_in_steps != 0:
             issue_warnings.append(
                 f"Last step will not be checkpointed. Since remaining_steps "
