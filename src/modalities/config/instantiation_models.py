@@ -97,8 +97,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
             # Check if the number of target steps and target tokens are consistent with the step profile
             required_num_tokens_per_step = (
-                self.training_target.num_target_tokens / self.training_target.num_target_steps
-            )
+                self.training_target.num_target_tokens - self.training_progress.num_seen_steps
+            ) / self.training_target.num_target_steps
             step_profile_num_tokens_per_step = (
                 self.step_profile.local_train_micro_batch_size
                 * self.step_profile.sequence_length
@@ -119,10 +119,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
         @model_validator(mode="after")
         def _check_last_step_logged(self) -> "TrainingComponentsInstantiationModel.Settings":
             # Check if the training is logged after the last step
-            if self.training_target.num_target_steps % self.intervals.training_log_interval_in_steps != 0:
+            remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
+            if remaining_steps % self.intervals.training_log_interval_in_steps != 0:
                 warning_message = (
-                    "Last step will not be logged. Since num_target_steps "
-                    f"({self.training_target.num_target_steps}) "
+                    "Last step will not be logged. Since remaining_steps "
+                    f"({remaining_steps}) "
                     "is not a multiple of training_log_interval_in_steps "
                     f"({self.intervals.training_log_interval_in_steps})"
                 )
@@ -134,10 +135,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
         @model_validator(mode="after")
         def _check_last_step_evaluated(self) -> "TrainingComponentsInstantiationModel.Settings":
             # Check if the model is evaluated after the last step
-            if self.training_target.num_target_steps % self.intervals.evaluation_interval_in_steps != 0:
+            remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
+            if remaining_steps % self.intervals.evaluation_interval_in_steps != 0:
                 warning_message = (
-                    "Last step will not be evaluated. Since num_target_steps "
-                    f"({self.training_target.num_target_steps}) "
+                    "Last step will not be evaluated. Since remaining_steps "
+                    f"({remaining_steps}) "
                     "is not a multiple of evaluation_interval_in_steps "
                     f"({self.intervals.evaluation_interval_in_steps})"
                 )
@@ -149,10 +151,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
         @model_validator(mode="after")
         def _check_last_step_checkpointed(self) -> "TrainingComponentsInstantiationModel.Settings":
             # Check if the model is evaluated after the last step
-            if self.training_target.num_target_steps % self.intervals.checkpointing_interval_in_steps != 0:
+            remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
+            if remaining_steps % self.intervals.checkpointing_interval_in_steps != 0:
                 warning_message = (
-                    "Last step will not be checkpointed. Since num_target_steps "
-                    f"({self.training_target.num_target_steps}) "
+                    "Last step will not be checkpointed. Since remaining_steps "
+                    f"({remaining_steps}) "
                     "is not a multiple of checkpointing_interval_in_steps "
                     f"({self.intervals.checkpointing_interval_in_steps})"
                 )
@@ -292,26 +295,28 @@ class TrainingReportGenerator:
                 f"Number of tokens in the dataset ({tokens_in_dataset}) "
                 f"does not match the number of target tokens ({self.training_target.num_target_tokens})."
             )
-        if self.training_target.num_target_steps % self.intervals.training_log_interval_in_steps != 0:
+
+        remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
+        if remaining_steps % self.intervals.training_log_interval_in_steps != 0:
             issue_warnings.append(
-                f"Last step will not be logged. Since num_target_steps "
-                f"({self.training_target.num_target_steps}) "
+                f"Last step will not be logged. Since remaining_steps "
+                f"({remaining_steps}) "
                 "is not a multiple of training_log_interval_in_steps "
                 f"({self.intervals.training_log_interval_in_steps})."
             )
 
-        if self.training_target.num_target_steps % self.intervals.evaluation_interval_in_steps != 0:
+        if remaining_steps % self.intervals.evaluation_interval_in_steps != 0:
             issue_warnings.append(
-                f"Last step will not be evaluated. Since num_target_steps "
-                f"({self.training_target.num_target_steps}) "
+                f"Last step will not be evaluated. Since remaining_steps "
+                f"({remaining_steps}) "
                 "is not a multiple of evaluation_interval_in_steps "
                 f"({self.intervals.evaluation_interval_in_steps})."
             )
 
-        if self.training_target.num_target_steps % self.intervals.checkpointing_interval_in_steps != 0:
+        if remaining_steps % self.intervals.checkpointing_interval_in_steps != 0:
             issue_warnings.append(
-                f"Last step will not be checkpointed. Since num_target_steps "
-                f"({self.training_target.num_target_steps}) "
+                f"Last step will not be checkpointed. Since remaining_steps "
+                f"({remaining_steps}) "
                 "is not a multiple of checkpointing_interval_in_steps "
                 f"({self.intervals.checkpointing_interval_in_steps})."
             )
