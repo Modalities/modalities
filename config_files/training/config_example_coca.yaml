@@ -18,6 +18,7 @@ settings:
     evaluation_interval_in_steps: 2
   consistency_enforcement:
     enforce_tokens_per_step_conistency: true
+    enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
   step_profile: 

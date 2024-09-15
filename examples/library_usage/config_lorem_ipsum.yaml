@@ -15,11 +15,12 @@ settings:
     index_path: ../../data/lorem_ipsum_long.idx
     tokenizer_path: tokenizer
   intervals:
-    training_log_interval_in_steps: 2
-    checkpointing_interval_in_steps: 10
-    evaluation_interval_in_steps: 1
+    training_log_interval_in_steps: 10
+    checkpointing_interval_in_steps: 50
+    evaluation_interval_in_steps: 50
   consistency_enforcement:
     enforce_tokens_per_step_conistency: true
+    enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
   step_profile: 
@@ -332,8 +333,8 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: modalities
-    mode: OFFLINE
+    project: modalities_library_usage_example
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: wandb
     config_file_path: ${settings.config_file_path}

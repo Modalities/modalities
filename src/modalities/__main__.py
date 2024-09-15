@@ -18,6 +18,7 @@ from modalities.config.config import ProcessGroupBackendType, load_app_config_di
 from modalities.config.instantiation_models import (
     PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
+    TrainingReportGenerator,
 )
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
@@ -332,6 +333,18 @@ class Main:
         logging.info(f"Training model with {num_params} parameters.")
 
         print_rank_0(f"Model initialized at {datetime.now()}.")
+
+        report = TrainingReportGenerator(
+            training_target=components.settings.training_target,
+            intervals=components.settings.intervals,
+            step_profile=components.settings.step_profile,
+            cuda_env=components.settings.cuda_env,
+            consistency_enforcement=components.settings.consistency_enforcement,
+            train_dataset=components.train_dataset,
+            training_progress=components.settings.training_progress,
+        ).get_report()
+
+        print(report)
 
         gym.run(
             train_data_loader=components.train_dataloader,
