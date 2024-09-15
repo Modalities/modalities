@@ -284,16 +284,20 @@ class TrainingReportGenerator:
         )
 
         if self.training_target.num_target_tokens != num_tokens:
+            missing_percentage = (1 - num_tokens / self.training_target.num_target_tokens) * 100
             issue_warnings.append(
                 f"Number of target tokens ({self.training_target.num_target_tokens}) "
                 f"does not match the number of tokens per step ({num_tokens})."
+                f"Missing {missing_percentage:.2f}% of target tokens."
             )
 
         tokens_in_dataset = len(self.train_dataset) * self.step_profile.sequence_length
         if tokens_in_dataset != self.training_target.num_target_tokens:
+            missing_percentage = (1 - num_tokens / tokens_in_dataset) * 100
             issue_warnings.append(
                 f"Number of tokens in the dataset ({tokens_in_dataset}) "
-                f"does not match the number of target tokens ({self.training_target.num_target_tokens})."
+                f"does not match the number of target tokens ({self.training_target.num_target_tokens}). "
+                f"Missing {missing_percentage:.2f}% of tokens in the dataset."
             )
 
         remaining_steps = self.training_target.num_target_steps - self.training_progress.num_seen_steps
