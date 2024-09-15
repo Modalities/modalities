@@ -28,27 +28,29 @@ settings:
   training_target:
     num_target_tokens:      
       component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+      variant_key: num_tokens_from_num_steps
       config:
-        dataset_path: ${settings.paths.train_dataset_path}
-        sequence_length: ${settings.step_profile.sequence_length}
+        num_steps: ${settings.training_target.num_target_steps}
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
+      variant_key: num_steps_from_num_samples
       config:
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
+        global_num_samples: ${settings.coca_example_settings.train_num_samples}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
   training_progress: 
     global_num_seen_tokens: 0
     num_seen_steps: 0
     local_num_seen_batches: 0
     last_step: -1
+  coca_example_settings:
+    train_num_samples: 64
+    val_num_samples: 32
 
 collate_fn:
   component_key: collate_fn
@@ -65,7 +67,7 @@ train_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 64
+    num_samples: ${settings.coca_example_settings.train_num_samples}
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
@@ -78,7 +80,7 @@ val_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 32
+    num_samples: ${settings.coca_example_settings.val_num_samples}
     sample_definition:
       - sample_key: images
         sample_shape: [3, 224, 224]
