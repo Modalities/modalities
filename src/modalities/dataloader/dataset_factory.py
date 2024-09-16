@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -36,7 +37,6 @@ class DatasetFactory:
     @staticmethod
     def get_mem_map_dataset(
         raw_data_path: Path,
-        sequence_length: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
         index_path: Optional[Path] = None,
@@ -47,7 +47,6 @@ class DatasetFactory:
 
         Args:
             raw_data_path (Path): The path to the raw data.
-            sequence_length (int): The length of each sequence.
             tokenizer (PreTrainedTokenizer): The tokenizer used to tokenize the data.
             sample_key (str): The key used to retrieve the samples from the dataset.
             index_path (Optional[Path], optional): The path to the index file. Defaults to None.
@@ -59,13 +58,18 @@ class DatasetFactory:
         """
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
-            block_size=sequence_length + 1,
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
             jq_pattern=jq_pattern,
         )
         return dataset
+
+    @staticmethod
+    def get_raw_index(raw_index_path: Path) -> List[Tuple[int, int]]:
+        with raw_index_path.open("rb") as f:
+            index = pickle.load(f)
+        return index
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(

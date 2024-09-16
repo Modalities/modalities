@@ -10,8 +10,7 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
+    dataloader_tag: train
     skip_num_batches: 1
     dataset:
       instance_key: train_dataset

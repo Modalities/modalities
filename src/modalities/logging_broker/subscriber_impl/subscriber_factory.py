@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.subscriber_impl.batch_progress_subscriber import (
+from modalities.logging_broker.subscriber_impl.progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
 )
@@ -18,20 +18,17 @@ from modalities.logging_broker.subscriber_impl.results_subscriber import (
 class ProgressSubscriberFactory:
     @staticmethod
     def get_rich_progress_subscriber(
-        train_dataloader: LLMDataLoader,
         eval_dataloaders: List[LLMDataLoader],
-        global_num_seen_steps: int,
+        train_dataloader_tag: str,
+        num_seen_steps: int,
+        num_target_steps: int,
         global_rank: int,
-        gradient_acc_steps: int,
     ) -> RichProgressSubscriber:
         if global_rank == 0:
             train_split_num_steps = {
                 # first element describes the total number of steps
                 # and the second element describes the number of steps already completed
-                train_dataloader.dataloader_tag: (
-                    len(train_dataloader) // gradient_acc_steps + global_num_seen_steps,
-                    global_num_seen_steps,
-                )
+                train_dataloader_tag: (num_target_steps, num_seen_steps)
             }
 
             eval_splits_num_steps = {dataloader.dataloader_tag: len(dataloader) for dataloader in eval_dataloaders}

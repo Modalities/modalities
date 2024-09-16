@@ -2,15 +2,15 @@
 
 Modalities can be used in a library fashion by installing the package via `pip`, as described in the [README](https://github.com/Modalities/modalities?tab=readme-ov-file#installation). The framework allows for the addition of custom components to the registry at runtime without necessitating any code changes to modalities. This functionality is achieved in Modalities with the introduction of a component registry, containing all the internal components (e.g., Dataloader, Loss function etc.). To support the addition of custom components (e.g., new model architectures) at runtime, Modalities exposes a function endpoint adding custom components to the internal registry. A full list of all the components already available in Modalities can be found [here](../../docs/components/components.md).
 
-A  typical use case for running Modalities in package-like fashion would be to have a custom model implemented in a repository parallel to modalities. To train the model, we would register the model class and its config class  within Modalities' registry and additionally provide the typical training config (see [here](https://github.com/Modalities/modalities/blob/main/examples/getting_started/example_config.yaml) for an example) that also references the new model. Since modalities is aware of the model and config class, the model can be built from the config YAML file and used for training.
+A  typical use case for running Modalities in package-like fashion would be to have a custom model implemented in a repository parallel to modalities. To train the model, we would register the model class and its config class  within Modalities' registry and additionally provide the typical training config (see [here](https://github.com/Modalities/modalities/blob/main/tutorials/getting_started/example_config.yaml) for an example) that also references the new model. Since modalities is aware of the model and config class, the model can be built from the config YAML file and used for training.
 
 ## Concrete Example
 
 Given the explanation above, we now provide a minimal dummy example of the process of implementing, registering and instantiating a custom component via the example of a custom collate function. 
-The full example code can be found [here](https://github.com/Modalities/modalities/tree/hierarchical_instantiation/examples/library_usage).
+The full example code can be found [here](https://github.com/Modalities/modalities/tree/hierarchical_instantiation/tutorials/library_usage).
 
 The code for the custom collate function, its config and registering is implemented in 
-[main.py](https://github.com/Modalities/modalities/blob/hierarchical_instantiation/examples/library_usage/main.py). Firstly, the script implements the custom collate function by first defining the config that parameterizes the collate function. Here, we took the two attributes from the original [GPT2LLMCollateFnConfig]() and added the custom field `custom_attribute`.
+[main.py](https://github.com/Modalities/modalities/blob/hierarchical_instantiation/tutorials/library_usage/main.py). Firstly, the script implements the custom collate function by first defining the config that parameterizes the collate function. Here, we took the two attributes from the original [GPT2LLMCollateFnConfig]() and added the custom field `custom_attribute`.
 
 ```python
  class CustomGPT2LLMCollateFnConfig(BaseModel): 
@@ -60,7 +60,7 @@ def main():
      modalities_main.run() 
 ```
 
-Lastly, we add the `collate_fn` to the [example YAML config](https://github.com/Modalities/modalities/blob/hierarchical_instantiation/examples/library_usage/config_lorem_ipsum.yaml) with the the new collator.
+Lastly, we add the `collate_fn` to the [example YAML config](https://github.com/Modalities/modalities/blob/hierarchical_instantiation/tutorials/library_usage/config_lorem_ipsum.yaml) with the the new collator.
 ```yaml
 collate_fn:  
   component_key: collate_fn

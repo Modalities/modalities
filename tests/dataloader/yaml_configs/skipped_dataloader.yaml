@@ -1,3 +1,6 @@
+# NOTE, settings is not type checked in the instantiation model (specified within the test), as the settings are not used in the pydantic model.
+# Therefore, we can place arbitrary values in the settings field.
+
 settings:  
   referencing_keys:
     sample_key: input_ids
@@ -40,7 +43,6 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
     dataloader_tag: train
     skip_num_batches: 
       instance_key: skip_num_batches

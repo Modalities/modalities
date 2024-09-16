@@ -11,6 +11,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
 from modalities.trainer import Trainer
+from modalities.training.training_progress import TrainingProgress
 from modalities.util import print_rank_0
 
 
@@ -63,7 +64,7 @@ class Gym:
             evaluation_interval_in_steps=evaluation_interval_in_steps,
         )
 
-        checkpointing_callback: Callable[[int], None] = partial(
+        checkpointing_callback: Callable[[TrainingProgress], None] = partial(
             self._run_checkpointing,
             model=model,
             optimizer=optimizer,
@@ -88,13 +89,16 @@ class Gym:
         self,
         model: nn.Module,
         optimizer: Optimizer,
-        num_train_steps_done: int,
+        training_progress: TrainingProgress,
         checkpoint_saving: CheckpointSaving,
         checkpointing_interval_in_steps: int,
     ):
-        if num_train_steps_done % checkpointing_interval_in_steps == 0 and num_train_steps_done > 0:
+        if (
+            training_progress.num_seen_steps_total % checkpointing_interval_in_steps == 0
+            and training_progress.num_seen_steps_total > 0
+        ):
             checkpoint_saving.save_checkpoint(
-                num_train_steps_done=num_train_steps_done,
+                training_progress=training_progress,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 model=model,
                 optimizer=optimizer,

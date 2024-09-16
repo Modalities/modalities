@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
@@ -50,6 +51,7 @@ PydanticCheckpointSavingExecutionIFType = Annotated[
     CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticFSDPModuleType = Annotated[FSDP, PydanticThirdPartyTypeIF(FSDP)]
 PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]

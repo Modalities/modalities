@@ -32,7 +32,7 @@ Issues = "https://github.com/Modalities/modalities/issues"
 
 [project.optional-dependencies]
 linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov"]
+tests = ["pytest", "pytest-cov", "debugpy"]
 install_helper = ["ninja"]
 
 [project.scripts]

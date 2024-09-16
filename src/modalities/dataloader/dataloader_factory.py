@@ -17,7 +17,6 @@ class DataloaderFactory:
         collate_fn: Callable,
         num_workers: int,
         pin_memory: bool,
-        shuffle: bool,
         skip_num_batches: Optional[int] = 0,
         fixed_num_batches: Optional[int] = None,
     ) -> LLMDataLoader:
@@ -31,7 +30,6 @@ class DataloaderFactory:
             collate_fn (Callable): Callable for shaping the batch
             num_workers (int): Number of workers for the dataloader
             pin_memory (bool): Flag indicating whether to pin memory
-            shuffle (bool): Flag indicating whether to shuffle the dataset
             skip_num_batches (int, optional): Defines the number of batches to skip.
               NOTE: The checkpoints are indexed with training steps (i.e., number of optimizer steps).
               skip_num_batches must not be confused with the number of optimizer steps!
@@ -67,7 +65,6 @@ class DataloaderFactory:
             collate_fn=collate_fn,
             num_workers=num_workers,
             pin_memory=pin_memory,
-            shuffle=shuffle,
         )
 
         return dataloader
