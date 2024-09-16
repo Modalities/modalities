@@ -183,7 +183,7 @@ Even though Modalities significantly simplifies LLM training, there is still som
   How to use Modalities as a library and register custom components with Modalities.
 
 - [Modalities in 15mins] </br>
-  Jupyter notebook will be added soon
+  Train a dense model with Modalities in 15 minutes
 
 
 ## Supported Features
