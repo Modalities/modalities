@@ -124,14 +124,9 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             ValueError: If the end mask token indicator is before the begin mask token indicator in the target tensor.
             ValueError: If the masking tokens are not alternating in the target tensor.
         """
-        error_msg = ""
         if b_mask_token_id not in target:
-            error_msg += "b_mask_token_id not found in target."
-        if e_mask_token_id not in target:
-            error_msg += "e_mask_token_id not found in target."
-        if error_msg:
             raise ValueError(
-                f"{error_msg} in masking tokens for loss computation. "
+                "b_mask_token_id not found in target. in masking tokens for loss computation. "
                 + "Make sure the tokenizer tokenizes as expected. "
                 + "Frequent source of error is the tokenization of spaces: "
                 + "e.g. ' <token>' and '<token>' are different tokens."

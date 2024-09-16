@@ -96,11 +96,12 @@ Created JSONL file entry:
 }
 ```
 
-Run the `apply_chat_template` entry point with:
+Run the `prepare_instruction_tuning_data` entry point with:
 ```bash
-modalities data apply_chat_template --config_file_path config_files/data_preparation/apply_chat_template_config.yaml
+modalities data prepare_instruction_tuning_data --config_file_path config_files/data_preparation/apply_chat_template_config.yaml
 ```
 
+# TODO
 This will create two files
 1. The new JSONL file with a new attribute `chat` containing the conversations e.g. `lorem_ipsum_sft_40e0699/lorem_ipsum_sft_converted.40e0699.jsonl`
 2. The config used to generate the `chat` e.g. `lorem_ipsum_sft_40e0699/sft_chat_template_config.40e0699.yaml`
