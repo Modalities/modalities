@@ -182,7 +182,7 @@ Even though Modalities significantly simplifies LLM training, there is still som
 - [Library Usage](examples/library_usage/README.md)</br>
   How to use Modalities as a library and register custom components with Modalities.
 
-- [Modalities in 15mins] </br>
+- [Modalities in 15mins](examples/modalities_in_15_mins/README.md) </br>
   Train a dense model with Modalities in 15 minutes
 
 
