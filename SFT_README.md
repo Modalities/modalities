@@ -11,7 +11,11 @@ Specifically, we need the model to only learn to act as the assistant. Hence, we
 
 For example, we only calculate the loss for the words not struck-trough:
 
-> ~~You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser1: What is the best way to learn a new language?\nAssistant:^~~The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers.\n°~~$User1: Thank you for the advice.\nAssistant:^~~You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask.\n°~~$~~
+> ~~You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser1: What is the best way to learn a new language?\nAssistant:^~~
+> The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers.\n°
+> ~~$User1: Thank you for the advice.\nAssistant:^~~
+> You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask.\n°
+> ~~$~~
 
 ### Overview
 
