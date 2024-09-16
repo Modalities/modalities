@@ -23,7 +23,7 @@ We successfully scaled Modalities up to 2048 GPUs on two HPC centers, namely [Le
 Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using Modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within Modalities at runtime. 
 
 ## Getting Started
-For training and evaluation of a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/examples/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
+For training and evaluation of a model, feel free to checkout [this](https://github.com/Modalities/modalities/blob/main/tutorials/getting_started/README.md) getting started tutorial, in which we train a small, 60M-parameter GPT model on a tiny subset of the Redpajama V2 dataset. 
 
 ## Installation
 
@@ -108,7 +108,7 @@ Explanation:
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `configs/pretraining_config.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](examples/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `configs/pretraining_config.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
 
 If you are a VSCode user, you may want to add this to your `launch.json`:
 ```json
@@ -155,7 +155,7 @@ The `modalities data create_raw_index` command triggers the process of creating 
 
 ### Raw Training Dataset Tokenization
 
-Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](examples/getting_started/example_dataset_config_train.yaml).
+Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](tutorials/getting_started/example_dataset_config_train.yaml).
 
 Example:
 ```sh
@@ -164,7 +164,7 @@ modalities data pack_encoded_data configs/tokenization_config.yaml
 
 ### Inference
 
-For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](examples/getting_started/example_text_generation_config.yaml).
+For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](tutorials/getting_started/example_text_generation_config.yaml).
 
 Example:
 
@@ -176,14 +176,19 @@ modalities generate_text --config_file_path example_text_generation_config.yaml
 ## Tutorials
 Even though Modalities significantly simplifies LLM training, there is still some technical complexity left. We provide a series of tutorials to help you get started with training and evaluating models using Modalities.
 
-- [Getting Started](examples/getting_started/README.md)</br>
+- [Modalities in 15mins](tutorials/modalities_in_15_mins/README.md) </br>
+  Train a dense model with Modalities in 15 minutes
+
+- [Getting Started](tutorials/getting_started/README.md)</br>
   Brief overview on how to get started with Modalities by training a small GPT model on a tiny subset of the Redpajama V2 dataset.
 
-- [Library Usage](examples/library_usage/README.md)</br>
+- [Wamstarts](tutorials/warmstart/README.md) </br>
+  Continue the training from a checkpoint, e.g., after the training was interrupted or had crashed.
+
+- [Library Usage](tutorials/library_usage/README.md)</br>
   How to use Modalities as a library and register custom components with Modalities.
 
-- [Modalities in 15mins](examples/modalities_in_15_mins/README.md) </br>
-  Train a dense model with Modalities in 15 minutes
+
 
 
 ## Supported Features

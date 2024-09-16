@@ -61,8 +61,8 @@ settings:
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
   warmstart_checkpoint_paths: 
-    model_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/examples/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-model-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
-    optimizer_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/examples/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-optimizer-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
+    model_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/tutorials/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-model-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
+    optimizer_checkpoint_path: /raid/s3/opengptx/max_lue/modalities/tutorials/warmstart/data/checkpoints/2024-09-15__15-42-23_046dd737/eid_2024-09-15__15-42-23_046dd737-optimizer-seen_steps_250-seen_tokens_8192000-target_steps_15205-target_tokens_498237440.bin
 
 collate_fn:
   component_key: collate_fn
