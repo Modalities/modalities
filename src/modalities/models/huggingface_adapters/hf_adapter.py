@@ -9,7 +9,7 @@ from transformers.utils import ModelOutput
 
 from modalities.exceptions import ConfigError
 from modalities.models.model import NNModel
-from modalities.models.utils import ModelTypeEnum, get_model_from_config
+from modalities.models.utils import get_model_from_config
 
 
 class HFModelAdapterConfig(PretrainedConfig):
@@ -64,6 +64,25 @@ class HFModelAdapterConfig(PretrainedConfig):
         return data_to_be_formatted
 
 
+def init_model(config, load_checkpoint: bool) -> NNModel:
+    if load_checkpoint:
+        model = get_model_from_config(config.config, model_type="checkpointed_model")
+    else:
+        model_instance_key = None
+        fsdp_variant_key = "fsdp_wrapped"
+        for k in config:
+            if "variant_key" in config[k]:
+                if config[k]["variant_key"] == fsdp_variant_key:
+                    model_instance_key = config[k]["config"]["model"]["instance_key"]
+
+        if model_instance_key is None:
+            raise ValueError(f"Could not find model's instance_key for variant_key {fsdp_variant_key} in config")
+
+        model = get_model_from_config(config, model_type=model_instance_key)
+
+    return model
+
+
 class HFModelAdapter(PreTrainedModel):
     """HFModelAdapter class for the HuggingFace model adapter."""
 
@@ -84,10 +103,8 @@ class HFModelAdapter(PreTrainedModel):
         """
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
-        if load_checkpoint:
-            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
-        else:
-            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.MODEL)
+
+        self.model: NNModel = init_model(config=config.config, load_checkpoint=load_checkpoint)
 
     def forward(
         self,

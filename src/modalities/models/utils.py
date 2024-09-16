@@ -1,10 +1,8 @@
 from enum import Enum
 from typing import Dict
 
-from pydantic import BaseModel
-
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -21,10 +19,10 @@ class ModelTypeEnum(Enum):
     MODEL = "model"
     CHECKPOINTED_MODEL = "checkpointed_model"
     LORA_MODEL = "lora_model"
-    HUGGINGFACE_SMOL_LLM_MODEL = "huggingface_smol_llm_model"
+    HUGGINGFACE_SMOL_LLM_MODEL = "huggingface_smol_llm_model"  # TODO remove this and change get_model_from_config
 
 
-def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
+def get_model_from_config(config: Dict, model_type: str):
     """
     Retrieves a model from the given configuration based on the specified model type.
 
@@ -40,32 +38,35 @@ def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
     """
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-
-    # create the pydantic config for the component factory dynamically based on model_type
-    if model_type.value == "model":
-
-        class PydanticConfig(BaseModel):
-            model: PydanticPytorchModuleType
-
-    elif model_type.value == "checkpointed_model":
-
-        class PydanticConfig(BaseModel):
-            checkpointed_model: PydanticPytorchModuleType
-
-    elif model_type.value == "lora_model":
-
-        class PydanticConfig(BaseModel):
-            lora_model: PydanticPytorchModuleType
-
-    elif model_type.value == "huggingface_smol_llm_model":
-
-        class PydanticConfig(BaseModel):
-            huggingface_smol_llm_model: PydanticPytorchModuleType
-
-    else:
-        raise NotImplementedError()
-
     components = component_factory.build_components(
-        config_dict=config, components_model_type=PydanticConfig
+        config_dict=config, components_model_type=TrainingComponentsInstantiationModel
     )
+
+    # # create the pydantic config for the component factory dynamically based on model_type
+    # if model_type.value == "model":
+
+    #     class PydanticConfig(BaseModel):
+    #         model: PydanticPytorchModuleType
+
+    # elif model_type.value == "checkpointed_model":
+
+    #     class PydanticConfig(BaseModel):
+    #         checkpointed_model: PydanticPytorchModuleType
+
+    # elif model_type.value == "lora_model":
+
+    #     class PydanticConfig(BaseModel):
+    #         lora_model: PydanticPytorchModuleType
+
+    # elif model_type.value == "huggingface_smol_llm_model":
+
+    #     class PydanticConfig(BaseModel):
+    #         huggingface_smol_llm_model: PydanticPytorchModuleType
+
+    # else:
+    #     raise NotImplementedError()
+
+    # components = component_factory.build_components(
+    #     config_dict=config, components_model_type=PydanticConfig
+    # )
     return getattr(components, model_type.value)
