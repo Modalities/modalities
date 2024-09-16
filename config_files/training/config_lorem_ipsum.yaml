@@ -304,7 +304,7 @@ gradient_clipper:
     norm_type: P2_NORM
     max_norm: 1.0
 
-batch_progress_subscriber:
+progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
