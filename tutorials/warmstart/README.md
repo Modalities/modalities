@@ -42,7 +42,7 @@ However, the training result is most likely not exactly the same as if you had c
 We specify consistency checks in the configuration file, such as 
 ```yaml
   consistency_enforcement:
-    enforce_tokens_per_step_conistency: true
+    enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false

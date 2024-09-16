@@ -36,7 +36,7 @@ class StepProfile(BaseModel):
 
 
 class ConsistencyEnforcement(BaseModel):
-    enforce_tokens_per_step_conistency: bool = True
+    enforce_tokens_per_step_consistency: bool = True
     enforce_last_step_logged: bool = True
     enforce_last_step_evaluated: bool = True
     enforce_last_step_checkpointed: bool = True
@@ -111,7 +111,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
                     f"which does not match the number of tokens per step ({step_profile_num_tokens_per_step}) "
                     "from the step profile."
                 )
-                if self.consistency_enforcement.enforce_tokens_per_step_conistency:
+                if self.consistency_enforcement.enforce_tokens_per_step_consistency:
                     raise ValueError(warning_message)
                 warn_rank_0(warning_message)
             return self
