@@ -5,9 +5,9 @@ settings:
   pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
   split_config:
     splitting:
-      train: 80
-      val: 10
-      test: 10
+      train: 70
+      val: 15
+      test: 15
     seed: 1234
 
 instruction_data_transformation:

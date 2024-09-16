@@ -21,6 +21,6 @@ tokenizer:
     special_tokens:
       pad_token: ${settings.eod_token}
       additional_special_tokens: 
-        - "^"
-        - "$"
-        - "°"
+        - ^
+        - $
+        - °
