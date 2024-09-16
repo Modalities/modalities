@@ -6,7 +6,7 @@ settings:
     target_key: target_ids
   training:
     training_log_interval_in_steps: 2
-    checkpointing_interval_in_steps: 25
+    checkpointing_interval_in_steps: 2
     evaluation_interval_in_steps: 40
     global_num_seen_tokens: 0
     activation_checkpointing_modules: [ ]
@@ -18,7 +18,7 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: /raid/s3/opengptx/models/modalities/smol_lora_instruct/
+    checkpointing_path: xxx # is overwritten during test
 
 collate_fn:
   component_key: collate_fn
@@ -34,8 +34,8 @@ collate_fn:
       - ${settings.referencing_keys.target_key}
     loss_ignore_index: -100
     mask_tokens:
-      b_include_to_loss_token: <|im_start|>
-      e_include_to_loss_token: <|im_end|>
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
     tokenizer:
       instance_key: tokenizer
       pass_type: BY_REFERENCE
@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_39721ee/ultrachat_200k_fastchat_converted_train.39721ee.pbin
+    raw_data_path: test_data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_train.7e71e5e.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -53,7 +53,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_39721ee/ultrachat_200k_fastchat_converted_val.39721ee.pbin
+    raw_data_path: test_data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_test.7e71e5e.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -62,7 +62,7 @@ test_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/alignment_data/data/honey/data/en/ultrachat_200k_fastchat_39721ee/ultrachat_200k_fastchat_converted_test.39721ee.pbin
+    raw_data_path: test_data/lorem_ipsum_sft_7e71e5e/lorem_ipsum_sft_converted_test.7e71e5e.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -174,7 +174,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
-        k: 5
+        k: 1
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
       variant_key: fsdp
@@ -198,31 +198,6 @@ loss_fn:
     prediction_key: logits
 
 
-huggingface_smol_llm_model:
-  component_key: model
-  variant_key: huggingface_pretrained_model
-  config:
-    model_type: AutoModelForCausalLM
-    model_name: HuggingFaceTB/SmolLM-1.7B
-    prediction_key: logits
-    huggingface_prediction_subscription_key: logits
-    sample_key: input_ids
-
-checkpointed_model:
-  component_key: model
-  variant_key: checkpointed
-  config:
-    checkpoint_loading:
-      component_key: checkpoint_loading
-      variant_key: torch
-      config:
-        device: 0
-        precision: FP_32
-    model:
-      instance_key: huggingface_smol_llm_model
-      pass_type: BY_REFERENCE
-    checkpoint_path: /raid/s3/opengptx/alexj/llm_gym/models/SmolLM-1.7B_saved/model.bin
-
 lora_model:
   component_key: model
   variant_key: lora
@@ -230,12 +205,12 @@ lora_model:
     alpha: 1
     r: 2
     target_layers:
-      - q_proj
-      - k_proj
-      - v_proj
-      - o_proj
+      - q_attn
+      - k_attn
+      - v_attn
+      - c_proj
     model:
-      instance_key: checkpointed_model
+      instance_key: model
       pass_type: BY_REFERENCE
 
 wrapped_model:
@@ -246,15 +221,79 @@ wrapped_model:
       instance_key: lora_model
       pass_type: BY_REFERENCE
     sync_module_states: true
-    mixed_precision_settings: FP_32
+    mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
-    block_names: [ LlamaDecoderLayer ]
+    block_names: [GPT2Block]
+
+model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    poe_type: NOPE
+    sequence_length: ${settings.training.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 2
+    n_head_q: 8
+    n_head_kv: 4
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+    attention_implementation: manual
+    activation_type: swiglu
+    attention_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
 
 tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
+    pretrained_model_name_or_path: ../data/tokenizer/hf_gpt2
     padding: false
     truncation: false
 
@@ -317,11 +356,5 @@ batch_progress_subscriber:
 
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: wandb
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    project: modalities_lorem_ipsum
-    mode: ONLINE
-    experiment_id: ${settings.experiment_id}
-    directory: "."
-    config_file_path: ${settings.config_file_path}
+  variant_key: dummy
+  config: {}
