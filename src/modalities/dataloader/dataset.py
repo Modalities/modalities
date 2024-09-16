@@ -368,3 +368,41 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class CombinedDataset(Dataset):
+    """Combines multiple datasets into one large dataset at runtime."""
+
+    def __init__(self, datasets: List[Dataset]):
+        """Initializes the CombinedDataset object, combining multiple datasets.
+
+        Args:
+            datasets (List[Dataset]): A list of datasets to combine.
+        """
+        self.datasets = datasets
+        self.cumulative_sizes = CombinedDataset._get_cummulated_sizes(datasets=datasets)
+
+    @staticmethod
+    def _get_cummulated_sizes(datasets: List[Dataset]) -> List[int]:
+        total = 0
+        cummulated_sizes = [0]
+        for dataset in datasets:
+            total += len(dataset)
+            cummulated_sizes.append(total)
+        return cummulated_sizes
+
+    def _find_dataset_idx(self, idx: int) -> int:
+        for i, cumulative_size in enumerate(self.cumulative_sizes):
+            if idx < cumulative_size:
+                return i
+        raise IndexError(f"Index {idx} is out of bounds.")
+
+    def __len__(self) -> int:
+        return self.cumulative_sizes[-1]
+
+    def __getitem__(self, idx: int) -> Dict:
+        dataset_idx = self._find_dataset_idx(idx)
+        local_idx = idx - self.cumulative_sizes[dataset_idx - 1]
+
+        sample = self.datasets[dataset_idx][local_idx]
+        return sample

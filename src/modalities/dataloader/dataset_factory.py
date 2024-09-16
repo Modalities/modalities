@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.dataset import (
+    CombinedDataset,
+    Dataset,
     DummyDataset,
     DummySampleConfig,
     MemMapDataset,
@@ -94,3 +96,15 @@ class DatasetFactory:
             raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
         )
         return dataset
+
+    @staticmethod
+    def get_combined_dataset(datasets: List[Dataset]) -> Dataset:
+        """Factory method for creating a combined datset .
+
+        Args:
+            datasets (List[Dataset]): List of datasets to combine.
+
+        Returns:
+            Dataset: CombinedDataset object.
+        """
+        return CombinedDataset(datasets=datasets)

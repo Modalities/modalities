@@ -281,6 +281,10 @@ class PackedMemMapDatasetMegatronConfig(BaseModel):
     sample_key: str
 
 
+class CombinedDatasetConfig(BaseModel):
+    datasets: List[PydanticDatasetIFType]
+
+
 class MMapIndexedDatasetConfig(BaseModel):
     path: Path
     skip_warmup: bool

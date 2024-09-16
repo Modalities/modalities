@@ -22,6 +22,7 @@ from modalities.config.config import (
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
+    CombinedDatasetConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
@@ -165,6 +166,7 @@ COMPONENTS = [
         PackedMemMapDatasetMegatronConfig,
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
+    ComponentEntity("dataset", "combined_dataset", DatasetFactory.get_combined_dataset, CombinedDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
