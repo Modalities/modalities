@@ -172,7 +172,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: List[PydanticLLMDataLoaderIFType]
-    batch_progress_subscriber: PydanticMessageSubscriberIFType
+    progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType

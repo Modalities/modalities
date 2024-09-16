@@ -287,8 +287,8 @@ class Main:
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
 
-        evaluation_result_publisher, process_publisher = self.get_logging_publishers(
-            progress_subscriber=components.batch_progress_subscriber,
+        evaluation_result_publisher, progress_publisher = self.get_logging_publishers(
+            progress_subscriber=components.progress_subscriber,
             results_subscriber=components.evaluation_subscriber,
             global_rank=components.settings.cuda_env.global_rank,
             local_rank=components.settings.cuda_env.local_rank,
@@ -303,7 +303,7 @@ class Main:
         )
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
-            progress_publisher=process_publisher,
+            progress_publisher=progress_publisher,
             num_target_steps=components.settings.training_target.num_target_steps,
             num_target_tokens=components.settings.training_target.num_target_tokens,
             num_seen_train_steps=components.settings.training_progress.num_seen_steps,
@@ -316,7 +316,7 @@ class Main:
 
         # Evaluator
         evaluator = Evaluator(
-            progress_publisher=process_publisher,
+            progress_publisher=progress_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
         )
 

@@ -302,7 +302,7 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
 
-batch_progress_subscriber:
+progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
