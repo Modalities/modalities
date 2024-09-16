@@ -182,7 +182,7 @@ Even though Modalities significantly simplifies LLM training, there is still som
 - [Getting Started](tutorials/getting_started/README.md)</br>
   Brief overview on how to get started with Modalities by training a small GPT model on a tiny subset of the Redpajama V2 dataset.
 
-- [Wamstarts](tutorials/warmstart/README.md) </br>
+- [Warmstart](tutorials/warmstart/README.md) </br>
   Continue the training from a checkpoint, e.g., after the training was interrupted or had crashed.
 
 - [Library Usage](tutorials/library_usage/README.md)</br>
