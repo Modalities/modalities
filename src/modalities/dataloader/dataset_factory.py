@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from transformers import PreTrainedTokenizer
 
@@ -37,8 +37,9 @@ class DatasetFactory:
         sequence_length: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
+        tokenization_jq_patterns: Dict[str, str],
         index_path: Optional[Path] = None,
-        jq_pattern: str = ".text",
+        pass_through_jq_patterns: Optional[Dict[str, str]] = None,
     ) -> MemMapDataset:
         """
         Returns a MemMapDataset object.
@@ -61,7 +62,8 @@ class DatasetFactory:
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
-            jq_pattern=jq_pattern,
+            tokenization_jq_patterns=tokenization_jq_patterns,
+            pass_through_jq_patterns=pass_through_jq_patterns,
         )
         return dataset
 
