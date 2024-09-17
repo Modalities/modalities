@@ -6,19 +6,19 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, T
 from rich.rule import Rule
 from rich.text import Text
 
-from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, Message
+from modalities.logging_broker.messages import ExperimentStatus, Message, ProgressUpdate
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 
 
-class DummyProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
-    def consume_message(self, message: Message[BatchProgressUpdate]):
+class DummyProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
+    def consume_message(self, message: Message[ProgressUpdate]):
         pass
 
     def consume_dict(self, mesasge_dict: Dict[str, Any]):
         pass
 
 
-class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
+class RichProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
     """A subscriber object for the RichProgress observable."""
 
     _live_display: Live = None
@@ -57,10 +57,10 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
         group = Group(
             Text(text="\n\n\n"),
             Rule(style="#AAAAAA"),
-            Text(text="Training", style="blue"),
+            Text(text="Training (steps)", style="blue"),
             self.train_splits_progress,
             Rule(style="#AAAAAA"),
-            Text(text="Evaluation", style="blue"),
+            Text(text="Evaluation (batches)", style="blue"),
             self.eval_splits_progress,
         )
 
@@ -79,7 +79,7 @@ class RichProgressSubscriber(MessageSubscriberIF[BatchProgressUpdate]):
             cls._live_display.stop()
         cls._live_display = live_display
 
-    def consume_message(self, message: Message[BatchProgressUpdate]):
+    def consume_message(self, message: Message[ProgressUpdate]):
         """Consumes a message from a message broker."""
         batch_progress = message.payload
 

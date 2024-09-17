@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 import torch
 from pydantic import BaseModel
@@ -24,19 +24,17 @@ class CustomGPT2LLMCollateFn(CollateFnIF):
         self.target_key = target_key
         self.custom_attribute = custom_attribute
 
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
-        sample_tensor = torch.stack([torch.tensor(d[self.sample_key]) for d in batch])
+    def __call__(self, batch: List[List[int]]) -> DatasetBatch:
+        sample_tensor = torch.tensor(batch)
         samples = {self.sample_key: sample_tensor[:, :-1]}
         targets = {self.target_key: sample_tensor[:, 1:]}
-
-        print(f"Custom attribute: {self.custom_attribute}")
-
         return DatasetBatch(targets=targets, samples=samples)
 
 
 def main():
     # load and parse the config file
-    config_file_path = Path("config_lorem_ipsum.yaml")
+    cwd = Path(__file__).parent
+    config_file_path = cwd / Path("config_lorem_ipsum.yaml")
     # instantiate the Main entrypoint of modalities by passing in the config path
     modalities_main = Main(config_path=config_file_path)
 

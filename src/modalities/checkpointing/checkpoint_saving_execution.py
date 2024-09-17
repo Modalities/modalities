@@ -4,20 +4,21 @@ import torch.nn as nn
 from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
+from modalities.training.training_progress import TrainingProgress
 
 
 class CheckpointSavingExecutionABC(ABC):
     """Abstract class for saving PyTorch model and optimizer checkpoints."""
 
     @abstractmethod
-    def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, num_train_steps_done: int):
+    def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, training_progress: TrainingProgress):
         """
         Saves the checkpoint of the model and optimizer.
 
         Args:
             model (nn.Module): The model to be saved.
             optimizer (Optimizer): The optimizer to be saved.
-            num_train_steps_done (int): The number of training steps completed.
+            training_progress (TrainingProgress): The training progress.
 
         Raises:
             NotImplementedError: This method is not implemented and should be overridden in a subclass.
@@ -25,12 +26,12 @@ class CheckpointSavingExecutionABC(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _delete_checkpoint(self, num_train_steps_done: int):
+    def _delete_checkpoint(self, training_progress: TrainingProgress):
         """
-        Deletes the checkpoint based on the number of performed train steps.
+        Deletes the checkpoint based on the training progress.
 
         Args:
-            num_train_steps_done (int): The number of training steps completed.
+            training_progress (TrainingProgress): The training progress.
 
         Raises:
             NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
@@ -40,7 +41,7 @@ class CheckpointSavingExecutionABC(ABC):
     def run_checkpoint_instruction(
         self,
         checkpointing_instruction: CheckpointingInstruction,
-        num_train_steps_done: int,
+        training_progress: TrainingProgress,
         model: nn.Module,
         optimizer: Optimizer,
     ):
@@ -49,12 +50,12 @@ class CheckpointSavingExecutionABC(ABC):
 
         Args:
             checkpointing_instruction (CheckpointingInstruction): The checkpointing instruction.
-            num_train_steps_done (int): The number of training steps done.
+            training_progress (TrainingProgress): The training progress.
             model (nn.Module): The model.
             optimizer (Optimizer): The optimizer.
         """
         if checkpointing_instruction.save_current:
-            self._save_checkpoint(model=model, optimizer=optimizer, num_train_steps_done=num_train_steps_done)
+            self._save_checkpoint(model=model, optimizer=optimizer, training_progress=training_progress)
 
-        for num_train_steps_done in checkpointing_instruction.checkpoints_to_delete:
-            self._delete_checkpoint(num_train_steps_done=num_train_steps_done)
+        for training_progress_to_delete in checkpointing_instruction.checkpoints_to_delete:
+            self._delete_checkpoint(training_progress=training_progress_to_delete)

@@ -65,7 +65,7 @@ tokenizer:
 
 Firstly, after
 ```sh
-cd modalities/examples/getting_started/
+cd modalities/tutorials/getting_started/
 ```
 we create the dataset index via
 
@@ -148,7 +148,7 @@ first and then divides it into chunks of size context-length.
 ### Config File
 In Modalities, we describe the entire training and evaluation setup (i.e., components such as model, trainer, evaluator, dataloder etc.) within a single configuration file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. A full list of all the components already available in modalities an be found [here](../../docs/components/components.md).
 
-The example config file for this experiment can be found in `examples/getting_started/example_config.yaml`. 
+The example config file for this experiment can be found in `tutorials/getting_started/example_config.yaml`. 
 
 ### Training
 Having created the dataset and defined the experiment in the configuration file, we can already start the training by running the following command.

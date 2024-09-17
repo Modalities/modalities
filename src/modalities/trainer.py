@@ -8,14 +8,15 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from modalities.batch import DatasetBatch, EvaluationResultBatch
+from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.logging_broker.messages import BatchProgressUpdate, ExperimentStatus, MessageTypes
+from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.training.training_progress import TrainingProgress
 from modalities.util import Aggregator, TimeRecorder, print_rank_0
 from modalities.utils.mfu import compute_mfu, get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
 
@@ -29,10 +30,14 @@ class Trainer:
     def __init__(
         self,
         global_rank: int,
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
+        progress_publisher: MessagePublisher[ProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
+        num_seen_train_steps: int,
+        global_num_seen_tokens: int,
+        num_target_steps: int,
+        num_target_tokens: int,
         gradient_clipper: GradientClipperIF,
     ) -> None:
         """
@@ -40,22 +45,26 @@ class Trainer:
 
         Args:
             global_rank (int): The global rank to which operates the trainer object.
-            batch_progress_publisher (MessagePublisher[BatchProgressUpdate]): The publisher for batch progress
-                updates.
+            progress_publisher (MessagePublisher[ProgressUpdate]): The publisher for progress updates.
             evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):
                 The publisher for evaluation result batches.
             gradient_acc_steps (int): The number of gradient accumulation steps.
             global_num_tokens_per_train_step (int): The number of global tokens per training step.
+            target_train_steps (int): The target number of training steps.
             gradient_clipper (GradientClipperIF): The gradient clipper.
 
         Returns:
             None
         """
         self.global_rank = global_rank
-        self.batch_progress_publisher = batch_progress_publisher
+        self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
+        self.num_seen_train_steps = num_seen_train_steps
+        self.num_target_steps = num_target_steps
+        self.num_target_tokens = num_target_tokens
+        self.global_num_seen_tokens = global_num_seen_tokens
         self.gradient_clipper = gradient_clipper
 
     @staticmethod
@@ -128,8 +137,8 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         training_log_interval_in_steps: int,
-        evaluation_callback: Callable[[int], None],
-        checkpointing_callback: Callable[[int], None],
+        evaluation_callback: Callable[[TrainingProgress], None],
+        checkpointing_callback: Callable[[TrainingProgress], None],
     ):
         """
         Trains the model.
@@ -141,8 +150,8 @@ class Trainer:
             scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
             training_log_interval_in_steps (int): The interval at which training progress is logged.
-            evaluation_callback (Callable[[int], None]): A callback function for evaluation.
-            checkpointing_callback (Callable[[int], None]): A callback function for checkpointing.
+            evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.
+            checkpointing_callback (Callable[[TrainingProgress], None]): A callback function for checkpointing.
 
         Returns:
             None
@@ -166,14 +175,21 @@ class Trainer:
         gradient_norm_scores = []
 
         # run evaluation callback and checkpointing callback before the first optimizer step
-        num_train_steps_done = Trainer._get_num_train_steps_done(
-            micro_batch_id=train_loader.fast_forward_batch_id - 1, gradient_acc_steps=self.gradient_acc_steps
+        evaluation_callback(num_train_steps_done=self.num_seen_train_steps)
+        training_progress = TrainingProgress(
+            num_seen_steps_previous_run=self.num_seen_train_steps,
+            num_seen_tokens_previous_run=self.global_num_seen_tokens,
+            num_seen_steps_current_run=0,
+            num_seen_tokens_current_run=0,
+            num_target_steps=self.num_target_steps,
+            num_target_tokens=self.num_target_tokens,
         )
-        evaluation_callback(num_train_steps_done=num_train_steps_done)
-        checkpointing_callback(num_train_steps_done=num_train_steps_done)
+        checkpointing_callback(training_progress=training_progress)
 
+        num_steps_todo = self.num_target_steps - self.num_seen_train_steps
+        num_batches_todo = num_steps_todo * self.gradient_acc_steps
         # Because we might resume training, we add the starting batch id of the data loader
-        for micro_batch_id, batch in enumerate(train_loader, start=train_loader.fast_forward_batch_id):
+        for _, (micro_batch_id, batch) in zip(range(num_batches_todo), enumerate(train_loader)):
             # Train single batch
             (
                 step_performed,
@@ -189,6 +205,8 @@ class Trainer:
                 micro_batch_id=micro_batch_id,
             )
             forward_backward_time_recorder.stop()
+            training_progress.num_seen_steps_current_run = num_train_steps_done
+            training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
             # Save the batch loss
             cumulated_losses[0] += batch_loss.item()
@@ -203,12 +221,12 @@ class Trainer:
             thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
             self._publish_progress(
-                batch_progress_publisher=self.batch_progress_publisher,
-                num_train_steps_done=num_train_steps_done,
+                progress_publisher=self.progress_publisher,
+                num_train_steps_done=training_progress.num_seen_steps_total,
                 dataloader_tag=train_loader.dataloader_tag,
             )
             # Check if model performance should be logged
-            if num_train_steps_done % training_log_interval_in_steps == 0 and step_performed:
+            if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
 
@@ -237,15 +255,15 @@ class Trainer:
                     reduced_losses[1],
                 )
                 losses = {
-                    "train loss avg": train_loss_avg,
-                    "train loss last": train_loss_last_batch,
+                    "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
+                    "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
 
-                consumed_tokens = torch.Tensor([num_train_steps_done * self.global_num_tokens_per_train_step])
+                consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
                 metrics = {
-                    "consumed tokens": consumed_tokens,
-                    "grad norm avg": torch.mean(torch.Tensor(gradient_norm_scores)),
-                    "grad norm last": torch.tensor(gradient_norm_scores[-1]),
+                    "consumed tokens": ResultItem(consumed_tokens, 0),
+                    "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
+                    "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
                 }
                 gradient_norm_scores = []
 
@@ -260,12 +278,12 @@ class Trainer:
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
-                        "train samples/s": synced_num_samples_per_second,
-                        "train mfu": mfu,
-                        "lr mean": torch.tensor(scheduler.get_last_lr()).mean(),
+                        "train samples/s": ResultItem(synced_num_samples_per_second, 1),
+                        "train mfu": ResultItem(mfu, 2),
+                        "lr mean": ResultItem(torch.tensor(scheduler.get_last_lr()).mean()),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
-                    num_train_steps_done=num_train_steps_done,
+                    num_train_steps_done=training_progress.num_seen_steps_total,
                 )
                 print_rank_0(training_metrics)
                 self._publish_evaluation_result(
@@ -276,8 +294,8 @@ class Trainer:
 
                 cumulated_losses = self._reset_tracked_losses()
             if step_performed:
-                evaluation_callback(num_train_steps_done=num_train_steps_done)
-                checkpointing_callback(num_train_steps_done=num_train_steps_done)
+                evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
+                checkpointing_callback(training_progress=training_progress)
             # we start the time recoder here again to also capture the time spend loading
             # via the dataloader.
             forward_backward_time_recorder.start()
@@ -295,18 +313,18 @@ class Trainer:
 
     @staticmethod
     def _publish_progress(
-        batch_progress_publisher: MessagePublisher[BatchProgressUpdate],
+        progress_publisher: MessagePublisher[ProgressUpdate],
         num_train_steps_done: int,
         dataloader_tag: str,
     ):
         # Publishes the progress of the training, i.e., number of training steps done.
 
-        payload = BatchProgressUpdate(
+        payload = ProgressUpdate(
             num_steps_done=num_train_steps_done,
             experiment_status=ExperimentStatus.TRAIN,
             dataloader_tag=dataloader_tag,
         )
-        batch_progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
+        progress_publisher.publish_message(payload=payload, message_type=MessageTypes.BATCH_PROGRESS_UPDATE)
 
     @staticmethod
     def _publish_evaluation_result(
