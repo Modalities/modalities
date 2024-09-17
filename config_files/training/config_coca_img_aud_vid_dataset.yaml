@@ -1,0 +1,549 @@
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpoint_saving_path: data/checkpoints
+    train_dataset_path: ./data/lorem_ipsum.pbin
+  intervals:
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 2
+    evaluation_interval_in_steps: 2
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: true
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile: 
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 10
+    sequence_length: 256
+  training_target:
+    num_target_tokens:
+      component_key: number_conversion
+      variant_key: num_tokens_from_num_steps
+      config:
+        num_steps: ${settings.training_target.num_target_steps}
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+    num_target_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_steps_from_num_samples
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_samples: ${settings.coca_example_settings.train_num_samples}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  training_progress: 
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    local_num_seen_batches: 0
+    last_step: -1
+  coca_example_settings:
+    train_num_samples: 64
+    val_num_samples: 32
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: tokenizer/
+    padding: true
+    max_length: ${settings.step_profile.sequence_length}
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: coca_collator
+  config:
+    sample_keys:
+      - images
+      - audio
+      - audio_len
+      - video
+      - ${settings.referencing_keys.sample_key}
+    target_keys: []
+    text_sample_key: ${settings.referencing_keys.sample_key}
+    text_target_key: ${settings.referencing_keys.target_key}
+
+train_audio_transform:
+  component_key: transform
+  variant_key: audio_transform
+  config:
+    is_training: True
+    block_size_audio_encoder: ${model_raw.config.audio_encoder_config.block_size}
+    freq_domain_mask_length: 30
+    time_domain_mask_length: 100
+
+train_image_transform:
+  component_key: transform
+  variant_key: image_transform
+  config:
+    is_training: True
+    input_size: ${model_raw.config.image_encoder_config.img_size}
+
+train_video_transform:
+  component_key: transform
+  variant_key: video_transform
+  config:
+    is_training: True
+    input_size: ${model_raw.config.video_encoder_config.img_size}
+    num_frames: ${model_raw.config.video_encoder_config.num_video_frames}
+
+val_audio_transform:
+  component_key: transform
+  variant_key: audio_transform
+  config:
+    is_training: False
+    block_size_audio_encoder: ${model_raw.config.audio_encoder_config.block_size}
+    freq_domain_mask_length: 30
+    time_domain_mask_length: 100
+
+val_image_transform:
+  component_key: transform
+  variant_key: image_transform
+  config:
+    is_training: False
+    input_size: ${model_raw.config.image_encoder_config.img_size}
+
+val_video_transform:
+  component_key: transform
+  variant_key: video_transform
+  config:
+    is_training: False
+    input_size: ${model_raw.config.video_encoder_config.img_size}
+    num_frames: ${model_raw.config.video_encoder_config.num_video_frames}
+
+text_transform:
+  component_key: transform
+  variant_key: text_transform
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+train_video_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "youcook2/training/000000.tar"
+    is_audio_video: ${model_raw.config.is_audio_video}
+    modality_key_mapping:
+      TEXT: ["json", "input_ids"]
+      VIDEO: ["mp4", "video"]
+    modality_transforms:
+      VIDEO:
+        instance_key: train_video_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 100_000
+
+val_video_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "youcook2/training/000000.tar"
+    is_audio_video: ${model_raw.config.is_audio_video}
+    modality_key_mapping:
+      TEXT: ["json", "input_ids"]
+      VIDEO: ["mp4", "video"]
+    modality_transforms:
+      VIDEO:
+        instance_key: val_video_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+train_audio_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "commonvoice/commonvoice_17_dev_wav_000001.tar"
+    modality_key_mapping:
+      TEXT: ["transcript.txt", "input_ids"] # source and target keys
+      AUDIO: ["wav", "audio"]
+    modality_transforms:
+      AUDIO:
+        instance_key: train_audio_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 30000
+
+val_audio_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "commonvoice/commonvoice_17_dev_wav_000001.tar"
+    modality_key_mapping:
+      TEXT: ["transcript.txt", "input_ids"] # source and target keys
+      AUDIO: ["wav", "audio"]
+    modality_transforms:
+      AUDIO:
+        instance_key: val_audio_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+train_coco_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "coco_captions/data/train/000000.tar"
+    modality_key_mapping:
+      TEXT: ["json_text0", "input_ids"]
+      IMAGE: ["jpg", "images"]
+    modality_transforms:
+      IMAGE:
+        instance_key: train_image_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+val_coco_dataset_builder:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: "coco_captions/data/train/000000.tar"
+    modality_key_mapping:
+      TEXT: ["json_text0", "input_ids"]
+      IMAGE: ["jpg", "images"]
+    modality_transforms:
+      IMAGE:
+        instance_key: val_image_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+
+train_dataset:
+  component_key: dataset
+  variant_key: web_dataset
+  config:
+    builders:
+      - instance_key: train_audio_dataset_builder
+        pass_type: BY_REFERENCE 
+      - instance_key: train_coco_dataset_builder
+        pass_type: BY_REFERENCE
+      - instance_key: train_video_builder
+        pass_type: BY_REFERENCE
+    mixing_ratios: [0.5, 0.4, 0.1]
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    shardshuffle: 100
+    repeat: false
+    resample: false
+    shuffle_buffer: 10_000
+
+val_dataset:
+  component_key: dataset
+  variant_key: web_dataset
+  config:
+    builders:
+      - instance_key: val_audio_dataset_builder
+        pass_type: BY_REFERENCE
+      - instance_key: val_coco_dataset_builder
+        pass_type: BY_REFERENCE
+      - instance_key: val_video_builder
+        pass_type: BY_REFERENCE
+    mixing_ratios: [0.5, 0.4, 0.1]
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    shardshuffle: 1000
+    repeat: true
+    resample: true
+    shuffle_buffer: 10_000
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: web_loader
+  config:
+    num_workers: 8
+    pin_memory: true
+    drop_last: true
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: web_loader
+  config:
+    num_workers: 8
+    pin_memory: true
+    drop_last: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: val_dataset
+      pass_type: BY_REFERENCE
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: -1 # -1 to save all checkpoints
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
+      config:
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+captioning_loss:
+  component_key: loss
+  variant_key: cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${model_raw.config.prediction_key}
+    tag: captioning_loss
+    weight: 2.0
+
+contrastive_loss_audio:
+  component_key: loss
+  variant_key: clip_loss
+  config:
+    prediction_keys:
+      - ${model_raw.config.audio_cls_prediction_key}
+      - ${model_raw.config.audio_text_cls_prediction_key}
+    logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
+    tag: contrastive_loss_audio
+    weight: 1.0
+
+contrastive_loss_image:
+  component_key: loss
+  variant_key: clip_loss
+  config:
+    prediction_keys:
+      - ${model_raw.config.image_cls_prediction_key}
+      - ${model_raw.config.image_text_cls_prediction_key}
+    logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
+    tag: contrastive_loss_image
+    weight: 1.0
+
+contrastive_loss_video:
+  component_key: loss
+  variant_key: clip_loss
+  config:
+    prediction_keys:
+      - ${model_raw.config.video_cls_prediction_key}
+      - ${model_raw.config.video_text_cls_prediction_key}
+    logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
+    tag: contrastive_loss_image
+    weight: 1.0
+
+loss_fn:
+  - instance_key: captioning_loss
+    pass_type: BY_REFERENCE
+  - instance_key: contrastive_loss_audio
+    pass_type: BY_REFERENCE
+  - instance_key: contrastive_loss_image
+    pass_type: BY_REFERENCE
+  - instance_key: contrastive_loss_video
+    pass_type: BY_REFERENCE
+
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: FP_16
+    sharding_strategy: HYBRID_SHARD
+    block_names: [TransformerBlock, VisionTransformerBlock, ConformerBlock]
+
+model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: coca
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.text_decoder_config.n_layer_text}
+
+model_raw:
+  component_key: model
+  variant_key: coca
+  config:
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    audio_embd_prediction_key: audio_embeddings
+    image_embd_prediction_key: image_embeddings
+    video_embd_prediction_key: video_embeddings
+    text_embd_prediction_key: text_embeddings
+    image_cls_prediction_key: image_cls
+    image_text_cls_prediction_key: image_text_cls
+    audio_cls_prediction_key: audio_cls
+    audio_text_cls_prediction_key: audio_text_cls
+    video_cls_prediction_key: video_cls
+    video_text_cls_prediction_key: video_text_cls
+    text_cls_prediction_key: text_cls
+    modality_keys: ${collate_fn.config.sample_keys}
+    is_audio_video: false
+    individual_datasets: true
+    logit_scale_prediction_key: logit_scale
+    audio_encoder_config:
+      sample_key: audio
+      prediction_key: audio_embeddings
+      block_size: 2_000
+      n_mels: 128
+      n_embd: 768
+      n_heads: 8
+      n_conformer_blocks: 2
+      attention_config:
+        attention_engine_type: default_attention
+      pointwise_conv_kernel_size: 1
+      depthwise_conv_kernel_size: 31
+    image_encoder_config:
+      sample_key: images
+      prediction_key: image_embeddings
+      img_size: 256 # 288 in the original coca
+      n_classes: Null # Disable vision transformer head
+      n_layer: 2
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      n_embd: 768
+      dropout: 0.0
+      patch_size: 16 # 18 in the original coca
+      patch_stride: 16 # 18 in the original coca
+      n_img_channels: 3
+      add_cls_token: False
+      bias: True
+    video_encoder_config:
+      sample_key: video
+      prediction_key: video_embeddings
+      img_size: 256 # 288 in the original coca
+      n_classes: Null # Disable vision transformer head
+      n_layer: 2
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      n_embd: 768
+      dropout: 0.0
+      patch_size: 18 # 18 in the original coca
+      patch_stride: 18 # 18 in the original coca
+      n_img_channels: 3
+      add_cls_token: False
+      bias: True
+      num_video_frames: 16
+      n_latents: 64
+    text_decoder_config:
+      sample_key: ${settings.referencing_keys.sample_key}
+      prediction_key: ${model_raw.config.prediction_key}
+      block_size: 512
+      vocab_size: 50304 # 64k in the original coca
+      n_layer_text: 2
+      n_layer_multimodal_text: 2
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      ffn_hidden: 2048
+      n_embd: 768
+      dropout: 0.0
+      bias: true
+      activation: swiglu
+      epsilon: 1e-5
+    n_pool_head: 12
+    n_queries: 256
+    bias_attn_pool: False
+    epsilon_attn_pool: 1e-5
+
+scheduler:
+  component_key: scheduler
+  variant_key: cosine_annealing_with_warmup_lr # COCA uses linear decay
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    num_warmup_steps: 2_000
+    num_training_steps: 500_000
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 8e-4
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 1e-1
+    weight_decay_groups_excluded: []
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+
+progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: modalities_coca
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: wandb_storage
+    config_file_path: ${settings.config_file_path}
