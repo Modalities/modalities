@@ -16,6 +16,7 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpoint
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
+    ActivationCheckpointedModelConfig,
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
@@ -36,7 +37,6 @@ from modalities.config.config import (
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
-    OpenGPTXMMapDatasetConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
@@ -51,6 +51,7 @@ from modalities.config.config import (
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
     WebLoaderConfig,
+    WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import (
@@ -86,14 +87,12 @@ from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
-from modalities.models.huggingface.huggingface_models import (
-    HuggingFacePretrainedModel,
-    HuggingFacePretrainedModelConfig,
-)
-
-# from modalities.models.mamba.mamba_config import MambaLLMConfig
-# from modalities.models.mamba.mamba_model import MambaLLM
+from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import ModelFactory
+from modalities.nn.model_initialization.composed_initialization import (
+    ComposedInitializationRoutines,
+    ComposedModelInitializationConfig,
+)
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
@@ -107,10 +106,33 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
+from modalities.utils.number_conversion import (
+    LocalNumBatchesFromNumSamplesConfig,
+    LocalNumBatchesFromNumTokensConfig,
+    NumberConversion,
+    NumberConversionFromCheckpointPathConfig,
+    NumStepsFromNumSamplesConfig,
+    NumStepsFromNumTokensConfig,
+    NumStepsFromRawDatasetIndexConfig,
+    NumTokensFromNumStepsConfig,
+    NumTokensFromPackedMemMapDatasetContinuousConfig,
+)
 
 
 @dataclass
 class ComponentEntity:
+    """Dataclass to store the component entity.
+    The component entity stores the component key, the variant key, the component type and the component config type.
+    The component key is used to identify the component type, whereas the variant key is used to identify the component.
+    An example of a component entity is the GPT2 model with the component key "model" and the variant key "gpt2".
+
+    Args:
+        component_key (str): Key to identify the component type.
+        variant_key (str): Variant key to identify the component.
+        component_type (Type | Callable): Type of the component.
+        component_config_type (Type[BaseModel]): Type of the component config.
+    """
+
     component_key: str
     variant_key: str
     component_type: Type | Callable
@@ -120,13 +142,28 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
-    # ComponentEntity("model", "mamba", MambaLLM, MambaLLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity(
+        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_model,
+        ActivationCheckpointedModelConfig,
+    ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # weight initializers
+    ComponentEntity(
+        "model_initialization",
+        "composed",
+        ComposedInitializationRoutines.get_composed_model_initializer,
+        ComposedModelInitializationConfig,
+    ),
     # losses
     ComponentEntity("loss", "cross_entropy_loss", CrossEntropyLoss, CrossEntropyLossConfig),
     ComponentEntity("loss", "nce_loss", NCELoss, NCELossConfig),
@@ -168,9 +205,6 @@ COMPONENTS = [
         "packed_mem_map_dataset_megatron",
         DatasetFactory.get_packed_mem_map_dataset_megatron,
         PackedMemMapDatasetMegatronConfig,
-    ),
-    ComponentEntity(
-        "dataset", "open_gptx_mmap_dataset", DatasetFactory.get_open_gptx_mmap_dataset, OpenGPTXMMapDatasetConfig
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     ComponentEntity("dataset", "web_dataset", MultimodalWebDataset, MultimodalWebDatasetConfig),
@@ -254,4 +288,77 @@ COMPONENTS = [
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # Number conversion
+    ComponentEntity(
+        "number_conversion",
+        "local_num_batches_from_num_samples",
+        NumberConversion.get_local_num_batches_from_num_samples,
+        LocalNumBatchesFromNumSamplesConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "local_num_batches_from_num_tokens",
+        NumberConversion.get_local_num_batches_from_num_tokens,
+        LocalNumBatchesFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_samples",
+        NumberConversion.get_num_steps_from_num_samples,
+        NumStepsFromNumSamplesConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_num_tokens",
+        NumberConversion.get_num_steps_from_num_tokens,
+        NumStepsFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_tokens_from_num_steps",
+        NumberConversion.get_num_tokens_from_num_steps,
+        NumTokensFromNumStepsConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "last_step_from_checkpoint_path",
+        NumberConversion.get_last_step_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_seen_steps_from_checkpoint_path",
+        NumberConversion.get_num_seen_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_seen_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_target_steps_from_checkpoint_path",
+        NumberConversion.get_num_target_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_target_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_target_tokens_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_tokens_from_packed_mem_map_dataset_continuous",
+        NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
+        NumTokensFromPackedMemMapDatasetContinuousConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_raw_dataset_index",
+        NumberConversion.get_num_steps_from_raw_dataset_index,
+        NumStepsFromRawDatasetIndexConfig,
+    ),
 ]

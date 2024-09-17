@@ -1,11 +1,14 @@
 [project]
 name = "modalities"
-version = "0.1.0"
-requires-python = ">=3.8,<3.12"
+version = "0.2.2"
+requires-python = ">=3.10,<3.12"
 description = "Modalities, a python framework for distributed and reproducible foundation model training."
+readme = "README.md"
 dependencies = [
-    "torch>=2.0",
-"torchaudio",
+    "torchaudio",
+    "numpy<2.0",
+    "torch>=2.3",
+    "packaging",
     "tqdm",
     "pyyaml",
     "transformers",
@@ -13,15 +16,12 @@ dependencies = [
     "decord",
     "protobuf",
     "SentencePiece",
-    "accelerate",
     "rich",
-    "xformers",
     "omegaconf",
     "pydantic",
     "click",
     "click_pathlib",
     "jq",
-    "xformers",
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
@@ -31,9 +31,13 @@ dependencies = [
     "flash-attn",         # install this directly via `pip install flash-attn --no-build-isolation`
 ]
 
+[project.urls]
+Homepage = "https://github.com/Modalities/modalities"
+Issues = "https://github.com/Modalities/modalities/issues"
+
 [project.optional-dependencies]
 linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov"]
+tests = ["pytest", "pytest-cov", "debugpy"]
 install_helper = ["ninja"]
 
 [project.scripts]

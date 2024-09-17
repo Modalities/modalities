@@ -29,10 +29,10 @@ class ExperimentStatus(Enum):
 
 
 @dataclass
-class BatchProgressUpdate:
-    """Object holding the state of the current batch computation progress."""
+class ProgressUpdate:
+    """Object holding the state of the current batch / step computation progress."""
 
-    step_id: int
+    num_steps_done: int
     # Note: in case of ExperimentState.TRAIN, dataset_batch_id=global_train_batch_id
     experiment_status: ExperimentStatus
     dataloader_tag: str

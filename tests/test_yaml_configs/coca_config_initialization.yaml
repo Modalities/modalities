@@ -1,0 +1,61 @@
+model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: coca
+        weight_init_type: WILL_BE_REPLACED
+        mean: 0.0
+        std: WILL_BE_REPLACED
+
+model_raw:
+  component_key: model
+  variant_key: coca
+  config:
+    prediction_key: logits
+    vision_embd_prediction_key: vision_embeddings
+    text_embd_prediction_key: text_embeddings
+    vision_cls_prediction_key: vision_cls
+    text_cls_prediction_key: text_cls
+    vision_encoder_config:
+      sample_key: images
+      prediction_key: vision_embeddings
+      img_size: 224
+      n_classes: Null # Disable vision transformer head
+      n_layer: 6
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 8
+      n_embd: 768
+      dropout: 0.0
+      patch_size: 16
+      patch_stride: 16
+      n_img_channels: 3
+      add_cls_token: False
+      bias: True
+    text_decoder_config:
+      sample_key: input_ids
+      prediction_key: logits
+      block_size: 1024
+      vocab_size: 50304
+      n_layer_text: 6
+      n_layer_multimodal_text: 6
+      attention_config:
+        attention_engine_type: default_attention
+      n_head: 12
+      ffn_hidden: 2048
+      n_embd: 768
+      dropout: 0.0
+      bias: true
+      activation: swiglu
+      epsilon: 1e-5
+    n_pool_head: 8
+    n_vision_queries: 256
+    bias_attn_pool: False
+    epsilon_attn_pool: 1e-5

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
@@ -109,9 +110,7 @@ def test_single_component(config_file_path: Path, component_factory: ComponentFa
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "custom_comp_1" in components
-import pytest
-from pydantic import BaseModel
-from modalities.config.component_factory import ComponentFactory
+
 
 class TestComponentFactory:
     @pytest.fixture

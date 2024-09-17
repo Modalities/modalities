@@ -97,6 +97,7 @@ celerybeat-schedule
 # Environments
 .env
 .venv
+modalities_env/
 env/
 venv/
 ENV/
@@ -151,7 +152,7 @@ tags
 # End of https://www.toptal.com/developers/gitignore/api/vim
 
 checkpoints
-data
+data-temp/
 docs/source/generated
 docs/source/api
 pyenv*
@@ -159,3 +160,5 @@ pyenv*
 noteboks/*
 
 tests/tmp/*
+*wandb_storage*
+.coverage/*

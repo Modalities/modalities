@@ -34,13 +34,10 @@ text_decoder_config:
   n_embd: 768
   dropout: 0.0
   bias: true
-  activation: fused_swiglu
+  activation: swiglu
   epsilon: 1e-5
 n_pool_head: 8
 n_vision_queries: 256
 n_audio_queries: Null
 bias_attn_pool: False
 epsilon_attn_pool: 1e-5
-weight_init:
-  mean: 0.0
-  std: 0.02

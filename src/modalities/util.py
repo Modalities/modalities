@@ -1,16 +1,39 @@
+import hashlib
 import time
 import warnings
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from types import TracebackType
-from typing import Callable, Dict, Generic, Type, TypeVar
+from typing import Callable, Dict, Generic, Optional, Type, TypeVar
 
 import torch
 import torch.distributed as dist
 from pydantic import ValidationError
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
+
+
+def print_rank_0(message: str):
+    """If torch.distributed is initialized, print only on rank 0."""
+    if torch.distributed.is_initialized():
+        if torch.distributed.get_rank() == 0:
+            print(message, flush=True)
+    else:
+        print(message, flush=True)
+
+
+def warn_rank_0(message: str):
+    """If torch.distributed is initialized, print only on rank 0."""
+    message_with_color_code = f"\033[91m {message} \033[00m"
+    if torch.distributed.is_initialized():
+        if torch.distributed.get_rank() == 0:
+            warnings.warn(message_with_color_code)
+    else:
+        warnings.warn(message_with_color_code)
 
 
 def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
@@ -36,12 +59,14 @@ def get_callback_interval_in_batches_per_rank(
     return num_local_train_micro_batches_ret
 
 
-def get_date_of_run():
-    """create date and time for file save uniqueness
-    example: 2022-05-07__14-31-22'
+def get_experiment_id_of_run(config_file_path: Path, hash_length: Optional[int] = 8) -> str:
+    """create experiment ID including the date and time for file save uniqueness
+    example: 2022-05-07__14-31-22_fdh1xaj2'
     """
+    hash = hashlib.sha256(str(config_file_path).encode()).hexdigest()[:hash_length]
     date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-    return date_of_run
+    experiment_id = f"{date_of_run}_{hash}"
+    return experiment_id
 
 
 def format_metrics_to_gb(item):
@@ -52,8 +77,26 @@ def format_metrics_to_gb(item):
     return metric_num
 
 
-def compute_number_of_trainable_parameters(model: torch.nn.Module):
+def get_local_number_of_trainable_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def get_total_number_of_trainable_parameters(model: FSDP) -> Number:
+    num_params = get_local_number_of_trainable_parameters(model)
+    num_params_tensor = torch.tensor(num_params).cuda()
+    dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
+    total_num_params = num_params_tensor.item()
+    # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
+    # TODO: Define constant instead of hardcoding string
+    if model.sharding_strategy.name == "HYBRID_SHARD":
+        # Assumes that CUDA is available and each node has the same number of GPUs
+        # Note: Per default FSDP constructs process groups for the user to shard intra-node and replicate inter-node.
+        # However, users can also provide their own sharding process groups (currently not supported in Modalities)
+        # which would require to adapt the code.
+        sharding_factor_hybrid_sharding = dist.get_world_size() // torch.cuda.device_count()
+        total_num_params = total_num_params // sharding_factor_hybrid_sharding
+
+    return total_num_params
 
 
 class TimeRecorderStates(Enum):
@@ -158,3 +201,23 @@ def flatten_dict(d, parent_key="", sep="_"):
         else:
             items.append((new_key, v))
     return dict(items)
+
+def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch.nn.Module] | None:
+    """From Accelerate source code
+    (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
+    Gets a class from a module by its name.
+
+    Args:
+        module (`torch.nn.Module`): The module to get the class from.
+        name (`str`): The name of the class.
+    """
+    modules_children = list(module.children())
+    if module.__class__.__name__ == name:
+        return module.__class__
+    elif len(modules_children) == 0:
+        return
+    else:
+        for child_module in modules_children:
+            module_class = get_module_class_from_name(child_module, name)
+            if module_class is not None:
+                return module_class

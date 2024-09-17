@@ -1,4 +1,3 @@
-import os
 from unittest.mock import call
 
 import torch
@@ -26,10 +25,11 @@ def test_evaluate_cpu(
     llm_data_loader_mock.batch_size = batch_size
 
     evaluator = Evaluator(
-        local_rank=int(os.getenv("LOCAL_RANK")),
-        batch_progress_publisher=progress_publisher_mock,
+        progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 
-    evaluator.evaluate(model=nn_model_mock, data_loaders=[llm_data_loader_mock], loss_fun=loss_mock, train_step_id=0)
+    evaluator.evaluate(
+        model=nn_model_mock, data_loaders=[llm_data_loader_mock], loss_fun=loss_mock, num_train_steps_done=1
+    )
     nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])

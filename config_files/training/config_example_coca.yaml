@@ -4,30 +4,53 @@ settings:
   referencing_keys:
     sample_key: input_ids
     target_key: target_ids
-  training:
-    global_training_log_interval_in_steps: 4
-    global_checkpointing_interval_in_steps: 5_000
-    global_evaluation_interval_in_steps: 5_000
-    global_num_training_samples: 102_400
-    global_num_seen_steps: 0
-    do_apply_activation_checkpointing: true
-    gradient_acc_steps: 1
-    local_train_micro_batch_size: 144
-    sequence_length: 256
+    prediction_key: logits
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpointing_path: data/checkpoints
-
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: gpt2
-    padding: true
-    max_length: 256
+    checkpoint_saving_path: data/checkpoints
+    train_dataset_path: ./data/lorem_ipsum.pbin
+  intervals:
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 2
+    evaluation_interval_in_steps: 2
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: true
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile: 
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 1
+    sequence_length: 256
+  training_target:
+    num_target_tokens:      
+      component_key: number_conversion
+      variant_key: num_tokens_from_num_steps
+      config:
+        num_steps: ${settings.training_target.num_target_steps}
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+    num_target_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_steps_from_num_samples
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_samples: ${settings.coca_example_settings.train_num_samples}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  training_progress: 
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    local_num_seen_batches: 0
+    last_step: -1
+  coca_example_settings:
+    train_num_samples: 64
+    val_num_samples: 32
 
 collate_fn:
   component_key: collate_fn
@@ -45,7 +68,7 @@ train_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 10_000
+    num_samples: ${settings.coca_example_settings.train_num_samples}
     sample_definition:
       - sample_key: images
         sample_shape: [3, 256, 256]
@@ -61,7 +84,7 @@ val_dataset:
   component_key: dataset
   variant_key: dummy_dataset
   config:
-    num_samples: 1_000
+    num_samples: ${settings.coca_example_settings.val_num_samples}
     sample_definition:
       - sample_key: images
         sample_shape: [3, 256, 256]
@@ -79,8 +102,8 @@ train_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
-    dataloader_tag: "train"
+    dataloader_tag: train
+    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -88,7 +111,8 @@ train_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -96,6 +120,8 @@ train_dataloader:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: true
+            drop_last: true
+            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
@@ -109,8 +135,7 @@ val_dataloader:
   config:
     num_workers: 2
     pin_memory: true
-    shuffle: false
-    dataloader_tag: "val"
+    dataloader_tag: val
     dataset:
       instance_key: val_dataset
       pass_type: BY_REFERENCE
@@ -118,7 +143,9 @@ val_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: ${settings.training.local_train_micro_batch_size}
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+
         sampler:
           component_key: sampler
           variant_key: distributed_sampler
@@ -126,6 +153,7 @@ val_dataloader:
             rank: ${settings.cuda_env.global_rank}
             num_replicas: ${settings.cuda_env.world_size}
             shuffle: false
+            drop_last: true
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
@@ -150,19 +178,16 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: fsdp
       config:
-        checkpoint_path: ${settings.paths.checkpointing_path}
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
-        mixed_precision_settings: FP_16
-        sharding_strategy: HYBRID_SHARD
-        block_names: [TransformerBlock, VisionTransformerBlock]
 
 captioning_loss:
   component_key: loss
   variant_key: cross_entropy_loss
   config:
     target_key: ${settings.referencing_keys.target_key}
-    prediction_key: ${model.config.prediction_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
     tag: captioning_loss
 
 contrastive_loss:
@@ -193,6 +218,22 @@ wrapped_model:
     block_names: [TransformerBlock, VisionTransformerBlock]
 
 model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: coca
+        weight_init_type: plain
+        mean: 0.0
+        std: 0.02
+
+model_raw:
   component_key: model
   variant_key: coca
   config:
@@ -232,16 +273,13 @@ model:
       n_embd: 768
       dropout: 0.0
       bias: true
-      activation: fused_swiglu
+      activation: swiglu
       epsilon: 1e-5
     n_pool_head: 12
     n_vision_queries: 256
     n_audio_queries: Null
     bias_attn_pool: False
     epsilon_attn_pool: 1e-5
-    weight_init:
-      mean: 0.0
-      std: 0.02
 
 scheduler:
   component_key: scheduler
@@ -253,9 +291,10 @@ scheduler:
     max_lr: 8e-4
     div_factor: 10
     final_div_factor: 1
-    total_steps: 500_000 # depends on 500.000 iterations on 65,536 image-text pairs -> 5 epochs on JFT -> 32.7B image-text pairs
-    pct_start: 0.02
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.01
     anneal_strategy: cos
+    last_epoch: ${settings.training_progress.last_step}
 
 optimizer:
   component_key: optimizer
@@ -264,7 +303,8 @@ optimizer:
     lr: 8e-4
     betas: [0.9, 0.999]
     eps: 1e-8
-    weight_decay: 0.01
+    weight_decay: 1e-1
+    weight_decay_groups_excluded: []
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
@@ -278,16 +318,14 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
 
-batch_progress_subscriber:
+progress_subscriber:
   component_key: progress_subscriber
   variant_key: rich
   config:
-    local_rank: ${settings.cuda_env.global_rank}
-    world_size: ${settings.cuda_env.world_size}
-    global_num_seen_steps: ${settings.training.global_num_seen_steps}
-    train_dataloader:
-      instance_key: train_dataloader
-      pass_type: BY_REFERENCE
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
     eval_dataloaders:
       instance_key: eval_dataloaders
       pass_type: BY_REFERENCE
@@ -296,9 +334,9 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: wandb
   config:
-    local_rank: ${settings.cuda_env.global_rank}
+    global_rank: ${settings.cuda_env.global_rank}
     project: modalities
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
-    directory: "."
+    directory: wandb_storage
     config_file_path: ${settings.config_file_path}

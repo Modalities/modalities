@@ -12,15 +12,29 @@ from torch.optim import Optimizer
 from modalities.checkpointing.checkpoint_saving import CheckpointEntityType
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.exceptions import CheckpointingError
+from modalities.training.training_progress import TrainingProgress
 
 
 class CheckpointingEntityType(Enum):
+    """
+    Enum class representing the types of entities that can be checkpointed.
+
+    Attributes:
+        MODEL (str): Represents the model entity.
+        OPTIMIZER (str): Represents the optimizer entity.
+    """
+
     MODEL = "model"
     OPTIMIZER = "optimizer"
 
 
 class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
-    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_steps_{num_train_steps}.bin"
+    """FSDPCheckpointSaving class for saving checkpoints of FSDP models and optimizers."""
+
+    CHECKPOINT_STRUCTURE = (
+        "eid_{experiment_id}-{entity}-seen_steps_{num_seen_steps}-seen_tokens_{num_seen_tokens}"
+        "-target_steps_{num_target_steps}-target_tokens_{num_target_tokens}.bin"
+    )
 
     def __init__(
         self,
@@ -29,12 +43,15 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         global_rank: int,
     ):
         """
-        Implementation of checkpointing to disc via FSDP
+        Initializes the FSDPCheckpointSaving class.
 
         Args:
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
+
+         Returns:
+            None
         """
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
@@ -43,19 +60,26 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
     def _get_checkpointing_path(
         self,
         experiment_id: str,
-        train_step_id: int,
+        num_seen_steps: int,
+        num_seen_tokens: int,
+        num_target_steps: int,
+        num_target_tokens: int,
         entity_type: CheckpointingEntityType,
     ) -> Path:
         entity_file_name = self.CHECKPOINT_STRUCTURE.format(
-            experiment_id=experiment_id, entity=entity_type.value, num_train_steps=str(train_step_id + 1)
+            experiment_id=experiment_id,
+            entity=entity_type.value,
+            num_seen_steps=str(num_seen_steps),
+            num_seen_tokens=str(num_seen_tokens),
+            num_target_steps=str(num_target_steps),
+            num_target_tokens=str(num_target_tokens),
         )
 
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, train_step_id: int):
+    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, training_progress: TrainingProgress):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
-        # TODO Need to check if LR schedulers also need checkpointing
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(
@@ -74,7 +98,10 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save model
             model_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_seen_steps=training_progress.num_seen_steps_total,
+                num_seen_tokens=training_progress.num_seen_tokens_total,
+                num_target_steps=training_progress.num_target_steps,
+                num_target_tokens=training_progress.num_target_tokens,
                 entity_type=CheckpointingEntityType.MODEL,
             )
 
@@ -84,7 +111,10 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
             # save optimizer
             optimize_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
-                train_step_id=train_step_id,
+                num_seen_steps=training_progress.num_seen_steps_total,
+                num_seen_tokens=training_progress.num_seen_tokens_total,
+                num_target_steps=training_progress.num_target_steps,
+                num_target_tokens=training_progress.num_target_tokens,
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
@@ -94,19 +124,24 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         # leading to wrong throughput measurements.
         dist.barrier()
 
-    def _get_paths_to_delete(self, train_step_id: int) -> List[Path]:
+    def _get_paths_to_delete(self, training_progress: TrainingProgress) -> List[Path]:
         return [
             self._get_checkpointing_path(
-                experiment_id=self.experiment_id, entity_type=entity_type, train_step_id=train_step_id
+                experiment_id=self.experiment_id,
+                entity_type=entity_type,
+                num_seen_steps=training_progress.num_seen_steps_total,
+                num_seen_tokens=training_progress.num_seen_tokens_total,
+                num_target_steps=training_progress.num_target_steps,
+                num_target_tokens=training_progress.num_target_tokens,
             )
             for entity_type in CheckpointEntityType
         ]
 
-    def _delete_checkpoint(self, train_step_id: int):
+    def _delete_checkpoint(self, training_progress: TrainingProgress):
         if self.global_rank != 0:
             return
 
-        files_paths_to_delete = self._get_paths_to_delete(train_step_id=train_step_id)
+        files_paths_to_delete = self._get_paths_to_delete(training_progress=training_progress)
         for full_path in files_paths_to_delete:
             if full_path.exists():
                 # unlink removes the file

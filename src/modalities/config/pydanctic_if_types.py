@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
@@ -17,6 +18,7 @@ from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.gpt2.collator import CollateFnIF
+from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
@@ -49,6 +51,7 @@ PydanticCheckpointSavingExecutionIFType = Annotated[
     CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticFSDPModuleType = Annotated[FSDP, PydanticThirdPartyTypeIF(FSDP)]
 PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
@@ -61,3 +64,4 @@ PydanticMessageSubscriberIFType = Annotated[MessageSubscriberIF, PydanticThirdPa
 PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(torch.device)]
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
+PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThirdPartyTypeIF(ModelInitializationIF)]

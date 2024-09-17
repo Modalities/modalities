@@ -13,8 +13,7 @@ from modalities.models.audio_transformer.audio_transformer_model import AudioTra
 from modalities.models.coca.attention_pooling import AttentionPooling
 from modalities.models.coca.multi_modal_decoder import MultiModalTextDecoder
 from modalities.models.coca.text_decoder import TextDecoder
-from modalities.models.gpt2.gpt2_model import ActivationType, WeightInitializationConfig
-from modalities.models.model import NNModel
+from modalities.models.model import ActivationType, NNModel
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from modalities.nn.attention import AttentionConfig
 
@@ -25,6 +24,27 @@ class AVConfig(BaseModel):
 
 
 class TextDecoderConfig(BaseModel):
+    """
+    Configuration class for the TextDecoder.
+
+
+    Args:
+        sample_key (str): The key for the samples.
+        prediction_key (str): The key for the predictions.
+        block_size (int): The block size. Must be greater than or equal to 1.
+        vocab_size (int): The vocabulary size. Must be greater than or equal to 1.
+        n_layer_text (int): The number of layers for processing text. Must be greater than or equal to 1.
+        n_layer_multimodal_text (int): -. Must be greater than or equal to 1.
+        n_head (int): The number of attention heads. Must be greater than or equal to 1.
+        n_embd (int): The embedding size. Must be greater than or equal to 1.
+        ffn_hidden (int): The hidden size for the feed-forward network. Must be greater than or equal to 1.
+        dropout (float): The dropout rate. Must be greater than or equal to 0.0.
+        bias (bool): Flag indicating whether to include bias in the model.
+        attention_config (AttentionConfig): The attention configuration.
+        activation (ActivationType): The activation type.
+        epsilon (float): The epsilon value. Must be greater than or equal to 0.0.
+    """
+
     sample_key: str
     prediction_key: str
     block_size: Annotated[int, Field(ge=1)]
@@ -42,6 +62,24 @@ class TextDecoderConfig(BaseModel):
 
 
 class CoCaConfig(BaseModel):
+    """
+    Configuration class for CoCa model.
+
+    Args:
+        prediction_key (str): The key for the predictions.
+        vision_embd_prediction_key (str): The key for the vision embeddings.
+        text_embd_prediction_key (str): The key for the text embeddings.
+        vision_cls_prediction_key (str): The key for the vision cls token.
+        text_cls_prediction_key (str): The key for the text cls token.
+        vision_encoder_config (VisionTransformerConfig): Configuration for the vision encoder.
+        text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
+        n_pool_head (int): Number of attention heads for pooling.
+        n_vision_queries (int): Number of vision queries.
+        bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
+        epsilon_attn_pool (float): Epsilon value for attention pooling.
+
+    """
+
     prediction_key: str = "logits"
     modality_key: str = "modality"
     modality_embd_prediction_key: str
@@ -56,11 +94,11 @@ class CoCaConfig(BaseModel):
     n_audio_queries: Annotated[int, Field(ge=1)] | None
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
-    weight_init: WeightInitializationConfig
 
 
 class CoCa(NNModel):
-    """CoCa
+    """
+    CoCa model
 
     The Contrastive Captioner (CoCa) is an encoder-decoder model that integrates the concepts of CLIP
     and generative models such as SimVLM by using contrastive and captioning losses for training.
@@ -85,8 +123,27 @@ class CoCa(NNModel):
         epsilon_attn_pool: float,
         modality_encoder_config: VisionTransformerConfig | AudioTransformerConfig | AVConfig,
         text_decoder_config: TextDecoderConfig,
-        weight_init: WeightInitializationConfig,
     ) -> None:
+        """
+        Initializes the CocaModel object.
+
+        Args:
+            prediction_key (str): The key for the predictions.
+            vision_cls_prediction_key (str): The key for the vision cls token.
+            text_cls_prediction_key (str): The key for the text cls token.
+            vision_embd_prediction_key (str): The key for the vision embeddings.
+            text_embd_prediction_key (str): The key for the text embeddings.
+
+            n_vision_queries (int): The number of vision queries.
+            n_pool_head (int): The number of pool heads.
+            bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
+            epsilon_attn_pool (float): The epsilon value for attention pooling.
+            vision_encoder_config (VisionTransformerConfig): The configuration for the vision encoder.
+            text_decoder_config (TextDecoderConfig): The configuration for the text decoder.
+
+        Returns:
+            None
+        """
         super().__init__()
 
         self.AUDIO = 0
@@ -168,8 +225,6 @@ class CoCa(NNModel):
         # Logit scale for contrastive loss
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
-        # init all weights
-        self.apply(partial(self._init_weights, weight_init=weight_init))
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
@@ -192,16 +247,16 @@ class CoCa(NNModel):
         )
         return encoder, queries, attn_pool
 
-    def _init_weights(self, module: nn.Module, weight_init: WeightInitializationConfig):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=weight_init.mean, std=weight_init.std)
-
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        # TODO: The "modality_key" needs to be implemented.
+        """
+        Forward pass of the CoCa model.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): Input dictionary containing the tensors.
+
+        Returns:
+            dict[str, torch.Tensor]: Output dictionary.
+        """
         if inputs[self.modality_key][0] == self.AUDIO:
             modality_embd, modality_cls_token = self._forward_encode_audio(inputs)
         if inputs[self.modality_key][0] == self.VISION:
@@ -216,6 +271,15 @@ class CoCa(NNModel):
         }
 
     def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encodes the input image using the vision encoder.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): Dictionary containing vision inputs.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
+        """
         vision_embd = self.vision_encoder(inputs)[self.modality_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
         vision_embd = self.vision_attn_pool(queries, context=vision_embd)
@@ -230,11 +294,31 @@ class CoCa(NNModel):
         return audio_embd, audio_cls_token
 
     def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encodes the input text using the text decoder.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
+            and the classification token tensor.
+        """
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]
         text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
 
     def _forward_decode(self, text_embd: torch.Tensor, modality_embd: torch.Tensor) -> torch.Tensor:
+        """
+        Perform forward decoding using the given text and vision embeddings.
+
+        Args:
+            text_embd (torch.Tensor): The text embeddings.
+            vision_embd (torch.Tensor): The vision embeddings.
+
+        Returns:
+            torch.Tensor: The logits obtained from the multimodal decoder.
+        """
         decoder_inputs = {
             self.text_embd_prediction_key: text_embd,
             "context": modality_embd,

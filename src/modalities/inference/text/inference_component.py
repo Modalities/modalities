@@ -14,7 +14,7 @@ class TextInferenceComponent:
         model: nn.Module,
         tokenizer: TokenizerWrapper,
         prompt_template: str,
-        context_length: int,
+        sequence_length: int,
         temperature: float,
         eod_token: str,
         device: torch.device,
@@ -25,7 +25,7 @@ class TextInferenceComponent:
         self.eod_token = eod_token
         self.prompt_template = prompt_template
         self.temperature = temperature
-        self.context_length = context_length
+        self.sequence_length = sequence_length
         self.device = device
 
     def generate_tokens(
@@ -33,7 +33,7 @@ class TextInferenceComponent:
         context: str,
     ):
         token_ids_list = self.tokenizer.tokenize(context)
-        max_new_tokens = self.context_length - len(token_ids_list)
+        max_new_tokens = self.sequence_length - len(token_ids_list)
         input_token_ids = torch.IntTensor(token_ids_list).to(self.device).unsqueeze(0)
         input_dict = {"input_ids": input_token_ids}
 
