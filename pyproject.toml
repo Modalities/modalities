@@ -10,6 +10,7 @@ dependencies = [
     "pyyaml",
     "transformers",
     "datasets",
+    "decord",
     "protobuf",
     "SentencePiece",
     "accelerate",
@@ -26,6 +27,7 @@ dependencies = [
     "einops>=0.7.0",
     "webdataset>=0.2.86",
     "timm>=0.9.16",
+    "pyav",
     "flash-attn",         # install this directly via `pip install flash-attn --no-build-isolation`
 ]
 
