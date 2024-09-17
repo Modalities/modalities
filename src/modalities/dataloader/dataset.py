@@ -11,6 +11,7 @@ import decord
 import jq
 import numpy as np
 import torch
+import torchaudio
 import webdataset as wds
 from pydantic import BaseModel, Field
 from timm.data import create_transform

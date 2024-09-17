@@ -138,8 +138,6 @@ class CoCa(NNModel):
         n_queries: Optional[int],
         bias_attn_pool: bool,
         epsilon_attn_pool: float,
-        modality_encoder_config: VisionTransformerConfig | AudioTransformerConfig | AVConfig,
-        text_decoder_config: TextDecoderConfig,
     ) -> None:
         """
         Initializes the CocaModel object.
@@ -254,6 +252,7 @@ class CoCa(NNModel):
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
         # apply special scaled init to the residual projections, per GPT-2 paper
+        '''
         for pn, p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
                 torch.nn.init.normal_(
@@ -262,6 +261,7 @@ class CoCa(NNModel):
                     std=weight_init.std
                     / math.sqrt(2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)),
                 )
+        '''
 
     def _init_modality(self, encoder_class, encoder_config, n_queries):
         encoder = encoder_class(**dict(encoder_config))

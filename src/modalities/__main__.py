@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import logging
 import os
 import shutil
 from datetime import datetime

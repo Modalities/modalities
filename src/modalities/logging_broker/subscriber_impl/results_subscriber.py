@@ -105,7 +105,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         wandb.log(data=throughput_metrics, step=eval_result.num_train_steps_done)
 
-        num_samples = eval_result.train_step_id + 1
+        num_samples = eval_result.num_train_steps_done
         group_content = [f"Train [{num_samples}]:"]
 
         losses = [f"{k}: {v}" for k, v in losses.items()]
