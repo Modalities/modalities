@@ -172,6 +172,7 @@ class Trainer:
             None
         """
         model.train()
+        cumulated_losses = self._reset_tracked_losses(len(loss_fun))
 
         # throughput & MFU
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -179,8 +180,6 @@ class Trainer:
         theoretical_flops_per_token, sequence_length = get_theoretical_flops_per_token(model)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        cumulated_losses = torch.zeros(len(loss_fun) + 1 + 1).to(device)
 
         # batch loop
         batch: DatasetBatch
