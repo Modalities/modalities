@@ -9,7 +9,7 @@ from tests.conftest import _ROOT_DIR
 
 
 @pytest.mark.parametrize(
-    "input,sample_key,n_classes,num_video_frames,add_cls_token,out_put",
+    "input,sample_key,n_classes,num_video_frames,add_cls_token,output",
     [
         (torch.randn(1, 3, 224, 224), "images", 1000, 1, True, (1, 1000)),
         (torch.randn(1, 3, 224, 224), "images", None, 1, True, (1, 197, 768)),
@@ -21,7 +21,7 @@ from tests.conftest import _ROOT_DIR
         (torch.randn(1, 16, 3, 224, 224), "videos", 1000, 16, False, (1, 1000)),
     ],
 )
-def test_vision_transformer(input, sample_key, n_classes, num_video_frames, add_cls_token, out_put):
+def test_vision_transformer(input, sample_key, n_classes, num_video_frames, add_cls_token, output):
     # Create model
     config_file_path = _ROOT_DIR / Path("tests/models/vision_transformer/vision_transformer_config.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
@@ -48,7 +48,7 @@ def test_vision_transformer(input, sample_key, n_classes, num_video_frames, add_
 
     # Test outputs
     assert "logits" in out
-    assert out["logits"].shape == out_put
+    assert out["logits"].shape == output
 
 
 @pytest.mark.parametrize(
