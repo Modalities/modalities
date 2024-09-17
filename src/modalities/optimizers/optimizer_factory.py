@@ -59,7 +59,9 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     """
     if weight_decay == 0 or len(weight_decay_groups_excluded) == 0:
         # there will be 1 optimizer group, i.e. all parameters have the same weight decay
-        optimizer_groups = [{"params": list(model.parameters()), "weight_decay": weight_decay}]
+        optimizer_groups = [
+            {"params": [p for p in model.parameters() if p.requires_grad], "weight_decay": weight_decay}
+        ]
         optimizer_groups_names = ["all"]
     else:
         # there will be N optimizer groups, i.e. one for each model parameter group
@@ -82,6 +84,7 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
         weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
+
     nn_model: NNModel = model.module
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:

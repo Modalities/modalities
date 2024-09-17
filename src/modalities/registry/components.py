@@ -48,6 +48,11 @@ from modalities.config.config import (
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
+    LoraConfig,
+)
+from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
+    LossMaskingCollateFnWrapper,
+    LossMaskingCollateFnWrapperConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
@@ -115,12 +120,29 @@ COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
     ComponentEntity(
-        "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
+        "model",
+        "huggingface_pretrained_model",
+        HuggingFacePretrainedModel,
+        HuggingFacePretrainedModelConfig,
     ),
-    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
-    ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+        "model",
+        "checkpointed",
+        ModelFactory.get_checkpointed_model,
+        CheckpointedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
+        "fsdp_wrapped",
+        ModelFactory.get_fsdp_wrapped_model,
+        FSDPWrappedModelConfig,
+    ),
+    ComponentEntity("model", "lora", ModelFactory.get_lora_model, LoraConfig),
+    ComponentEntity(
+        "model",
+        "model_initialized",
+        ModelFactory.get_weight_initalized_model,
+        WeightInitializedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # weight initializers
@@ -136,22 +158,53 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+        "optimizer",
+        "checkpointed",
+        OptimizerFactory.get_checkpointed_optimizer,
+        CheckpointedOptimizerConfig,
     ),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
-    ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
-    ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
-        "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+        "scheduler",
+        "constant_lr",
+        torch.optim.lr_scheduler.ConstantLR,
+        ConstantLRSchedulerConfig,
+    ),
+    ComponentEntity(
+        "scheduler",
+        "onecycle_lr",
+        torch.optim.lr_scheduler.OneCycleLR,
+        OneCycleLRSchedulerConfig,
+    ),
+    ComponentEntity(
+        "scheduler",
+        "cosine_annealing_lr",
+        torch.optim.lr_scheduler.CosineAnnealingLR,
+        CosineAnnealingLRSchedulerConfig,
     ),
     # tokenizers
-    ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
-    ComponentEntity("tokenizer", "pretrained_sp_tokenizer", PreTrainedSPTokenizer, PreTrainedSPTokenizerConfig),
+    ComponentEntity(
+        "tokenizer",
+        "pretrained_hf_tokenizer",
+        PreTrainedHFTokenizer,
+        PreTrainedHFTokenizerConfig,
+    ),
+    ComponentEntity(
+        "tokenizer",
+        "pretrained_sp_tokenizer",
+        PreTrainedSPTokenizer,
+        PreTrainedSPTokenizerConfig,
+    ),
     # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
-    ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),
+    ComponentEntity(
+        "dataset",
+        "mem_map_dataset",
+        DatasetFactory.get_mem_map_dataset,
+        MemMapDatasetConfig,
+    ),
     ComponentEntity(
         "dataset",
         "packed_mem_map_dataset_continuous",
@@ -172,6 +225,9 @@ COMPONENTS = [
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
+    ComponentEntity(
+        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
+    ),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity(

@@ -34,7 +34,6 @@ class DatasetFactory:
     @staticmethod
     def get_mem_map_dataset(
         raw_data_path: Path,
-        sequence_length: int,
         tokenizer: PreTrainedTokenizer,
         sample_key: str,
         index_path: Optional[Path] = None,
@@ -57,7 +56,6 @@ class DatasetFactory:
         """
         dataset = MemMapDataset(
             raw_data_path=raw_data_path,
-            block_size=sequence_length + 1,
             tokenizer=tokenizer,
             sample_key=sample_key,
             index_path=index_path,
@@ -67,22 +65,27 @@ class DatasetFactory:
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(
-        raw_data_path: Path, sequence_length: int, sample_key: str
+        raw_data_path: Path, sequence_length: int, sample_key: str, reuse_last_target: Optional[bool] = True
     ) -> PackedMemMapDatasetContinuous:
         """
-        Returns a PackedMemMapDatasetContinuous object.
+        Initializes a Dataset object. In case `reuse_last_target` is True,
+        we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
+        we don't reuse the last target in the next sample but never have the the first token of a sample as the target.
 
         Args:
             raw_data_path (Path): The path to the raw data.
             sequence_length (int): The length of each sequence.
-            sample_key (str): The key used to retrieve the samples from the dataset.
+            sample_key (str): The key to access the sample data.
+            reuse_last_target (Optional[bool], optional): Whether to reuse the last target. Defaults to True.
 
         Returns:
-            PackedMemMapDatasetContinuous: The packed memory-mapped dataset.
-
+            PackedMemMapDatasetContinuous: The created dataset object.
         """
         dataset = PackedMemMapDatasetContinuous(
-            raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
+            raw_data_path=raw_data_path,
+            block_size=sequence_length + 1,
+            sample_key=sample_key,
+            reuse_last_target=reuse_last_target,
         )
         return dataset
 

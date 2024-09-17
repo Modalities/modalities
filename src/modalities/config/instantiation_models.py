@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator
 
@@ -92,3 +92,39 @@ class TextGenerationInstantiationModel(BaseModel):
 
     text_inference_component: PydanticTextInferenceComponentType
     settings: TextGenerationSettings
+
+
+class Splitting(BaseModel):
+    train: int
+    val: int
+    test: int
+
+
+class SplitConfig(BaseModel):
+    splitting: Splitting
+    seed: int
+
+    @field_validator("splitting", mode="before")
+    def validate_splitting(cls, splitting) -> Optional[Splitting]:
+        if splitting is None:
+            return None
+        if splitting["train"] + splitting["val"] + splitting["test"] != 100:
+            raise ValueError("The sum of the split configuration must be 100 (excluding the seed).")
+        return splitting
+
+
+class InstructionTuningInstantiationModel(BaseModel):
+    class Settings(BaseModel):
+        src_path: FilePath
+        dst_path: Path
+        conversations_key: str
+        split_config: SplitConfig | None = None
+        pbin_creation_config_file_path: FilePath | None = None
+
+    class InstructionDataTransformation(BaseModel):
+        role_mapping: Dict[str, str]
+
+    settings: Settings
+    instruction_data_transformation: InstructionDataTransformation
+    jinja2_chat_template: str
+    chat_template_data: Dict[str, Any]

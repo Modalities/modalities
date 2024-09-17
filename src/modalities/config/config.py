@@ -51,9 +51,9 @@ class WandbMode(LookupEnum):
 
 
 class PrecisionEnum(LookupEnum):
-    FP32 = torch.float32
-    FP16 = torch.float16
-    BF16 = torch.bfloat16
+    FP_32 = torch.float32
+    FP_16 = torch.float16
+    BF_16 = torch.bfloat16
 
 
 class ReferenceConfig(BaseModel):
@@ -158,12 +158,12 @@ class OneCycleLRSchedulerConfig(BaseModel):
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
     cycle_momentum: bool = True
-    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[
-        Annotated[float, Field(strict=True, gt=0.0)]
-    ] = 0.85
-    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[
-        Annotated[float, Field(strict=True, gt=0.0)]
-    ] = 0.95
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.85
+    )
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.95
+    )
     div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     three_phase: bool = False
@@ -206,6 +206,13 @@ class CheckpointedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
 
 
+class LoraConfig(BaseModel):
+    alpha: int
+    r: int
+    target_layers: List[str]
+    model: PydanticPytorchModuleType
+
+
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     sync_module_states: bool
@@ -244,11 +251,12 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[Dict[str, str]] = None
+    special_tokens: Optional[Dict[str, str | List | Tuple]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
     tokenizer_model_file: str
+    # TODO: add support for special tokens, see issue #222
 
 
 class DistributedSamplerConfig(BaseModel):
@@ -263,7 +271,6 @@ class DistributedSamplerConfig(BaseModel):
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
-    sequence_length: Annotated[int, Field(strict=True, gt=1)]
     tokenizer: PydanticTokenizerIFType
     jq_pattern: str
     sample_key: str
@@ -273,6 +280,7 @@ class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
     sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
+    reuse_last_target: Optional[bool] = True
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
@@ -380,7 +388,9 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
     OmegaConf.register_new_resolver(
-        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+        "modalities_env",
+        partial(modalities_env_resolver_fun, config_file_path=config_file_path),
+        replace=True,
     )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 

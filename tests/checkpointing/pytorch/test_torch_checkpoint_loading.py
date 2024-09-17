@@ -25,11 +25,11 @@ def test_load_model_checkpoint(tmp_path):
     tmp_file_path = tmp_path / "model_state.pth"
 
     # model that we checkpoint
-    model_1 = DummyModel().to(dtype=PrecisionEnum.BF16.value)
+    model_1 = DummyModel().to(dtype=PrecisionEnum.BF_16.value)
 
     # models that we load the checkpoint into
-    model_2 = DummyModel().to(dtype=PrecisionEnum.FP16.value)
-    model_3 = DummyModel().to(dtype=PrecisionEnum.FP16.value)
+    model_2 = DummyModel().to(dtype=PrecisionEnum.FP_16.value)
+    model_3 = DummyModel().to(dtype=PrecisionEnum.FP_16.value)
 
     # perform checkpointing
     model_state = model_1.state_dict()
@@ -38,7 +38,7 @@ def test_load_model_checkpoint(tmp_path):
     # load the model checkpoint with different settings
     gpu_device = torch.device("cuda:0")
     loaded_model_1: DummyModel = TorchCheckpointLoading(
-        device=gpu_device, precision=PrecisionEnum.FP32
+        device=gpu_device, precision=PrecisionEnum.FP_32
     ).load_model_checkpoint(model_2, tmp_file_path)
 
     assert torch.equal(model_1._weights.weight.to(gpu_device), loaded_model_1._weights.weight)

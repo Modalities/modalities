@@ -9,6 +9,7 @@ from typing import List, Tuple, Type
 
 import click
 import click_pathlib
+import yaml
 from pydantic import BaseModel, FilePath
 
 from modalities.activation_checkpointing import apply_activation_checkpointing_inplace
@@ -17,12 +18,13 @@ from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import (
-    PackedDatasetComponentsInstantiationModel,
     TrainingComponentsInstantiationModel,
+    InstructionTuningInstantiationModel,
 )
-from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.apply_chat_template import split_and_apply_chat_template
+from modalities.dataloader.create_index import create_raw_index
+from modalities.dataloader.create_packed_data import pack_encoded_data
+from modalities.dataloader.packed_data_generator import EmbeddedStreamData, join_embedded_stream_data
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.inference.inference import generate_text
@@ -37,6 +39,13 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
 
+config_file_path_option = click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+
 
 @click.group()
 def main() -> None:
@@ -44,12 +53,7 @@ def main() -> None:
 
 
 @main.command(name="run")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=False),
-    required=True,
-    help="Path to a file with the YAML config file.",
-)
+@config_file_path_option
 def entry_point_run_modalities(config_file_path: Path):
     """Entrpoint to run the model training.
 
@@ -63,12 +67,7 @@ def entry_point_run_modalities(config_file_path: Path):
 
 
 @main.command(name="generate_text")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=False),
-    required=True,
-    help="Path to a file with the YAML config file.",
-)
+@config_file_path_option
 def entry_point_generate_text(config_file_path: FilePath):
     """Inference entrypoint to generate text with a given model.
 
@@ -79,12 +78,7 @@ def entry_point_generate_text(config_file_path: FilePath):
 
 
 @main.command(name="convert_pytorch_to_hf_checkpoint")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=True),
-    required=True,
-    help="Path to config of model checkpoint.",
-)
+@config_file_path_option
 @click.option(
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
@@ -124,6 +118,38 @@ def data():
     pass
 
 
+@data.command(name="prepare_instruction_tuning_data")
+@config_file_path_option
+def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
+    """
+    Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
+    """
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+
+    # split and apply chat template
+    partition_to_output_file_path_mapping = split_and_apply_chat_template(config_file_path)
+
+    config = InstructionTuningInstantiationModel(**config_dict)
+    hash_suffix = list(partition_to_output_file_path_mapping.values())[0].suffixes[0]
+    for partition, jsonl_data_out_file_path in partition_to_output_file_path_mapping.items():
+        # create the index
+        idx_file_path = jsonl_data_out_file_path.with_suffix(".idx")
+        create_raw_index(jsonl_data_out_file_path, idx_file_path)
+
+        # create pbin files
+        pbin_config_file_path = jsonl_data_out_file_path.with_name(f"pbin_config_{partition}").with_suffix(
+            f"{hash_suffix}.yaml"
+        )
+        shutil.copyfile(config.settings.pbin_creation_config_file_path, pbin_config_file_path)
+        pbin_config = load_app_config_dict(config_file_path=pbin_config_file_path)
+        pbin_config["settings"]["src_path"] = str(jsonl_data_out_file_path)
+        pbin_config["settings"]["index_path"] = str(idx_file_path)
+        pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
+        with open(pbin_config_file_path, "w") as f:
+            yaml.dump(pbin_config, f, allow_unicode=True)
+        pack_encoded_data(pbin_config_file_path)
+
+
 @data.command(name="create_raw_index")
 @click.argument("src_path", type=Path)
 @click.option(
@@ -133,7 +159,7 @@ def data():
     help="output path for index. will use parent directory of src_path if none.",
 )
 def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
-    """Utility CMD IF for indexing the confent of a large jsonl-file.
+    """Utility CMD IF for indexing the content of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
     It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.
@@ -145,21 +171,15 @@ def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     Raises:
         ValueError: If the index file already exists.
     """
-
-    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
-    if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
-
-    print(f"reading raw data from {src_path}")
-    print(f"writing index to {index_path}")
-    generator = IndexGenerator(src_path)
-    generator.create_index(index_path)
+    create_raw_index(src_path, index_path)
 
 
 @data.command(name="pack_encoded_data")
-@click.argument("config_path", type=FilePath)
-def entry_point_pack_encoded_data(config_path: FilePath):
-    """Utility to encode an indexed, large jsonl-file.
+@config_file_path_option
+def entry_point_pack_encoded_data(config_file_path: FilePath):
+    """
+    Utility to encode an indexed, large jsonl-file.
+
     (see also `create_index` for more information)
     Returns .pbin-file, which can be inserted into a training process directly
     and does not require its original jsonl-file or the respective index file anymore.
@@ -167,32 +187,7 @@ def entry_point_pack_encoded_data(config_path: FilePath):
     Args:
         config_path (FilePath): Path to the config file describing the tokenization setup.
     """
-
-    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
-    #  we can currently not rely on the existing class resolver.
-    #  This is based on its connection to the overall `AppConfig`.
-    #  One would requires an object of it to instantiate the ResolverRegistry.
-    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
-    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    config = load_app_config_dict(config_path)
-    registry = Registry(COMPONENTS)
-    component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
-    )
-
-    generator = PackedDataGenerator(
-        components.settings.src_path,
-        index_path=components.settings.index_path,
-        tokenizer=components.tokenizer,
-        eod_token=components.settings.eod_token,
-        jq_pattern=components.settings.jq_pattern,
-        number_of_processes=components.settings.num_cpus,
-        processing_batch_size=components.settings.processing_batch_size,
-        raw_samples_queue_size=components.settings.raw_samples_queue_size,
-        processed_samples_queue_size=components.settings.processed_samples_queue_size,
-    )
-    generator.run(components.settings.dst_path)
+    pack_encoded_data(config_file_path)
 
 
 @data.command(name="merge_packed_data")

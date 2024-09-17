@@ -8,9 +8,12 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.models.lora.utils import convert_to_lora
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
+from modalities.running_env.fsdp.fsdp_auto_wrapper import (
+    FSDPTransformerAutoWrapPolicyFactory,
+)
 from modalities.util import get_local_number_of_trainable_parameters
 
 
@@ -73,6 +76,8 @@ class ModelFactory:
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
 
         # model is on CPU before input to FSDP
+        model = model.to("cpu")
+
         fsdp_model = FSDP(
             model,
             auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
@@ -88,6 +93,21 @@ class ModelFactory:
         )
 
         return fsdp_model
+
+    @staticmethod
+    def get_lora_model(
+        model: nn.Module,
+        r: int,
+        alpha: int,
+        target_layers: List[str],
+    ) -> nn.Module:
+        convert_to_lora(
+            model=model,
+            r=r,
+            alpha=alpha,
+            target_layers=target_layers,
+        )
+        return model
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:

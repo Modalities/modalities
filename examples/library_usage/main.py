@@ -8,7 +8,7 @@ from modalities.__main__ import Main
 from modalities.batch import DatasetBatch
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
-from modalities.models.gpt2.collator import CollateFnIF
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.running_env.cuda_env import CudaEnv
 
 
