@@ -22,7 +22,7 @@ Throughout the tutorial, we will use the Jupyter Notebook `modalities_demo.ipynb
 
 
 To start the tutorial check out the Jupyter Notebook `modalities_demo.ipynb` and follow the instructions provided in the notebook.
-If you don't have Jupyter Notebook installed in your python environment, you can install it by running the following command:
+If you do not have Jupyter Notebook installed in your python environment yet, you can install it by running the following command:
 
 ```bash
 pip install jupyterlab
