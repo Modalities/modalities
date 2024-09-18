@@ -328,10 +328,21 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         # of the subsequent sample).
         num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
         # given num_samples we calculate the starting index and length of each sample as tuple.
-        return [
-            ((i * self.block_size - i) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
-            for i in range(num_samples)
-        ]
+        # return [
+        #     ((i * self.block_size - i) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
+        #     for i in range(num_samples)
+        # ]
+
+        # Create an array of indices (i values)
+        i_array = np.arange(num_samples)
+
+        # Vectorized operations
+        first_component = (i_array * self.block_size - i_array) * self._token_size_in_bytes
+        second_component = np.full(num_samples, self.block_size * self._token_size_in_bytes)
+
+        # Combine both components into a 2D array of tuples (or list of tuples if needed)
+        result = np.stack((first_component, second_component), axis=1)
+        return result
 
 
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
@@ -394,7 +405,7 @@ class CombinedDataset(Dataset):
     def _find_dataset_idx(self, idx: int) -> int:
         for i, cumulative_size in enumerate(self.cumulative_sizes):
             if idx < cumulative_size:
-                return i
+                return i - 1
         raise IndexError(f"Index {idx} is out of bounds.")
 
     def __len__(self) -> int:
@@ -402,7 +413,7 @@ class CombinedDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict:
         dataset_idx = self._find_dataset_idx(idx)
-        local_idx = idx - self.cumulative_sizes[dataset_idx - 1]
+        local_idx = idx - self.cumulative_sizes[dataset_idx]
 
         sample = self.datasets[dataset_idx][local_idx]
         return sample
