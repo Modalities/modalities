@@ -125,7 +125,7 @@ If you are a VSCode user, you may want to add this to your `launch.json`:
                 "--nnodes",
                 "1",
                 "--nproc_per_node",
-                "2",
+                "4",
                 "--rdzv-endpoint=0.0.0.0:29515",
                 "src/modalities/__main__.py",
                 "run",
