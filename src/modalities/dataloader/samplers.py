@@ -120,39 +120,38 @@ class ResumableDistributedSampler(Sampler[T_co]):
     def __init__(
         self,
         dataset: Dataset,
+        rank: int,
         num_replicas: Optional[int] = None,
-        rank: Optional[int] = None,
-        shuffle: bool = True,
-        seed: int = 0,
-        drop_last: bool = False,
+        epoch: Optional[int] = 0,
+        shuffle: Optional[bool] = False,
+        seed: Optional[int] = 0,
+        drop_last: Optional[bool] = False,
+        skip_num_global_samples: Optional[int] = 0,
     ) -> None:
-        if num_replicas is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            num_replicas = dist.get_world_size()
-        if rank is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            rank = dist.get_rank()
-        if rank >= num_replicas or rank < 0:
-            raise ValueError(f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]")
+        num_replicas = dist.get_world_size()
+        self.rank = rank
         self.dataset = dataset
         self.num_replicas = num_replicas
-        self.rank = rank
-        self.epoch = 0
+        self.epoch = epoch
         self.drop_last = drop_last
+        self.skip_num_global_samples = skip_num_global_samples
+
+        self.global_num_samples = len(self.dataset) - self.skip_num_global_samples
         # If the dataset length is evenly divisible by # of replicas, then there
         # is no need to drop any data, since the dataset will be split equally.
-        if self.drop_last and len(self.dataset) % self.num_replicas != 0:  # type: ignore[arg-type]
+        if self.drop_last and self.global_num_samples % self.num_replicas != 0:  # type: ignore[arg-type]
             # Split to nearest available length that is evenly divisible.
             # This is to ensure each rank receives the same amount of data when
             # using this Sampler.
-            self.num_samples = math.ceil(
-                (len(self.dataset) - self.num_replicas) / self.num_replicas  # type: ignore[arg-type]
+            self.local_num_samples = math.ceil(
+                (self.global_num_samples - self.num_replicas) / self.num_replicas  # type: ignore[arg-type]
             )
         else:
-            self.num_samples = math.ceil(len(self.dataset) / self.num_replicas)  # type: ignore[arg-type]
-        self.total_size = self.num_samples * self.num_replicas
+            # if this is not integer divisible, we will add padding by reusing the beginning of the data
+            self.local_num_samples = math.ceil(self.global_num_samples / self.num_replicas)  # type: ignore[arg-type]
+
+        # the actual number of samples we will be iterating over
+        self.global_num_samples_effective = self.local_num_samples * self.num_replicas
         self.shuffle = shuffle
         self.seed = seed
 
@@ -165,26 +164,28 @@ class ResumableDistributedSampler(Sampler[T_co]):
         else:
             indices = list(range(len(self.dataset)))  # type: ignore[arg-type]
 
+        indices = indices[self.skip_num_global_samples :]
+
         if not self.drop_last:
             # add extra samples to make it evenly divisible
-            padding_size = self.total_size - len(indices)
+            padding_size = self.global_num_samples_effective - len(indices)
             if padding_size <= len(indices):
                 indices += indices[:padding_size]
             else:
                 indices += (indices * math.ceil(padding_size / len(indices)))[:padding_size]
         else:
             # remove tail of data to make it evenly divisible.
-            indices = indices[: self.total_size]
-        assert len(indices) == self.total_size
+            indices = indices[: self.global_num_samples_effective]
+        assert len(indices) == self.global_num_samples_effective
 
         # subsample
-        indices = indices[self.rank : self.total_size : self.num_replicas]
-        assert len(indices) == self.num_samples
+        indices = indices[self.rank : self.global_num_samples_effective : self.num_replicas]
+        assert len(indices) == self.local_num_samples
 
         return iter(indices)
 
     def __len__(self) -> int:
-        return self.num_samples
+        return self.local_num_samples
 
     def set_epoch(self, epoch: int) -> None:
         r"""
