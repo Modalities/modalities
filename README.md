@@ -11,6 +11,9 @@
   <a href="https://coveralls.io/github/Modalities/modalities">
     <img src="https://coveralls.io/repos/github/Modalities/modalities/badge.svg?branch=main" alt="Coverage Status">
   </a>
+  <a herf="https://img.shields.io/pypi/pyversions/modalities">
+    <img src="https://img.shields.io/pypi/v/modalities" alt="PyPI">
+  </a>
  <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
   </a>
