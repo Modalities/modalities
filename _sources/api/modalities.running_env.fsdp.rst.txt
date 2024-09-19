@@ -1,0 +1,29 @@
+modalities.running\_env.fsdp package
+====================================
+
+Submodules
+----------
+
+modalities.running\_env.fsdp.fsdp\_auto\_wrapper module
+-------------------------------------------------------
+
+.. automodule:: modalities.running_env.fsdp.fsdp_auto_wrapper
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.running\_env.fsdp.reducer module
+-------------------------------------------
+
+.. automodule:: modalities.running_env.fsdp.reducer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.running_env.fsdp
+   :members:
+   :undoc-members:
+   :show-inheritance:

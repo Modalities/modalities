@@ -1,0 +1,29 @@
+modalities.optimizers package
+=============================
+
+Submodules
+----------
+
+modalities.optimizers.lr\_schedulers module
+-------------------------------------------
+
+.. automodule:: modalities.optimizers.lr_schedulers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.optimizers.optimizer\_factory module
+-----------------------------------------------
+
+.. automodule:: modalities.optimizers.optimizer_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.optimizers
+   :members:
+   :undoc-members:
+   :show-inheritance:
