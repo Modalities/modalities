@@ -97,6 +97,7 @@ class CoCaConfig(BaseModel):
     n_queries: Optional[Annotated[int, Field(ge=1)]]
     bias_attn_pool: bool
     epsilon_attn_pool: Annotated[float, Field(ge=0.0)]
+    seed: Optional[int] = None
 
 
 class CoCa(NNModel):
@@ -136,6 +137,7 @@ class CoCa(NNModel):
         n_queries: Optional[int],
         bias_attn_pool: bool,
         epsilon_attn_pool: float,
+        seed: int = None,
     ) -> None:
         """
         Initializes the CocaModel object.
@@ -153,11 +155,19 @@ class CoCa(NNModel):
             epsilon_attn_pool (float): The epsilon value for attention pooling.
             vision_encoder_config (VisionTransformerConfig): The configuration for the vision encoder.
             text_decoder_config (TextDecoderConfig): The configuration for the text decoder.
+            seed (int, optional): The random seed. Defaults to None.
 
         Returns:
             None
         """
-        super().__init__()
+        weight_decay_groups = {
+            "linear": ["attention", "\.attn", "\.cross_attn", "\.post_subsampler", "_ffmodule", "mlp"],
+            "conv": ["embedding_fn\.conv", "project", "\.subsampler", "pointwise_conv", "depthwise_conv"],
+            "embedding": ["wte", "wpe", "positional_embedding", "time_embd"],
+            "norm": ["norm", "\.ln_", "\.ln", "\.bn", "exit_ln"],
+            "parameter": ["_queries", "logit_scale", "\.latents", "cls_token"],
+        }
+        super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
 
         self.prediction_key = prediction_key
         self.text_embd_prediction_key = text_embd_prediction_key

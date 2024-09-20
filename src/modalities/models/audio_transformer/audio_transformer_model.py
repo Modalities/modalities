@@ -92,8 +92,8 @@ class ConformerBlock(nn.Module):
             act_fn=nn.SiLU,
             dropout=ffmodule_dropout,
         )
-        self.mhsa_ln = nn.LayerNorm(n_embd)
-        self.mhsa = MultiHeadAttention(
+        self.ln_mhsa = nn.LayerNorm(n_embd)
+        self.attn = MultiHeadAttention(
             attention_config=attention_config,
             attention_type=AttentionType.NON_CAUSAL_SELF_ATTENTION,
             n_embd=n_embd,
@@ -125,7 +125,7 @@ class ConformerBlock(nn.Module):
     ) -> torch.Tensor:
         x = self.ln1(x)  # x.shape: B, T, D
         x = x + 0.5 * self.entry_ffmodule(x)
-        x = x + self.mhsa(self.mhsa_ln(x), mask=mask)
+        x = x + self.attn(self.ln_mhsa(x), mask=mask)
         x = x + self.convmodule(x)
         x = self.ln2(x)
         x = x + 0.5 * self.exit_ffmodule(x)

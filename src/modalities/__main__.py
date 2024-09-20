@@ -9,7 +9,6 @@ from typing import List, Tuple, Type
 
 import click
 import click_pathlib
-import torch.distributed as dist
 from pydantic import BaseModel, FilePath
 
 from modalities.batch import EvaluationResultBatch
