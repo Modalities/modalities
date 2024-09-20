@@ -188,13 +188,6 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     verbose: bool = False
 
 
-class CosineAnnealingWithWarmupLRSchedulerConfig(BaseModel):
-    optimizer: PydanticOptimizerIFType
-    num_warmup_steps: Annotated[int, Field(strict=True, gt=0)]
-    num_training_steps: Annotated[int, Field(strict=True, gt=0)]
-    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-
-
 class CheckpointedOptimizerConfig(BaseModel):
     checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path

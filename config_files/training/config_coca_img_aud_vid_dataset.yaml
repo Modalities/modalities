@@ -494,13 +494,18 @@ model_raw:
 
 scheduler:
   component_key: scheduler
-  variant_key: cosine_annealing_with_warmup_lr # COCA uses linear decay
+  variant_key: onecycle_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    num_warmup_steps: 2_000
-    num_training_steps: 500_000
+    max_lr: 8e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.02
+    anneal_strategy: linear # COCA uses linear decay
+    last_epoch: ${settings.training_progress.last_step}
 
 optimizer:
   component_key: optimizer
