@@ -68,9 +68,15 @@ NAMED_PARAMETER_INIT_GROUPS = {
     SupportWeightInitModels.COCA: {
         # we reject all bias and weight parameters belonging to norms
         WeightInitTypes.PLAIN: RegexFilter(
-            weights=[r"^(?!.*norm)(?!.*ln_).*\.weight$"], biases=[r"^(?!.*norm)(?!.*ln_).*\.bias$"]
+            weights=[r"^(?!.*norm)(?!.*ln).*\.weight$"], biases=[r"^(?!.*norm)(?!.*ln).*\.bias$"]
         ),
-        WeightInitTypes.SCALED: RegexFilter(weights=[], biases=[]),
+        # scaled init for residual layers:
+        # https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf (pp 4)
+        WeightInitTypes.SCALED: RegexFilter(
+            weights=[
+                r"transformer\.h\.\d+\.attn\.c_proj\.weight",
+            ]
+        ),
         WeightInitTypes.SCALED_EMBED: RegexFilter(weights=[], biases=[]),
     },
 }

@@ -403,7 +403,7 @@ model:
         weight_init_type: scaled
         mean: 0.0
         std: 0.02
-        num_layers: ${model_raw.config.text_decoder_config.n_layer_text}
+        num_layers: 4 # text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text
 
 model_raw:
   component_key: model
@@ -476,8 +476,8 @@ model_raw:
       prediction_key: ${model_raw.config.prediction_key}
       block_size: 512
       vocab_size: 50304 # 64k in the original coca
-      n_layer_text: 2
-      n_layer_multimodal_text: 2
+      n_layer_text: 2 # update model_initializer num_layers
+      n_layer_multimodal_text: 2 # update model_initializer num_layers
       attention_config:
         attention_engine_type: default_attention
       n_head: 12

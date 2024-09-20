@@ -1,5 +1,3 @@
-import math
-from functools import partial
 from typing import Annotated, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -250,18 +248,6 @@ class CoCa(NNModel):
 
         # Logit scale for contrastive loss
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
-
-        # apply special scaled init to the residual projections, per GPT-2 paper
-        '''
-        for pn, p in self.named_parameters():
-            if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(
-                    p,
-                    mean=weight_init.mean,
-                    std=weight_init.std
-                    / math.sqrt(2 * (text_decoder_config.n_layer_text + text_decoder_config.n_layer_multimodal_text)),
-                )
-        '''
 
     def _init_modality(self, encoder_class, encoder_config, n_queries):
         encoder = encoder_class(**dict(encoder_config))
