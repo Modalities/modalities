@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Dict
 
 import torch
 from torch import nn
@@ -102,7 +101,7 @@ class TransformerBlock(nn.Module):
         if not self.with_context or self.add_extra_mlp:
             x = x + self.mlp(self.ln_2(x))
         if self.with_context:
-            if isinstance(context, Dict):
+            if isinstance(context, dict):
                 x = self.ln_3(x)
                 x = x + self.cross_attn(x, context=context["audio"]) + self.cross_attn2(x, context=context["video"])
                 x = x + self.mlp_2(self.ln_4(x))
@@ -184,7 +183,7 @@ class MultiModalTextDecoder(NNModel):
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the MultiModalTextDecoder module.
 

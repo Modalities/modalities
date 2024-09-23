@@ -2,7 +2,7 @@ import math
 import os
 import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import pytest
 import torch
@@ -27,7 +27,7 @@ from tests.conftest import _ROOT_DIR
 #   $(which pytest) path/to/test_initialization.py
 
 
-def get_model_from_config(model_config_dict: Dict) -> GPT2LLM | CoCa:
+def get_model_from_config(model_config_dict: dict) -> GPT2LLM | CoCa:
     """get gpt2 or coca model from config_dict"""
 
     class InstantationModel(BaseModel):
@@ -44,7 +44,7 @@ def get_model_from_config(model_config_dict: Dict) -> GPT2LLM | CoCa:
     return model
 
 
-def _replace_config_dict(_config_dict: Dict, _initialization_type: str, _std: str) -> Dict:
+def _replace_config_dict(_config_dict: dict, _initialization_type: str, _std: str) -> dict:
     """dynamically replace initialization_type, std and dependent fields in config_dict"""
     _config_dict["model"]["config"]["model_initializer"]["config"]["weight_init_type"] = _initialization_type  # replace
     _config_dict["model"]["config"]["model_initializer"]["config"]["std"] = _std  # replace
@@ -120,7 +120,7 @@ MAPPING_COCA = {
 }
 
 
-def get_group_params(model: FSDP, model_name: str) -> Dict[str, Optional[torch.Tensor]]:
+def get_group_params(model: FSDP, model_name: str) -> dict[str, Optional[torch.Tensor]]:
     """
     divide all model parameters into initialization groups
     """

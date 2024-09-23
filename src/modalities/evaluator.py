@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -36,7 +34,7 @@ class Evaluator:
         self,
         batch: DatasetBatch,
         model: nn.Module,
-        loss_fun: List[Loss],
+        loss_fun: list[Loss],
     ) -> torch.Tensor:
         """Evaluate a single batch by forwarding it through the model and calculating the loss.
 
@@ -72,22 +70,22 @@ class Evaluator:
     def evaluate(
         self,
         model: nn.Module,
-        data_loaders: List[LLMDataLoader],
-        loss_fun: List[Loss],
+        data_loaders: list[LLMDataLoader],
+        loss_fun: list[Loss],
         num_train_steps_done: int,
-    ) -> Dict[str, EvaluationResultBatch]:
+    ) -> dict[str, EvaluationResultBatch]:
         """Evaluate the model on a set of datasets.
 
         Args:
             model (nn.Module): The model to evaluate
-            data_loaders (List[LLMDataLoader]): List of dataloaders to evaluate the model on
+            data_loaders (list[LLMDataLoader]): List of dataloaders to evaluate the model on
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
             num_train_steps_done (int): The number of training steps done so far for logging purposes
 
         Returns:
-            Dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
+            dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
         """
-        result_dict: Dict[str, EvaluationResultBatch] = {}
+        result_dict: dict[str, EvaluationResultBatch] = {}
         model.eval()
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

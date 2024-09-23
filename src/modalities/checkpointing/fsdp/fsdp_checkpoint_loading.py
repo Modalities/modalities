@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import torch
 import torch.nn as nn
@@ -17,7 +16,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
     def __init__(
         self,
         global_rank: int,
-        block_names: List[str],
+        block_names: list[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
     ):
@@ -26,7 +25,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
 
         Args:
             global_rank (int): The global rank of the process.
-            block_names (List[str]): The names of the blocks.
+            block_names (list[str]): The names of the blocks.
             mixed_precision_settings (MixedPrecisionSettings): The settings for mixed precision.
             sharding_strategy (ShardingStrategy): The sharding strategy.
 

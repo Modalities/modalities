@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import PosixPath
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
 
 import torch
 from transformers import PretrainedConfig, PreTrainedModel
@@ -49,8 +49,8 @@ class HFModelAdapterConfig(PretrainedConfig):
         return json.dumps(json_dict)
 
     def _convert_posixpath_to_str(
-        self, data_to_be_formatted: Union[Dict[str, Any], List[Any], PosixPath, Any]
-    ) -> Union[Dict[str, Any], List[Any], PosixPath, Any]:
+        self, data_to_be_formatted: dict[str, Any] | list[Any] | PosixPath | Any
+    ) -> dict[str, Any] | list[Any] | PosixPath | Any:
         # Recursively converts any PosixPath objects within a nested data structure to strings.
 
         if isinstance(data_to_be_formatted, dict):
@@ -108,13 +108,13 @@ class HFModelAdapter(PreTrainedModel):
             output_hidden_states (bool, optional): Whether to output hidden states. Defaults to False.
 
         Returns:
-            Union[ModalitiesModelOutput, torch.Tensor]: The output of the forward pass.
+            ModalitiesModelOutput | torch.Tensor: The output of the forward pass.
         """
         # These parameters are required by HuggingFace. We do not use them and hence don't implement them.
         if output_attentions or output_hidden_states:
             raise NotImplementedError
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
-        model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
+        model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
         if return_dict:
             return ModalitiesModelOutput(**model_forward_output)
         else:
@@ -122,7 +122,7 @@ class HFModelAdapter(PreTrainedModel):
 
     def prepare_inputs_for_generation(
         self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Prepares the inputs for generation.
 
@@ -132,7 +132,7 @@ class HFModelAdapter(PreTrainedModel):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the prepared inputs for generation.
+            dict[str, Any]: A dictionary containing the prepared inputs for generation.
 
         Note:
             Implement in subclasses of :class:`~transformers.PreTrainedModel`
@@ -151,10 +151,10 @@ class ModalitiesModelOutput(ModelOutput):
 
     Args:
         logits (torch.FloatTensor, optional): The logits output of the model. Defaults to None.
-        hidden_states (Tuple[torch.FloatTensor], optional): The hidden states output of the model. Defaults to None.
-        attentions (Tuple[torch.FloatTensor], optional): The attentions output of the model. Defaults to None.
+        hidden_states (tuple[torch.FloatTensor], optional): The hidden states output of the model. Defaults to None.
+        attentions (tuple[torch.FloatTensor], optional): The attentions output of the model. Defaults to None.
     """
 
     logits: Optional[torch.FloatTensor] = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[tuple[torch.FloatTensor]] = None
+    attentions: Optional[tuple[torch.FloatTensor]] = None

@@ -1,6 +1,6 @@
 import math
 import re
-from typing import Annotated, List, Optional
+from typing import Annotated, Optional
 
 import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator
@@ -12,7 +12,7 @@ from modalities.nn.model_initialization.parameter_name_filters import RegexFilte
 class PlainInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
-    parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+    parameter_name_regexes: list[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
     hidden_dim: Optional[int] = None
 
     @model_validator(mode="after")
@@ -30,12 +30,12 @@ class ScaledInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)]
     num_layers: Annotated[int, Field(strict=True, gt=0)]
-    parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+    parameter_name_regexes: list[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
 class ScaledEmbedInitializationConfig(BaseModel):
     mean: float
-    parameter_name_regexes: List[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
+    parameter_name_regexes: list[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
 
 
 class NamedParameterwiseNormalInitialization(ModelInitializationIF):
@@ -59,7 +59,7 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
 class InitializationRoutines:
     @staticmethod
     def get_plain_initialization(
-        mean: float, std: float | str, parameter_name_regexes: List[str], hidden_dim: Optional[int] = None
+        mean: float, std: float | str, parameter_name_regexes: list[str], hidden_dim: Optional[int] = None
     ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
@@ -86,7 +86,7 @@ class InitializationRoutines:
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, std: float, num_layers: int, parameter_name_regexes: List[str]
+        mean: float, std: float, num_layers: int, parameter_name_regexes: list[str]
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -94,7 +94,7 @@ class InitializationRoutines:
             mean (float): Mean of the normal distribution
             std (float): Standard deviation of the normal distribution used to initialize the other weights
             num_layers (int): Number of layers in the model which we use to downscale std with
-            parameter_name_regexes (List[str]): List of parameter name regexes to which the initialization
+            parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
                 should be applied
 
         Returns:
@@ -109,13 +109,13 @@ class InitializationRoutines:
         return initialization
 
     @staticmethod
-    def get_scaled_embed_initialization(mean: float, parameter_name_regexes: List[str]) -> ModelInitializationIF:
+    def get_scaled_embed_initialization(mean: float, parameter_name_regexes: list[str]) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
 
         Args:
             mean (float): Mean of the normal distribution
-            parameter_name_regexes (List[str], optional): List of parameter name regexes to which the initialization
+            parameter_name_regexes (list[str], optional): List of parameter name regexes to which the initialization
                 should be applied Defaults to None.
 
         Returns:

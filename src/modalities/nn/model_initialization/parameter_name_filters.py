@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,8 +16,8 @@ class SupportWeightInitModels(Enum):
 
 
 class RegexFilter(BaseModel):
-    weights: List[str]
-    biases: Optional[List[str]] = Field(default_factory=list)
+    weights: list[str]
+    biases: Optional[list[str]] = Field(default_factory=list)
 
 
 NAMED_PARAMETER_INIT_GROUPS = {

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import torch
 import torch.distributed as dist
@@ -46,7 +45,7 @@ class ModelFactory:
     def get_fsdp_wrapped_model(
         model: nn.Module,
         sync_module_states: bool,
-        block_names: List[str],
+        block_names: list[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
     ) -> FSDP:
@@ -56,7 +55,7 @@ class ModelFactory:
         Args:
             model (nn.Module): The original model to be wrapped.
             sync_module_states (bool): Whether to synchronize module states across ranks.
-            block_names (List[str]): List of block names.
+            block_names (list[str]): List of block names.
             mixed_precision_settings (MixedPrecisionSettings): Mixed precision settings.
             sharding_strategy (ShardingStrategy): Sharding strategy.
 
@@ -108,12 +107,12 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_model(model: FSDP, activation_checkpointing_modules: List[str]) -> FSDP:
+    def get_activation_checkpointed_model(model: FSDP, activation_checkpointing_modules: list[str]) -> FSDP:
         """Apply activation checkpointing to the given model (in-place operation).
 
         Args:
             model (FSDP): The FSDP-wrapped model to apply activation checkpointing to.
-            activation_checkpointing_modules (List[str]): List of module names to apply activation checkpointing to.
+            activation_checkpointing_modules (list[str]): List of module names to apply activation checkpointing to.
 
         Raises:
             ValueError: Activation checkpointing can only be applied to FSDP-wrapped models!

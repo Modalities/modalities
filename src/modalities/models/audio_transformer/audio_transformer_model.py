@@ -1,4 +1,4 @@
-from typing import Annotated, Dict
+from typing import Annotated
 
 import torch
 from pydantic import BaseModel, Field
@@ -194,8 +194,8 @@ class AudioTransformer(nn.Module):
 
     def forward(
         self,
-        inputs: Dict[str, tuple[torch.Tensor, torch.Tensor]],
-    ) -> Dict[str, tuple[torch.Tensor, torch.Tensor]]:
+        inputs: dict[str, tuple[torch.Tensor, torch.Tensor]],
+    ) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
         x = inputs[self.sample_key]  # x.shape: B, T, D
         attn_key_mask = self._get_attn_key_mask(inputs["audio_len"])
         # x.shape: B, T, D

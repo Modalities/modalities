@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from rich.console import Group
 from rich.live import Live
@@ -14,15 +14,15 @@ class DummyProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
     def consume_message(self, message: Message[ProgressUpdate]):
         pass
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         pass
 
 
 class SimpleProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
     def __init__(
         self,
-        train_split_num_samples: Dict[str, int],
-        eval_splits_num_samples: Dict[str, int],
+        train_split_num_samples: dict[str, int],
+        eval_splits_num_samples: dict[str, int],
     ) -> None:
         self.train_split_num_samples = train_split_num_samples
         self.eval_splits_num_samples = eval_splits_num_samples
@@ -61,8 +61,8 @@ class RichProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
 
     def __init__(
         self,
-        train_split_num_steps: Dict[str, Tuple[int, int]],
-        eval_splits_num_steps: Dict[str, int],
+        train_split_num_steps: dict[str, tuple[int, int]],
+        eval_splits_num_steps: dict[str, int],
     ) -> None:
         # train split progress bar
         self.train_splits_progress = Progress(
@@ -132,5 +132,5 @@ class RichProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
                 completed=batch_progress.num_steps_done,
             )
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         raise NotImplementedError

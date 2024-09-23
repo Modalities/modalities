@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, List, Optional, Tuple
+from typing import Annotated, Optional
 
 import numpy as np
 import torch
@@ -86,7 +86,7 @@ class CoCaConfig(BaseModel):
     image_text_cls_prediction_key: Optional[str] = None
     video_cls_prediction_key: Optional[str] = None
     video_text_cls_prediction_key: Optional[str] = None
-    modality_keys: List[str]
+    modality_keys: list[str]
     individual_datasets: Optional[bool] = False
     is_audio_video: Optional[bool] = False
     audio_encoder_config: Optional[AudioTransformerConfig] = None
@@ -126,7 +126,7 @@ class CoCa(NNModel):
         image_text_cls_prediction_key: Optional[str],
         video_cls_prediction_key: Optional[str],
         video_text_cls_prediction_key: Optional[str],
-        modality_keys: List[str],
+        modality_keys: list[str],
         individual_datasets: Optional[bool],
         is_audio_video: Optional[bool],
         audio_encoder_config: Optional[AudioTransformerConfig],
@@ -271,7 +271,7 @@ class CoCa(NNModel):
         )
         return encoder, queries, attn_pool
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the CoCa model.
 
@@ -350,15 +350,15 @@ class CoCa(NNModel):
         )
         return output
 
-    def _forward_encode_image(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_image(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input image using the vision encoder.
 
         Args:
-            inputs (dict[str, torch.Tensor]): Dictionary containing vision inputs.
+            inputs (dict[str, torch.Tensor]): dictionary containing vision inputs.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
+             tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
         """
         image_embd = self.image_encoder(inputs)[self.image_embd_prediction_key]
         queries = repeat(self.image_queries, "n d -> b n d", b=image_embd.shape[0])
@@ -366,21 +366,21 @@ class CoCa(NNModel):
         image_embd, image_cls_token = image_embd[:, :-1, :], F.normalize(image_embd[:, -1, :], dim=-1)
         return image_embd, image_cls_token
 
-    def _forward_encode_video(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_video(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         video_embd = self.video_encoder(inputs)[self.video_embd_prediction_key]
         queries = repeat(self.video_queries, "n d -> b n d", b=video_embd.shape[0])
         video_embd = self.video_attn_pool(queries, context=video_embd)
         video_embd, video_cls_token = video_embd[:, :-1, :], F.normalize(video_embd[:, -1, :], dim=-1)
         return video_embd, video_cls_token
 
-    def _forward_encode_audio(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_audio(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         audio_embd = self.audio_encoder(inputs)[self.audio_embd_prediction_key]
         queries = repeat(self.audio_queries, "n d -> b n d", b=audio_embd.shape[0])
         audio_embd = self.audio_attn_pool(queries, context=audio_embd)
         audio_embd, audio_cls_token = audio_embd[:, :-1, :], F.normalize(audio_embd[:, -1, :], dim=-1)
         return audio_embd, audio_cls_token
 
-    def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_text(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input text using the text decoder.
 
@@ -388,7 +388,7 @@ class CoCa(NNModel):
             inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
+            tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
             and the classification token tensor.
         """
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import torch
 from pydantic import BaseModel
@@ -24,7 +23,7 @@ class CustomGPT2LLMCollateFn(CollateFnIF):
         self.target_key = target_key
         self.custom_attribute = custom_attribute
 
-    def __call__(self, batch: List[List[int]]) -> DatasetBatch:
+    def __call__(self, batch: list[list[int]]) -> DatasetBatch:
         sample_tensor = torch.tensor(batch)
         samples = {self.sample_key: sample_tensor[:, :-1]}
         targets = {self.target_key: sample_tensor[:, 1:]}

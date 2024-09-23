@@ -1,5 +1,3 @@
-from typing import Dict
-
 from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
 
@@ -11,7 +9,7 @@ class TestDataset(TorchdataSet):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> dict:
         return self.samples[idx]
 
 

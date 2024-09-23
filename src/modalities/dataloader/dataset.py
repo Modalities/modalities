@@ -5,7 +5,7 @@ import random
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Tuple, Union
+from typing import Annotated, Optional
 
 import decord
 import jq
@@ -73,13 +73,13 @@ class DummySampleConfig(BaseModel):
 
     Attributes:
         sample_key (str): The key of the sample.
-        sample_shape (Tuple[int, ...]): The shape of the sample.
+        sample_shape (tuple[int, ...]): The shape of the sample.
         sample_type (DummySampleDataType): The type of the sample.
 
     """
 
     sample_key: str
-    sample_shape: Tuple[int, ...]
+    sample_shape: tuple[int, ...]
     sample_type: DummySampleDataType
 
 
@@ -89,24 +89,24 @@ class DummyDatasetConfig(BaseModel):
 
     Attributes:
         num_samples (int): The number of samples in the dataset.
-        sample_definition (List[DummySampleConfig]): The list of sample definitions in the dataset.
+        sample_definition (list[DummySampleConfig]): The list of sample definitions in the dataset.
     """
 
     num_samples: int
-    sample_definition: List[DummySampleConfig]
+    sample_definition: list[DummySampleConfig]
 
 
 class DummyDataset(Dataset):
     """DummyDataset class."""
 
-    def __init__(self, num_samples: int, sample_definition: Tuple[DummySampleConfig]):
+    def __init__(self, num_samples: int, sample_definition: tuple[DummySampleConfig]):
         """
         Initializes a DummyDataset object with the given number of samples and sample definition.
         When calling the __getitem__ method, the dataset will return a random sample based on the sample definition.
 
         Args:
             num_samples (int): The number of samples in the dataset.
-            sample_definition (Tuple[DummySampleConfig]): A list of tuples defining the dataset output.
+            sample_definition (tuple[DummySampleConfig]): A list of tuples defining the dataset output.
                 Each touple contains the sample key, shape and data type.
 
         Returns:
@@ -127,7 +127,7 @@ class DummyDataset(Dataset):
         """
         return self.num_samples
 
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Retrieves an item from the dataset at the specified index.
 
@@ -142,7 +142,7 @@ class DummyDataset(Dataset):
         """
         return self._create_random_sample()
 
-    def _create_random_sample(self) -> Dict:
+    def _create_random_sample(self) -> dict:
         # creates a random sample based on the sample definition
         sample = dict()
         for s in self.sample_definition:
@@ -259,7 +259,7 @@ class PackedMemMapDatasetBase(Dataset):
             )
         self._index = self._generate_packing_index()
 
-    def _generate_packing_index(self) -> List[Tuple[int, int]]:
+    def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
         # The index is list of tuples, where each tuple contains the offset and length in bytes.
 
@@ -329,7 +329,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         self.block_size = block_size
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
-    def _generate_packing_index(self) -> List[Tuple[int, int]]:
+    def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
         # A list of tuples representing the index, where each tuple contains the offset and length in bytes.
 
@@ -360,7 +360,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
         self.block_size = block_size
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
-    def _generate_packing_index(self) -> List[Tuple[int, int]]:
+    def _generate_packing_index(self) -> list[tuple[int, int]]:
         index = []
         curr_offset = self.HEADER_SIZE_IN_BYTES
         curr_len = 0
@@ -410,22 +410,22 @@ PydanticTransformIFType = Annotated[Transform, PydanticThirdPartyTypeIF(Transfor
 
 
 class ImageTransformConfig(TransformConfig):
-    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    input_size: int | tuple[int, int] | tuple[int, int, int] = 224
     is_training: bool = False
     no_aug: bool = False
     train_crop_mode: Optional[str] = None
-    scale: Optional[Tuple[float, float]] = None
-    ratio: Optional[Tuple[float, float]] = None
+    scale: Optional[tuple[float, float]] = None
+    ratio: Optional[tuple[float, float]] = None
     hflip: float = 0.5
     vflip: float = 0.0
-    color_jitter: Union[float, Tuple[float, ...]] = 0.4
+    color_jitter: float | tuple[float, ...] = 0.4
     color_jitter_prob: Optional[float] = None
     grayscale_prob: float = 0.0
     gaussian_blur_prob: float = 0.0
     auto_augment: Optional[str] = None
     interpolation: str = "bilinear"
-    mean: Tuple[float, ...] = IMAGENET_DEFAULT_MEAN
-    std: Tuple[float, ...] = IMAGENET_DEFAULT_STD
+    mean: tuple[float, ...] = IMAGENET_DEFAULT_MEAN
+    std: tuple[float, ...] = IMAGENET_DEFAULT_STD
     re_prob: float = 0.0
     re_mode: str = "const"
     re_count: int = 1
@@ -538,7 +538,7 @@ class RandomTemporalCrop:
 
 
 class VideoTransformConfig(TransformConfig):
-    input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224
+    input_size: int | tuple[int, int] | tuple[int, int, int] = 224
     is_training: bool = False
     num_frames: int = 16
 
@@ -546,7 +546,7 @@ class VideoTransformConfig(TransformConfig):
 class VideoTransform(Transform):
     def __init__(
         self,
-        input_size: Union[int, Tuple[int, int], Tuple[int, int, int]] = 224,
+        input_size: int | tuple[int, int] | tuple[int, int, int] = 224,
         is_training: bool = False,
         num_frames: int = 16,
     ):
@@ -652,9 +652,9 @@ class FixedRatioRoundRobinMix(IterableDataset):
 
 
 class MultimodalWebDatasetBuilderConfig(BaseModel):
-    urls: Union[List[str], str]
-    modality_key_mapping: Dict[ModalityEnum, Tuple[str, str]]
-    modality_transforms: Dict[ModalityEnum, PydanticTransformIFType]
+    urls: list[str] | str
+    modality_key_mapping: dict[ModalityEnum, tuple[str, str]]
+    modality_transforms: dict[ModalityEnum, PydanticTransformIFType]
     is_audio_video: Optional[bool] = False
     num_samples: Annotated[int, Field(ge=1)]
 
@@ -663,9 +663,9 @@ class MultimodalWebDatasetBuilderConfig(BaseModel):
 class MultimodalWebDatasetBuilder:
     def __init__(
         self,
-        urls: Union[List[str], str],
-        modality_key_mapping: Dict[str, Tuple[str, str]],
-        modality_transforms: Dict[str, Transform],
+        urls: list[str] | str,
+        modality_key_mapping: dict[str, tuple[str, str]],
+        modality_transforms: dict[str, Transform],
         is_audio_video: bool,
         num_samples: int,
     ):
@@ -813,9 +813,9 @@ PydanticMultimodalWebDatasetBuilderIFType = Annotated[
 
 
 class MultimodalWebDatasetConfig(BaseModel):
-    builders: List[PydanticMultimodalWebDatasetBuilderIFType]
+    builders: list[PydanticMultimodalWebDatasetBuilderIFType]
     batch_size: Optional[int] = None
-    mixing_ratios: Optional[List[float]] = None
+    mixing_ratios: Optional[list[float]] = None
     shardshuffle: int = 100
     repeat: bool = False
     resample: bool = True
@@ -826,9 +826,9 @@ class MultimodalWebDatasetConfig(BaseModel):
 class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
-        builders: List[MultimodalWebDatasetBuilder],
+        builders: list[MultimodalWebDatasetBuilder],
         batch_size: int = None,
-        mixing_ratios: Optional[List[float]] = None,
+        mixing_ratios: Optional[list[float]] = None,
         shardshuffle: int = 100,
         repeat: bool = False,
         resample: bool = True,

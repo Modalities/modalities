@@ -1,5 +1,4 @@
 from functools import partial
-from typing import List
 
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
@@ -13,12 +12,12 @@ from modalities.util import get_module_class_from_name
 
 
 def is_module_to_apply_activation_checkpointing(
-    submodule: torch.nn.Module, activation_checkpointing_modules: List[type]
+    submodule: torch.nn.Module, activation_checkpointing_modules: list[type]
 ) -> bool:
     return isinstance(submodule, tuple(activation_checkpointing_modules))
 
 
-def apply_activation_checkpointing_inplace(model: torch.nn.Module, activation_checkpointing_modules: List[str]):
+def apply_activation_checkpointing_inplace(model: torch.nn.Module, activation_checkpointing_modules: list[str]):
     activation_checkpointing_module_types = [
         get_module_class_from_name(model, m) for m in activation_checkpointing_modules
     ]

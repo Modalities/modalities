@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 
 from modalities.checkpointing.checkpoint_saving_strategies import SaveKMostRecentCheckpointsStrategy
@@ -25,7 +23,7 @@ from modalities.training.training_progress import TrainingProgress
     ],
 )
 def test_checkpoint_strategy_k(
-    k: int, saved_instances: List[TrainingProgress], checkpoints_to_delete: List[int], save_current: bool
+    k: int, saved_instances: list[TrainingProgress], checkpoints_to_delete: list[int], save_current: bool
 ) -> None:
     training_progress = TrainingProgress(
         num_seen_steps_current_run=10, num_seen_tokens_current_run=10, num_target_steps=20, num_target_tokens=40

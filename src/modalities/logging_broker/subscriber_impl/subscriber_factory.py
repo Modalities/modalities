@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from modalities.config.config import WandbMode
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -19,7 +19,7 @@ from modalities.logging_broker.subscriber_impl.results_subscriber import (
 class ProgressSubscriberFactory:
     @staticmethod
     def get_rich_progress_subscriber(
-        eval_dataloaders: List[LLMDataLoader],
+        eval_dataloaders: list[LLMDataLoader],
         train_dataloader_tag: str,
         num_seen_steps: int,
         num_target_steps: int,
@@ -42,7 +42,7 @@ class ProgressSubscriberFactory:
     @staticmethod
     def get_simple_progress_subscriber(
         train_dataloader: LLMDataLoader,
-        eval_dataloaders: List[LLMDataLoader],
+        eval_dataloaders: list[LLMDataLoader],
         world_size: int,
         global_num_seen_samples: int,
         local_rank: int,

@@ -1,25 +1,25 @@
 from dataclasses import asdict
-from typing import Dict, List, Optional, Tuple, Type
+from typing import Optional, Type
 
 from pydantic import BaseModel
 
 from modalities.registry.components import ComponentEntity
 
-Entity = Tuple[Type, Type[BaseModel]]
+Entity = tuple[Type, Type[BaseModel]]
 
 
 class Registry:
     """Registry class to store the components and their config classes."""
 
-    def __init__(self, components: Optional[List[ComponentEntity]] = None) -> None:
+    def __init__(self, components: Optional[list[ComponentEntity]] = None) -> None:
         """Initializes the Registry class with an optional list of components.
 
         Args:
-            components (List[ComponentEntity], optional): List of components to
+            components (list[ComponentEntity], optional): List of components to
                 intialize the registry with . Defaults to None.
         """
         # maps component_key -> variant_key -> entity = (component, config)
-        self._registry_dict: Dict[str, Dict[str, Entity]] = {}
+        self._registry_dict: dict[str, dict[str, Entity]] = {}
         if components is not None:
             for component in components:
                 self.add_entity(**asdict(component))

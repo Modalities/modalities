@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Optional
 
 import torch
 
@@ -32,8 +32,8 @@ class Batch(ABC):
 class DatasetBatch(Batch, TorchDeviceMixin):
     """A batch of samples and its targets. Used to batch train a model."""
 
-    samples: Dict[str, torch.Tensor]
-    targets: Dict[str, torch.Tensor]
+    samples: dict[str, torch.Tensor]
+    targets: dict[str, torch.Tensor]
     batch_dim: int = 0
 
     def to(self, device: torch.device):
@@ -58,8 +58,8 @@ class DatasetBatch(Batch, TorchDeviceMixin):
 class InferenceResultBatch(Batch, TorchDeviceMixin):
     """Stores targets and predictions of an entire batch."""
 
-    targets: Dict[str, torch.Tensor]
-    predictions: Dict[str, torch.Tensor]
+    targets: dict[str, torch.Tensor]
+    predictions: dict[str, torch.Tensor]
     batch_dim: int = 0
 
     def to_cpu(self):
@@ -106,12 +106,12 @@ class EvaluationResultBatch(Batch):
 
     dataloader_tag: str
     num_train_steps_done: int
-    losses: Dict[str, ResultItem] = field(default_factory=dict)
-    metrics: Dict[str, ResultItem] = field(default_factory=dict)
-    throughput_metrics: Dict[str, ResultItem] = field(default_factory=dict)
+    losses: dict[str, ResultItem] = field(default_factory=dict)
+    metrics: dict[str, ResultItem] = field(default_factory=dict)
+    throughput_metrics: dict[str, ResultItem] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        def _round_result_item_dict(result_item_dict: Dict[str, ResultItem]) -> Dict[str, ResultItem]:
+        def _round_result_item_dict(result_item_dict: dict[str, ResultItem]) -> dict[str, ResultItem]:
             rounded_result_item_dict = {}
             for k, item in result_item_dict.items():
                 if item.decimal_places is not None:

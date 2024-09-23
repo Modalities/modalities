@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 import webdataset as wd
 from torch.utils.data import Dataset, DistributedSampler, Sampler
@@ -13,13 +13,14 @@ class DataLoaderIF:
 
 class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
     """LLMDataLoader is a custom DataLoader class that extends the PyTorch DataLoader class."""
+
     def __init__(
         self,
         dataloader_tag: str,
         batch_sampler: ResumableBatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
-        sampler: Union[Sampler, Iterable, None] = None,
+        sampler: Sampler | Iterable | None = None,
         num_workers: int = 0,
         collate_fn: Optional[_collate_fn_t] = None,
         pin_memory: bool = False,
@@ -41,7 +42,7 @@ class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
             batch_sampler (ResumableBatchSampler): The batch sampler used for sampling batches.
             dataset (Dataset[T_co]): The dataset to load the data from.
             batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
-            sampler (Union[Sampler, Iterable, None], optional): The sampler used for sampling data. Defaults to None.
+            sampler (Sampler | Iterable | None, optional): The sampler used for sampling data. Defaults to None.
             num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
             collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
               Defaults to None.
