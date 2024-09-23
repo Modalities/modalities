@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import torch.nn as nn
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
@@ -9,7 +8,10 @@ from modalities.checkpointing.checkpoint_saving_instruction import Checkpointing
 
 
 class TorchCheckpointSaving(CheckpointSavingExecutionABC):
-    CHECKPOINT_STRUCTURE = "eid_{experiment_id}-{entity}-num_samples_{num_samples}.bin"
+    CHECKPOINT_STRUCTURE = (
+        "eid_{experiment_id}-{entity}-seen_steps_{num_seen_steps}-seen_tokens_{num_seen_tokens}"
+        "-target_steps_{num_target_steps}-target_tokens_{num_target_tokens}.bin"
+    )
 
     def __init__(
         self,
@@ -32,7 +34,8 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
     def run_checkpoint_instruction(
         self,
         checkpointing_instruction: CheckpointingInstruction,
-        global_train_sample_id: int,
+        num_train_steps_done: int,
+        target_train_steps: int,
         model: nn.Module,
         optimizer: Optimizer,
     ):
@@ -41,7 +44,8 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
 
         Args:
             checkpointing_instruction (CheckpointingInstruction): The instruction for checkpointing.
-            global_train_sample_id (int): The global train sample ID.
+            num_train_steps_done (int): The number of training steps done.
+            target_train_steps (int): The target number of training steps.
             model (nn.Module): The model to be saved.
             optimizer (Optimizer): The optimizer to be saved.
 
@@ -53,8 +57,32 @@ class TorchCheckpointSaving(CheckpointSavingExecutionABC):
         """
         raise NotImplementedError  # TODO Future work
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, global_train_sample_id: int):
+    def _save_checkpoint(
+        self, model: nn.Module, optimizer: Optimizer, num_train_steps_done: int, target_train_steps: int
+    ):
+        """
+        Saves the checkpoint of the model and optimizer.
+
+        Args:
+            model (nn.Module): The model to be saved.
+            optimizer (Optimizer): The optimizer to be saved.
+            num_train_steps_done (int): The number of training steps completed.
+            target_train_steps (int): The target number of training steps.
+
+        Raises:
+            NotImplementedError: This method is not implemented and should be overridden in a subclass.
+        """
         raise NotImplementedError  # TODO Future work
 
-    def _delete_checkpoint(self, global_train_sample_id: int):
+    def _delete_checkpoint(self, num_train_steps_done: int, target_train_steps: int):
+        """
+        Deletes the checkpoint based on the number of performed train steps and target train steps.
+
+        Args:
+            num_train_steps_done (int): The number of training steps completed.
+            target_train_steps (int): The target number of training steps.
+
+        Raises:
+            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
+        """
         raise NotImplementedError  # TODO Future work

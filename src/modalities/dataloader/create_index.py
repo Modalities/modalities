@@ -29,7 +29,7 @@ def create_raw_index(src_path: Path, index_path: Path):
 
 
 class IndexGenerator:
-    def __init__(self, src_file: Path, chunksize: int = 4096, drop_faulty_entries: bool = False):
+    def __init__(self, src_file: Path, drop_faulty_entries: bool = False):
         """
         Initializes an IndexGenerator object.
         Reads a JSONL file as a binary file, and iterates through it character by character.
@@ -38,8 +38,6 @@ class IndexGenerator:
 
         Args:
             src_file (Path): Path to a jsonl-file.
-            chunksize (int): Defines the size of byte chunks that are processed using a producer-consumer approach.
-                The producer reads chunks from the `src_file`, while the consumer creates index entries.
             drop_faulty_entries (bool): Allow broken json entries in `src_file` by just skipping them.
                 Otherwise, the index generation fails with an exception.
 
@@ -47,14 +45,12 @@ class IndexGenerator:
             None
         """
         self.src_file = src_file
-        self.chunksize = chunksize
         self.drop_faulty_entries = drop_faulty_entries
         with self.src_file.open(mode="r") as fin:
             # Move the cursor to the end of the file
             fin.seek(0, os.SEEK_END)
             # Get number of characters in the file
             self._total_num_chars = fin.tell()
-        self.num_chunks = self._total_num_chars // self.chunksize
         self._queue_of_raw_lines = queue.Queue()
         self._index_map = []
         self._exception_buffer = []

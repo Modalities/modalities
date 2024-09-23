@@ -15,6 +15,7 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpoint
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
+    ActivationCheckpointedModelConfig,
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
@@ -89,9 +90,12 @@ from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
     NumberConversion,
+    NumberConversionFromCheckpointPathConfig,
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
+    NumStepsFromRawDatasetIndexConfig,
     NumTokensFromNumStepsConfig,
+    NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 
 
@@ -125,6 +129,12 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_model,
+        ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # weight initializers
@@ -266,8 +276,50 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "number_conversion",
-        "num_tokens_from_num_steps_callable",
-        NumberConversion.get_num_tokens_from_num_steps_callable,
+        "num_tokens_from_num_steps",
+        NumberConversion.get_num_tokens_from_num_steps,
         NumTokensFromNumStepsConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "last_step_from_checkpoint_path",
+        NumberConversion.get_last_step_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_seen_steps_from_checkpoint_path",
+        NumberConversion.get_num_seen_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_seen_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_target_steps_from_checkpoint_path",
+        NumberConversion.get_num_target_steps_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "global_num_target_tokens_from_checkpoint_path",
+        NumberConversion.get_global_num_target_tokens_from_checkpoint_path,
+        NumberConversionFromCheckpointPathConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_tokens_from_packed_mem_map_dataset_continuous",
+        NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
+        NumTokensFromPackedMemMapDatasetContinuousConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_steps_from_raw_dataset_index",
+        NumberConversion.get_num_steps_from_raw_dataset_index,
+        NumStepsFromRawDatasetIndexConfig,
     ),
 ]

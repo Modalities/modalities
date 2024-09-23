@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
 import torch
 from omegaconf import OmegaConf
@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -111,7 +112,6 @@ class FSDPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
-    get_num_tokens_from_num_steps_callable: Callable[[int], int]
 
 
 class CheckpointSavingConfig(BaseModel):
@@ -239,6 +239,11 @@ class WeightInitializedModelConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
+class ActivationCheckpointedModelConfig(BaseModel):
+    model: PydanticFSDPModuleType
+    activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
+
+
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
@@ -282,11 +287,6 @@ class PackedMemMapDatasetMegatronConfig(BaseModel):
     sample_key: str
 
 
-class MMapIndexedDatasetConfig(BaseModel):
-    path: Path
-    skip_warmup: bool
-
-
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
@@ -310,7 +310,6 @@ class LLMDataLoaderConfig(BaseModel):
     collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
-    shuffle: bool
     skip_num_batches: Optional[int] = 0
     fixed_num_batches: Optional[int] = None
 
@@ -326,11 +325,11 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 
 class RichProgressSubscriberConfig(BaseModel):
-    train_dataloader: PydanticLLMDataLoaderIFType
     eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
-    global_num_seen_steps: int
-    global_rank: int
-    gradient_acc_steps: Annotated[int, Field(strict=True, gt=0)]
+    train_dataloader_tag: str
+    num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
+    num_target_steps: Annotated[int, Field(strict=True, gt=0)]
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class DummyResultSubscriberConfig(BaseModel):

@@ -15,7 +15,6 @@ class LLMDataLoader(DataLoader[T_co]):
         batch_sampler: ResumableBatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
-        shuffle: Optional[bool] = None,
         sampler: Union[Sampler, Iterable, None] = None,
         num_workers: int = 0,
         collate_fn: Optional[_collate_fn_t] = None,
@@ -38,7 +37,6 @@ class LLMDataLoader(DataLoader[T_co]):
             batch_sampler (ResumableBatchSampler): The batch sampler used for sampling batches.
             dataset (Dataset[T_co]): The dataset to load the data from.
             batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
-            shuffle (Optional[bool], optional): Flag indicating whether to shuffle the data. Defaults to None.
             sampler (Union[Sampler, Iterable, None], optional): The sampler used for sampling data. Defaults to None.
             num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
             collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
@@ -62,7 +60,7 @@ class LLMDataLoader(DataLoader[T_co]):
         super().__init__(
             dataset=dataset,
             batch_size=batch_size,
-            shuffle=shuffle,
+            shuffle=False,  # shuffling must be implemented on a dataset level
             sampler=sampler,
             batch_sampler=batch_sampler,
             num_workers=num_workers,

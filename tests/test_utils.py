@@ -1,11 +1,43 @@
+import os
 from enum import Enum
 
+import debugpy
 import torch
 
 import modalities
 import modalities.util
 from modalities.batch import DatasetBatch
 from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
+
+
+def add_debugger_to_distributed_test():
+    """Add a debugger to a distributed test.
+    This function should be called at the beginning of the test.
+
+    Within VScode you can use the following configuration to attach the debugger to the test:
+
+    ```json
+    {
+        "name": "Test Torch Distributed",
+        "type": "python",
+        "request": "launch",
+        "program": "path/to/torchrun",
+        "console": "integratedTerminal",
+        "env": {"CUDA_VISIBLE_DEVICES": "0,1"},
+        "args": ["--rdzv-endpoint", "localhost:29833", "--nnodes", "1",
+                "--nproc_per_node", "2", "path/to/pytest", "tests/some_test.py"],
+        "justMyCode": false,
+    },
+    ```
+    """
+    # Get the rank of the process (0 or 1 in this case)
+    rank = int(os.getenv("RANK"))
+
+    # Use a different port for each process
+    port = 9875 + rank
+    debugpy.listen(("0.0.0.0", port))  # Listening on all interfaces to allow debugger to attach
+    print(f"Rank {rank}: Waiting for debugger to attach on port {port}...")
+    debugpy.wait_for_client()  # Pause here until the debugger attaches
 
 
 def configure_dataloader_mock(

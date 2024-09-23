@@ -1,5 +1,6 @@
+import pickle
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from transformers import PreTrainedTokenizer
 
@@ -44,7 +45,6 @@ class DatasetFactory:
 
         Args:
             raw_data_path (Path): The path to the raw data.
-            sequence_length (int): The length of each sequence.
             tokenizer (PreTrainedTokenizer): The tokenizer used to tokenize the data.
             sample_key (str): The key used to retrieve the samples from the dataset.
             index_path (Optional[Path], optional): The path to the index file. Defaults to None.
@@ -62,6 +62,12 @@ class DatasetFactory:
             jq_pattern=jq_pattern,
         )
         return dataset
+
+    @staticmethod
+    def get_raw_index(raw_index_path: Path) -> List[Tuple[int, int]]:
+        with raw_index_path.open("rb") as f:
+            index = pickle.load(f)
+        return index
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(

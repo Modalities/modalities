@@ -1,4 +1,3 @@
-import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Dict, List
@@ -197,13 +196,11 @@ def test_skipped_and_distributed_dataloader_from_config():
     # make sure that the dataloaders for the two ranks have the correct number of batches
     assert (
         len(components_rank_0.train_dataloader)
-        == math.ceil(len(dataset) // 2) // components_rank_0.train_dataloader.batch_size
-        - components_rank_0.skip_num_batches
+        == len(dataset) // 2 // components_rank_0.train_dataloader.batch_size - components_rank_0.skip_num_batches
     )
     assert (
         len(components_rank_1.train_dataloader)
-        == math.ceil(len(dataset) // 2) // components_rank_0.train_dataloader.batch_size
-        - components_rank_0.skip_num_batches
+        == len(dataset) // 2 // components_rank_0.train_dataloader.batch_size - components_rank_0.skip_num_batches
     )
 
     # we manually build up the batches from each dataloader to compare on a value basis

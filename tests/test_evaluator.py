@@ -25,7 +25,7 @@ def test_evaluate_cpu(
     llm_data_loader_mock.batch_size = batch_size
 
     evaluator = Evaluator(
-        batch_progress_publisher=progress_publisher_mock,
+        progress_publisher=progress_publisher_mock,
         evaluation_result_publisher=progress_publisher_mock,
     )
 

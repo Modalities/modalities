@@ -33,12 +33,6 @@ jobs:
     needs:
     - build
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/modalities
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
     steps:
     - name: Download all the dists
       uses: actions/download-artifact@v4
@@ -47,6 +41,8 @@ jobs:
         path: dist/
     - name: Publish dist to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_RELEASE_TOKEN }}
 
   github-release:
     name: >-

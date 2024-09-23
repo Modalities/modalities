@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
@@ -94,20 +94,38 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
 
 
 @dataclass
+class ResultItem:
+    value: torch.Tensor
+    decimal_places: Optional[int] = None
+
+
+@dataclass
 class EvaluationResultBatch(Batch):
     """Data class for storing the results of a single or multiple batches.
     Also entire epoch results are stored in here."""
 
     dataloader_tag: str
     num_train_steps_done: int
-    losses: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
-    throughput_metrics: Dict[str, torch.Tensor] = field(default_factory=lambda: dict())
+    losses: Dict[str, ResultItem] = field(default_factory=dict)
+    metrics: Dict[str, ResultItem] = field(default_factory=dict)
+    throughput_metrics: Dict[str, ResultItem] = field(default_factory=dict)
 
     def __str__(self) -> str:
+        def _round_result_item_dict(result_item_dict: Dict[str, ResultItem]) -> Dict[str, ResultItem]:
+            rounded_result_item_dict = {}
+            for k, item in result_item_dict.items():
+                if item.decimal_places is not None:
+                    rounded_result_item_dict[k] = round(item.value.mean().item(), item.decimal_places)
+                else:
+                    rounded_result_item_dict[k] = item.value.mean()
+            return rounded_result_item_dict
+
         eval_str = f"Dataloader: {self.dataloader_tag} | "
         eval_str = f"step: {self.num_train_steps_done} | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.throughput_metrics.items()]) + " | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.losses.items()]) + " | "
-        eval_str += " | ".join([f"{k}: {v.mean().item()}" for k, v in self.metrics.items()]) + " | "
+
+        eval_str += (
+            " | ".join([f"{k}: {item}" for k, item in _round_result_item_dict(self.throughput_metrics).items()]) + " | "
+        )
+        eval_str += " | ".join([f"{k}: {item}" for k, item in _round_result_item_dict(self.losses).items()]) + " | "
+        eval_str += " | ".join([f"{k}: {item}" for k, item in _round_result_item_dict(self.metrics).items()]) + " | "
         return eval_str

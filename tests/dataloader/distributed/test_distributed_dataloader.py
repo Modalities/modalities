@@ -8,7 +8,8 @@ import torch.distributed as dist
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
+from modalities.config.config import ProcessGroupBackendType
+from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
