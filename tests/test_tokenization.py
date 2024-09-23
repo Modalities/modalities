@@ -1,3 +1,5 @@
+from typing import Dict
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,10 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
     text = "This is a test sentence."
     token_ids = tokenizer.tokenize(text)
     assert len(token_ids) > 0
+
+
+def _get_special_tokens() -> Dict[str, str]:
+    return {"pad_token": "°"}
 
 
 @pytest.mark.parametrize(
@@ -27,7 +33,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding="max_length",
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             10,
             4,
@@ -39,7 +45,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding="max_length",
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             10,
             4,
@@ -51,7 +57,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding="max_length",
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1024,
             1018,
@@ -63,7 +69,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding="max_length",
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1024,
             1018,
@@ -77,7 +83,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=False,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             6,
             0,
@@ -89,7 +95,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=False,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             6,
             0,
@@ -102,7 +108,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=False,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             6,
             0,
@@ -114,7 +120,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=False,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             6,
             0,
@@ -129,7 +135,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=False,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             10,
             0,
@@ -141,7 +147,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=True,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             10,
             0,
@@ -153,7 +159,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=False,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -165,7 +171,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=True,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -179,7 +185,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=False,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -191,7 +197,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=True,
                 max_length=10,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -203,7 +209,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=False,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -215,7 +221,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=True,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             15,
             0,
@@ -229,7 +235,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=False,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1030,
             0,
@@ -241,7 +247,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=False,
                 padding=True,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1030,
             0,
@@ -253,7 +259,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=True,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1024,
             0,
@@ -268,7 +274,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding=True,
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1020,
             0,
@@ -280,7 +286,7 @@ def _assert_tokenization(tokenizer: TokenizerWrapper):
                 truncation=True,
                 padding="max_length",
                 max_length=None,
-                special_tokens={"pad_token": "[PAD]"},
+                special_tokens=_get_special_tokens(),
             ),
             1024,
             4,
@@ -305,10 +311,12 @@ def test_hf_tokenize(
     assert len(token_ids) == expected_length
 
     # check number of non-padding tokens (token_id = 43488 corresponds to "AAAAAAAA")
-    assert sum(np.array(token_ids) == 43488) == (expected_length - expected_num_padding_tokens)
+    non_pad_token_id = tokenizer.tokenize("AAAAAAAA")[0]
+    assert sum(np.array(token_ids) == non_pad_token_id) == (expected_length - expected_num_padding_tokens)
 
     # check number of padding tokens
-    assert sum(np.array(token_ids) == 50257) == expected_num_padding_tokens
+    pad_token_id = tokenizer.tokenize(_get_special_tokens()["pad_token"])[0]
+    assert sum(np.array(token_ids) == pad_token_id) == expected_num_padding_tokens
 
 
 @pytest.mark.skip(reason="Missing pretrained unigram sp tokenizer.")

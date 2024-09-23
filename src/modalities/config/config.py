@@ -249,11 +249,12 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[Dict[str, str]] = None
+    special_tokens: Optional[Dict[str, str | List | Tuple]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
     tokenizer_model_file: str
+    # TODO: add support for special tokens, see issue #222
 
 
 class DistributedSamplerConfig(BaseModel):
@@ -277,6 +278,7 @@ class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
     sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
+    reuse_last_target: Optional[bool] = True
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
