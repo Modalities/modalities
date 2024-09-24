@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -76,7 +76,7 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
         return None
 
 
-def get_theoretical_flops_per_token(model: FSDP) -> Tuple[Optional[int], Optional[int]]:
+def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optional[int]]:
     """
     Calculates the theoretical number of floating point operations (FLOPs) per token for a given model.
     compute theoretical_flops_per_token = 6*N + 12*L*T*H
@@ -86,7 +86,7 @@ def get_theoretical_flops_per_token(model: FSDP) -> Tuple[Optional[int], Optiona
         model (FSDP): The model for which to calculate the FLOPs per token.
 
     Returns:
-        Tuple[(int, optional), (int, optional)]: A tuple containing the theoretical FLOPs per token
+        tuple[(int, optional), (int, optional)]: A tuple containing the theoretical FLOPs per token
           and the sequence length.
             - Theoretical FLOPs per token: The estimated number of FLOPs required to process each token in the model.
             - Sequence length: The length of the input sequence. Needed to convert samples to tokens in compute_mfu.

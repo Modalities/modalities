@@ -1,5 +1,4 @@
 from dataclasses import field
-from typing import Dict, List
 
 import torch
 from pydantic import BaseModel
@@ -13,14 +12,14 @@ class CoCaCollateFnConfig(BaseModel):
     Configuration class for CoCaCollateFn.
 
     Args:
-        sample_keys (List[str]): List of samples keys.
-        target_keys (List[str]): List of target keys.
+        sample_keys (list[str]): List of samples keys.
+        target_keys (list[str]): List of target keys.
         text_sample_key (str): Key for the text samples.
         text_target_key (str): Key for the text targets.
     """
 
-    sample_keys: List[str]
-    target_keys: List[str]
+    sample_keys: list[str]
+    target_keys: list[str]
     text_sample_key: str
     text_target_key: str
 
@@ -28,13 +27,13 @@ class CoCaCollateFnConfig(BaseModel):
 class CoCaCollatorFn(CollateFnIF):
     """Collator function for CoCa model."""
 
-    def __init__(self, sample_keys: List[str], target_keys: List[str], text_sample_key: str, text_target_key: str):
+    def __init__(self, sample_keys: list[str], target_keys: list[str], text_sample_key: str, text_target_key: str):
         """
         Initializes the CoCaCollatorFn object.
 
         Args:
-            sample_keys (List[str]): List of samples keys.
-            target_keys (List[str]): List of target keys.
+            sample_keys (list[str]): List of samples keys.
+            target_keys (list[str]): List of target keys.
             text_sample_key (str): Key for the text samples.
             text_target_key (str): Key for the text targets.
 
@@ -58,12 +57,12 @@ class CoCaCollatorFn(CollateFnIF):
         self.text_sample_key = text_sample_key
         self.text_target_key = text_target_key
 
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> DatasetBatch:
         """
         Process a batch of data.
 
         Args:
-            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries containing tensors
+            batch (list[dict[str, torch.Tensor]]): A list of dictionaries containing tensors
             representing the batch data.
 
         Returns:

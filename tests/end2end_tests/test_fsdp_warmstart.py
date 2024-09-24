@@ -2,7 +2,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 import torch
@@ -31,13 +31,13 @@ working_dir = Path(os.path.dirname(__file__))
 
 class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     def __init__(self):
-        self.message_list: List[Message[EvaluationResultBatch]] = []
+        self.message_list: list[Message[EvaluationResultBatch]] = []
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         self.message_list.append(message)
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         pass
 
 
@@ -55,7 +55,7 @@ class TrainDataloaderInstantiationModel(BaseModel):
 )
 class TestWarmstart:
     @staticmethod
-    def get_loss_scores(messages: List[Message[EvaluationResultBatch]], loss_key: str) -> List[float]:
+    def get_loss_scores(messages: list[Message[EvaluationResultBatch]], loss_key: str) -> list[float]:
         return [message.payload.losses[loss_key].value.item() for message in messages]
 
     def test_warm_start(self):
@@ -130,7 +130,7 @@ class TestWarmstart:
 
                 # we collect the loss values from rank 0 and store them in the temporary experiment folder
                 if dist.get_rank() == 0:
-                    messages_0: List[Message[EvaluationResultBatch]] = components_0.evaluation_subscriber.message_list
+                    messages_0: list[Message[EvaluationResultBatch]] = components_0.evaluation_subscriber.message_list
                     loss_scores_0 = TestWarmstart.get_loss_scores(messages_0, "train loss avg")
                     with open(loss_values_experiment_0_path, "w") as f:
                         json.dump(loss_scores_0, f)
@@ -156,7 +156,7 @@ class TestWarmstart:
                 # we collect the loss values from rank 0 for the warmstart model
                 # and store them in the temporary experiment folder
                 if dist.get_rank() == 0:
-                    messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
+                    messages_1: list[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
                     loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "train loss avg")
                     with open(loss_values_experiment_1_path, "w") as f:
                         json.dump(loss_scores_1, f)

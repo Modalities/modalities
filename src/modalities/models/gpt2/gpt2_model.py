@@ -1,7 +1,7 @@
 import math
 from copy import deepcopy
 from enum import Enum
-from typing import Annotated, Dict, List, Tuple
+from typing import Annotated
 
 import torch
 import torch.nn as nn
@@ -42,7 +42,7 @@ class QueryKeyValueTransform(nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Perform forward pass for transforming queries/keys/values.
 
@@ -52,7 +52,7 @@ class QueryKeyValueTransform(nn.Module):
             v (torch.Tensor): The value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
         """
         pass
 
@@ -65,7 +65,7 @@ class IdentityTransform(QueryKeyValueTransform):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass of the IdentityTransform which does not apply any transform.
 
@@ -75,7 +75,7 @@ class IdentityTransform(QueryKeyValueTransform):
             v (torch.Tensor): The value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
         """
         return q, k, v
 
@@ -160,7 +160,7 @@ class RotaryTransform(QueryKeyValueTransform):
 
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass of the RotaryTransform module.
 
@@ -170,7 +170,7 @@ class RotaryTransform(QueryKeyValueTransform):
             v (torch.Tensor): Value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             Tuple containing the modified query tensor, key tensor, and value tensor.
         """
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
@@ -213,7 +213,7 @@ class AttentionConfig(BaseModel):
     Configuration class for attention mechanism.
 
     Attributes:
-        qkv_transforms (List[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.
+        qkv_transforms (list[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.
     """
 
     class QueryKeyValueTransformConfig(BaseModel):
@@ -222,7 +222,7 @@ class AttentionConfig(BaseModel):
 
         Attributes:
             type_hint (QueryKeyValueTransformType): The type hint for the transform.
-            config (Union[RotaryTransformConfig, IdentityTransformConfig]): The configuration for the transform.
+            config (RotaryTransformConfig | IdentityTransformConfig): The configuration for the transform.
         """
 
         class IdentityTransformConfig(BaseModel):
@@ -262,7 +262,7 @@ class AttentionConfig(BaseModel):
         type_hint: QueryKeyValueTransformType
         config: RotaryTransformConfig | IdentityTransformConfig
 
-    qkv_transforms: List[QueryKeyValueTransformConfig]
+    qkv_transforms: list[QueryKeyValueTransformConfig]
 
 
 class GPT2LLMConfig(BaseModel):
@@ -422,7 +422,7 @@ class CausalSelfAttention(nn.Module):
             for transform_config in attention_config.qkv_transforms
         )
 
-    def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def projection(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Applies projections to the input tensor to get queries, keys, and values.
 
@@ -430,7 +430,7 @@ class CausalSelfAttention(nn.Module):
             x (torch.Tensor): The input tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.
         """
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
@@ -438,7 +438,7 @@ class CausalSelfAttention(nn.Module):
     @staticmethod
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Applies a series of transformations to the query, key, and value tensors.
 
@@ -450,7 +450,7 @@ class CausalSelfAttention(nn.Module):
             n_head_q (int): The number of heads for the query tensors.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             A tuple containing the transformed query, key, and value tensors.
         """
         batch_size, sequence_length, embedding_dim = q.size()
@@ -826,16 +826,16 @@ class GPT2LLM(NNModel):
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
-    def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass implementation of the GPT2LLM module.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
                 - sample_key (str): Key for the input tensor containing token ids.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
                 - prediction_key (str): Key for the output tensor containing logits.
         """
         input_ids = inputs[self.sample_key]
@@ -861,16 +861,16 @@ class GPT2LLM(NNModel):
         logits = self.lm_head(x)
         return {self.prediction_key: logits}
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
                 - sample_key (str): Key for the input tensor containing token ids.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
                 - prediction_key (str): Key for the output tensor containing logits.
         """
         return self.forward_impl(inputs)

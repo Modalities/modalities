@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
@@ -69,7 +69,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
                 extra = "allow"
 
             @root_validator(pre=True)
-            def _validate_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            def _validate_all_paths(cls, values: dict[str, Any]) -> dict[str, Any]:
                 for field_name, value in values.items():
                     if isinstance(value, str):  # If a value is a string, convert it to Path
                         values[field_name] = Path(value)
@@ -83,7 +83,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
         experiment_id: str
         config_file_path: FilePath
-        referencing_keys: Dict[str, str]
+        referencing_keys: dict[str, str]
         cuda_env: CudaEnvSettings
         paths: Paths
         intervals: Intervals
@@ -171,7 +171,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     loss_fn: PydanticLossIFType
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
+    eval_dataloaders: list[PydanticLLMDataLoaderIFType]
     progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
@@ -212,7 +212,7 @@ class TextGenerationInstantiationModel(BaseModel):
         model_path: FilePath
         sequence_length: int
         device: PydanticPytorchDeviceType
-        referencing_keys: Dict[str, str]
+        referencing_keys: dict[str, str]
 
         # avoid warning about protected namespace 'model_', see
         # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
@@ -246,10 +246,10 @@ class TrainingReportGenerator:
         self.training_progress = training_progress
 
     def get_report(self) -> str:
-        def _get_formatted_dict_str(d: Dict[str, Any]) -> str:
+        def _get_formatted_dict_str(d: dict[str, Any]) -> str:
             return "\n\t".join([f"{k}: {v}" for k, v in d.items()])
 
-        def _get_formatted_list_str(lst: List[str]) -> str:
+        def _get_formatted_list_str(lst: list[str]) -> str:
             return "\n\t".join(lst)
 
         training_target_str = _get_formatted_dict_str(dict(self.training_target))
@@ -273,7 +273,7 @@ class TrainingReportGenerator:
         )
         return report
 
-    def _get_issue_warnings(self) -> List[str]:
+    def _get_issue_warnings(self) -> list[str]:
         issue_warnings = []
         num_tokens = (
             self.step_profile.local_train_micro_batch_size

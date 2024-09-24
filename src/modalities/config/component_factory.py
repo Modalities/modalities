@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Type, TypeVar, Union
+from typing import Any, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -19,12 +19,12 @@ class ComponentFactory:
         """
         self.registry = registry
 
-    def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
+    def build_components(self, config_dict: dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
         """Builds the components from a config dictionary. All components specified in `components_model_type`
         are built from the config dictionary in a recursive manner.
 
         Args:
-            config_dict (Dict): Dictionary with the configuration of the components.
+            config_dict (dict[): Dictionary with the configuration of the components.
             components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.
 
         Returns:
@@ -35,7 +35,7 @@ class ComponentFactory:
         components = components_model_type(**component_dict)
         return components
 
-    def _build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
+    def _build_config(self, config_dict: dict, component_names: list[str]) -> dict[str, Any]:
         component_dict_filtered = {name: config_dict[name] for name in component_names}
         components, _ = self._build_component(
             current_component_config=component_dict_filtered,
@@ -47,10 +47,10 @@ class ComponentFactory:
 
     def _build_component(
         self,
-        current_component_config: Union[Dict, List, Any],
-        component_config: Union[Dict, List, Any],
-        top_level_components: Dict[str, Any],
-        traversal_path: List,
+        current_component_config: dict | list | Any,
+        component_config: dict | list | Any,
+        top_level_components: dict[str, Any],
+        traversal_path: list,
     ) -> Any:
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
@@ -130,16 +130,16 @@ class ComponentFactory:
             return current_component_config, top_level_components
 
     @staticmethod
-    def _is_component_config(config_dict: Dict) -> bool:
+    def _is_component_config(config_dict: dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return "component_key" in config_dict.keys()
 
     @staticmethod
-    def _is_reference_config(config_dict: Dict) -> bool:
+    def _is_reference_config(config_dict: dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return {"instance_key", "pass_type"} == config_dict.keys()
 
-    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
+    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
         self._assert_valid_config_keys(
             component_key=component_key,
@@ -151,7 +151,7 @@ class ComponentFactory:
         return comp_config
 
     def _assert_valid_config_keys(
-        self, component_key: str, variant_key: str, config_dict: Dict, component_config_type: Type[BaseModelChild]
+        self, component_key: str, variant_key: str, config_dict: dict, component_config_type: Type[BaseModelChild]
     ) -> None:
         required_keys = []
         optional_keys = []
@@ -178,7 +178,7 @@ class ComponentFactory:
         return component
 
     @staticmethod
-    def _base_model_to_dict(base_model: BaseModel) -> Dict:
+    def _base_model_to_dict(base_model: BaseModel) -> dict:
         # converts top level structure of base_model into dictionary while maintaining substructure
         output = {}
         for name, _ in base_model.model_fields.items():

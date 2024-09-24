@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class CompXConfig(BaseModel):
 
 class CompYConfig(BaseModel):
     val_y: str
-    multi_dependency: List[PydanticComponent_V_W_X_IF_Type]
+    multi_dependency: list[PydanticComponent_V_W_X_IF_Type]
 
 
 class CompZConfig(BaseModel):

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import pytest
 import torch
@@ -26,7 +26,7 @@ from tests.conftest import _ROOT_DIR
 #   $(which pytest) path/to/test_mfu.py
 
 
-def get_model_from_config(model_config_dict: Dict) -> GPT2LLM:
+def get_model_from_config(model_config_dict: dict) -> GPT2LLM:
     """get gpt2 model from config_dict"""
 
     class InstantationModel(BaseModel):

@@ -1,7 +1,7 @@
 import functools
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, List
+from typing import Callable
 
 import torch.nn as nn
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
@@ -17,13 +17,13 @@ class FSDPAutoWrapFactoryIF(ABC):
 
 
 class FSDPTransformerAutoWrapPolicyFactory(FSDPAutoWrapFactoryIF):
-    def __init__(self, model: nn.Module, block_names: List[str]) -> None:
+    def __init__(self, model: nn.Module, block_names: list[str]) -> None:
         # TODO it's problematic that we store the model in-memory here. Might get too large in RAM...
         self.model = model
         self.block_names = block_names
 
     @staticmethod
-    def _get_fsdp_blocks_from_block_names(model: nn.Module, block_names: List[str]) -> List[nn.Module]:
+    def _get_fsdp_blocks_from_block_names(model: nn.Module, block_names: list[str]) -> list[nn.Module]:
         fsdp_block_types = []
         for cls_block_name in block_names:
             # TODO FullyShardedDataParallelPlugin from Accelerate uses string matching to find the correct

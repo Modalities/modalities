@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Dict
 
 import pytest
 import torch
@@ -26,7 +25,7 @@ from tests.conftest import _ROOT_DIR
 #   $(which pytest) path/to/test_optimizer_factory.py
 
 
-def get_gpt2_model_from_config(gpt2_model_config_dict: Dict) -> GPT2LLM:
+def get_gpt2_model_from_config(gpt2_model_config_dict: dict) -> GPT2LLM:
     class GPT2InstantationModel(BaseModel):
         model: PydanticPytorchModuleType
 

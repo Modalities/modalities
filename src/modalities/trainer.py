@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import torch
 import torch.distributed as dist
@@ -89,7 +89,7 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-    ) -> Tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         """
         Conducts a training step on batch of data.
 
@@ -102,7 +102,7 @@ class Trainer:
             micro_batch_id (int): The ID of the micro batch.
 
         Returns:
-            Tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+            tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
                 A tuple containing the following:
                     - step_performed (bool): Indicates whether a training step was performed.
                     - num_train_steps_done (int): The number of training steps done.
