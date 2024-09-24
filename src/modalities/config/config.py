@@ -81,6 +81,12 @@ class ClipLossConfig(BaseModel):
     local_loss: bool = True
     tag: str = "ClipLoss"
 
+
+class MultipleFunctionsLossConfig(BaseModel):
+    losses: list
+    corrsp_weights: list
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt

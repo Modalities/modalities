@@ -26,6 +26,65 @@ class Loss(ABC):
         raise NotImplementedError
 
 
+class MultipleFunctionsLoss(Loss):
+    """Loss objects of this type use more
+    than one loss function and weights corresponding
+    to the losses to compute total loss.
+    """
+
+    def __init__(
+        self,
+        losses: list[Loss],
+        corrsp_weights: list[float],
+        tag: str = "MultipleFunctionsLoss",
+    ) -> None:
+        """MultipleFunctionsLoss Constructor
+
+        Args:
+            losses (list): Initialized losses. This list should contain more than one loss.
+            corrsp_weights (list): Weights to be multiplied to each loss while summing up.
+
+        Returns:
+            None
+        """
+        super().__init__(tag)
+
+        if len(losses) <= 1:
+            raise ValueError("Number of losses used should be more than 1.")
+
+        self.groups = [(loss_func, weight) for loss_func, weight in zip(losses, corrsp_weights, strict=True)]
+
+        self.cumulated_individual_losses = None
+        # variable storing each loss,
+        # summed over local batches,
+        # separately.
+
+        self.reset_cumulated_individual_losses()
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        device = forward_batch.predictions[list(forward_batch.predictions.keys())[0]].device
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
+        for ind, (loss_func, weight) in enumerate(self.groups):
+            loss = loss_func(forward_batch)
+            self.cumulated_individual_losses[ind] += loss
+            total_loss += weight * loss
+        return total_loss
+
+    def reset_cumulated_individual_losses(
+        self,
+    ) -> None:
+        """Initializes and resets the variable
+        accumulating each loss separately.
+
+        Called first when the class is initialized, and then
+        after every logging step in trainer.py.
+        """
+        if torch.cuda.is_available():
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to(torch.device("cuda"))
+        else:
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to("cpu")
+
+
 class CLMCrossEntropyLoss(Loss):
     def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
         super().__init__(tag)

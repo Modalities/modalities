@@ -36,6 +36,7 @@ from modalities.config.config import (
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MultipleFunctionsLossConfig,
     NCELossConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
@@ -75,7 +76,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import ClipLoss, CLMCrossEntropyLoss, NCELoss
+from modalities.loss_functions import ClipLoss, CLMCrossEntropyLoss, MultipleFunctionsLoss, NCELoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -162,6 +163,7 @@ COMPONENTS = [
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     ComponentEntity("loss", "nce_loss", NCELoss, NCELossConfig),
     ComponentEntity("loss", "clip_loss", ClipLoss, ClipLossConfig),
+    ComponentEntity("loss", "multiple_functions_loss", MultipleFunctionsLoss, MultipleFunctionsLossConfig),
     # optmizers
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),

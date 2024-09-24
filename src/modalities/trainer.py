@@ -12,7 +12,7 @@ from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.loss_functions import Loss
+from modalities.loss_functions import Loss, MultipleFunctionsLoss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
@@ -258,6 +258,25 @@ class Trainer:
                     "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
                     "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
+
+                # If there are multiple loss functions being used,
+                # this block computes and logs all the individual
+                # losses, averaged over the global batch size.
+                if isinstance(loss_fun, MultipleFunctionsLoss):
+                    global_batch_size = Reducer.reduce(
+                        tensor=cumulated_losses[-1], operation=dist.ReduceOp.SUM, post_processing_fun=None
+                    )
+                    reduced_individual_losses = Reducer.reduce(
+                        tensor=loss_fun.cumulated_individual_losses,
+                        operation=dist.ReduceOp.SUM,
+                        post_processing_fun=lambda t: torch.stack(
+                            [t[ind] / global_batch_size for ind in range(len(t))]
+                        ),
+                    )
+                    for ind, (loss, _) in enumerate(loss_fun.groups):
+                        losses[f"train {loss.tag} avg"] = ResultItem(reduced_individual_losses[ind], decimal_places=2)
+
+                    loss_fun.reset_cumulated_individual_losses()
 
                 consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
                 metrics = {

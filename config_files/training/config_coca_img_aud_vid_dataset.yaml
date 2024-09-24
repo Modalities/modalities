@@ -326,12 +326,10 @@ checkpoint_saving:
 
 captioning_loss:
   component_key: loss
-  variant_key: cross_entropy_loss
+  variant_key: clm_cross_entropy_loss
   config:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${model_raw.config.prediction_key}
-    tag: captioning_loss
-    weight: 2.0
 
 contrastive_loss_audio:
   component_key: loss
@@ -342,7 +340,6 @@ contrastive_loss_audio:
       - ${model_raw.config.audio_text_cls_prediction_key}
     logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
     tag: contrastive_loss_audio
-    weight: 1.0
 
 contrastive_loss_image:
   component_key: loss
@@ -353,7 +350,6 @@ contrastive_loss_image:
       - ${model_raw.config.image_text_cls_prediction_key}
     logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
     tag: contrastive_loss_image
-    weight: 1.0
 
 contrastive_loss_video:
   component_key: loss
@@ -364,17 +360,25 @@ contrastive_loss_video:
       - ${model_raw.config.video_text_cls_prediction_key}
     logit_scale_key: ${model_raw.config.logit_scale_prediction_key}
     tag: contrastive_loss_image
-    weight: 1.0
 
 loss_fn:
-  - instance_key: captioning_loss
-    pass_type: BY_REFERENCE
-  - instance_key: contrastive_loss_audio
-    pass_type: BY_REFERENCE
-  - instance_key: contrastive_loss_image
-    pass_type: BY_REFERENCE
-  - instance_key: contrastive_loss_video
-    pass_type: BY_REFERENCE
+  component_key: loss
+  variant_key: multiple_functions_loss
+  config:
+    losses:
+      - instance_key: captioning_loss
+        pass_type: BY_REFERENCE
+      - instance_key: contrastive_loss_audio
+        pass_type: BY_REFERENCE
+      - instance_key: contrastive_loss_image
+        pass_type: BY_REFERENCE
+      - instance_key: contrastive_loss_video
+        pass_type: BY_REFERENCE
+    corrsp_weights:
+      - 2.0
+      - 1.0
+      - 1.0
+      - 1.0
 
 wrapped_model:
   component_key: model
