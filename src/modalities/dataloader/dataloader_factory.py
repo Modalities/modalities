@@ -1,11 +1,9 @@
-from typing import Callable, Optional
+from typing import Callable
 
 from torch.utils.data import BatchSampler
 from torch.utils.data.dataset import Dataset
 
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
-from modalities.dataloader.samplers import ResumableBatchSampler
-from modalities.exceptions import ConfigError
 
 
 class DataloaderFactory:
@@ -17,8 +15,6 @@ class DataloaderFactory:
         collate_fn: Callable,
         num_workers: int,
         pin_memory: bool,
-        skip_num_batches: Optional[int] = 0,
-        fixed_num_batches: Optional[int] = None,
     ) -> LLMDataLoader:
         """
         Factory method for the instantiation of LLMDataLoader.
@@ -44,19 +40,20 @@ class DataloaderFactory:
             LLMDataLoader: Instance of LLMDataLoader
         """
 
-        batch_sampler = ResumableBatchSampler(
-            start_index=skip_num_batches, underlying_batch_sampler=batch_sampler, max_num_elements=fixed_num_batches
-        )
+        # batch_sampler = ResumableBatchSampler(
+        #     start_index=skip_num_batches, underlying_batch_sampler=batch_sampler, max_num_elements=fixed_num_batches
+        # )
 
-        if fixed_num_batches is not None and fixed_num_batches <= skip_num_batches:
-            raise ConfigError("fixed_num_batches must be larger than skip_num_batches")
+        # if fixed_num_batches is not None and fixed_num_batches <= skip_num_batches:
+        #     raise ConfigError("fixed_num_batches must be larger than skip_num_batches")
 
-        # make sure that the batch sampler has enough elements such that we can fix the number of batches to num_batches
-        if fixed_num_batches is not None and len(batch_sampler) < fixed_num_batches - skip_num_batches:
-            raise ConfigError(
-                f"The dataloader contains only {len(batch_sampler)} batches, which is less than "
-                f"specified fixed amount of batches of {fixed_num_batches}."
-            )
+        # # make sure that the batch sampler has enough elements such
+        # # that we can fix the number of batches to num_batches
+        # if fixed_num_batches is not None and len(batch_sampler) < fixed_num_batches - skip_num_batches:
+        #     raise ConfigError(
+        #         f"The dataloader contains only {len(batch_sampler)} batches, which is less than "
+        #         f"specified fixed amount of batches of {fixed_num_batches}."
+        #     )
 
         dataloader = LLMDataLoader(
             dataloader_tag=dataloader_tag,
