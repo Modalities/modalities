@@ -4,15 +4,14 @@ import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 from pydantic import BaseModel
-from torch.nn import CrossEntropyLoss as TorchCrossEntropyLoss
+from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
 
 
 class Loss(ABC):
-    def __init__(self, tag: str, weight: float = 1.0):
+    def __init__(self, tag: str):
         self._tag = tag
-        self.weight = weight
 
     @property
     def tag(self) -> str:
@@ -27,22 +26,13 @@ class Loss(ABC):
         raise NotImplementedError
 
 
-class CrossEntropyLossConfig(BaseModel):
-    target_key: str
-    prediction_key: str
-    weight: float = 1
-    tag: str = "CLMCrossEntropyLoss"
-
-
-class CrossEntropyLoss(Loss):
-    def __init__(self, target_key: str, prediction_key: str, weight: float, tag: str = "CLMCrossEntropyLoss"):
-        super().__init__(tag, weight)
+class CLMCrossEntropyLoss(Loss):
+    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
+        super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
         # Mean over the tokens in the local-batch (batch per rank)
-        self.loss_fun = TorchCrossEntropyLoss(
-            reduction="mean",
-        )
+        self.loss_fun = CrossEntropyLoss(reduction="mean")
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
@@ -97,15 +87,6 @@ def nce_loss(
     return torch.mean(denominator - numerator)  # calculated in log space
 
 
-class NCELossConfig(BaseModel):
-    prediction_key1: str
-    prediction_key2: str
-    is_asymmetric: bool = True
-    temperature: float = 1.0
-    weight: float = 1
-    tag: str = "NCELoss"
-
-
 class NCELoss(Loss):
     def __init__(
         self,
@@ -113,7 +94,6 @@ class NCELoss(Loss):
         prediction_key2: str,
         is_asymmetric: bool,
         temperature: float,
-        weight: float,
         tag: str = "NCELoss",
     ):
         """
@@ -126,7 +106,7 @@ class NCELoss(Loss):
             temperature (float, optional): temperature. Defaults to 1.0.
             tag (str, optional): Defaults to "NCELoss".
         """
-        super().__init__(tag, weight)
+        super().__init__(tag)
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
         self.is_asymmetric = is_asymmetric
@@ -152,20 +132,11 @@ class NCELoss(Loss):
         return loss
 
 
-class ClipLossConfig(BaseModel):
-    logit_scale_key: str
-    prediction_keys: list[str]
-    weight: float = 1
-    local_loss: bool = True
-    tag: str = "ClipLoss"
-
-
 class ClipLoss(Loss):
     def __init__(
         self,
         logit_scale_key: str,
         prediction_keys: list[str],
-        weight: float,
         local_loss: bool,
         tag: str = "ClipLoss",
     ):
@@ -177,7 +148,7 @@ class ClipLoss(Loss):
             prediction_keys (list[str]): Keys to access embeddings.
             tag (str, optional): Defaults to "ClipLoss".
         """
-        super().__init__(tag, weight)
+        super().__init__(tag)
         self.logit_scale_key = logit_scale_key
         self.prediction_keys = prediction_keys
         self.local_loss = local_loss
