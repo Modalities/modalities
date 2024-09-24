@@ -483,6 +483,21 @@ class TextTransform(Transform):
 
 
 class AudioTransformConfig(TransformConfig):
+    """
+    Configuration class for the audio transformation module.
+
+    This class defines various parameters that control the behavior of the AudioTransform.
+    These parameters include whether the module is in training mode, the number of mel-frequency bands,
+    lengths for frequency and time domain masking during training, and the target block size for audio encoding.
+
+    Attributes:
+        is_training (bool): Whether the module is in training mode. Defaults to False.
+        n_mels (int): Number of mel-frequency bands. Defaults to 128.
+        freq_domain_mask_length (int): Length of frequency masking during training. Defaults to 30.
+        time_domain_mask_length (int): Length of time masking during training. Defaults to 100.
+        block_size_audio_encoder (int): The target block size for audio encoding.
+    """
+
     is_training: bool = False
     n_mels: int = 128
     freq_domain_mask_length: int = 30
@@ -491,6 +506,13 @@ class AudioTransformConfig(TransformConfig):
 
 
 class AudioTransform(Transform):
+    """
+    An audio transformation module that processes raw audio into mel-spectrogram features.
+
+    This module includes steps such as feature extraction, frequency and time domain masking during training,
+    padding to match a fixed block size, and returns the processed features along with their length.
+    """
+
     def __init__(
         self,
         block_size_audio_encoder: int,
@@ -499,6 +521,19 @@ class AudioTransform(Transform):
         freq_domain_mask_length: int = 30,
         time_domain_mask_length: int = 100,
     ):
+        """
+        Initializes the AudioTransform class.
+
+        Args:
+            block_size_audio_encoder (int): The target block size for audio encoding.
+            is_training (bool, optional): Whether the module is in training mode. Defaults to False.
+            n_mels (int, optional): Number of mel-frequency bands. Defaults to 128.
+            freq_domain_mask_length (int, optional): Length of frequency masking. Defaults to 30.
+            time_domain_mask_length (int, optional): Length of time masking. Defaults to 100.
+
+        Returns:
+            tuple[torch.Tensor, int]: A tuple containing the processed audio features and their length.
+        """
         self.block_size_audio_encoder = block_size_audio_encoder
         self.is_training = is_training
         self.n_mels = n_mels
@@ -506,7 +541,17 @@ class AudioTransform(Transform):
         self.time_domain_mask_length = time_domain_mask_length
 
     def __call__(self, raw_audio: tuple[torch.Tensor, int]) -> tuple[torch.Tensor, int]:
-        SUB_SAMPLING_FACTOR = 4
+        """
+        Processes the input raw audio into mel-spectrogram features.
+
+        Args:
+            raw_audio (tuple[torch.Tensor, int]): A tuple containing the raw audio tensor and its sample rate.
+
+        Returns:
+            tuple[torch.Tensor, int]: A tuple containing the processed audio features and their length.
+        """
+
+        SUB_SAMPLING_FACTOR = 4  # reduce the number of features (i.e., time frames)
 
         self.extract_features = torchaudio.transforms.MelSpectrogram(n_mels=self.n_mels)
 
@@ -567,9 +612,25 @@ class VideoTransform(Transform):
         return self.spatial_transform(video)
 
 
-def decord_video(key, data):
-    """Based on the torch_video decoder in webdataset
+def decord_video(key: str, data: bytes) -> None | tuple[torch.Tensor, Optional[torch.Tensor], int]:
+    """
+    Based on the torch_video decoder in webdataset
     https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L394
+
+    Decode a video file using Decord and optionally extract audio.
+
+    This function decodes a video file from the provided data.
+    It first checks if the file extension is one of the supported formats.
+    If an audio stream exists, it extracts the audio with a mean across channels (if there are multiple).
+    It then uses Decord to decode uniformly sampled frames from the video.
+
+    Parameters:
+        key (str): The key or identifier for the video data.
+        data (bytes): The binary data of the video file.
+
+    Returns:
+        tuple: A tuple containing the decoded video frames, audio tensor (if available), and audio sample rate.
+            If no audio stream exists, the audio tensor will be None.
     """
     extension = re.sub(r".*[.]", "", key)
     if extension not in "mp4 ogv mjpeg avi mov h264 mpg webm wmv".split():
@@ -592,19 +653,34 @@ def decord_video(key, data):
     frame_ids = torch.linspace(0, len(vr) - 1, clip_num_frames, dtype=torch.int64)
     frames = vr.get_batch(frame_ids.tolist())  # T x H x W x C
 
-    return (frames, audio, audio_sample_rate)  # audio can be None if no audio stream exists
+    return (frames, audio, audio_sample_rate)
 
 
-def torch_audio(key, data):
-    """Based on the torch_audio decoder in webdataset
-    https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L418
+def torch_audio(key: str, data: bytes) -> None | tuple[torch.Tensor, int]:
     """
+    Based on the torch_audio decoder in webdataset
+    https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py#L418
+
+    Decode an audio file using torchaudio.
+
+    This function decodes an audio file from the provided data.
+    It first checks if the file extension is one of the supported formats.
+    If there are multiple channels in the audio file, it averages them to produce a mono audio tensor.
+
+    Parameters:
+        key (str): The key or identifier for the audio data.
+        data (bytes): The binary data of the audio file.
+
+    Returns:
+        tuple: A tuple containing the decoded audio tensor and its sample rate. If the file extension is not supported,
+               the function will return None.
+    """
+
     extension = re.sub(r".*[.]", "", key)
     valid_extensions = "mp4 ogv mjpeg avi mov h264 mpg webm wmv flac mp3 sox wav m4a ogg wma".split()
     if extension not in valid_extensions:
         return None
 
-    # torchaudio.load returns (torch.Tensor, int)
     audio, sample_rate = torchaudio.load(data)
     if audio.shape[0] > 1:  # more than one channel
         audio = torch.mean(audio, dim=0, keepdim=True)
@@ -777,7 +853,8 @@ class MultimodalWebDatasetBuilder:
         del sample[source_key]
         return sample
 
-    def _transform_audio(self, sample):
+    def _transform_audio(self, sample: dict):
+        # Apply audio transforms to the input sample.
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
         transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
         sample[target_key], sample["audio_len"] = transform(sample[source_key])
