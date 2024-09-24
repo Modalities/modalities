@@ -1,6 +1,5 @@
 from enum import Enum
 from pathlib import Path
-from typing import List
 
 import torch
 import torch.distributed as dist
@@ -124,7 +123,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         # leading to wrong throughput measurements.
         dist.barrier()
 
-    def _get_paths_to_delete(self, training_progress: TrainingProgress) -> List[Path]:
+    def _get_paths_to_delete(self, training_progress: TrainingProgress) -> list[Path]:
         return [
             self._get_checkpointing_path(
                 experiment_id=self.experiment_id,

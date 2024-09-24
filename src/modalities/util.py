@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
-from typing import Callable, Dict, Generic, Optional, Type, TypeVar
+from typing import Callable, Generic, Optional, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -151,7 +151,7 @@ T = TypeVar("T")
 
 class Aggregator(Generic[T]):
     def __init__(self):
-        self.key_to_value: Dict[T, torch.Tensor] = {}
+        self.key_to_value: dict[T, torch.Tensor] = {}
 
     def add_value(self, key: T, value: torch.Tensor):
         if key not in self.key_to_value:

@@ -1,5 +1,3 @@
-from typing import Dict
-
 import torch
 from transformers import PreTrainedModel
 
@@ -38,7 +36,7 @@ class PretrainedGPTModel(PreTrainedModel):
 
         """
         model_input = {"input_ids": tensor}
-        model_forward_output: Dict[str, torch.Tensor] = self.model.forward(model_input)
+        model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
         return model_forward_output[self.config.config.prediction_key]
 
 

@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Type
+from typing import Type
 
 import click
 import click_pathlib
@@ -198,7 +198,7 @@ def entry_point_pack_encoded_data(config_path: FilePath):
 @data.command(name="merge_packed_data")
 @click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
 @click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
-def entry_point_merge_packed_data(src_paths: List[Path], target_path: Path):
+def entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
     """Utility for merging different pbin-files into one.
     This is especially useful, if different datasets were at different points in time or if one encoding takes so long,
     that the overall process was done in chunks.
@@ -207,7 +207,7 @@ def entry_point_merge_packed_data(src_paths: List[Path], target_path: Path):
     Specify an arbitrary amount of pbin-files and/or directory containing such as input.
 
     Args:
-        src_paths (List[Path]): List of paths to the pbin-files or directories containing such.
+        src_paths (list[Path]): List of paths to the pbin-files or directories containing such.
         target_path (Path): The path to the merged pbin-file, that will be created.
     """
     input_files = []
@@ -364,7 +364,7 @@ class Main:
         results_subscriber: MessageSubscriberIF[EvaluationResultBatch],
         global_rank: int,
         local_rank: int,
-    ) -> Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]:
+    ) -> tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]:
         """Returns the logging publishers for the training.
 
         These publishers are used to pass the evaluation results and the progress updates to the message broker.
@@ -377,7 +377,7 @@ class Main:
             local_rank (int): The local rank of the current process on the current node
 
         Returns:
-            Tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]: The evaluation
+            tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]: The evaluation
                 result publisher and the progress publisher
         """
         message_broker = MessageBroker()

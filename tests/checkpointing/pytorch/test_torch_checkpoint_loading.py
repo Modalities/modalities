@@ -1,5 +1,3 @@
-from typing import Dict
-
 import pytest
 import torch
 import torch.nn as nn
@@ -13,7 +11,7 @@ class DummyModel(nn.Module):
         super().__init__()
         self._weights = nn.Linear(2, 3)
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         output = self._weights(**inputs)
         return {"output": output}
 

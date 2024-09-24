@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pytest
@@ -44,7 +44,7 @@ def test_resumable_dataloader():
     assert (flat_samples == original_samples).all()
 
 
-def test_dataloader_from_config(dummy_config: Dict):
+def test_dataloader_from_config(dummy_config: dict):
     start_index = 2
     dummy_config["train_dataloader"]["config"]["skip_num_batches"] = start_index
 
@@ -248,7 +248,7 @@ def test_dataloader_with_fixed_num_batches(global_rank):
         fixed_num_batches: int
 
     class IdentityCollateFn(CollateFnIF):
-        def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> List[Dict[str, torch.Tensor]]:
+        def __call__(self, batch: list[dict[str, torch.Tensor]]) -> list[dict[str, torch.Tensor]]:
             return batch
 
     root_dir = Path(__file__).parents[0]

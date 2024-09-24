@@ -1,6 +1,6 @@
 import math
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -78,7 +78,7 @@ class MultiHeadAttention(nn.Module):
         y = self.resid_dropout(self.c_proj(y))
         return y
 
-    def _forward_input_projection(self, x: Tensor, context: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+    def _forward_input_projection(self, x: Tensor, context: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         B, T, C = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
         _, Tc, Cc = context.shape  # batch size, context length, context embedding dimensionality
         # Note that the context length (Tc), sequence length (T) and embedding dimensionalities (C and Cc)
