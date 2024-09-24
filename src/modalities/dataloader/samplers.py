@@ -67,7 +67,7 @@ T_co = TypeVar("T_co", covariant=True)
 
 
 class ResumableDistributedSampler(Sampler[T_co]):
-    r"""Sampler that restricts data loading to a subset of the dataset.
+    """Sampler that restricts data loading to a subset of the dataset.
     We adopted this class from pytorch's DistributedSampler class and added the ability to resume from a specific index.
     source: https://github.com/pytorch/pytorch/blob/main/torch/utils/data/distributed.py
 
@@ -80,41 +80,6 @@ class ResumableDistributedSampler(Sampler[T_co]):
     .. note::
         Dataset is assumed to be of constant size and that any instance of it always
         returns the same elements in the same order.
-
-    Args:
-        dataset: Dataset used for sampling.
-        num_replicas (int, optional): Number of processes participating in
-            distributed training. By default, :attr:`world_size` is retrieved from the
-            current distributed group.
-        rank (int, optional): Rank of the current process within :attr:`num_replicas`.
-            By default, :attr:`rank` is retrieved from the current distributed
-            group.
-        shuffle (bool, optional): If ``True`` (default), sampler will shuffle the
-            indices.
-        seed (int, optional): random seed used to shuffle the sampler if
-            :attr:`shuffle=True`. This number should be identical across all
-            processes in the distributed group. Default: ``0``.
-        drop_last (bool, optional): if ``True``, then the sampler will drop the
-            tail of the data to make it evenly divisible across the number of
-            replicas. If ``False``, the sampler will add extra indices to make
-            the data evenly divisible across the replicas. Default: ``False``.
-
-    .. warning::
-        In distributed mode, calling the :meth:`set_epoch` method at
-        the beginning of each epoch **before** creating the :class:`DataLoader` iterator
-        is necessary to make shuffling work properly across multiple epochs. Otherwise,
-        the same ordering will be always used.
-
-    Example::
-
-        >>> # xdoctest: +SKIP
-        >>> sampler = DistributedSampler(dataset) if is_distributed else None
-        >>> loader = DataLoader(dataset, shuffle=(sampler is None),
-        ...                     sampler=sampler)
-        >>> for epoch in range(start_epoch, n_epochs):
-        ...     if is_distributed:
-        ...         sampler.set_epoch(epoch)
-        ...     train(loader)
     """
 
     def __init__(
@@ -128,7 +93,11 @@ class ResumableDistributedSampler(Sampler[T_co]):
         drop_last: Optional[bool] = False,
         skip_num_global_samples: Optional[int] = 0,
     ) -> None:
-        num_replicas = dist.get_world_size()
+        if num_replicas is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            num_replicas = dist.get_world_size()
+
         self.rank = rank
         self.dataset = dataset
         self.num_replicas = num_replicas
@@ -160,29 +129,42 @@ class ResumableDistributedSampler(Sampler[T_co]):
             # deterministically shuffle based on epoch and seed
             g = torch.Generator()
             g.manual_seed(self.seed + self.epoch)
-            indices = torch.randperm(len(self.dataset), generator=g).tolist()  # type: ignore[arg-type]
+            indices_full = torch.randperm(len(self.dataset), generator=g).tolist()  # type: ignore[arg-type]
         else:
-            indices = list(range(len(self.dataset)))  # type: ignore[arg-type]
+            indices_full = list(range(len(self.dataset)))  # type: ignore[arg-type]
 
-        indices = indices[self.skip_num_global_samples :]
+        indices_without_skipped = indices_full[self.skip_num_global_samples :]
 
         if not self.drop_last:
             # add extra samples to make it evenly divisible
-            padding_size = self.global_num_samples_effective - len(indices)
-            if padding_size <= len(indices):
-                indices += indices[:padding_size]
+            padding_size = self.global_num_samples_effective - len(indices_without_skipped)
+            if padding_size <= len(indices_full):
+                indices_without_skipped += indices_full[:padding_size]  # we want to reuse the beginning of the data
             else:
-                indices += (indices * math.ceil(padding_size / len(indices)))[:padding_size]
+                # if the padding size is larger than the data, we create an extended index by repeating the indices
+                indices_without_skipped += (indices_full * math.ceil(padding_size / len(indices_full)))[:padding_size]
         else:
             # remove tail of data to make it evenly divisible.
-            indices = indices[: self.global_num_samples_effective]
-        assert len(indices) == self.global_num_samples_effective
+            indices_without_skipped = indices_without_skipped[: self.global_num_samples_effective]
+
+        if len(indices_without_skipped) != self.global_num_samples_effective:
+            raise ValueError(
+                f"global_num_samples_effective ({self.global_num_samples_effective}) does not match the actual"
+                f"number of samples ({len(indices_without_skipped)})"
+            )
 
         # subsample
-        indices = indices[self.rank : self.global_num_samples_effective : self.num_replicas]
-        assert len(indices) == self.local_num_samples
+        indices_without_skipped = indices_without_skipped[
+            self.rank : self.global_num_samples_effective : self.num_replicas
+        ]
 
-        return iter(indices)
+        if len(indices_without_skipped) != self.local_num_samples:
+            raise ValueError(
+                f"local_num_samples ({self.local_num_samples}) does not match the actual"
+                f"number of samples ({len(indices_without_skipped)})"
+            )
+
+        return iter(indices_without_skipped)
 
     def __len__(self) -> int:
         return self.local_num_samples

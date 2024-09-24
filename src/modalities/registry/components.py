@@ -42,6 +42,7 @@ from modalities.config.config import (
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
     RepeatingDataLoaderConfig,
+    ResumableDistributedSamplerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
@@ -54,6 +55,7 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
@@ -179,6 +181,9 @@ COMPONENTS = [
     ComponentEntity("dataset", "combined", DatasetFactory.get_combined_dataset, CombinedDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
+    ComponentEntity(
+        "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
+    ),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
