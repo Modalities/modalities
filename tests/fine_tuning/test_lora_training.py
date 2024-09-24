@@ -10,14 +10,14 @@ from modalities.config.instantiation_models import TrainingComponentsInstantiati
 from modalities.running_env.cuda_env import CudaEnv
 from tests.conftest import _ROOT_DIR
 
-os.environ["LOCAL_RANK"] = "0"
-os.environ["RANK"] = "0"
-os.environ["WORLD_SIZE"] = "1"
-os.environ["NNODES"] = "1"
-os.environ["NPROC_PER_NODE"] = "1"
-os.environ["RDZV_ENDPOINT"] = "0.0.0.0:29502"
-os.environ["MASTER_ADDR"] = "localhost"
-os.environ["MASTER_PORT"] = "29500"
+# os.environ["LOCAL_RANK"] = "0"
+# os.environ["RANK"] = "0"
+# os.environ["WORLD_SIZE"] = "2"
+# os.environ["NNODES"] = "1"
+# os.environ["NPROC_PER_NODE"] = "2"
+# os.environ["RDZV_ENDPOINT"] = "0.0.0.0:29502"
+# os.environ["MASTER_ADDR"] = "localhost"
+# os.environ["MASTER_PORT"] = "29500"
 
 
 @pytest.fixture()
@@ -49,8 +49,8 @@ def main_obj(config_file_path, checkpointing_path):
 
 
 @pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 1,
-    reason="This e2e test requires 1 GPU and a torchrun distributed environment.",
+    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
 def test_lora_model_training_on_one_gpu(main_obj, checkpointing_path):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
