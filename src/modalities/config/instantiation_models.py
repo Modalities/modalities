@@ -56,7 +56,7 @@ class TrainingTarget(BaseModel):
 class TrainingProgress(BaseModel):
     global_num_seen_tokens: Annotated[int, Field(strict=True, ge=0)]
     num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
-    local_num_seen_batches: Annotated[int, Field(strict=True, ge=0)]
+    num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
     last_step: Annotated[int, Field(strict=True, ge=-1)]
 
 

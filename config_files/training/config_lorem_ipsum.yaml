@@ -26,7 +26,7 @@ settings:
     local_train_micro_batch_size: 1
     sequence_length: 256
   training_target:
-    num_target_tokens:      
+    num_target_tokens:
       component_key: number_conversion
       variant_key: num_tokens_from_packed_mem_map_dataset_continuous
       config:
