@@ -1,27 +1,32 @@
 prediction_key: logits
-audio_embd_prediction_key: audio_embeddings
+video_embd_prediction_key: video_embeddings
 text_embd_prediction_key: text_embeddings
-audio_cls_prediction_key: audio_cls
+video_cls_prediction_key: video_cls
 text_cls_prediction_key: text_cls
 modality_keys:
-  - audio
-  - audio_len
+  - video
   - input_ids
 is_audio_video: false
 individual_datasets: false
 logit_scale_prediction_key: logit_scale
-audio_encoder_config:
-  sample_key: audio
-  prediction_key: audio_embeddings
-  block_size: 500
-  n_mels: 128
-  n_embd: 768
-  n_heads: 4
-  n_conformer_blocks: 3
+video_encoder_config:
+  sample_key: video
+  prediction_key: video_embeddings
+  img_size: 224
+  n_classes: Null # Disable vision transformer head
+  n_layer: 6
   attention_config:
-    attention_engine_type: default_attention
-  pointwise_conv_kernel_size: 1
-  depthwise_conv_kernel_size: 31
+    attention_engine_type: pytorch_flash_attention
+  n_head: 8
+  n_embd: 768
+  dropout: 0.0
+  patch_size: 16
+  patch_stride: 16
+  n_img_channels: 3
+  add_cls_token: False
+  bias: True
+  num_video_frames: 16
+  n_latents: 64
 text_decoder_config:
   sample_key: input_ids
   prediction_key: text_embeddings
