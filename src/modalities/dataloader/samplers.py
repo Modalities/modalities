@@ -93,6 +93,26 @@ class ResumableDistributedSampler(Sampler[T_co]):
         drop_last: Optional[bool] = False,
         skip_num_global_samples: Optional[int] = 0,
     ) -> None:
+        """Instantiates a distributed and resumable Sampler object.
+
+        Args:
+            dataset (Dataset): The dataset to sample from.
+            rank (int): The global rank of the current process.
+            num_replicas (int, optional): Number of replicas.
+                This usually equals the world size. Defaults to None.
+            epoch (int, optional): Current epoch. Defaults to 0.
+            shuffle (bool, optional): Boolean flag whether to shuffle the data. Defaults to False.
+            seed (int, optional): Seed for the shuffling. Defaults to 0.
+            drop_last (bool, optional): Boolean flag indicating whether to drop the last samples
+                that cannot be distributed over all ranks (i.e., maximum world size - samples).
+                If drop_last is false padding is applied for these samples, by resampling the initial samples.
+                Defaults to False.
+            skip_num_global_samples (int, optional): Number of samples to skip, e.g., due to warmstart.
+                Defaults to 0.
+
+        Raises:
+            RuntimeError: Requires distributed package to be available if num_replicas is None.
+        """
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
