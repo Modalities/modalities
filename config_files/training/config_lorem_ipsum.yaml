@@ -47,7 +47,7 @@ settings:
   training_progress: 
     global_num_seen_tokens: 0
     num_seen_steps: 0
-    local_num_seen_batches: 0
+    num_seen_samples: 0
     last_step: -1
 
 collate_fn:
@@ -93,7 +93,7 @@ train_dataloader:
             shuffle: true
             seed: 42
             drop_last: true
-            skip_num_global_samples: 0
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
