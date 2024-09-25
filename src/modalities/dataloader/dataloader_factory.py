@@ -26,35 +26,9 @@ class DataloaderFactory:
             collate_fn (Callable): Callable for shaping the batch
             num_workers (int): Number of workers for the dataloader
             pin_memory (bool): Flag indicating whether to pin memory
-            skip_num_batches (int, optional): Defines the number of batches to skip.
-              NOTE: The checkpoints are indexed with training steps (i.e., number of optimizer steps).
-              skip_num_batches must not be confused with the number of optimizer steps!
-              skip_num_batches = num optimizer steps * gradient accumulation steps
-              Defaults to 0.
-            fixed_num_batches: (int, optional): Fixed length of the dataloader by cutting off subsequent batches.
-                Note that these are NOT the global number of batches, but the amount of batches that an
-                individual rank sees. Make sure that the dataloader has at least fixed_num_batches.
-                Defaults to None.
-
         Returns:
             LLMDataLoader: Instance of LLMDataLoader
         """
-
-        # batch_sampler = ResumableBatchSampler(
-        #     start_index=skip_num_batches, underlying_batch_sampler=batch_sampler, max_num_elements=fixed_num_batches
-        # )
-
-        # if fixed_num_batches is not None and fixed_num_batches <= skip_num_batches:
-        #     raise ConfigError("fixed_num_batches must be larger than skip_num_batches")
-
-        # # make sure that the batch sampler has enough elements such
-        # # that we can fix the number of batches to num_batches
-        # if fixed_num_batches is not None and len(batch_sampler) < fixed_num_batches - skip_num_batches:
-        #     raise ConfigError(
-        #         f"The dataloader contains only {len(batch_sampler)} batches, which is less than "
-        #         f"specified fixed amount of batches of {fixed_num_batches}."
-        #     )
-
         dataloader = LLMDataLoader(
             dataloader_tag=dataloader_tag,
             batch_sampler=batch_sampler,
