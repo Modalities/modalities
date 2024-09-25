@@ -19,6 +19,10 @@ class ResumableBatchSampler(Sampler):
             underlying_batch_sampler (BatchSampler): Sampler providing the batch ids.
             max_num_elements (Optional[int]): The maximum number of elements the sampler returns. Default None.
 
+        Warning: During instantiation the indices are computed and stored in memory. This is needed for skipping
+            and is very costly with large datasets, leading to long delays until the training starts.
+            In this case, it is recommended to use the `ResumableDistributedSampler` instead.
+
         Returns:
             None
         """
@@ -26,8 +30,10 @@ class ResumableBatchSampler(Sampler):
         self.start_index = start_index
         self.max_num_elements = max_num_elements
         self.underlying_batch_sampler = underlying_batch_sampler
-        # NOTE: we are only iterating ove the indices not the actual data
-        # so this is relatively cheap
+        # NOTE: we are only iterating over the indices not the actual data
+        # so this is relatively cheap for small datasets.
+        # For large-scale datasets in the range of billions to trillion samples, this can be very costly
+        # and delay the training start.
         self.indices = list(iter(self.underlying_batch_sampler))
         # We discard the samples that come after max_num_elements
         # NOTE, that skipping is implemented in __iter__ and __len__.
