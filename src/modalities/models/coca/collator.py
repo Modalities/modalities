@@ -107,12 +107,7 @@ class CoCaCollatorFn(CollateFnIF):
         samples[self.text_sample_key] = torch.cat([text_samples[sample_key] for sample_key in text_samples])
         samples["attention_mask"] = torch.cat([attention_masks[sample_key] for sample_key in attention_masks])
 
-        ## TODO: this will not work when there is data from multiple datasets per batch
-        targets = {
-            target_key: torch.stack([self._prepare_sample(d[target_key]) for d in batch])
-            for target_key in self.target_keys
-        }
-
+        targets = {}
         # Create target for text input
         targets[self.text_target_key] = samples[self.text_sample_key][:, 1:].clone().detach()
         samples[self.text_sample_key] = samples[self.text_sample_key][:, :-1]

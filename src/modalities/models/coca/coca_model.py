@@ -75,8 +75,8 @@ class CoCaConfig(BaseModel):
 
     prediction_key: str = "logits"
     text_embd_prediction_key: str
-    text_cls_prediction_key: str
     logit_scale_prediction_key: str
+    text_cls_prediction_key: Optional[str] = None
     audio_embd_prediction_key: Optional[str] = None
     image_embd_prediction_key: Optional[str] = None
     video_embd_prediction_key: Optional[str] = None
@@ -115,8 +115,8 @@ class CoCa(NNModel):
         self,
         prediction_key: str,
         text_embd_prediction_key: str,
-        text_cls_prediction_key: str,
         logit_scale_prediction_key: str,
+        text_cls_prediction_key: Optional[str],
         audio_embd_prediction_key: Optional[str],
         image_embd_prediction_key: Optional[str],
         video_embd_prediction_key: Optional[str],
@@ -161,13 +161,26 @@ class CoCa(NNModel):
             None
         """
         weight_decay_groups = {
-            "linear": ["attention", "\.attn", "\.cross_attn", "\.post_subsampler", "_ffmodule", "mlp"],
-            "conv": ["embedding_fn\.conv", "project", "\.subsampler", "pointwise_conv", "depthwise_conv"],
-            "embedding": ["wte", "wpe", "positional_embedding", "time_embd"],
-            "norm": ["norm", "\.ln_", "\.ln", "\.bn", "exit_ln"],
-            "parameter": ["_queries", "logit_scale", "\.latents", "cls_token"],
+            "linear": [r"attention", r"\.attn", r"\.cross_attn", r"\.post_subsampler", r"_ffmodule", r"mlp"],
+            "conv": [r"embedding_fn\.conv", r"project", r"\.subsampler", r"pointwise_conv", r"depthwise_conv"],
+            "embedding": [r"wte", r"wpe", r"positional_embedding", r"time_embd"],
+            "norm": [r"norm", r"\.ln_", r"\.ln", r"\.bn", r"exit_ln"],
+            "parameter": [r"_queries", r"logit_scale", r"\.latents", r"cls_token"],
         }
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
+
+        if individual_datasets:
+            if (
+                not audio_text_cls_prediction_key
+                and not image_text_cls_prediction_key
+                and not video_text_cls_prediction_key
+            ):
+                raise ValueError("All text_cls_prediction_keys cannot be None")
+        else:
+            if not text_cls_prediction_key:
+                raise ValueError("text_cls_prediction key cannot be None")
+        if not audio_encoder_config and not image_encoder_config and not video_encoder_config:
+            raise ValueError("Atleast one modality encoder config should be specified")
 
         self.prediction_key = prediction_key
         self.text_embd_prediction_key = text_embd_prediction_key
