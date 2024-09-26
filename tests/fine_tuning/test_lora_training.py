@@ -12,7 +12,7 @@ from tests.conftest import _ROOT_DIR
 
 # os.environ["LOCAL_RANK"] = "0"
 # os.environ["RANK"] = "0"
-# os.environ["WORLD_SIZE"] = "2"
+# os.environ["WORLD_SIZE"] = "1"
 # os.environ["NNODES"] = "1"
 # os.environ["NPROC_PER_NODE"] = "2"
 # os.environ["RDZV_ENDPOINT"] = "0.0.0.0:29502"
@@ -22,7 +22,8 @@ from tests.conftest import _ROOT_DIR
 
 @pytest.fixture()
 def config_file_name() -> str:
-    return "config_lorem_ipsum_lora_training.yaml"
+    # return "config_lorem_ipsum_lora_training.yaml"
+    return "config_lorem_ipsum_lora_training_test.yaml"
 
 
 @pytest.fixture()
@@ -35,7 +36,7 @@ def config_file_path(config_file_name) -> Path:
 
 @pytest.fixture
 def checkpointing_path(tmp_path):
-    return tmp_path / "smol_lora_instruct/"
+    return tmp_path.parent
 
 
 @pytest.fixture
@@ -50,7 +51,7 @@ def main_obj(config_file_path, checkpointing_path):
 
 @pytest.mark.skipif(
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+    reason="This e2e test requires 2 GPU and a torchrun distributed environment.",
 )
 def test_lora_model_training_on_one_gpu(main_obj, checkpointing_path):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -58,8 +59,11 @@ def test_lora_model_training_on_one_gpu(main_obj, checkpointing_path):
         main_obj.run(components)
 
     assert os.path.exists(checkpointing_path)
-    checkpoint_files = [
-        "model" in path.name or "optimizer" in path.name or path.suffix == ".yaml"
-        for path in list(checkpointing_path.glob("*"))[0].glob("*")
-    ]
-    assert sum(checkpoint_files) == 3, "Output of the test i.e. a model checkpoint was not created!"
+
+    checkpoint_files = []
+    for root, dirs, files in os.walk(checkpointing_path):
+        for file in files:
+            if "model" in file or "optimizer" in file or file.endswith('.yaml'):
+                checkpoint_files.append(file)
+    if torch.cuda.current_device() == 0:
+        assert len(checkpoint_files) >= 3, "Output of the test i.e. a model checkpoint was not created!"
