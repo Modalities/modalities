@@ -41,7 +41,6 @@ from modalities.config.config import (
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
-    RepeatingDataLoaderConfig,
     ResumableDistributedSamplerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
@@ -192,9 +191,6 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
-    ComponentEntity(
-        "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
-    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies

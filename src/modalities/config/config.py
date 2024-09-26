@@ -311,11 +311,6 @@ class BatchSamplerConfig(BaseModel):
     drop_last: Literal[True] = True
 
 
-class ResumableBatchSamplerConfig(BaseModel):
-    sampler: PydanticSamplerIFType
-    start_index: Annotated[int, Field(strict=True, gt=0)]
-
-
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
@@ -328,12 +323,6 @@ class LLMDataLoaderConfig(BaseModel):
     collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
-
-
-class RepeatingDataLoaderConfig(BaseModel):
-    dataloader: PydanticLLMDataLoaderIFType
-    reshuffle_after_epoch: Optional[bool] = False
-    num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
 
 class DummyProgressSubscriberConfig(BaseModel):

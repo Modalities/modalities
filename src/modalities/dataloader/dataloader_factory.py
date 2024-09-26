@@ -3,7 +3,7 @@ from typing import Callable
 from torch.utils.data import BatchSampler
 from torch.utils.data.dataset import Dataset
 
-from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
+from modalities.dataloader.dataloader import LLMDataLoader
 
 
 class DataloaderFactory:
@@ -38,25 +38,4 @@ class DataloaderFactory:
             pin_memory=pin_memory,
         )
 
-        return dataloader
-
-    @staticmethod
-    def get_repeating_dataloader(
-        dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False
-    ) -> RepeatingDataLoader:
-        """
-        Returns a RepeatingDataLoader object that repeats the given dataloader
-          for the specified number of epochs.
-
-        Parameters:
-            dataloader (LLMDataLoader): The dataloader to be repeated.
-            num_epochs (int): The number of times the dataloader should be repeated.
-            reshuffle_after_epoch (bool, optional): Flag indicating whether to reshuffle
-              the data after each epoch. Defaults to False.
-
-        Returns:
-            RepeatingDataLoader: A RepeatingDataLoader object that repeats the given dataloader
-              for the specified number of epochs.
-        """
-        dataloader = RepeatingDataLoader(dataloader, num_epochs, reshuffle_after_epoch)
         return dataloader
