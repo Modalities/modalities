@@ -9,14 +9,12 @@ import pytest
 import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
-from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -226,13 +224,3 @@ def set_env_cpu(monkeypatch):
     else:
         # see https://pytorch.org/docs/2.4/_modules/torch/cuda.html#device_count
         torch.cuda._cached_device_count = None
-
-
-@pytest.fixture(scope="function")
-def resumable_batch_sampler() -> ResumableBatchSampler:
-    data_source = list(range(12))[::-1]  # torch.range(0,11)[::-1].reshape(3, 4)
-    seq_sampler = SequentialSampler(data_source=data_source)
-
-    seq_sampler = BatchSampler(sampler=seq_sampler, batch_size=3, drop_last=False)
-    sampler = ResumableBatchSampler(start_index=2, underlying_batch_sampler=seq_sampler)
-    return sampler
