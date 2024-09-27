@@ -62,6 +62,31 @@ class ReferenceConfig(BaseModel):
     pass_type: PassType
 
 
+class CLMCrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+
+
+class NCELossConfig(BaseModel):
+    prediction_key1: str
+    prediction_key2: str
+    is_asymmetric: bool = True
+    temperature: float = 1.0
+    tag: str = "NCELoss"
+
+
+class ClipLossConfig(BaseModel):
+    logit_scale_key: str
+    prediction_keys: list[str]
+    local_loss: bool = True
+    tag: str = "ClipLoss"
+
+
+class MultipleFunctionsLossConfig(BaseModel):
+    losses: list
+    corrsp_weights: list
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt

@@ -4,15 +4,14 @@ import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 from pydantic import BaseModel
-from torch.nn import CrossEntropyLoss as TorchCrossEntropyLoss
+from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
 
 
 class Loss(ABC):
-    def __init__(self, tag: str, weight: float = 1.0):
+    def __init__(self, tag: str):
         self._tag = tag
-        self.weight = weight
 
     @property
     def tag(self) -> str:
@@ -27,22 +26,72 @@ class Loss(ABC):
         raise NotImplementedError
 
 
-class CrossEntropyLossConfig(BaseModel):
-    target_key: str
-    prediction_key: str
-    weight: float = 1
-    tag: str = "CLMCrossEntropyLoss"
+class MultipleFunctionsLoss(Loss):
+    """Loss objects of this type use more
+    than one loss function and weights corresponding
+    to the losses to compute total loss.
+    """
+
+    def __init__(
+        self,
+        losses: list[Loss],
+        corrsp_weights: list[float],
+        tag: str = "MultipleFunctionsLoss",
+    ) -> None:
+        """MultipleFunctionsLoss Constructor
+
+        Args:
+            losses (list): Initialized losses. This list should contain more than one loss.
+            corrsp_weights (list): Weights to be multiplied to each loss while summing up.
+
+        Returns:
+            None
+        """
+        super().__init__(tag)
+
+        if len(losses) <= 1:
+            raise ValueError("Number of losses used should be more than 1.")
+
+        self.groups = [(loss_func, weight) for loss_func, weight in zip(losses, corrsp_weights, strict=True)]
+
+        self.cumulated_individual_losses = None
+        # variable storing each loss,
+        # summed over local batches,
+        # separately.
+
+        self.reset_cumulated_individual_losses()
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        device = forward_batch.predictions[list(forward_batch.predictions.keys())[0]].device
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
+        for ind, (loss_func, weight) in enumerate(self.groups):
+            loss = loss_func(forward_batch)
+            self.cumulated_individual_losses[ind] += loss
+            total_loss += weight * loss
+        return total_loss
+
+    def reset_cumulated_individual_losses(
+        self,
+    ) -> None:
+        """Initializes and resets the variable
+        accumulating each loss separately.
+
+        Called first when the class is initialized, and then
+        after every logging step in trainer.py.
+        """
+        if torch.cuda.is_available():
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to(torch.device("cuda"))
+        else:
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to("cpu")
 
 
-class CrossEntropyLoss(Loss):
-    def __init__(self, target_key: str, prediction_key: str, weight: float, tag: str = "CLMCrossEntropyLoss"):
-        super().__init__(tag, weight)
+class CLMCrossEntropyLoss(Loss):
+    def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
+        super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
         # Mean over the tokens in the local-batch (batch per rank)
-        self.loss_fun = TorchCrossEntropyLoss(
-            reduction="mean",
-        )
+        self.loss_fun = CrossEntropyLoss(reduction="mean")
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
@@ -97,15 +146,6 @@ def nce_loss(
     return torch.mean(denominator - numerator)  # calculated in log space
 
 
-class NCELossConfig(BaseModel):
-    prediction_key1: str
-    prediction_key2: str
-    is_asymmetric: bool = True
-    temperature: float = 1.0
-    weight: float = 1
-    tag: str = "NCELoss"
-
-
 class NCELoss(Loss):
     def __init__(
         self,
@@ -113,7 +153,6 @@ class NCELoss(Loss):
         prediction_key2: str,
         is_asymmetric: bool,
         temperature: float,
-        weight: float,
         tag: str = "NCELoss",
     ):
         """
@@ -126,7 +165,7 @@ class NCELoss(Loss):
             temperature (float, optional): temperature. Defaults to 1.0.
             tag (str, optional): Defaults to "NCELoss".
         """
-        super().__init__(tag, weight)
+        super().__init__(tag)
         self.prediction_key1 = prediction_key1
         self.prediction_key2 = prediction_key2
         self.is_asymmetric = is_asymmetric
@@ -152,20 +191,11 @@ class NCELoss(Loss):
         return loss
 
 
-class ClipLossConfig(BaseModel):
-    logit_scale_key: str
-    prediction_keys: list[str]
-    weight: float = 1
-    local_loss: bool = True
-    tag: str = "ClipLoss"
-
-
 class ClipLoss(Loss):
     def __init__(
         self,
         logit_scale_key: str,
         prediction_keys: list[str],
-        weight: float,
         local_loss: bool,
         tag: str = "ClipLoss",
     ):
@@ -177,7 +207,7 @@ class ClipLoss(Loss):
             prediction_keys (list[str]): Keys to access embeddings.
             tag (str, optional): Defaults to "ClipLoss".
         """
-        super().__init__(tag, weight)
+        super().__init__(tag)
         self.logit_scale_key = logit_scale_key
         self.prediction_keys = prediction_keys
         self.local_loss = local_loss

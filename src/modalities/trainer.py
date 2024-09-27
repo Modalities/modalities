@@ -12,7 +12,7 @@ from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.loss_functions import Loss
+from modalities.loss_functions import Loss, MultipleFunctionsLoss
 from modalities.models.model import model_predict_batch
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
@@ -87,7 +87,7 @@ class Trainer:
         model: FSDP,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        loss_fun: list[Loss],
+        loss_fun: Loss,
         micro_batch_id: int,
     ) -> tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         """
@@ -111,23 +111,8 @@ class Trainer:
                         if a training step was performed otherwise return None.
         """
         result_batch = model_predict_batch(model=model, batch=batch)
-
-        total_loss = None
-        losses = []
-        for lfn in loss_fun:
-            # Calculate loss
-            weighted_loss = lfn(result_batch) * lfn.weight
-
-            # Add loss to total loss
-            if total_loss is None:
-                total_loss = weighted_loss
-            else:
-                total_loss += weighted_loss
-
-            # Append individual losses (for logging)
-            losses.append(weighted_loss.clone().detach())
-
-        (total_loss / self.gradient_acc_steps).backward()
+        loss = loss_fun(result_batch)
+        (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:
             gradient_norm_score = self.gradient_clipper.clip_gradients()
@@ -142,7 +127,7 @@ class Trainer:
         num_train_steps_done = Trainer._get_num_train_steps_done(
             micro_batch_id=micro_batch_id, gradient_acc_steps=self.gradient_acc_steps
         )
-        return total_loss, *losses, step_performed, num_train_steps_done, gradient_norm_score
+        return step_performed, num_train_steps_done, loss, gradient_norm_score
 
     def train(
         self,
@@ -172,7 +157,7 @@ class Trainer:
             None
         """
         model.train()
-        cumulated_losses = self._reset_tracked_losses(len(loss_fun))
+        cumulated_losses = self._reset_tracked_losses()
 
         # throughput & MFU
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
@@ -207,9 +192,9 @@ class Trainer:
         for _, (micro_batch_id, batch) in zip(range(num_batches_todo), enumerate(train_loader)):
             # Train single batch
             (
-                *batch_losses,
                 step_performed,
                 num_train_steps_done,
+                batch_loss,
                 gradient_norm_score,
             ) = self._train_batch(
                 batch=batch,
@@ -224,8 +209,7 @@ class Trainer:
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
             # Save the batch loss
-            for i, batch_loss in enumerate(batch_losses):
-                cumulated_losses[i] += batch_loss.item()
+            cumulated_losses[0] += batch_loss.item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
             cumulated_losses[-1] += 1  # number of local batches
 
@@ -256,26 +240,43 @@ class Trainer:
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
+                cumulated_losses[1] = batch_loss.item()
 
                 reduced_losses = Reducer.reduce(
                     tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
                     # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.cat([t[:-1] / t[-1], t[-1:] / dist.get_world_size()]),
+                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / dist.get_world_size()]),
                 )
 
                 train_loss_avg, train_loss_last_batch = (
                     reduced_losses[0],
-                    reduced_losses[-1],
+                    reduced_losses[1],
                 )
-
                 losses = {
                     "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
                     "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
-                for i, lfn in enumerate(loss_fun):
-                    losses[lfn.tag] = ResultItem(reduced_losses[i + 1], decimal_places=2)
+
+                # If there are multiple loss functions being used,
+                # this block computes and logs all the individual
+                # losses, averaged over the global batch size.
+                if isinstance(loss_fun, MultipleFunctionsLoss):
+                    global_batch_size = Reducer.reduce(
+                        tensor=cumulated_losses[-1], operation=dist.ReduceOp.SUM, post_processing_fun=None
+                    )
+                    reduced_individual_losses = Reducer.reduce(
+                        tensor=loss_fun.cumulated_individual_losses,
+                        operation=dist.ReduceOp.SUM,
+                        post_processing_fun=lambda t: torch.stack(
+                            [t[ind] / global_batch_size for ind in range(len(t))]
+                        ),
+                    )
+                    for ind, (loss, _) in enumerate(loss_fun.groups):
+                        losses[f"train {loss.tag} avg"] = ResultItem(reduced_individual_losses[ind], decimal_places=2)
+
+                    loss_fun.reset_cumulated_individual_losses()
 
                 consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
                 metrics = {
@@ -310,7 +311,7 @@ class Trainer:
                 )
                 thoughput_aggregator.remove_keys()
 
-                cumulated_losses = self._reset_tracked_losses(len(loss_fun))
+                cumulated_losses = self._reset_tracked_losses()
             if step_performed:
                 evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                 checkpointing_callback(training_progress=training_progress)
@@ -318,11 +319,11 @@ class Trainer:
             # via the dataloader.
             forward_backward_time_recorder.start()
 
-    def _reset_tracked_losses(self, num_loss_functions: int):
+    def _reset_tracked_losses(self):
         # Initializes and returns a tensor representing the cumulated loss and gradient norm.
         # The tensor is initialized with zeros and its device is set based on the availability of CUDA.
 
-        cumulated_loss_and_gradient_norm = torch.zeros(num_loss_functions + 1 + 1)
+        cumulated_loss_and_gradient_norm = torch.zeros(3)
         if torch.cuda.is_available():
             cumulated_loss_and_gradient_norm = cumulated_loss_and_gradient_norm.to(torch.device("cuda"))
         else:
