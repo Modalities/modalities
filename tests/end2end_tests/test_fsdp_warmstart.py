@@ -46,6 +46,7 @@ class SaveAllResultSubscriberConfig(BaseModel):
 
 
 class TrainDataloaderInstantiationModel(BaseModel):
+    settings: TrainingComponentsInstantiationModel.Settings
     train_dataloader: PydanticLLMDataLoaderIFType
 
 
@@ -200,7 +201,9 @@ class TestWarmstart:
                 custom_component=SaveAllResultSubscriber,
                 custom_config=SaveAllResultSubscriberConfig,
             )
-            components_1 = main_obj_1.build_components(components_model_type=TrainDataloaderInstantiationModel)
+            components_1: TrainDataloaderInstantiationModel = main_obj_1.build_components(
+                components_model_type=TrainDataloaderInstantiationModel
+            )
             dataloader_1: LLMDataLoader = components_1.train_dataloader
             dl_1_samples = [s for s in dataloader_1]
 
@@ -216,14 +219,14 @@ class TestWarmstart:
 
             # fast forward the first dataloader
 
-            num_skip_steps = dataloader_2.fast_forward_batch_id
+            num_skip_steps = components_2.settings.training_progress.num_seen_steps
 
             # make sure that we actually skip as defined in the config
             assert num_skip_steps == 4
             assert len(dl_1_samples) == num_skip_steps + len(dl_2_samples)
 
             # make sure that the first dataloader is not skipped
-            assert dataloader_1.fast_forward_batch_id == 0
+            assert components_1.settings.training_progress.num_seen_steps == 0
 
             # iterate through both sample lists from the dataloaders
             # and assert the equality of the samples

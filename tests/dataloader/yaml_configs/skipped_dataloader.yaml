@@ -28,14 +28,12 @@ train_dataset:
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
 
-skip_num_batches: 
+skip_num_samples: 
   component_key: number_conversion
-  variant_key: local_num_batches_from_num_tokens
+  variant_key: num_samples_from_num_tokens
   config:
-    num_ranks: ${settings.cuda_env.world_size}
-    global_num_tokens: ${settings.training.global_num_seen_tokens}
+    num_tokens: ${settings.training.global_num_seen_tokens}
     sequence_length: ${settings.training.sequence_length}
-    local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
 
 train_dataloader:
   component_key: data_loader
@@ -44,9 +42,6 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: 
-      instance_key: skip_num_batches
-      pass_type: BY_REFERENCE
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -58,15 +53,16 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            drop_last: true
-            shuffle: false
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            drop_last: true
+            skip_num_global_samples: ${skip_num_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE

@@ -360,8 +360,8 @@ def test_num_steps_from_raw_dataset_index(
     num_ranks: int, local_micro_batch_size: int, gradient_accumulation_steps: int
 ):
     working_dir = Path(__file__).parent
-    raw_dataset_path = working_dir / "../data/datasets/lorem_ipsum_long.jsonl"
-    raw_index_path = working_dir / "../data/datasets/lorem_ipsum_long.idx"
+    raw_dataset_path = working_dir / "../../data/lorem_ipsum_long.jsonl"
+    raw_index_path = working_dir / "../../data/lorem_ipsum_long.idx"
 
     with open(raw_dataset_path, "r") as f:
         num_samples = len(f.readlines())

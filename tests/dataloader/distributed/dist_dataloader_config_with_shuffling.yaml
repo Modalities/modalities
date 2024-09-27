@@ -11,7 +11,6 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: 0
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -23,12 +22,13 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
             rank: ${cuda_env:RANK}
             num_replicas: ${cuda_env:WORLD_SIZE}
             shuffle: true
             seed: 0
+            skip_num_global_samples: 0
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
