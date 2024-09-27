@@ -65,6 +65,27 @@ This [PR](https://github.com/Modalities/modalities/pull/236) removes all code re
 
 **Breaking changes:** 
 * None
+ 
+
+## PR #254 Warmstart infrastructure switch
+
+This PR mainly addresses the warmstart of model training, e.g., after GPU crashes.
+
+**General Changes**
+* Fixes issue #242 
+* Warmstarts with changing infrastructure (e.g.,. different number of GPUs) are now supported.
+* Restructures the settings part of the configs to 
+* Adds various checks for consistency of model training (e.g., target tokens and number of dataset tokens mismatch)
+* Refactors all configs to be runnable again
+* Adds an interactive jupyter notebook-based Tutorial on how to use Modalities. (merged from PR #239 )
+* Adds a warmstart tutorial
+* TrainingReportGenerator that creates a report on the training setup and prints out warnings in case of inconsistencies.
+* Activation Checkpointing is now a component
+* Added further NumberConversion routines
+
+**Breaking Changes**
+* the settings part of the configs have been completely refactored
+
 
 ## PR #261 Dataloader inefficiencies fix and combined dataset feature
 
@@ -86,5 +107,4 @@ with a vectorized version.
 **Breaking Changes**
 * Removed RepeatingDataloader, as a feature that was never actively used for running multiple epochs and had complex maintenance when refactoring the sampling. If needed we could reimpliment it. 
 *  In the settings, the `training_progress` section has now `num_seen_samples` instead of `local_num_seen_batches `, as skipping is now done on the Sampler level and not on the dataloader level anymore
-* `batch_size ` and `fast_forward_batch_id ` fields in the `LLMDataLoader ` are not neede anymore and were removed. 
-
+* `batch_size ` and `fast_forward_batch_id ` fields in the `LLMDataLoader ` are not neede anymore and were removed.

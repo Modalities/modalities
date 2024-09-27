@@ -300,11 +300,6 @@ class CombinedDatasetConfig(BaseModel):
     datasets: List[PydanticDatasetIFType]
 
 
-class MMapIndexedDatasetConfig(BaseModel):
-    path: Path
-    skip_warmup: bool
-
-
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
