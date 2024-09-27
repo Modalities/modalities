@@ -6,9 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, mo
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
+    PydanticDataLoaderIFType,
     PydanticDatasetIFType,
     PydanticGradientClipperIFType,
-    PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
     PydanticLRSchedulerIFType,
     PydanticMessageSubscriberIFType,
@@ -170,8 +170,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
     scheduler: PydanticLRSchedulerIFType
     loss_fn: PydanticLossIFType | list[PydanticLossIFType]
     train_dataset: PydanticDatasetIFType
-    train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: list[PydanticLLMDataLoaderIFType]
+    train_dataloader: PydanticDataLoaderIFType
+    eval_dataloaders: list[PydanticDataLoaderIFType]
     progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType

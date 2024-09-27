@@ -10,7 +10,7 @@ from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
-from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.config.pydanctic_if_types import PydanticDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.dataloader.samplers import ResumableBatchSampler
@@ -49,7 +49,7 @@ def test_dataloader_from_config(dummy_config: dict):
     dummy_config["train_dataloader"]["config"]["skip_num_batches"] = start_index
 
     class DataloaderTestModel(BaseModel):
-        train_dataloader: PydanticLLMDataLoaderIFType
+        train_dataloader: PydanticDataLoaderIFType
 
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
@@ -167,7 +167,7 @@ def test_repeating_dataloader_with_shuffling():
 
 def test_skipped_and_distributed_dataloader_from_config():
     class DataloaderTestModel(BaseModel):
-        train_dataloader: PydanticLLMDataLoaderIFType
+        train_dataloader: PydanticDataLoaderIFType
         skip_num_batches: int
 
     root_dir = Path(__file__).parents[0]
@@ -244,7 +244,7 @@ def test_skipped_and_distributed_dataloader_from_config():
 )
 def test_dataloader_with_fixed_num_batches(global_rank):
     class DataloaderTestModel(BaseModel):
-        train_dataloader: PydanticLLMDataLoaderIFType
+        train_dataloader: PydanticDataLoaderIFType
         fixed_num_batches: int
 
     class IdentityCollateFn(CollateFnIF):

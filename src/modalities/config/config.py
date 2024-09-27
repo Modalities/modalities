@@ -16,9 +16,9 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
+    PydanticDataLoaderIFType,
     PydanticDatasetIFType,
     PydanticFSDPModuleType,
-    PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
@@ -343,7 +343,7 @@ class WebLoaderConfig(BaseModel):
 
 
 class RepeatingDataLoaderConfig(BaseModel):
-    dataloader: PydanticLLMDataLoaderIFType
+    dataloader: PydanticDataLoaderIFType
     reshuffle_after_epoch: Optional[bool] = False
     num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
@@ -353,15 +353,15 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 
 class SimpleProgressSubscriberConfig(BaseModel):
-    train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: Optional[list[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    train_dataloader: PydanticDataLoaderIFType
+    eval_dataloaders: Optional[list[PydanticDataLoaderIFType]] = Field(default_factory=list)
     world_size: int
     global_num_seen_samples: int
     local_rank: int
 
 
 class RichProgressSubscriberConfig(BaseModel):
-    eval_dataloaders: Optional[list[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    eval_dataloaders: Optional[list[PydanticDataLoaderIFType]] = Field(default_factory=list)
     train_dataloader_tag: str
     num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
     num_target_steps: Annotated[int, Field(strict=True, gt=0)]

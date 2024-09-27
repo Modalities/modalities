@@ -1,3 +1,4 @@
+import multiprocessing
 from typing import Iterable, Optional
 
 import webdataset as wd
@@ -11,7 +12,7 @@ class DataLoaderIF:
     pass
 
 
-class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
+class LLMDataLoader(DataLoaderIF):
     """LLMDataLoader is a custom DataLoader class that extends the PyTorch DataLoader class."""
 
     def __init__(
@@ -62,7 +63,9 @@ class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
             None
         """
         assert batch_sampler is not None and batch_size == 1
-        super().__init__(
+        self._dataloader_tag = dataloader_tag
+        self._batch_size = batch_sampler.batch_size
+        self._torch_dataloader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
             shuffle=False,  # shuffling must be implemented on a dataset level
@@ -80,9 +83,6 @@ class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
             persistent_workers=persistent_workers,
             pin_memory_device=pin_memory_device,
         )
-
-        self._dataloader_tag = dataloader_tag
-        self._batch_size = batch_sampler.batch_size
 
     @property
     def dataloader_tag(self) -> str:
@@ -125,6 +125,47 @@ class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
         """
         self._batch_size = value
 
+    def __len__(self):
+        return self._torch_dataloader.__len__()
+
+    def __iter__(self):
+        return self._torch_dataloader.__iter__()
+
+    @property
+    def dataset(self) -> Dataset[T_co]:
+        return self._torch_dataloader.dataset
+
+    @property
+    def batch_sampler(self) -> ResumableBatchSampler:
+        return self._torch_dataloader.batch_sampler
+
+    @property
+    def sampler(self) -> Sampler | Iterable | None:
+        return self._torch_dataloader.sampler
+
+    @property
+    def collate_fn(self) -> _collate_fn_t:
+        return self._torch_dataloader.collate_fn
+
+    @property
+    def multiprocessing_context(self) -> str | multiprocessing.context.BaseContext:
+        return self._torch_dataloader.multiprocessing_context
+
+    @multiprocessing_context.setter
+    def multiprocessing_context(self, multiprocessing_context):
+        self._torch_dataloader.multiprocessing_context = multiprocessing_context
+
+    @property
+    def _auto_collation(self):
+        return self._torch_dataloader._auto_collation
+
+    @property
+    def _index_sampler(self):
+        return self._torch_dataloader._index_sampler
+
+    def check_worker_number_rationality(self):
+        return self._torch_dataloader.check_worker_number_rationality()
+
     @property
     def fast_forward_batch_id(self) -> int:
         """
@@ -133,15 +174,15 @@ class LLMDataLoader(DataLoader[T_co], DataLoaderIF):
         Returns:
             int: fast forward batch ID
         """
-        return self.batch_sampler.start_index
+        return self._torch_dataloader.batch_sampler.start_index
 
 
-class RepeatingDataLoader(LLMDataLoader[T_co]):
+class RepeatingDataLoader(LLMDataLoader):
     """
     RepeatingDataLoader is a custom DataLoader class that repeats the given dataloader
       for the specified number of epochs."""
 
-    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
+    def __init__(self, dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False):
         """
         Initializes a RepeatingDataLoader object that repeats the given dataloader for the specified number of epochs.
         This is especially useful for DataLoader types that we wish to automatically restart upon completion.
