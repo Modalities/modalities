@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
-from pydantic import BaseModel
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
@@ -151,8 +150,8 @@ class NCELoss(Loss):
         self,
         prediction_key1: str,
         prediction_key2: str,
-        is_asymmetric: bool,
-        temperature: float,
+        is_asymmetric: bool = True,
+        temperature: float = 1.0,
         tag: str = "NCELoss",
     ):
         """
