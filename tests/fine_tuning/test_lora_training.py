@@ -10,20 +10,14 @@ from modalities.config.instantiation_models import TrainingComponentsInstantiati
 from modalities.running_env.cuda_env import CudaEnv
 from tests.conftest import _ROOT_DIR
 
-# os.environ["LOCAL_RANK"] = "0"
-# os.environ["RANK"] = "0"
-# os.environ["WORLD_SIZE"] = "1"
-# os.environ["NNODES"] = "1"
-# os.environ["NPROC_PER_NODE"] = "2"
-# os.environ["RDZV_ENDPOINT"] = "0.0.0.0:29502"
-# os.environ["MASTER_ADDR"] = "localhost"
-# os.environ["MASTER_PORT"] = "29500"
 
+# NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
+# CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
+#   $(which pytest) path/to/test_lora_training.py
 
 @pytest.fixture()
 def config_file_name() -> str:
-    # return "config_lorem_ipsum_lora_training.yaml"
-    return "config_lorem_ipsum_lora_training_test.yaml"
+    return "config_lorem_ipsum_lora_training.yaml"
 
 
 @pytest.fixture()
