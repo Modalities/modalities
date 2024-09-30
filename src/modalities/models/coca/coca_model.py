@@ -60,16 +60,31 @@ class CoCaConfig(BaseModel):
 
     Args:
         prediction_key (str): The key for the predictions.
-        vision_embd_prediction_key (str): The key for the vision embeddings.
         text_embd_prediction_key (str): The key for the text embeddings.
-        vision_cls_prediction_key (str): The key for the vision cls token.
-        text_cls_prediction_key (str): The key for the text cls token.
-        vision_encoder_config (VisionTransformerConfig): Configuration for the vision encoder.
+        logit_scale_prediction_key (str): The key for the logit scale
+        text_cls_prediction_key (Optional[str]): The key for the text cls token.
+        audio_embd_prediction_key (Optional[str]): The key for audio embeddings
+        image_embd_prediction_key (Optional[str]): The key for image embeddings
+        video_embd_prediction_key (Optional[str]): The key for video embeddings
+        audio_cls_prediction_key (Optional[str]): Th key for the audio cls token
+        audio_text_cls_prediction_key (Optional[str]): Th key for the text cls token associated with the audio samples
+        image_cls_prediction_key (Optional[str]): Th key for the image cls token
+        image_text_cls_prediction_key (Optional[str]): Th key for the text cls token associated with the image samples
+        video_cls_prediction_key (Optional[str]): Th key for the video cls token
+        video_text_cls_prediction_key (Optional[str]): Th key for the text cls token associated with the video samples
+        modality_keys (list[str]): sample keys in the input associated with the input modalities
+        individual_datasets (Optional[bool]): flag indicating whether
+            there are separate datasets for different modalities
+        is_audio_video (Optional[bool]): flag indicating whether the video samples contain audio
+        audio_encoder_config (Optional[AudioTransformerConfig]): config for the audio encoder. Defaults to None.
+        image_encoder_config (Optional[VisionTransformerConfig]): config  for the image encoder. Defaults to None
+        video_encoder_config (Optional[VisionTransformerConfig]): config  for the video encoder. Defaults to None
         text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
         n_pool_head (int): Number of attention heads for pooling.
-        n_vision_queries (int): Number of vision queries.
+        n_queries (int): Number of vision queries.
         bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
         epsilon_attn_pool (float): Epsilon value for attention pooling.
+        seed (Optional[int]): The random seed. Defaults to None
 
     """
 
@@ -144,18 +159,40 @@ class CoCa(NNModel):
 
         Args:
             prediction_key (str): The key for the predictions.
-            vision_cls_prediction_key (str): The key for the vision cls token.
-            text_cls_prediction_key (str): The key for the text cls token.
-            vision_embd_prediction_key (str): The key for the vision embeddings.
             text_embd_prediction_key (str): The key for the text embeddings.
-
-            n_vision_queries (int): The number of vision queries.
-            n_pool_head (int): The number of pool heads.
+            logit_scale_prediction_key (str): The key for the logit scale
+            text_cls_prediction_key (Optional[str]): The key for the text cls token.
+            audio_embd_prediction_key (Optional[str]): The key for audio embeddings
+            image_embd_prediction_key (Optional[str]): The key for image embeddings
+            video_embd_prediction_key (Optional[str]): The key for video embeddings
+            audio_cls_prediction_key (Optional[str]): Th key for the audio cls token
+            audio_text_cls_prediction_key (Optional[str]): Th key for the text cls token
+                associated with the audio samples
+            image_cls_prediction_key (Optional[str]): Th key for the image cls token
+            image_text_cls_prediction_key (Optional[str]): Th key for the text cls token
+                associated with the image samples
+            video_cls_prediction_key (Optional[str]): Th key for the video cls token
+            video_text_cls_prediction_key (Optional[str]): Th key for the text cls token
+                associated with the video samples
+            modality_keys (list[str]): sample keys in the input associated with the input modalities
+            individual_datasets (Optional[bool]): flag indicating whether there are separate datasets
+                for different modalities
+            is_audio_video (Optional[bool]): flag indicating whether the video samples contain audio
+            audio_encoder_config (Optional[AudioTransformerConfig]): config for the audio encoder. Defaults to None.
+            image_encoder_config (Optional[VisionTransformerConfig]): config  for the image encoder. Defaults to None
+            video_encoder_config (Optional[VisionTransformerConfig]): config  for the video encoder. Defaults to None
+            text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
+            n_pool_head (int): Number of attention heads for pooling.
+            n_queries (int): Number of vision queries.
             bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
-            epsilon_attn_pool (float): The epsilon value for attention pooling.
-            vision_encoder_config (VisionTransformerConfig): The configuration for the vision encoder.
-            text_decoder_config (TextDecoderConfig): The configuration for the text decoder.
-            seed (int, optional): The random seed. Defaults to None.
+            epsilon_attn_pool (float): Epsilon value for attention pooling.
+            seed (Optional[int]): The random seed. Defaults to None
+
+        Raises:
+            ValueError: if none of the modality encoders are defined
+            ValueError: if using individual dataset and none of the text cls tokens
+                corresponding to the modalities is defined
+            ValueError: if training on a single dataset and text_cls_prediction_key is not defined
 
         Returns:
             None
@@ -289,10 +326,18 @@ class CoCa(NNModel):
         Forward pass of the CoCa model.
 
         Args:
-            inputs (dict[str, torch.Tensor]): Input dictionary containing the tensors.
+            inputs (dict[str, torch.Tensor]): Input dictionary containing the text and modality samples
+            In case of multiple modalities, the 'input_ids' key contain the token ids for
+            the text corresponding to all the modalities stacked together. Thus the length (batch size)
+            of 'input_ids' will be equal to the sum of the lengths of the individual modality
+            samples.
 
         Returns:
-            dict[str, torch.Tensor]: Output dictionary.
+            dict[str, torch.Tensor]: Output dictionary containing
+              - cls token(s) for the modality or modalities
+              - text cls token(s) corresponding to the modality sample(s)
+              - logits from the text decoder
+              - logit_scale
         """
         output = {}
 
@@ -364,15 +409,7 @@ class CoCa(NNModel):
         return output
 
     def _forward_encode_image(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Encodes the input image using the vision encoder.
-
-        Args:
-            inputs (dict[str, torch.Tensor]): dictionary containing vision inputs.
-
-        Returns:
-             tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
-        """
+        # returns a tuple containing the image embeddings and cls token
         image_embd = self.image_encoder(inputs)[self.image_embd_prediction_key]
         queries = repeat(self.image_queries, "n d -> b n d", b=image_embd.shape[0])
         image_embd = self.image_attn_pool(queries, context=image_embd)
@@ -380,6 +417,7 @@ class CoCa(NNModel):
         return image_embd, image_cls_token
 
     def _forward_encode_video(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        # returns a tuple containing the video embeddings and cls token
         video_embd = self.video_encoder(inputs)[self.video_embd_prediction_key]
         queries = repeat(self.video_queries, "n d -> b n d", b=video_embd.shape[0])
         video_embd = self.video_attn_pool(queries, context=video_embd)
@@ -387,6 +425,7 @@ class CoCa(NNModel):
         return video_embd, video_cls_token
 
     def _forward_encode_audio(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        # returns a tuple containing the audio embeddings and cls token
         audio_embd = self.audio_encoder(inputs)[self.audio_embd_prediction_key]
         queries = repeat(self.audio_queries, "n d -> b n d", b=audio_embd.shape[0])
         audio_embd = self.audio_attn_pool(queries, context=audio_embd)
@@ -394,16 +433,7 @@ class CoCa(NNModel):
         return audio_embd, audio_cls_token
 
     def _forward_encode_text(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Encodes the input text using the text decoder.
-
-        Args:
-            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
-            and the classification token tensor.
-        """
+        # returns a tuple containing the encoded text tensor and the cls token
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]
         text_embd, text_cls_token = text_embd[:, :-1, :], F.normalize(text_embd[:, -1, :], dim=-1)
         return text_embd, text_cls_token
@@ -411,16 +441,7 @@ class CoCa(NNModel):
     def _forward_decode(
         self, text_embd: torch.Tensor, modality_embd: list[torch.Tensor] | torch.Tensor
     ) -> torch.Tensor:
-        """
-        Perform forward decoding using the given text and vision embeddings.
-
-        Args:
-            text_embd (torch.Tensor): The text embeddings.
-            vision_embd (torch.Tensor): The vision embeddings.
-
-        Returns:
-            torch.Tensor: The logits obtained from the multimodal decoder.
-        """
+        # forward decode given the text and modality embedding(s)
         decoder_inputs = {
             self.text_embd_prediction_key: text_embd,
             "context": modality_embd,
