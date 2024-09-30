@@ -4,6 +4,7 @@ from torch.utils.data import BatchSampler
 from torch.utils.data.dataset import Dataset
 
 from modalities.dataloader.dataloader import LLMDataLoader, RepeatingDataLoader, WebDataLoader
+from modalities.dataloader.dataset import MultimodalWebDataset
 from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.exceptions import ConfigError
 
@@ -93,13 +94,28 @@ class DataloaderFactory:
     @staticmethod
     def get_web_dataloader(
         dataloader_tag: str,
-        dataset: Dataset,
+        dataset: MultimodalWebDataset,
         batch_size: int,
         collate_fn: Callable,
         num_workers: int,
         pin_memory: bool,
         drop_last: bool,
     ) -> WebDataLoader:
+        """
+        Returns a WebDataLoader object for a MultimodalWebDataset
+
+        Args:
+            dataloader_tag (str): Tag for the dataloader
+            dataset (Dataset): The MultimodalWebDataset to be used
+            batch_size (int): batch size per device
+            collate_fn (Callable): Callable for shaping the batch
+            num_workers (int): Number of workers for the dataloader
+            pin_memory (bool): Flag indicating whether to pin memory
+            drop_last (bool): Flag indicating whether to drop the last non-full batch
+
+        Returns:
+            WebDataLoader: A WebDataLoader object
+        """
         dataloader = WebDataLoader(
             dataloader_tag=dataloader_tag,
             dataset=dataset,
@@ -107,5 +123,6 @@ class DataloaderFactory:
             collate_fn=collate_fn,
             num_workers=num_workers,
             pin_memory=pin_memory,
+            drop_last=drop_last,
         )
         return dataloader

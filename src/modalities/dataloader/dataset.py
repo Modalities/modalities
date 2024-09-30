@@ -710,19 +710,32 @@ def fixed_ratio_round_robin(*sources, samples_per_batch):
 
 
 class FixedRatioRoundRobinMix(IterableDataset):
-    """
-    returns an iterator for a list of datasets; samples are yielded in a round robin manner
-    with a fixed ratio of samples per dataset. There is no random sampling, so the number of
-    samples per modality is guaranteed to be fixed per batch.
-    """
+    def __init__(
+        self,
+        datasets: list[wds.WebDataset],
+        mixing_ratios: list[float],
+        batch_size: int,
+    ):
+        """An iterator for a list of datasets.
+        Samples are yielded in a round robin manner
+        with a fixed ratio of samples per dataset. There is no random sampling, so the number of
+        samples per modality is guaranteed to be fixed per batch.
 
-    def __init__(self, datasets, mixing_ratios, batch_size):
+        Args:
+            datasets (list[WebDataset]): a list of WebDatasets to be iterated over
+            mixing_ratios (list[float]): the ratio of samples from each dataset that should be present in a batch
+            batch_size (int): size of batch containing samples from all datasets in the specified ratio
+        """
         self.datasets = datasets
         self.samples_per_batch = [int(batch_size * ratio) for ratio in mixing_ratios]
+        # ensure ratio sums up to 1.0
         self.samples_per_batch[0] += batch_size - sum(self.samples_per_batch)
 
     def __iter__(self):
-        """Return an iterator over the sources."""
+        """
+        Returns:
+            an iterator over the source datasets
+        """
         sources = [iter(d) for d in self.datasets]
         return fixed_ratio_round_robin(*sources, samples_per_batch=self.samples_per_batch)
 
@@ -748,12 +761,16 @@ class MultimodalWebDatasetBuilder:
         """A multimodal dataset instance for the WebDataset.
 
         Args:
-            urls: A webdataset url. For example: "/data/path/{00000..00012.tar".
-            modality_key_mapping: Mapping from dataset keys to keys expected by the forward pass of the model.
+            urls (list[str] or str): A webdataset url. For example: "/data/path/{00000..00012}.tar".
+            modality_key_mapping (dict[str, tuple[str, str]]): Mapping from dataset keys to keys
+                expected by the forward pass of the model.
                 For example: {ModalityEnum.IMAGE: ("jpg", "image"), ModalityEnum.TEXT: ("text", "caption")}}
-            modality_transforms: The transforms for each modality.
-            num_samples: The number of samples for each modality combination.
-            is_audio_video: Whether the dataset is a video dataset which contains audio
+            modality_transforms (dict[str, Transform]): The transforms for each modality as a dictionary.
+            is_audio_video (bool): Whether the dataset is a video dataset which contains audio
+            num_samples (int): The number of samples for each modality combination.
+
+        Returns:
+            None
         """
         self.urls = urls
         self.is_audio_video = is_audio_video
@@ -775,12 +792,12 @@ class MultimodalWebDatasetBuilder:
             ModalityEnum.AUDIO: wds.torch_audio,
         }
 
-        self.additional_extreacted_keys = []
+        self.additional_extracted_keys = []
         if ModalityEnum.TEXT in self.modality_transforms:
-            self.additional_extreacted_keys.append("attention_mask")
+            self.additional_extracted_keys.append("attention_mask")
 
         if ModalityEnum.AUDIO in self.modality_transforms or ModalityEnum.VIDEO in self.modality_transforms:
-            self.additional_extreacted_keys.append("audio_len")
+            self.additional_extracted_keys.append("audio_len")
 
         # Mapping between modality and transform
         self.modality_to_transform_fn = {
@@ -793,6 +810,21 @@ class MultimodalWebDatasetBuilder:
     def prepare(
         self, shardshuffle: int = 100, resample: bool = True, repeat: bool = False, shuffle_buffer: int = 10_000
     ):
+        """
+        Prepares a WebDataset object as a pipeline that includes shuffling, decoding data, and transformations
+
+        Args:
+            shardshuffle (int): Number of shards that should be used for shuffling. Defaults to 100.
+            resample (bool): Instead of iterating in order sample random shards.
+                This has the issue that the model will see sample multiple times but is significantly more
+                efficient. Defaults to True.
+            repeat (bool): Repeat the dataset. Defaults to False.
+            shuffle_buffer (Optional[int]): Number of samples that should be used for shuffling. Defaults to 10_000.
+
+        Returns:
+            None
+
+        """
         self.web_dataset = wds.WebDataset(
             urls=self.urls,
             nodesplitter=self.dummy_nodesplitter if not resample else None,
@@ -848,8 +880,8 @@ class MultimodalWebDatasetBuilder:
         if sample[source_key][1] is not None and ModalityEnum.AUDIO in self.modality_transforms and self.is_audio_video:
             transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
             sample["audio"], sample["audio_len"] = transform((sample[source_key][1], sample[source_key][2]))
-            if "audio" not in self.additional_extreacted_keys:
-                self.additional_extreacted_keys.append("audio")
+            if "audio" not in self.additional_extracted_keys:
+                self.additional_extracted_keys.append("audio")
         del sample[source_key]
         return sample
 
@@ -865,7 +897,10 @@ class MultimodalWebDatasetBuilder:
         return flatten_dict(sample)
 
     def _select_keys(self, sample):
-        select_keys = self.additional_extreacted_keys + [v[1] for v in self.modality_key_mapping.values()]
+        # only select the required keys from the sample
+        # i.e. the keys specified in modality_key_mapping
+        # and the additional_extracted_keys
+        select_keys = self.additional_extracted_keys + [v[1] for v in self.modality_key_mapping.values()]
         new_sample = {}
         for k, v in sample.items():
             if k not in select_keys:
@@ -915,14 +950,23 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
 
         Args:
             builders: WebDatasetBuilder instances.
-            mixing_ratios: Mixing ratios of the different modality combinations.
+            batch_size (int): batch size per device
+            mixing_ratios (Optinal[list[float]]): Mixing ratios of the different modality combinations.
                 For example: [0.3, 0.7]
-            shardshuffle: Number of sharfs that should be used for shuffling. Defaults to 100.
-            repeat: Repeat the dataset. Defaults to False.
-            resample: Instead if iterating in order sample random shards.
-                This has the issue that the model will see sample multiple times but if significantly more
+            shardshuffle (int): Number of shards that should be used for shuffling. Defaults to 100.
+            repeat (bool): Repeat the dataset. Defaults to False.
+            resample (bool): Instead of iterating in order sample random shards.
+                This has the issue that the model will see sample multiple times but is significantly more
                 efficient. Defaults to True.
-            shuffle_buffer: Number of samples that should be used for shuffling. Defaults to 10_000.
+            shuffle_buffer (Optional[int]): Number of samples that should be used for shuffling. Defaults to 10_000.
+
+        Raises:
+            NotImplementedError: if multiple builders are specified and at least one builder contains a
+                    video dataset which contains audio
+            ValueError: if multiple builders are specified and batch size is None
+
+        Returns:
+            None
         """
         super().__init__()
         self.builders = builders
