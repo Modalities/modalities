@@ -237,6 +237,7 @@ class LoRALinear(nn.Linear, LoRALayer):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
 
         nn.Linear.train(self, mode=training_mode)
+        self.to(device=self.weight.device) # todo revert/ change
         if training_mode:
             if self.merge_weights and self.merged:
                 # Make sure that the weights are not merged

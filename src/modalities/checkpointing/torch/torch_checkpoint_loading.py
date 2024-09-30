@@ -8,6 +8,7 @@ from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.config.config import PrecisionEnum
+from modalities.models.lora.utils import convert_to_lora
 from modalities.util import get_local_number_of_trainable_parameters
 
 
@@ -57,7 +58,9 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         # assign=True makes sure that the model is loaded with the same precision
         # as specified in the state_dict. When precision is set to None,
         # the model is loaded with the precision that is set in the state_dict.
+        model.huggingface_model = convert_to_lora(model=model.huggingface_model, r=2, alpha=1, target_layers=["q_proj", "k_proj", "v_proj", "o_proj"]) #todo revert back
         model.load_state_dict(model_state, assign=self.precision is None)
+        model = model.to(self.device) # todo revert back
         # set the model to the correct device and precision
         # model = model.to(self.precision.value)
         print(

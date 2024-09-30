@@ -84,10 +84,11 @@ class HFModelAdapter(PreTrainedModel):
         """
         super().__init__(config, *inputs, **kwargs)
         self.prediction_key = prediction_key
+        load_checkpoint = True #todo Need to revert this
         if load_checkpoint:
-            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
+            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.LORA_MODEL) # todo Careful
         else:
-            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.MODEL)
+            self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.HUGGINGFACE_SMOL_LLM_MODEL) #todo Need to change this.
 
     def forward(
         self,
