@@ -288,7 +288,7 @@ class RepeatingDataLoader(LLMDataLoader):
         return self.num_epochs * len(self.dataloader)
 
 
-class WebLoader(DataLoaderIF):
+class WebDataLoader(DataLoaderIF):
     def __init__(
         self,
         dataloader_tag: str,

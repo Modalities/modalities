@@ -332,7 +332,7 @@ class LLMDataLoaderConfig(BaseModel):
     fixed_num_batches: Optional[int] = None
 
 
-class WebLoaderConfig(BaseModel):
+class WebDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIFType
     batch_size: int

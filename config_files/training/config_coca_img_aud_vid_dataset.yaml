@@ -273,7 +273,7 @@ val_dataset:
 
 train_dataloader:
   component_key: data_loader
-  variant_key: web_loader
+  variant_key: web_dataloader
   config:
     num_workers: 8
     pin_memory: true
@@ -289,7 +289,7 @@ train_dataloader:
 
 val_dataloader:
   component_key: data_loader
-  variant_key: web_loader
+  variant_key: web_dataloader
   config:
     num_workers: 8
     pin_memory: true

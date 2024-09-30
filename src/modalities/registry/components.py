@@ -52,7 +52,7 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
-    WebLoaderConfig,
+    WebDataLoaderConfig,
     WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
@@ -213,7 +213,7 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
-    ComponentEntity("data_loader", "web_loader", DataloaderFactory.get_web_loader, WebLoaderConfig),
+    ComponentEntity("data_loader", "web_dataloader", DataloaderFactory.get_web_dataloader, WebDataLoaderConfig),
     ComponentEntity(
         "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
