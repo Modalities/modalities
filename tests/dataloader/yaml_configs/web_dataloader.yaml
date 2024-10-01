@@ -1,0 +1,111 @@
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: openai/clip-vit-base-patch32
+    padding: true
+    max_length: 50
+
+train_image_transform:
+  component_key: transform
+  variant_key: image_transform
+  config:
+    is_training: True
+    input_size: 224
+
+train_audio_transform:
+  component_key: transform
+  variant_key: audio_transform
+  config:
+    is_training: True
+    block_size_audio_encoder: 500
+    freq_domain_mask_length: 30
+    time_domain_mask_length: 100
+
+text_transform:
+  component_key: transform
+  variant_key: text_transform
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: coca_collator
+  config:
+    sample_keys:
+      - images
+      - audio
+      - audio_len
+      - input_ids
+    target_keys: []
+    text_sample_key: input_ids
+    text_target_key: logits
+
+image_dataset:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: None
+    modality_key_mapping:
+      TEXT: ["json_text0", "input_ids"]
+      IMAGE: ["jpg", "images"]
+    modality_transforms:
+      IMAGE:
+        instance_key: train_image_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+audio_dataset:
+  component_key: dataset
+  variant_key: web_dataset_builder
+  config:
+    urls: None
+    modality_key_mapping:
+      TEXT: ["transcript.txt", "input_ids"] # source and target keys
+      AUDIO: ["wav", "audio"]
+    modality_transforms:
+      AUDIO:
+        instance_key: train_audio_transform
+        pass_type: BY_REFERENCE
+      TEXT:
+        instance_key: text_transform
+        pass_type: BY_REFERENCE
+    num_samples: 10
+
+
+train_dataset:
+  component_key: dataset
+  variant_key: web_dataset
+  config:
+    builders:
+      - instance_key: image_dataset
+        pass_type: BY_REFERENCE
+      - instance_key: audio_dataset
+        pass_type: BY_REFERENCE
+    mixing_ratios: [0.9, 0.1]
+    batch_size: 10
+    shardshuffle: 100
+    repeat: false
+    resample: false
+    shuffle_buffer: 10_000
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: web_dataloader
+  config:
+    num_workers: 0
+    pin_memory: true
+    drop_last: true
+    dataloader_tag: "train"
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_size: 10
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
