@@ -440,7 +440,50 @@ class ImageTransformConfig(TransformConfig):
 
 # @register_component("transform", "image_transform", ImageTransformConfig)
 class ImageTransform(Transform):
+    """ImageTransform class."""
+
     def __init__(self, **kwargs):
+        """
+        Initializes a Transform object for image transformations.
+
+        The following argument descriptions are duplicated from:
+        https://github.com/huggingface/pytorch-image-models/blob/main/timm/data/transforms_factory.py
+
+        Args:
+            input_size (int, tuple[int,int], tuple[int, int, int]:
+                Target input size (channels, height, width) tuple or size scalar.
+            is_training (bool): Return training (random) transforms.
+            no_aug (bool): Disable augmentation for training (useful for debug).
+            train_crop_mode (Optional[str]): Training random crop mode ('rrc', 'rkrc', 'rkrr').
+            scale (Optional[tuple[float, float]]) : Random resize scale range (crop area, < 1.0 => zoom in).
+            ratio (Optional[tuple[float, float]]): Random aspect ratio range
+                (crop ratio for RRC, ratio adjustment factor for RKR).
+            hflip (float): Horizontal flip probability.
+            vflip (float): Vertical flip probability.
+            color_jitter (float | tuple[float, ...]): Random color jitter component factors
+                (brightness, contrast, saturation, hue).
+                Scalar is applied as (scalar,) * 3 (no hue).
+            color_jitter_prob (Optional[float]): Apply color jitter with this
+                probability if not None (for SimlCLR-like aug).
+            grayscale_prob (float): Probability of converting image to grayscale (for SimCLR-like aug).
+            gaussian_blur_prob (float): Probability of applying gaussian blur (for SimCLR-like aug).
+            auto_augment (Optional[str]): Auto augment configuration string (see auto_augment.py).
+            interpolation (str): Image interpolation mode.
+            mean (tuple[float, ...]): Image normalization mean.
+            std (tuple[float, ...]): Image normalization standard deviation.
+            re_prob (float): Random erasing probability.
+            re_mode (str): Random erasing fill mode.
+            re_count (int): Number of random erasing regions.
+            re_num_splits (int): Control split of random erasing across batch size.
+            crop_pct (Optional[float]): Inference crop percentage (output size / resize size).
+            crop_mode (Optional[str]): Inference crop mode.
+                One of ['squash', 'border', 'center']. Defaults to 'center' when None.
+            crop_border_pixels (Optional[int]): Inference crop border of
+                specified # pixels around edge of original image.
+            tf_preprocessing (bool): Use TF 1.0 inference preprocessing for testing model ports
+            use_prefetcher (bool): Pre-fetcher enabled. Do not convert image to tensor or normalize.
+        """
+
         self._timm_image_transform = create_transform(**kwargs)
 
     def __call__(self, image):
@@ -465,6 +508,17 @@ class TextTransform(Transform):
         truncation: bool = True,
         return_attention_mask: bool = True,
     ):
+        """
+        Args:
+            tokenizer (TokenizerWrapper): text tokenizer
+            max_length (int): maximum number of tokens. Default 77
+            padding (str): padding strategy. Default "max_length"
+            truncation (bool): Flag which determines whether to apply truncation. Default True.
+            return_attention_mask (bool): Flag which determines whether the attention mask is returned. Default True.
+
+        Returns:
+            None
+        """
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.padding = padding
@@ -586,6 +640,10 @@ class VideoTransformConfig(TransformConfig):
     input_size: int | tuple[int, int] | tuple[int, int, int] = 224
     is_training: bool = False
     num_frames: int = 16
+    hflip: float = 0.0
+    color_jitter: list[float] = [0.0, 0.0, 0.0, 0.0]
+    mean: list[float] = IMAGENET_DEFAULT_MEAN
+    std: list[float] = IMAGENET_DEFAULT_STD
 
 
 class VideoTransform(Transform):
@@ -594,14 +652,23 @@ class VideoTransform(Transform):
         input_size: int | tuple[int, int] | tuple[int, int, int] = 224,
         is_training: bool = False,
         num_frames: int = 16,
+        hflip: float = 0.0,
+        color_jitter: list[float] = [0.0, 0.0, 0.0, 0.0],
+        mean: list[float] = IMAGENET_DEFAULT_MEAN,
+        std: list[float] = IMAGENET_DEFAULT_STD,
     ):
         self.spatial_transform = transforms.Compose(
             [
                 transforms.RandomResizedCrop(input_size, antialias=True),
-                transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+                transforms.RandomHorizontalFlip(p=hflip),
+                transforms.ColorJitter(
+                    brightness=color_jitter[0],
+                    contrast=color_jitter[1],
+                    saturation=color_jitter[2],
+                    hue=color_jitter[3],
+                ),
                 transforms.ConvertImageDtype(torch.float),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                transforms.Normalize(mean=mean, std=std),
             ]
         )
         self.temporal_transform = RandomTemporalCrop(num_frames=num_frames)
@@ -706,7 +773,8 @@ def fixed_ratio_round_robin(*sources, samples_per_batch):
                 i = (i + 1) % len(sources)
             yield sample
         except StopIteration:
-            del sources[i]
+            # stop if any modality runs out of samples
+            break
 
 
 class FixedRatioRoundRobinMix(IterableDataset):

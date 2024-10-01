@@ -24,12 +24,15 @@ class VisionTransformerConfig(BaseModel):
         attention_config (AttentionConfig, optional): The configuration for the attention mechanism. Defaults to None.
         n_head (int): The number of attention heads. Defaults to 8.
         n_embd (int): The dimensionality of the embedding. Defaults to 768.
+        ffn_hidden (int): The number of hidden units in the feed-forward network. Defaults to 3072.
         dropout (float): The dropout rate. Defaults to 0.0.
         patch_size (int): The size of the image patches. Defaults to 16.
         patch_stride (int): The stride of the image patches. Defaults to 16.
         n_img_channels (int): The number of image channels. Defaults to 3.
         add_cls_token (bool): Flag indicating whether to add a classification token. Defaults to True.
         bias (bool): Flag indicating whether to include bias terms. Defaults to True.
+        num_video_frames (int): the number of video frames in case of video input
+        n_latents: the number of latent queries used for the Perceiver block in case of video input. Defaults to 64.
     """
 
     sample_key: str
@@ -47,7 +50,7 @@ class VisionTransformerConfig(BaseModel):
     n_img_channels: Annotated[int, Field(ge=1)] = 3
     add_cls_token: bool = True
     bias: bool = True
-    num_video_frames: Annotated[int, Field(ge=0)] = 1  # TODO: read this from dataloader/train config
+    num_video_frames: Annotated[int, Field(ge=0)] = 1
     n_latents: Annotated[int, Field(ge=1)] = 64
 
 
