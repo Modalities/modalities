@@ -122,6 +122,19 @@ class VideoPatchEmbedding(nn.Module):
         patch_size: int = 16,
         patch_stride: int = 16,
     ) -> None:
+        """
+        Initializes a VideoPatchEmbedding object.
+
+
+        Args:
+            n_img_channels (int): Number of image channels. Defaults to 3.
+            n_embd (int): Number of embedding dimensions. Defaults to 768.
+            patch_size (int): Patch size for convolutional layer. Defaults to 16.
+            patch_stride (int): Patch stride for convolutional layer. Defaults to 16.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.input_rearrange = Rearrange("b T c h w -> b c T h w")
         self.conv = nn.Conv3d(
@@ -135,6 +148,16 @@ class VideoPatchEmbedding(nn.Module):
         self.rearrange = Rearrange("b c T h w -> b T (h w) c")  # TODO: this might change when implementing dataloader
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the VideoPatchEmbedding.
+
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = self.input_rearrange(x)
         x = self.conv(x)
         x = self.rearrange(x)
@@ -194,12 +217,11 @@ class VisionTransformerBlock(nn.Module):
         return x
 
 
-# TODO: extend to all modalities based on the original paper (https://arxiv.org/pdf/2103.03206)!
-# TODO: extend this to work with video and images!
 class PerceiverTransformerBlock(nn.Module):
     """Perceiver Resampler
 
-    This is a transformer based architecture that performs cross and self attention to compress and embed video inputs.
+    This is a transformer based architecture that performs cross and self attention to compress and embed video
+    or other high-dimensional inputs.
     paper: 'Flamingo: a Visual Language Model for Few-Shot Learning'
     Link: https://github.com/mlfoundations/open_flamingo
     """
@@ -213,6 +235,21 @@ class PerceiverTransformerBlock(nn.Module):
         dropout: float = 0.0,
         attention_config: AttentionConfig = None,
     ) -> None:
+        """
+        Initializes a PerceiverTransformerBlock object.
+
+        Args:
+            n_embd (int, optional): The dimensionality of the embedding layer. Defaults to 768.
+            n_head (int, optional): The number of attention heads. Defaults to 8.
+            ffn_hidden (int, optional): The number of hidden units in the feed-forward network. Defaults to 3072.
+            bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.
+            dropout (float, optional): The dropout rate. Defaults to 0.0.
+            attention_config (AttentionConfig, optional): The configuration for the attention mechanism.
+            Defaults to None.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.norm_latents = nn.LayerNorm(n_embd)
         self.norm = nn.LayerNorm(n_embd)
@@ -225,6 +262,16 @@ class PerceiverTransformerBlock(nn.Module):
         self.mlp = MLP(in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
 
     def forward(self, x: torch.Tensor, latents: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the PerceiverTransformerBlock module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            latents (torch.Tensor): input latent array tensor
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         latents = self.norm_latents(latents)
         x = self.norm(x)
         context = torch.cat((x, latents), dim=-2)  # video features and the latent together
@@ -243,7 +290,7 @@ class VisionTransformer(nn.Module):
     Paper: `An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale`
     Link: https://arxiv.org/abs/2010.11929
 
-    This architecture is extended to encode videos using a perceiver resampler transformer model
+    This architecture is extended to encode videos using a Perceiver transformer model
     """
 
     def __init__(
@@ -263,7 +310,7 @@ class VisionTransformer(nn.Module):
         n_img_channels: int = 3,
         add_cls_token: bool = True,
         bias: bool = True,
-        num_video_frames: int = 1,  # when dealing with video this is bigger than 1
+        num_video_frames: int = 1,  # 1: Image, >1: Video
         n_latents: int = 64,
     ) -> None:
         """
@@ -285,6 +332,8 @@ class VisionTransformer(nn.Module):
             n_img_channels (int, optional): The number of image channels. Defaults to 3.
             add_cls_token (bool, optional): Flag indicating whether to add a classification token. Defaults to True.
             bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.
+            num_video_frames (int): Number of frames. Defaults to 1.
+            n_latents (int, optional): Size of latent array. Defaults to 64.
 
             Returns:
                 None
@@ -315,9 +364,7 @@ class VisionTransformer(nn.Module):
         else:
             self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
 
-        self.positional_embedding_fn = nn.Embedding(
-            num_embeddings=self.block_size, embedding_dim=n_embd
-        )  # [S D] #TODO: this needs to be adjusted for video with cls_token
+        self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)  # [S D]
         block_classes = {"Video": PerceiverTransformerBlock, "Image": VisionTransformerBlock}
 
         self.blocks = nn.ModuleList(
@@ -367,7 +414,6 @@ class VisionTransformer(nn.Module):
         """
         x = self.embedding_fn(x)  # [b T S D]
         b, T = x.shape[:2]
-        # TODO: check this!
         x = self.dropout(x + self.positional_embedding_fn.weight)
         x = self.dropout(x + self.time_embd.repeat(b, 1, 1, 1))
         x = self.rearrange(x)  # [b T*S D]
@@ -376,7 +422,7 @@ class VisionTransformer(nn.Module):
             latents = block(x, latents)
         return latents
 
-    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:  # TODO video adapt
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the VisionTransformer module.
 

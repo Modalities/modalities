@@ -5,11 +5,12 @@ import random
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import decord
 import jq
 import numpy as np
+import PIL
 import torch
 import torchaudio
 import webdataset as wds
@@ -438,11 +439,10 @@ class ImageTransformConfig(TransformConfig):
     separate: bool = False
 
 
-# @register_component("transform", "image_transform", ImageTransformConfig)
 class ImageTransform(Transform):
     """ImageTransform class."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """
         Initializes a Transform object for image transformations.
 
@@ -486,7 +486,7 @@ class ImageTransform(Transform):
 
         self._timm_image_transform = create_transform(**kwargs)
 
-    def __call__(self, image):
+    def __call__(self, image: PIL.Image.Image) -> torch.Tensor:
         return self._timm_image_transform(image)
 
 
@@ -498,7 +498,6 @@ class TextTransformConfig(TransformConfig):
     return_attention_mask: bool = True
 
 
-# @register_component("transform", "text_transform", TextTransformConfig)
 class TextTransform(Transform):
     def __init__(
         self,
@@ -507,7 +506,7 @@ class TextTransform(Transform):
         padding: str = "max_length",
         truncation: bool = True,
         return_attention_mask: bool = True,
-    ):
+    ) -> None:
         """
         Args:
             tokenizer (TokenizerWrapper): text tokenizer
@@ -525,7 +524,7 @@ class TextTransform(Transform):
         self.truncation = truncation
         self.return_attention_mask = return_attention_mask
 
-    def __call__(self, text):
+    def __call__(self, text: str) -> BatchEncoding:
         batch_encoding: BatchEncoding = self.tokenizer.tokenizer(
             text,
             max_length=self.max_length,
@@ -574,7 +573,7 @@ class AudioTransform(Transform):
         n_mels: int = 128,
         freq_domain_mask_length: int = 30,
         time_domain_mask_length: int = 100,
-    ):
+    ) -> None:
         """
         Initializes the AudioTransform class.
 
@@ -626,13 +625,44 @@ class AudioTransform(Transform):
         return log_mel_spec, feats_len
 
 
-class RandomTemporalCrop:
-    def __init__(self, num_frames):
-        self.num_frames = num_frames
+class TemporalCrop:
+    """
+    This module crops a video along the temporal dimension
+    """
 
-    def __call__(self, video):
+    def __init__(
+        self,
+        num_frames: int,
+        is_training: bool = False,
+    ) -> None:
+        """
+        Initializes the TemporalCrop class
+
+        Args:
+            num_frames (int): The length of the clip to be cropped
+            is_training (bool, optional): Whether the module is in training mode. Defaults to False.
+
+        Returns:
+            None
+        """
+        self.num_frames = num_frames
+        self.is_training = is_training
+
+    def __call__(self, video: torch.Tensor) -> torch.Tensor:
+        """
+        Crops the video to a length of `num_frames`. If in training mode, the start of the crop is chosen randomly.
+
+        Args:
+            video (torch.Tensor): the video to be cropped with dimensions T x H x W x C
+
+        Returns:
+            cropped video (torch.Tensor): the cropped video with dimensions num_frames x C x H x W
+        """
         total_frames = len(video)
-        start = random.randint(0, total_frames - self.num_frames)
+        if self.is_training:
+            start = random.randint(0, total_frames - self.num_frames)
+        else:
+            start = 0
         return video[start : start + self.num_frames].permute(0, 3, 1, 2)  # F C H W
 
 
@@ -647,6 +677,10 @@ class VideoTransformConfig(TransformConfig):
 
 
 class VideoTransform(Transform):
+    """
+    A video transformation module that performs spatial and temporal transformations.
+    """
+
     def __init__(
         self,
         input_size: int | tuple[int, int] | tuple[int, int, int] = 224,
@@ -656,24 +690,65 @@ class VideoTransform(Transform):
         color_jitter: list[float] = [0.0, 0.0, 0.0, 0.0],
         mean: list[float] = IMAGENET_DEFAULT_MEAN,
         std: list[float] = IMAGENET_DEFAULT_STD,
-    ):
-        self.spatial_transform = transforms.Compose(
-            [
-                transforms.RandomResizedCrop(input_size, antialias=True),
-                transforms.RandomHorizontalFlip(p=hflip),
-                transforms.ColorJitter(
-                    brightness=color_jitter[0],
-                    contrast=color_jitter[1],
-                    saturation=color_jitter[2],
-                    hue=color_jitter[3],
-                ),
-                transforms.ConvertImageDtype(torch.float),
-                transforms.Normalize(mean=mean, std=std),
-            ]
-        )
-        self.temporal_transform = RandomTemporalCrop(num_frames=num_frames)
+    ) -> None:
+        """
+        Initializes the VideoTransform class
 
-    def __call__(self, video):
+        Args:
+            input_size (int | tuple[int, int] | tuple[int, int, int] ): target spatial size of video frames.
+            is_training (bool, optional): Whether the module is in training mode. Defaults to False.
+                When not in training mode, resize and center crop is used instead of RandomResizedCrop,
+                no horizontal flip nor color jitter is performed, and the temporal crop is deterministic.
+            num_frames (int): target number of frames in the transformed video. Defaults to 16.
+            hflip (float): probability of performing horizontal flip on the frames. Defaults to 0.0.
+            color_jitter (list[float]): Random color jitter component factors
+                (brightness, contrast, saturation, hue).
+                Defaults to 0.0 for all components.
+            mean (list[float]): Image normalization mean. Defaults to IMAGENET defaults.
+            std (list[float]): Image normalization standard deviation. Defaults to IMAGENET defaults.
+
+
+        Returns:
+            None
+        """
+        if is_training:
+            self.spatial_transform = transforms.Compose(
+                [
+                    transforms.RandomResizedCrop(input_size, antialias=True),
+                    transforms.RandomHorizontalFlip(p=hflip),
+                    transforms.ColorJitter(
+                        brightness=color_jitter[0],
+                        contrast=color_jitter[1],
+                        saturation=color_jitter[2],
+                        hue=color_jitter[3],
+                    ),
+                    transforms.ConvertImageDtype(torch.float),
+                    transforms.Normalize(mean=mean, std=std),
+                ]
+            )
+        else:
+            self.spatial_transform = transforms.Compose(
+                [
+                    transforms.Resize(input_size, antialias=True),
+                    transforms.CenterCrop(input_size),
+                    transforms.ConvertImageDtype(torch.float),
+                    transforms.Normalize(mean=mean, std=std),
+                ]
+            )
+        self.temporal_transform = TemporalCrop(num_frames=num_frames, is_training=is_training)
+
+    def __call__(self, video: tuple[torch.Tensor, torch.Tensor | None, int]) -> torch.Tensor:
+        """
+        Performs spatial and temporal transformations on the input video
+
+        Args:
+            video (tuple[torch.Tensor, torch.Tensor, ]): the first element is the video
+                to be transformed T x H' x W' x C.
+                The second and third elements are ignored (optional audio, audio sample rate).
+
+        Returns:
+            transformed video (torch.Tensor): with dimensions num_frames x C x H x W
+        """
         video = video[0]
         video = self.temporal_transform(video)
         return self.spatial_transform(video)
@@ -691,7 +766,7 @@ def decord_video(key: str, data: bytes) -> None | tuple[torch.Tensor, Optional[t
     If an audio stream exists, it extracts the audio with a mean across channels (if there are multiple).
     It then uses Decord to decode uniformly sampled frames from the video.
 
-    Parameters:
+    Args:
         key (str): The key or identifier for the video data.
         data (bytes): The binary data of the video file.
 
@@ -734,7 +809,7 @@ def torch_audio(key: str, data: bytes) -> None | tuple[torch.Tensor, int]:
     It first checks if the file extension is one of the supported formats.
     If there are multiple channels in the audio file, it averages them to produce a mono audio tensor.
 
-    Parameters:
+    Args:
         key (str): The key or identifier for the audio data.
         data (bytes): The binary data of the audio file.
 
@@ -754,7 +829,22 @@ def torch_audio(key: str, data: bytes) -> None | tuple[torch.Tensor, int]:
     return (audio, sample_rate)
 
 
-def fixed_ratio_round_robin(*sources, samples_per_batch):
+def fixed_ratio_round_robin(*sources, samples_per_batch: list[int]):
+    """
+    Iterator over a list of iterators.
+    Samples from each source iterator are selected in a round-robin fashion, with a fixed number
+    of samples from each iterator for a given batch, as defined by `samples_per_batch`
+
+
+    Args:
+        sources (list[iterator]): An arbitrary number of source iterators
+        samples_per_batch (list[int]): Number of samples from each source iterator
+            which should be present in one batch
+
+    Yields:
+        sample: a sample from one of the iterators
+    """
+
     sources = list(sources)
     remaining_samples_in_batch = samples_per_batch.copy()
     i = 0
@@ -783,7 +873,7 @@ class FixedRatioRoundRobinMix(IterableDataset):
         datasets: list[wds.WebDataset],
         mixing_ratios: list[float],
         batch_size: int,
-    ):
+    ) -> None:
         """An iterator for a list of datasets.
         Samples are yielded in a round robin manner
         with a fixed ratio of samples per dataset. There is no random sampling, so the number of
@@ -793,6 +883,9 @@ class FixedRatioRoundRobinMix(IterableDataset):
             datasets (list[WebDataset]): a list of WebDatasets to be iterated over
             mixing_ratios (list[float]): the ratio of samples from each dataset that should be present in a batch
             batch_size (int): size of batch containing samples from all datasets in the specified ratio
+
+        Returns:
+            None
         """
         self.datasets = datasets
         self.samples_per_batch = [int(batch_size * ratio) for ratio in mixing_ratios]
@@ -816,7 +909,6 @@ class MultimodalWebDatasetBuilderConfig(BaseModel):
     num_samples: Annotated[int, Field(ge=1)]
 
 
-# @register_component("dataset", "web_dataset_builder", MultimodalWebDatasetBuilderConfig)
 class MultimodalWebDatasetBuilder:
     def __init__(
         self,
@@ -825,7 +917,7 @@ class MultimodalWebDatasetBuilder:
         modality_transforms: dict[str, Transform],
         is_audio_video: bool,
         num_samples: int,
-    ):
+    ) -> None:
         """A multimodal dataset instance for the WebDataset.
 
         Args:
@@ -877,7 +969,7 @@ class MultimodalWebDatasetBuilder:
 
     def prepare(
         self, shardshuffle: int = 100, resample: bool = True, repeat: bool = False, shuffle_buffer: int = 10_000
-    ):
+    ) -> None:
         """
         Prepares a WebDataset object as a pipeline that includes shuffling, decoding data, and transformations
 
@@ -924,7 +1016,7 @@ class MultimodalWebDatasetBuilder:
 
         self.web_dataset.append(wds.filters.map(self._select_keys))
 
-    def _transform_text(self, sample):
+    def _transform_text(self, sample: dict[str, Any]) -> dict[str, Any]:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.TEXT]
         transform: TextTransform = self.modality_transforms[ModalityEnum.TEXT]
         batch_encoding: BatchEncoding = transform(sample[source_key])
@@ -933,14 +1025,14 @@ class MultimodalWebDatasetBuilder:
         sample["attention_mask"] = batch_encoding.attention_mask
         return sample
 
-    def _transform_image(self, sample):
+    def _transform_image(self, sample: dict[str, Any]) -> dict[str, Any]:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.IMAGE]
         transform: TextTransform = self.modality_transforms[ModalityEnum.IMAGE]
         sample[target_key] = transform(sample[source_key])
         del sample[source_key]
         return sample
 
-    def _transform_video(self, sample):
+    def _transform_video(self, sample: dict[str, Any]) -> dict[str, Any]:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.VIDEO]
         transform: VideoTransform = self.modality_transforms[ModalityEnum.VIDEO]
         sample[target_key] = transform(sample[source_key])
@@ -953,7 +1045,7 @@ class MultimodalWebDatasetBuilder:
         del sample[source_key]
         return sample
 
-    def _transform_audio(self, sample: dict):
+    def _transform_audio(self, sample: dict[str, Any]) -> dict[str, Any]:
         # Apply audio transforms to the input sample.
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
         transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
@@ -961,10 +1053,10 @@ class MultimodalWebDatasetBuilder:
         del sample[source_key]
         return sample
 
-    def _flatten_sample(self, sample):
+    def _flatten_sample(self, sample: dict[str, Any]) -> dict[str, Any]:
         return flatten_dict(sample)
 
-    def _select_keys(self, sample):
+    def _select_keys(self, sample: dict[str, Any]) -> dict[str, Any]:
         # only select the required keys from the sample
         # i.e. the keys specified in modality_key_mapping
         # and the additional_extracted_keys
@@ -1002,7 +1094,6 @@ class MultimodalWebDatasetConfig(BaseModel):
     shuffle_buffer: Optional[int] = 10_000
 
 
-# @register_component("dataset", "web_dataset", MultimodalWebDatasetConfig)
 class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
     def __init__(
         self,
@@ -1013,7 +1104,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         repeat: bool = False,
         resample: bool = True,
         shuffle_buffer: Optional[int] = 10_000,
-    ):
+    ) -> None:
         """WebDataset for loading and combining multimodal datasets.
 
         Args:

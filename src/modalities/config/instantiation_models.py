@@ -168,7 +168,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
     scheduler: PydanticLRSchedulerIFType
-    loss_fn: PydanticLossIFType | list[PydanticLossIFType]
+    loss_fn: PydanticLossIFType
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticDataLoaderIFType
     eval_dataloaders: list[PydanticDataLoaderIFType]

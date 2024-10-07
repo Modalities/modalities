@@ -39,6 +39,8 @@ class TransformerBlock(nn.Module):
             dropout (float): The dropout rate.
             ffn_hidden (int): The number of hidden units in the feed-forward network.
             with_context (bool): Flag indicating whether to include context in the decoder.
+            is_audio_video (bool): Flag indicating whether an additional cross attention block is required for
+                data that consists of both audio and video from the same source.
             attention_type (AttentionType): The type of attention mechanism to use.
             attention_config (AttentionConfig, optional): The configuration for the attention mechanism.
             Defaults to None.
@@ -143,6 +145,8 @@ class MultiModalTextDecoder(NNModel):
             n_head (int): The number of attention heads.
             n_embd (int): The dimension of the embeddings.
             ffn_hidden (int): The size of the feed-forward network hidden layer.
+            is_audio_video (bool): Flag indicating whether an additional cross attention block is required for
+                data that consists of both audio and video from the same source.
             dropout (float): The dropout rate.
             bias (bool): Flag indicating whether to include bias terms.
             activation (ActivationType): The activation function to use.
