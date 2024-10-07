@@ -289,6 +289,8 @@ class RepeatingDataLoader(LLMDataLoader):
 
 
 class WebDataLoader(DataLoaderIF):
+    """WebDataLoader is a custom DataLoader class that wraps the webdataset.WebLoader class."""
+
     def __init__(
         self,
         dataloader_tag: str,
@@ -299,6 +301,18 @@ class WebDataLoader(DataLoaderIF):
         pin_memory: bool = False,
         drop_last: bool = False,
     ):
+        """Initializes WebDataLoader, which is a wrapper for webdataset.WebLoader.
+
+        Args:
+            dataloader_tag (str): The tag for the dataloader.
+            dataset (Dataset[T_co]): The dataset to load the data from.
+            batch_size (Optional[int], optional): The batch size. Defaults to 1.
+            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
+            collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
+              Defaults to None.
+            pin_memory (bool, optional): Flag indicating whether to pin the memory. Defaults to False.
+            drop_last (bool, optional): Flag indicating whether to drop the last incomplete batch. Defaults to False.
+        """
         self.num_batches = len(dataset) // batch_size + int(not drop_last)
         dataset = dataset.batched(batch_size, collation_fn=collate_fn)
         self.webloader = wd.WebLoader(dataset=dataset, batch_size=None, num_workers=num_workers, pin_memory=pin_memory)

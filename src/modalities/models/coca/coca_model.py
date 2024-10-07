@@ -309,7 +309,10 @@ class CoCa(NNModel):
         # Logit scale for contrastive loss
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
-    def _init_modality(self, encoder_class, encoder_config, n_queries):
+    def _init_modality(
+        self, encoder_class: type, encoder_config: VisionTransformerConfig | AudioTransformerConfig, n_queries: int
+    ) -> tuple[VisionTransformer | AudioTransformer, nn.Parameter, AttentionPooling]:
+        # initialize modality encoder, returns a tuple containing the encoder, queries and attention pooling layer
         encoder = encoder_class(**dict(encoder_config))
         queries = nn.Parameter(torch.randn(n_queries + 1, encoder_config.n_embd))
         attn_pool = AttentionPooling(
