@@ -374,10 +374,14 @@ class AudioTransformer(nn.Module):
         lengths: torch.Tensor,
     ) -> torch.Tensor:
         # Generates an attention key mask based on input sequence lengths.
+        stack = []
+        for length in lengths:
+            ones = torch.ones(length, self.block_size)
+            ones[1:, length:] = 0
+            stack.append(ones)
         return (
             torch.nn.utils.rnn.pad_sequence(
-                [torch.ones(length, self.block_size) for length in lengths]
-                + [torch.ones(self.block_size, self.block_size)],
+                stack + [torch.zeros(self.block_size, self.block_size)],
                 batch_first=True,
             )
             .transpose(1, 2)[:-1]
