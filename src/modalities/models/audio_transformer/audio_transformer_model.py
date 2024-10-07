@@ -143,6 +143,9 @@ class ConvolutionModule(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (B, T, D).
         """
+        if x.shape[1] == 1:
+            raise ValueError("The time dimension of the input to the convolution module cannot be 1!")
+
         x = self.ln(x)
         x = x.transpose(1, 2)
         x = self.glu(self.pointwise_conv_1(x))
