@@ -353,11 +353,11 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 
 class SimpleProgressSubscriberConfig(BaseModel):
-    train_dataloader: PydanticDataLoaderIFType
     eval_dataloaders: Optional[list[PydanticDataLoaderIFType]] = Field(default_factory=list)
-    world_size: int
-    global_num_seen_samples: int
-    local_rank: int
+    train_dataloader_tag: str
+    num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
+    num_target_steps: Annotated[int, Field(strict=True, gt=0)]
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class RichProgressSubscriberConfig(BaseModel):
