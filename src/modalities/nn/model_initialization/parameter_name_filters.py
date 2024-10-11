@@ -67,8 +67,10 @@ NAMED_PARAMETER_INIT_GROUPS = {
     },
     SupportWeightInitModels.COCA: {
         # we reject all bias and weight parameters belonging to norms
+        # optional .weight so that we include nn.Parameters
         WeightInitTypes.PLAIN: RegexFilter(
-            weights=[r"^(?!.*norm)(?!.*ln).*\.weight$"], biases=[r"^(?!.*norm)(?!.*ln).*\.bias$"]
+            weights=[r"^(?!.*norm)(?!.*ln)(?!.*batch_norm).*(.weight)?$"],
+            biases=[r"^(?!.*norm)(?!.*ln)(?!.*batch_norm).*.bias$"],
         ),
         # scaled init for residual layers:
         # https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf (pp 4)
@@ -77,6 +79,15 @@ NAMED_PARAMETER_INIT_GROUPS = {
                 r"transformer\.h\.\d+\.attn\.c_proj\.weight",
             ]
         ),
-        WeightInitTypes.SCALED_EMBED: RegexFilter(weights=[], biases=[]),
+        WeightInitTypes.SCALED_EMBED: RegexFilter(
+            weights=[
+                # embedding weights
+                r"\.wte\.weight",
+                r"\.wpe\.weight",
+                r"positional_embeddings\.weight",
+                r"positional_embedding_fn\.weight",
+                r"time_embd$",
+            ]
+        ),
     },
 }

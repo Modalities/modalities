@@ -102,7 +102,7 @@ class ConvolutionModule(nn.Module):
             )
         """
         super().__init__()
-        self.ln = nn.LayerNorm(n_embd)
+        self.ln_1 = nn.LayerNorm(n_embd)
         self.pointwise_conv_1 = nn.Conv1d(
             n_embd,
             2 * n_embd,
@@ -117,7 +117,7 @@ class ConvolutionModule(nn.Module):
             groups=n_embd,
             padding="same",
         )
-        self.bn = nn.BatchNorm1d(
+        self.batch_norm = nn.BatchNorm1d(
             n_embd,
         )
         self.swish = nn.SiLU()
@@ -146,10 +146,10 @@ class ConvolutionModule(nn.Module):
         if x.shape[1] == 1:
             raise ValueError("The time dimension of the input to the convolution module cannot be 1!")
 
-        x = self.ln(x)
+        x = self.ln_1(x)
         x = x.transpose(1, 2)
         x = self.glu(self.pointwise_conv_1(x))
-        x = self.swish(self.bn(self.depthwise_conv(x)))
+        x = self.swish(self.batch_norm(self.depthwise_conv(x)))
         x = self.pointwise_conv_2(x)
         return self.dropout(x.transpose(1, 2))
 
@@ -186,7 +186,7 @@ class ConformerBlock(nn.Module):
         """
         super().__init__()
 
-        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln_1 = nn.LayerNorm(n_embd)
         self.entry_ffmodule = MLP(
             in_features=n_embd,
             act_fn=nn.SiLU,
@@ -206,7 +206,7 @@ class ConformerBlock(nn.Module):
             depthwise_conv_kernel_size,
             convmodule_dropout,
         )
-        self.ln2 = nn.LayerNorm(
+        self.ln_2 = nn.LayerNorm(
             n_embd,
         )
         self.exit_ffmodule = MLP(
@@ -235,11 +235,11 @@ class ConformerBlock(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (B, T, D).
         """
-        x = self.ln1(x)
+        x = self.ln_1(x)
         x = x + 0.5 * self.entry_ffmodule(x)
         x = x + self.attn(self.ln_mhsa(x), mask=mask)
         x = x + self.convmodule(x)
-        x = self.ln2(x)
+        x = self.ln_2(x)
         x = x + 0.5 * self.exit_ffmodule(x)
         return self.exit_ln(x)
 

@@ -81,7 +81,7 @@ class CoCaConfig(BaseModel):
         video_encoder_config (Optional[VisionTransformerConfig]): config  for the video encoder. Defaults to None
         text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
         n_pool_head (int): Number of attention heads for pooling.
-        n_queries (int): Number of vision queries.
+        n_queries (int): Number of queries for attention pooling.
         bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
         epsilon_attn_pool (float): Epsilon value for attention pooling.
         seed (Optional[int]): The random seed. Defaults to None
@@ -183,7 +183,7 @@ class CoCa(NNModel):
             video_encoder_config (Optional[VisionTransformerConfig]): config  for the video encoder. Defaults to None
             text_decoder_config (TextDecoderConfig): Configuration for the text decoder.
             n_pool_head (int): Number of attention heads for pooling.
-            n_queries (int): Number of vision queries.
+            n_queries (int): Number of queries for attention pooling.
             bias_attn_pool (bool): Flag indicating whether to use bias in attention pooling.
             epsilon_attn_pool (float): Epsilon value for attention pooling.
             seed (Optional[int]): The random seed. Defaults to None
@@ -201,7 +201,7 @@ class CoCa(NNModel):
             "linear": [r"attention", r"\.attn", r"\.cross_attn", r"\.post_subsampler", r"_ffmodule", r"mlp"],
             "conv": [r"embedding_fn\.conv", r"project", r"\.subsampler", r"pointwise_conv", r"depthwise_conv"],
             "embedding": [r"wte", r"wpe", r"positional_embedding", r"time_embd"],
-            "norm": [r"norm", r"\.ln_", r"\.ln", r"\.bn", r"exit_ln"],
+            "norm": [r"norm", r"norm_latents", r"\.ln_", r"\.batch_norm", r"exit_ln"],
             "parameter": [r"_queries", r"logit_scale", r"\.latents", r"cls_token"],
         }
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
