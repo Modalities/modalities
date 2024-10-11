@@ -85,3 +85,19 @@ This PR mainly addresses the warmstart of model training, e.g., after GPU crashe
 
 **Breaking Changes**
 * the settings part of the configs have been completely refactored
+
+
+## PR #263 CoCa model updates
+
+This PR adds updates to the CoCa model:
+
+
+**General Changes**
+* add AudioTransformer model
+* update the VisionTransformer model for video
+* add the MultimodalWebDataset dataset for loading audio-text, image-text and video-text in the webdataset format
+* add a multi-loss function for specifying a weighted-sum of different losses
+* update the CoCa model to include encoders for video and audio
+
+**Breaking Changes**
+* the LLMDataLoader now contains a Pytorch Dataloader object instead of inheriting from it.
