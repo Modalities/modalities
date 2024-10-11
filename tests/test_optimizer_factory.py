@@ -55,14 +55,14 @@ def _load_gpt2() -> FSDP:
 
 
 def _load_coca() -> FSDP:
-    config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config.yaml")
+    config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config_img_aud_vid.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     coca_config = CoCaConfig.model_validate(config_dict)
     coca_model = CoCa(**dict(coca_config))
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         coca_model,
         sync_module_states=True,
-        block_names=["TransformerBlock", "VisionTransformerBlock"],
+        block_names=["TransformerBlock", "VisionTransformerBlock", "ConformerBlock"],
         mixed_precision_settings=MixedPrecisionSettings.FP_16,
         sharding_strategy=ShardingStrategy.NO_SHARD,
     )
@@ -73,7 +73,16 @@ def _load_coca() -> FSDP:
 GPT2_LINEAR = 66130944
 GPT2_EMBEDDING = 768 * (50304 + 2048)  # n_embd * (vocab_size + sequence_length)
 GPT2_LAYERNORM = 768 * 50  # n_embd * num_layer_norms
-COCA_ALL = 184502784
+
+COCA_LINEAR = 227321088
+COCA_CONV = 9226752
+# (n_embd * vocab_size) +
+# (n_embd * (text_block_size + img_block_size + vid_block_size + aud_block_size + num_frames)
+COCA_EMBEDDING = (768 * 50304) + (768 * ((1024 + 1) + 196 + 196 + 500 + 16))
+COCA_NORM = 768 * 152  # n_embd * norm layers
+# 3 * (n_queries + 1) n_embd + logit_scale + (1(cls_token) * n_embd) + (n_latents * n_embd)
+COCA_PARAMETER = (3 * 257 * 768) + 1 + (768) + (64 * 768)
+COCA_ALL = COCA_LINEAR + COCA_CONV + COCA_EMBEDDING + COCA_NORM + COCA_PARAMETER
 
 
 @pytest.mark.skipif(
@@ -92,6 +101,16 @@ COCA_ALL = 184502784
         ("gpt2", 1e-1, ["non-existing-group"], False, None, None),
         ("coca", 0, [], True, 0, COCA_ALL),
         ("coca", 1e-1, [], True, COCA_ALL, 0),
+        ("coca", 1e-1, ["embedding"], True, COCA_ALL - COCA_EMBEDDING, COCA_EMBEDDING),
+        ("coca", 1e-1, ["embedding", "norm"], True, COCA_ALL - COCA_EMBEDDING - COCA_NORM, COCA_EMBEDDING + COCA_NORM),
+        (
+            "coca",
+            1e-1,
+            ["embedding", "norm", "parameter"],
+            True,
+            COCA_LINEAR + COCA_CONV,
+            COCA_EMBEDDING + COCA_NORM + COCA_PARAMETER,
+        ),
         ("coca", 1e-1, ["non-existing-group"], False, None, None),
     ],
 )

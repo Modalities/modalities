@@ -82,7 +82,7 @@ def _load_coca(initialization_type: str, std: float | str) -> FSDP:
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         coca_model,
         sync_module_states=True,
-        block_names=["TransformerBlock", "VisionTransformerBlock"],
+        block_names=["TransformerBlock", "VisionTransformerBlock", "ConformerBlock"],
         mixed_precision_settings=MixedPrecisionSettings.FP_16,
         sharding_strategy=ShardingStrategy.NO_SHARD,
     )
@@ -111,9 +111,23 @@ MAPPING_GPT2 = {
     "other": [],
 }
 MAPPING_COCA = {
-    "embedding": [],  # TODO
+    "embedding": [
+        r"wte\.weight$",
+        r"wpe\.weight$",
+        r"positional_embeddings\.weight$",
+        "positional_embedding_fn.weight$",
+        "time_embd$",
+    ],
     "weight-projection": [r"c_proj\.weight$"],  # TODO
-    "weight-norm": [r"norm[12]\.weight$", r"ln_[1234f]\.weight$"],  # TODO
+    "weight-norm": [
+        r"norm[12]?\.weight$",
+        r"norm_latents\.weight$",
+        r"ln_[1234f]\.weight$",
+        r"ln_mhsa.weight",
+        r"batch_norm.*weight$",
+        r"exit_ln.weight$",
+        r"attention_norm.weight$",
+    ],
     "weight-normal": [r"\.weight$"],
     "other": [r"conv", r".*(?<!bias)$"],  # (contains conv) or (does not end with .bias)
     "bias": [r".bias$"],
@@ -171,13 +185,13 @@ GPT2_OTHER = 0
 GPT2_WEIGHT_NORMAL = GPT2_ALL - GPT2_WEIGHT_PROJECTION - GPT2_EMBEDDING - GPT2_WEIGHT_NORM - GPT2_BIAS  # 40107264
 
 COCA_NLAYERS = 6 + 6  # text + multimodal
-COCA_ALL = 184502784
-COCA_EMBEDDING = 0  # TODO
-COCA_WEIGHT_PROJECTION = 14745600
-COCA_WEIGHT_NORM = 34560
-COCA_BIAS = 191232
-COCA_OTHER = 198912
-COCA_WEIGHT_NORMAL = 169332480
+COCA_ALL = 277424641
+COCA_EMBEDDING = 40118016
+COCA_WEIGHT_PROJECTION = 21233664
+COCA_WEIGHT_NORM = 768 * 79
+COCA_BIAS = 292608
+COCA_OTHER = 657409
+COCA_WEIGHT_NORMAL = 215062272
 
 NR_PARAMETERS = {
     "gpt2": {
