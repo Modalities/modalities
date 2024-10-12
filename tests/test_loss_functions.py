@@ -79,9 +79,7 @@ def setup_distributed(monkeypatch):
 
 
 def test_clip_loss(clip_loss_object, clip_loss_forward_batch, setup_distributed):
-
     loss_fn = clip_loss_object
-    forward_batch = clip_loss_forward_batch
     loss_fn(clip_loss_forward_batch)
 
 
@@ -105,18 +103,18 @@ def test_multiple_functions_loss_initialized_with_single_loss(
 def test_multiple_functions_loss_reset_cumulated_individual_losses(
     multiple_functions_loss_object_with_two_losses,
 ):
-
     loss = multiple_functions_loss_object_with_two_losses
     num_losses = len(loss.groups)
     loss.cumulated_individual_losses = torch.randn(num_losses)
     loss.reset_cumulated_individual_losses()
 
-    assert (loss.cumulated_individual_losses, torch.zeros(num_losses))
+    assert torch.equal(
+        loss.cumulated_individual_losses, torch.zeros(num_losses, device=loss.cumulated_individual_losses.device)
+    )
 
 
 @pytest.fixture
 def multiple_functions_loss_forward_batch() -> InferenceResultBatch:
-
     targets = {"target_ids": torch.Tensor([[1, 2, 1], [1, 1, 2]])}
     predictions = {
         "image_cls": torch.Tensor([[1, 2, 3], [4, 5, 6]]).to("cuda"),
