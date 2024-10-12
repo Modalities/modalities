@@ -1,13 +1,13 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
 
-WeightDecayGroups = Dict[str, List[str]]
+WeightDecayGroups = dict[str, list[str]]
 
 
 class ActivationType(str, Enum):
@@ -50,19 +50,19 @@ class NNModel(nn.Module):
         return self._weight_decay_groups
 
     @abstractmethod
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
         """
         raise NotImplementedError
 
-    def get_parameters(self) -> Dict[str, torch.Tensor]:
+    def get_parameters(self) -> dict[str, torch.Tensor]:
         """
         Returns a dictionary of the model's parameters.
 

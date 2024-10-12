@@ -2,7 +2,6 @@ import dataclasses
 import os
 import pickle
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -51,7 +50,7 @@ def dummy_config_path() -> Path:
 
 
 @pytest.fixture
-def dummy_config(monkeypatch, dummy_config_path) -> Dict:
+def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")

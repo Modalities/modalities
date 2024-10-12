@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,7 +15,7 @@ from modalities.nn.model_initialization.parameter_name_filters import (
 
 
 class ModelInitializerWrapperConfig(BaseModel):
-    model_initializers: List[PydanticModelInitializationIFType]
+    model_initializers: list[PydanticModelInitializationIFType]
 
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
@@ -78,7 +78,7 @@ class ComposedModelInitializationConfig(BaseModel):
 
 
 class ModelInitializerWrapper(ModelInitializationIF):
-    def __init__(self, model_initializers: List[ModelInitializationIF]):
+    def __init__(self, model_initializers: list[ModelInitializationIF]):
         self.model_initializers = model_initializers
 
     def initialize_in_place(self, model: nn.Module):
@@ -88,7 +88,7 @@ class ModelInitializerWrapper(ModelInitializationIF):
 
 class ComposedInitializationRoutines:
     @staticmethod
-    def get_model_initializer_wrapper(model_initializers: List[ModelInitializationIF]) -> ModelInitializationIF:
+    def get_model_initializer_wrapper(model_initializers: list[ModelInitializationIF]) -> ModelInitializationIF:
         initializer_wrapper = ModelInitializerWrapper(model_initializers)
         return initializer_wrapper
 

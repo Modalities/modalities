@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import partial
-from typing import Callable, List
+from typing import Callable
 
 import torch.nn as nn
 from torch.optim import Optimizer
@@ -41,7 +41,7 @@ class Gym:
         checkpointing_interval_in_steps: int,
         evaluation_interval_in_steps: int,
         train_data_loader: LLMDataLoader,
-        evaluation_data_loaders: List[LLMDataLoader],
+        evaluation_data_loaders: list[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
     ):
         """Runs the model training, including evaluation and checkpointing.
@@ -54,7 +54,7 @@ class Gym:
             checkpointing_interval_in_steps (int): Interval in steps to save checkpoints.
             evaluation_interval_in_steps (int): Interval in steps to perform evaluation.
             train_data_loader (LLMDataLoader): Data loader with the training data.
-            evaluation_data_loaders (List[LLMDataLoader]): List of data loaders with the evaluation data.
+            evaluation_data_loaders (list[LLMDataLoader]): List of data loaders with the evaluation data.
             checkpoint_saving (CheckpointSaving): Routine for saving checkpoints.
         """
         evaluation_callback: Callable[[int], None] = partial(
@@ -109,7 +109,7 @@ class Gym:
         self,
         model: nn.Module,
         num_train_steps_done: int,
-        evaluation_data_loaders: List[LLMDataLoader],
+        evaluation_data_loaders: list[LLMDataLoader],
         evaluation_interval_in_steps: int,
     ):
         if num_train_steps_done % evaluation_interval_in_steps == 0:

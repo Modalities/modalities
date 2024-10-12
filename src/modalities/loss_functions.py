@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 import torch
+import torch.distributed as dist
+import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
@@ -23,6 +25,65 @@ class Loss(ABC):
         raise NotImplementedError
 
 
+class MultipleFunctionsLoss(Loss):
+    """Loss objects of this type use more
+    than one loss function and weights corresponding
+    to the losses to compute total loss.
+    """
+
+    def __init__(
+        self,
+        losses: list[Loss],
+        corrsp_weights: list[float],
+        tag: str = "MultipleFunctionsLoss",
+    ) -> None:
+        """MultipleFunctionsLoss Constructor
+
+        Args:
+            losses (list): Initialized losses. This list should contain more than one loss.
+            corrsp_weights (list): Weights to be multiplied to each loss while summing up.
+
+        Returns:
+            None
+        """
+        super().__init__(tag)
+
+        if len(losses) <= 1:
+            raise ValueError("Number of losses used should be more than 1.")
+
+        self.groups = [(loss_func, weight) for loss_func, weight in zip(losses, corrsp_weights, strict=True)]
+
+        self.cumulated_individual_losses = None
+        # variable storing each loss,
+        # summed over local batches,
+        # separately.
+
+        self.reset_cumulated_individual_losses()
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        device = forward_batch.predictions[list(forward_batch.predictions.keys())[0]].device
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
+        for ind, (loss_func, weight) in enumerate(self.groups):
+            loss = loss_func(forward_batch)
+            self.cumulated_individual_losses[ind] += loss
+            total_loss += weight * loss
+        return total_loss
+
+    def reset_cumulated_individual_losses(
+        self,
+    ) -> None:
+        """Initializes and resets the variable
+        accumulating each loss separately.
+
+        Called first when the class is initialized, and then
+        after every logging step in trainer.py.
+        """
+        if torch.cuda.is_available():
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to(torch.device("cuda"))
+        else:
+            self.cumulated_individual_losses = torch.zeros(len(self.groups)).to("cpu")
+
+
 class CLMCrossEntropyLoss(Loss):
     def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
         super().__init__(tag)
@@ -33,6 +94,11 @@ class CLMCrossEntropyLoss(Loss):
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
+
+        if "attention_mask" in forward_batch.targets:
+            attention_mask = forward_batch.get_targets("attention_mask")
+            labels[attention_mask == 0] = -100
+
         lm_logits = forward_batch.get_predictions(self.prediction_key)
 
         # move labels to correct device to enable model parallelism
@@ -122,3 +188,87 @@ class NCELoss(Loss):
             contiguous_embedding1, contiguous_embedding2, embedding1.device, self.is_asymmetric, self.temperature
         )
         return loss
+
+
+class ClipLoss(Loss):
+    def __init__(
+        self,
+        logit_scale_key: str,
+        prediction_keys: list[str],
+        local_loss: bool,
+        tag: str = "ClipLoss",
+    ):
+        """
+        CLIP Loss (Source: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/loss.py)
+
+        Args:
+            logit_scale_key (str): Value of a learnable logit scale parameter.
+            prediction_keys (list[str]): Keys to access embeddings.
+            tag (str, optional): Defaults to "ClipLoss".
+        """
+        super().__init__(tag)
+        self.logit_scale_key = logit_scale_key
+        self.prediction_keys = prediction_keys
+        self.local_loss = local_loss
+
+        if not (2 <= len(prediction_keys) <= 3):
+            raise ValueError("ClipLoss requires either 2 or 3 prediction keys.")
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        """
+        Args:
+            forward_batch (InferenceResultBatch): data batch.
+
+        Returns:
+            torch.Tensor: loss tensor.
+        """
+        logit_scale = forward_batch.get_predictions(self.logit_scale_key)
+
+        embeddings = [forward_batch.get_predictions(key).contiguous() for key in self.prediction_keys]
+        device = embeddings[0].device
+
+        # Gather all embeddings from each rank
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+
+        gathered_embeddings = [[torch.zeros_like(embedding) for _ in range(world_size)] for embedding in embeddings]
+
+        for gathered_embedding, embedding in zip(gathered_embeddings, embeddings):
+            dist.all_gather(gathered_embedding, embedding)
+
+        # Make sure we have gradients for the "local" embeddings
+        if not self.local_loss:
+            for gathered_embedding, embedding in zip(gathered_embeddings, embeddings):
+                gathered_embedding[rank] = embedding
+
+        # Combine embeddings
+        gathered_embeddings = [torch.cat(gathered_embedding, dim=0) for gathered_embedding in gathered_embeddings]
+
+        # Calculate logits
+        logits_per_embeddings = []
+        for i, embedding in enumerate(embeddings):
+            for j, gathered_embedding in enumerate(gathered_embeddings):
+                if i != j:
+                    if self.local_loss:
+                        logits = logit_scale * embedding @ gathered_embedding.T
+                    else:
+                        logits = logit_scale * gathered_embeddings[i] @ gathered_embeddings[j].T
+                    logits_per_embeddings.append(logits)
+
+        # Build gt labels for diagonal
+        num_logits = logits_per_embeddings[0].shape[0]
+        labels = torch.arange(num_logits, device=device, dtype=torch.long)
+        if world_size > 1 and self.local_loss:
+            labels = labels + num_logits * rank
+
+        # Calculate loss
+        losses = None
+        for logits in logits_per_embeddings:
+            if losses is None:
+                losses = F.cross_entropy(logits, labels)
+            else:
+                losses += F.cross_entropy(logits, labels)
+
+        clip_loss = losses.mean()
+
+        return clip_loss

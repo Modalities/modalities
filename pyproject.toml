@@ -5,6 +5,7 @@ requires-python = ">=3.10,<3.12"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
+    "torchaudio",
     "numpy<2.0",
     "torch>=2.3",
     "packaging",
@@ -12,6 +13,7 @@ dependencies = [
     "pyyaml",
     "transformers",
     "datasets",
+    "decord",
     "protobuf",
     "SentencePiece",
     "rich",
@@ -23,7 +25,10 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+    "webdataset>=0.2.86",
+    "timm>=0.9.16",
+    "pyav",
+    "flash-attn",         # install this directly via `pip install flash-attn --no-build-isolation`
 ]
 
 [project.urls]

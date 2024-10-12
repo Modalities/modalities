@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Dict
 
 import torch.nn as nn
 from torch.optim import Optimizer
@@ -43,7 +42,7 @@ class CheckpointSaving:
     def save_checkpoint(
         self,
         training_progress: TrainingProgress,
-        evaluation_result: Dict[str, EvaluationResultBatch],
+        evaluation_result: dict[str, EvaluationResultBatch],
         model: nn.Module,
         optimizer: Optimizer,
         early_stoppping_criterion_fulfilled: bool = False,
@@ -53,7 +52,7 @@ class CheckpointSaving:
 
         Args:
             training_progress (TrainingProgress): The training progress.
-            evaluation_result (Dict[str, EvaluationResultBatch]): The evaluation result.
+            evaluation_result (dict[str, EvaluationResultBatch]): The evaluation result.
             model (nn.Module): The model to be saved.
             optimizer (Optimizer): The optimizer to be saved.
             early_stoppping_criterion_fulfilled (bool, optional):

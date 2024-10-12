@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import rich
 import wandb
@@ -18,7 +18,7 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         pass
 
 
@@ -50,7 +50,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         if losses or metrics:
             rich.print(Panel(Group(*group_content)))
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         raise NotImplementedError
 
 
@@ -75,7 +75,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
         for k, v in mesasge_dict.items():
             self.run.config[k] = v
 
@@ -105,6 +105,15 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         wandb.log(data=throughput_metrics, step=eval_result.num_train_steps_done)
 
-        # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
-        # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
-        # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
+        num_samples = eval_result.num_train_steps_done
+        group_content = [f"Train [{num_samples}]:"]
+
+        losses = [f"{k}: {v}" for k, v in losses.items()]
+        metrics = [f"{k}: {v}" for k, v in metrics.items()]
+
+        if losses:
+            group_content.append(" ".join(losses))
+        if metrics:
+            group_content.append(" ".join(metrics))
+
+        print(" ".join(group_content))
