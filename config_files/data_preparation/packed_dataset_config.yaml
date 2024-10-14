@@ -1,10 +1,14 @@
 settings:
-  src_path: data/lorem_ipsum.jsonl
-  dst_path: data/lorem_ipsum.pbin
-  index_path: data/lorem_ipsum.idx
+  src_path: data/postprocessed_fine_web_10BT_10.jsonl
+  dst_path: data/postprocessed_fine_web_10BT_10.pbin
+  index_path: data/postprocessed_fine_web_10BT_10.idx
   jq_pattern: .text
-  num_cpus: ${node_env:num_cpus}
+  num_cpus: 5
   eod_token: <|endoftext|>
+  processing_batch_size: 100
+  raw_samples_queue_size: 100
+  processed_samples_queue_size: 100
+
 
 tokenizer:
   component_key: tokenizer
