@@ -11,6 +11,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.checkpointing.ddp.ddp_checkpoint_saving import DDPCheckpointSaving
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
@@ -26,6 +27,8 @@ from modalities.config.config import (
     CLMCrossEntropyLossConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    DDPCheckpointSavingConfig,
+    DDPWrappedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -51,6 +54,7 @@ from modalities.config.config import (
     SimpleProgressSubscriberConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
+    TorchModelConfig,
     WandBEvaluationResultSubscriberConfig,
     WebDataLoaderConfig,
     WeightInitializedModelConfig,
@@ -62,6 +66,8 @@ from modalities.dataloader.dataset import (
     DummyDatasetConfig,
     ImageTransform,
     ImageTransformConfig,
+    MultimodalTextTransform,
+    MultimodalTextTransformConfig,
     MultimodalWebDataset,
     MultimodalWebDatasetBuilder,
     MultimodalWebDatasetBuilderConfig,
@@ -77,6 +83,8 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ResultsSubscriberFactory,
 )
 from modalities.loss_functions import ClipLoss, CLMCrossEntropyLoss, MultipleFunctionsLoss, NCELoss
+from modalities.models.anymal.anymal_model import AnyMAL, AnyMALConfig
+from modalities.models.anymal.collator import AnyMALCollateFnConfig, AnyMALCollatorFn
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -84,6 +92,7 @@ from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import ModelFactory
+from modalities.models.vision_transformer.vision_transformer_model import Perceiver, PerceiverConfig
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
@@ -100,6 +109,14 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     DummyGradientClipperConfig,
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
+)
+from modalities.training.gradient_clipping.torch_gradient_clipper import (
+    TorchGradientClipper,
+    TorchLoggingOnlyGradientClipper,
+)
+from modalities.training.gradient_clipping.torch_gradient_clipper_config import (
+    TorchDummyGradientClipperConfig,
+    TorchGradientClipperConfig,
 )
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
@@ -142,6 +159,8 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "ddp_wrapped", ModelFactory.get_ddp_wrapped_model, DDPWrappedModelConfig),
+    ComponentEntity("model", "torch_model", ModelFactory.get_torch_model, TorchModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),
@@ -152,6 +171,8 @@ COMPONENTS = [
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity("model", "anymal", AnyMAL, AnyMALConfig),
+    ComponentEntity("model", "perceiver", Perceiver, PerceiverConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
@@ -201,6 +222,7 @@ COMPONENTS = [
     ComponentEntity("dataset", "web_dataset_builder", MultimodalWebDatasetBuilder, MultimodalWebDatasetBuilderConfig),
     # Data transforms & augmentations
     ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
+    ComponentEntity("transform", "multimodal_text_transform", MultimodalTextTransform, MultimodalTextTransformConfig),
     ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
     ComponentEntity("transform", "audio_transform", AudioTransform, AudioTransformConfig),
     ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
@@ -211,6 +233,7 @@ COMPONENTS = [
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
+    ComponentEntity("collate_fn", "anymal_collator", AnyMALCollatorFn, AnyMALCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     ComponentEntity("data_loader", "web_dataloader", DataloaderFactory.get_web_dataloader, WebDataLoaderConfig),
@@ -234,6 +257,7 @@ COMPONENTS = [
     ),
     # checkpoint saving execution
     ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "ddp", DDPCheckpointSaving, DDPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
@@ -278,6 +302,10 @@ COMPONENTS = [
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    ComponentEntity("gradient_clipper", "torch", TorchGradientClipper, TorchGradientClipperConfig),
+    ComponentEntity(
+        "gradient_clipper", "torch_logging_only", TorchLoggingOnlyGradientClipper, TorchDummyGradientClipperConfig
+    ),
     # Number conversion
     ComponentEntity(
         "number_conversion",

@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 import torch
 from pydantic import BaseModel, ConfigDict
-from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoTokenizer, CLIPVisionModel, SiglipVisionModel
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.models.model import NNModel
@@ -32,6 +32,8 @@ class HuggingFaceModelTypes(LookupEnum):
 
     AutoModelForCausalLM = AutoModelForCausalLM
     AutoModelForMaskedLM = AutoModelForMaskedLM
+    CLIPVisionModel = CLIPVisionModel
+    SiglipVisionModel = SiglipVisionModel
 
 
 class HuggingFacePretrainedModelConfig(BaseModel):
@@ -102,18 +104,34 @@ class HuggingFacePretrainedModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    def forward(
+        self, inputs: dict[str, torch.Tensor], forward_kwargs: dict[str, torch.Tensor] = dict()
+    ) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
         Args:
             inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+            foward_kwargs: (dict[str, torch.Tensor): A dictionary containing additional key-value
+                arguments for the huggingface forward function
 
         Returns:
             dict[str, torch.Tensor]: A dictionary containing output tensors.
         """
-        output = self.huggingface_model.forward(inputs[self.sample_key])
+        output = self.huggingface_model.forward(inputs[self.sample_key], **forward_kwargs)
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
+
+    def get_input_embeddings(self):
+        """
+        Returns the model's input embeddings.
+
+        Args:
+            None
+
+        Returns:
+            torch.nn.Module: A torch module mapping vocabulary to hidden states.
+        """
+        return self.huggingface_model.get_input_embeddings()
 
     @property
     def fsdp_block_names(self) -> list[str]:

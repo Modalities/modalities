@@ -134,6 +134,21 @@ class FSDPCheckpointSavingConfig(BaseModel):
     experiment_id: str
 
 
+class DDPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+    submodule: Optional[str] = None
+    lora_submodule: Optional[str] = None
+
+
+class TorchCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    experiment_id: str
+    submodule: Optional[str] = None
+    lora_submodule: Optional[str] = None
+
+
 class CheckpointSavingConfig(BaseModel):
     checkpoint_saving_strategy: PydanticCheckpointSavingStrategyIFType
     checkpoint_saving_execution: PydanticCheckpointSavingExecutionIFType
@@ -250,6 +265,12 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class DDPWrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    local_rank: int
+    mixed_precision_settings: MixedPrecisionSettings = None
+
+
 class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     model_initializer: PydanticModelInitializationIFType
@@ -257,6 +278,16 @@ class WeightInitializedModelConfig(BaseModel):
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
     model_config = ConfigDict(protected_namespaces=())
+
+
+class TorchModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    device: PydanticPytorchDeviceType
+    mixed_precision_settings: MixedPrecisionSettings = None
+
+    @field_validator("device", mode="before")
+    def parse_device(cls, device) -> PydanticPytorchDeviceType:
+        return parse_torch_device(device)
 
 
 class ActivationCheckpointedModelConfig(BaseModel):

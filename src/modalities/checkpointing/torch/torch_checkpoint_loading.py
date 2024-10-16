@@ -77,7 +77,6 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         Returns:
             Optimizer: The optimizer with the loaded checkpoint.
 
-        Raises:
-            NotImplementedError: This method is not implemented yet. It is reserved for future work.
         """
-        raise NotImplementedError  # TODO future work
+        optimizer.load_state_dict(torch.load(file_path))
+        return optimizer

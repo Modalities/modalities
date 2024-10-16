@@ -51,7 +51,12 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
           or None if it cannot be calculated.
     """
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-        precision = model.mixed_precision.param_dtype
+        if hasattr(model, "mixed_precision"):
+            if model.mixed_precision is None:
+                return None
+            precision = model.mixed_precision.param_dtype
+        else:
+            return None
         if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
             warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
             return None

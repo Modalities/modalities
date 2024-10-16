@@ -5,6 +5,7 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
@@ -90,6 +91,31 @@ class ModelFactory:
         )
 
         return fsdp_model
+
+    @staticmethod
+    def get_ddp_wrapped_model(
+        model: nn.Module,
+        local_rank: int,
+        mixed_precision_settings: MixedPrecisionSettings = None,
+    ) -> DDP:
+        device_id = local_rank
+        if mixed_precision_settings is not None:
+            model = model.to(device_id, dtype=mixed_precision_settings.value.param_dtype)
+        else:
+            model = model.to(device_id)
+        ddp_model = DDP(model, device_ids=[device_id], output_device=device_id)
+
+        return ddp_model
+
+    @staticmethod
+    def get_torch_model(
+        model: nn.Module, device: torch.device, mixed_precision_settings: MixedPrecisionSettings = None
+    ) -> nn.Module:
+        if mixed_precision_settings is not None:
+            model = model.to(device, dtype=mixed_precision_settings.value.param_dtype)
+        else:
+            model = model.to(device)
+        return model
 
     @staticmethod
     def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:

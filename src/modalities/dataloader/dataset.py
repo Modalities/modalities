@@ -535,6 +535,110 @@ class TextTransform(Transform):
         return batch_encoding
 
 
+class MultimodalTextTransformConfig(TransformConfig):
+    tokenizer: PydanticTokenizerIFType
+    max_length: int = 77
+    padding: str = "max_length"
+    truncation: bool = True
+    n_image_tokens: int = 64
+    n_audio_tokens: int = 64
+    n_video_tokens: int = 64
+
+
+class MultimodalTextTransform(Transform):
+    def __init__(
+        self,
+        tokenizer: TokenizerWrapper,
+        max_length: int = 77,
+        padding: str = "max_length",
+        truncation: bool = True,
+        n_image_tokens: int = 64,
+        n_audio_tokens: int = 64,
+        n_video_tokens: int = 64,
+    ):
+        """
+        Args:
+            tokenizer (TokenizerWrapper): text tokenizer
+            max_length (int): maximum number of tokens. Default 77
+            padding (str): padding strategy. Default "max_length"
+            truncation (bool): Flag which determines whether to apply truncation. Default True.
+
+        Returns:
+            None
+        """
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.padding = padding
+        self.truncation = truncation
+        self.n_image_tokens = n_image_tokens
+        self.n_audio_tokens = n_audio_tokens
+        self.n_video_tokens = n_video_tokens
+        # https://github.com/haotian-liu/LLaVA/blob/main/llava/conversation.py#L267
+        self.system_instruction = (
+            "<<SYS>>\n"
+            "You are a helpful language and vision assistant. "
+            "You are able to understand the visual content that the user provides, "
+            "and assist the user with a variety of tasks using natural language.\n"
+            "<</SYS>>\n\n"
+        )
+
+    def __call__(self, conversation):
+        input_ids = []
+        labels = []
+        IGNORE_INDEX = -100
+        contains_image = False
+        for msg_id, message in enumerate(conversation):
+            msg_text = message["value"]
+            if "<image>" in msg_text:
+                contains_image = True
+                msg_text = msg_text.replace("<image>", "").strip()
+            if "<audio>" in msg_text:
+                msg_text = msg_text.replace("<audio>", "").strip()
+            if "<video>" in msg_text:
+                msg_text = msg_text.replace("<video>", "").strip()
+
+            if msg_id == 0:
+                add_special_tokens = True
+                msg_text = self.system_instruction + msg_text
+            else:
+                add_special_tokens = False
+            # user
+            if msg_id % 2 == 0:
+                msg_text = "[INST] %s [/INST] " % msg_text
+            else:  # response
+                msg_text = msg_text + self.tokenizer.tokenizer.eos_token
+            msg_input_ids = self.tokenizer.tokenizer(msg_text, add_special_tokens=add_special_tokens).input_ids
+            if msg_id % 2 == 0:
+                msg_labels = [IGNORE_INDEX] * len(msg_input_ids)
+            else:
+                msg_labels = msg_input_ids
+            input_ids.extend(msg_input_ids)
+            labels.extend(msg_labels)
+
+        attention_mask = [1] * len(input_ids)
+        if contains_image:
+            # if there's a real image, insert it right after the <bos> token
+            labels[1:1] = [IGNORE_INDEX] * self.n_image_tokens
+            attention_mask[1:1] = [1] * self.n_image_tokens
+            # input_ids: embeddings get inserted in model.forward
+        else:
+            # if there's no image, just pad the end
+            labels.extend([IGNORE_INDEX] * self.n_image_tokens)
+            attention_mask.extend([0] * self.n_image_tokens)
+
+        if self.padding == "max_length":
+            padding_size = self.max_length - len(labels)
+            input_ids.extend([self.tokenizer.tokenizer.eos_token_id] * padding_size)
+            labels.extend([IGNORE_INDEX] * padding_size)
+            attention_mask.extend([0] * padding_size)
+        if self.truncation:
+            input_ids = input_ids[: (self.max_length - self.n_image_tokens)]
+            labels = labels[: self.max_length]
+            attention_mask = attention_mask[: self.max_length]
+        batch_encoding = BatchEncoding({"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask})
+        return batch_encoding
+
+
 class AudioTransformConfig(TransformConfig):
     """
     Configuration class for the audio transformation module.
@@ -906,6 +1010,7 @@ class MultimodalWebDatasetBuilderConfig(BaseModel):
     modality_key_mapping: dict[ModalityEnum, tuple[str, str]]
     modality_transforms: dict[ModalityEnum, PydanticTransformIFType]
     is_audio_video: Optional[bool] = False
+    flatten_text_dict: Optional[bool] = True
     num_samples: Annotated[int, Field(ge=1)]
 
 
@@ -916,6 +1021,7 @@ class MultimodalWebDatasetBuilder:
         modality_key_mapping: dict[str, tuple[str, str]],
         modality_transforms: dict[str, Transform],
         is_audio_video: bool,
+        flatten_text_dict: bool,
         num_samples: int,
     ) -> None:
         """A multimodal dataset instance for the WebDataset.
@@ -934,6 +1040,7 @@ class MultimodalWebDatasetBuilder:
         """
         self.urls = urls
         self.is_audio_video = is_audio_video
+        self.flatten_text_dict = flatten_text_dict
         self.modality_key_mapping = modality_key_mapping
         self.modality_transforms = modality_transforms
         # transforms should be specified for all modality_key mappings,
@@ -955,6 +1062,7 @@ class MultimodalWebDatasetBuilder:
         self.additional_extracted_keys = []
         if ModalityEnum.TEXT in self.modality_transforms:
             self.additional_extracted_keys.append("attention_mask")
+            self.additional_extracted_keys.append("labels")
 
         if ModalityEnum.AUDIO in self.modality_transforms or ModalityEnum.VIDEO in self.modality_transforms:
             self.additional_extracted_keys.append("audio_len")
@@ -1000,7 +1108,8 @@ class MultimodalWebDatasetBuilder:
 
         # Flatten the json structure for convenience
         self.web_dataset.append(wds.filters.decode(partial=True))  # Decode json byte string
-        self.web_dataset.append(wds.filters.map(self._flatten_sample))
+        if self.flatten_text_dict:
+            self.web_dataset.append(wds.filters.map(self._flatten_sample))
 
         # Load the actual data
         for modality_key in self.modalities:
@@ -1019,17 +1128,27 @@ class MultimodalWebDatasetBuilder:
     def _transform_text(self, sample: dict[str, Any]) -> dict[str, Any]:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.TEXT]
         transform: TextTransform = self.modality_transforms[ModalityEnum.TEXT]
-        batch_encoding: BatchEncoding = transform(sample[source_key])
+        text = sample[source_key]
+        if isinstance(text, dict):
+            if "conversations" in text:
+                text = text["conversations"]
+            batch_encoding = transform(text)
+
+        else:
+            batch_encoding: BatchEncoding = transform(text)
         del sample[source_key]
         sample[target_key] = batch_encoding.input_ids
         sample["attention_mask"] = batch_encoding.attention_mask
+        if "labels" in batch_encoding:
+            sample["labels"] = batch_encoding.labels
         return sample
 
     def _transform_image(self, sample: dict[str, Any]) -> dict[str, Any]:
         source_key, target_key = self.modality_key_mapping[ModalityEnum.IMAGE]
         transform: TextTransform = self.modality_transforms[ModalityEnum.IMAGE]
-        sample[target_key] = transform(sample[source_key])
-        del sample[source_key]
+        if source_key in sample:
+            sample[target_key] = transform(sample[source_key])
+            del sample[source_key]
         return sample
 
     def _transform_video(self, sample: dict[str, Any]) -> dict[str, Any]:
