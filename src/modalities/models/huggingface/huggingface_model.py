@@ -86,7 +86,8 @@ class HuggingFacePretrainedModel(NNModel):
             model_args (Any, optional): Additional arguments for the Hugging Face model. Defaults to None.
             kwargs (Any, optional): Additional keyword arguments for the Hugging Face model. Defaults to None.
         """
-        super().__init__()
+        weight_decay_groups = self.get_weight_decay_groups(model_name)
+        super().__init__(weight_decay_groups=weight_decay_groups)
         if model_args is None:
             model_args = []
         if kwargs is None:
@@ -114,6 +115,19 @@ class HuggingFacePretrainedModel(NNModel):
         """
         output = self.huggingface_model.forward(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
+
+    @staticmethod
+    def get_weight_decay_groups(model_name):
+        if "llama" in str(model_name).lower() or "olmo" in str(model_name).lower():
+            weight_decay_groups = {
+                "linear": ["self_attn", "mlp"],
+                "embedding": ["embed_tokens", "lm_head"],
+                "layernorm": ["norm"],
+            }
+        else:
+            # must set weight_decay_groups_excluded in config file to empty list
+            weight_decay_groups = {}
+        return weight_decay_groups
 
     @property
     def fsdp_block_names(self) -> List[str]:
