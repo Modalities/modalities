@@ -548,7 +548,7 @@ class AudioTransformConfig(TransformConfig):
         n_mels (int): Number of mel-frequency bands. Defaults to 128.
         freq_domain_mask_length (int): Length of frequency masking during training. Defaults to 30.
         time_domain_mask_length (int): Length of time masking during training. Defaults to 100.
-        block_size_audio_encoder (int): The target block size for audio encoding.
+        block_size_audio_encoder (int): Maximum allowed input length to the audio encoder.
     """
 
     is_training: bool = False
@@ -578,7 +578,7 @@ class AudioTransform(Transform):
         Initializes the AudioTransform class.
 
         Args:
-            block_size_audio_encoder (int): The target block size for audio encoding.
+            block_size_audio_encoder (int): Maximum allowed input length to the audio encoder.
             is_training (bool, optional): Whether the module is in training mode. Defaults to False.
             n_mels (int, optional): Number of mel-frequency bands. Defaults to 128.
             freq_domain_mask_length (int, optional): Length of frequency masking. Defaults to 30.
@@ -1046,7 +1046,6 @@ class MultimodalWebDatasetBuilder:
         return sample
 
     def _transform_audio(self, sample: dict[str, Any]) -> dict[str, Any]:
-        # Apply audio transforms to the input sample.
         source_key, target_key = self.modality_key_mapping[ModalityEnum.AUDIO]
         transform: AudioTransform = self.modality_transforms[ModalityEnum.AUDIO]
         sample[target_key], sample["audio_len"] = transform(sample[source_key])

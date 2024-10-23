@@ -14,45 +14,27 @@ class AudioTransformerConfig(BaseModel):
 
     This configuration class defines all necessary parameters to instantiate and configure an `AudioTransformer` model.
 
-    Args:
+    Attributes:
         sample_key (str): The key in the input dictionary that contains the audio samples.
         prediction_key (str): The key under which the model's output will be stored in the output dictionary.
         block_size (int): The size of each block for positional embeddings. Must be a positive integer.
-        n_mels (int): The number of mel-frequency bands used for input audio feature extraction. 
+        n_mels (int): The number of mel-frequency bands used for input audio feature extraction.
             Must be a positive integer.
         n_embd (int): The embedding dimension used throughout the model. Must be a positive integer.
         n_heads (int): The number of attention heads in the conformer blocks. Must be a positive integer.
-        n_conformer_blocks (int): The number of conformer blocks to include in the transformer model. 
+        n_conformer_blocks (int): The number of conformer blocks to include in the transformer model.
             Must be a positive integer.
         attention_config (AttentionConfig): Configuration object for attention mechanisms.
-        pointwise_conv_kernel_size (int): Kernel size for the pointwise convolutional layers in conformer blocks. 
+        pointwise_conv_kernel_size (int): Kernel size for the pointwise convolutional layers in conformer blocks.
             Must be a positive integer.
-        depthwise_conv_kernel_size (int): Kernel size for the depthwise convolutional layers in conformer blocks. 
+        depthwise_conv_kernel_size (int): Kernel size for the depthwise convolutional layers in conformer blocks.
             Must be a positive integer.
-        ffmodule_dropout (float, optional): Dropout rate for feed-forward modules in conformer blocks. 
+        ffmodule_dropout (float, optional): Dropout rate for feed-forward modules in conformer blocks.
             Must be a float less than 1.0. Default is 0.1.
-        attn_dropout (float, optional): Dropout rate for attention mechanisms. Must be a float less than 1.0. 
+        attn_dropout (float, optional): Dropout rate for attention mechanisms. Must be a float less than 1.0.
             Default is 0.1.
-        convmodule_dropout (float, optional): Dropout rate for depthwise convolutional layers in conformer blocks. 
+        convmodule_dropout (float, optional): Dropout rate for depthwise convolutional layers in conformer blocks.
             Must be a float less than 1.0. Default is 0.1.
-
-    Returns:
-        AudioTransformerConfig: A configuration object that can be used to instantiate an `AudioTransformer` model with\
-            the specified parameters.
-
-    Examples:
-        >>> audio_encoder_config = AudioTransformerConfig(
-            sample_key="audio",
-            prediction_key="audio_embeddings",
-            block_size=2_000,
-            n_mels=128,
-            n_embd=768,
-            n_heads=8,
-            n_conformer_blocks=2,
-            attention_config=AttentionConfig(attention_engine_type="default_attention"),
-            pointwise_conv_kernel_size=1,
-            depthwise_conv_kernel_size=31
-        )
     """
 
     sample_key: str
@@ -92,14 +74,6 @@ class ConvolutionModule(nn.Module):
             pointwise_conv_kernel_size (int): The kernel size for both the first and second pointwise convolutions.
             depthwise_conv_kernel_size (int): The kernel size for the depthwise convolution.
             dropout (float): Dropout rate applied after each layer. Must be a float between 0 and 1.
-
-        Examples:
-            >>> module = ConvolutionModule(
-                n_embd=768,
-                pointwise_conv_kernel_size=1,
-                depthwise_conv_kernel_size=31,
-                dropout=0.1
-            )
         """
         super().__init__()
         self.ln_1 = nn.LayerNorm(n_embd)
@@ -285,22 +259,6 @@ class AudioTransformer(nn.Module):
             attn_dropout (float): Dropout rate for attention mechanisms. Default is 0.1.
             convmodule_dropout (float): Dropout rate for depthwise convolutional layers in conformer blocks.
                 Default is 0.1.
-
-        Examples:
-            >>> audio_encoder_config = {
-                "sample_key": "audio",
-                "prediction_key": "audio_embeddings",
-                "block_size": 2000,
-                "n_mels": 128,
-                "n_embd": 768,
-                "n_heads": 8,
-                "n_conformer_blocks": 2,
-                "attention_config": {
-                    "attention_engine_type": "default_attention"
-                },
-                "pointwise_conv_kernel_size": 1,
-                "depthwise_conv_kernel_size": 31
-            }
         """
         super().__init__()
         self.sample_key = sample_key
