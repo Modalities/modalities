@@ -103,6 +103,17 @@ def test_skipped_and_distributed_dataloader_from_config():
     dataset_indices_rank_0 = np.arange(0, 28, 2).reshape(-1, local_micro_batch_size)[skip_num_local_batches:]
     dataset_indices_rank_1 = np.arange(1, 29, 2).reshape(-1, local_micro_batch_size)[skip_num_local_batches:]
 
+    # make sure that the recreated dataset index with the hardcoded 28 elements
+    # fits the actual dataset used in the config
+    effective_dataset_length = len(components_rank_0.train_dataloader.dataset) // world_size // local_micro_batch_size
+    effective_dataset_length = effective_dataset_length * local_micro_batch_size * world_size
+    recalculated_dataset_length = (
+        len(dataset_indices_rank_0.flatten())
+        + len(dataset_indices_rank_1.flatten())
+        + skip_num_local_batches * world_size * local_micro_batch_size
+    )
+    assert recalculated_dataset_length == effective_dataset_length
+
     assert np.all((dataset_indices_rank_0 == list(components_rank_0.train_dataloader.batch_sampler)))
     assert np.all((dataset_indices_rank_1 == list(components_rank_1.train_dataloader.batch_sampler)))
 
