@@ -2,7 +2,6 @@ import os
 import tempfile
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict
 
 import pytest
 import torch
@@ -42,7 +41,7 @@ working_dir = Path(os.path.dirname(__file__))
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
 class TestFSDPToDiscCheckpointing:
-    def get_gpt2_model_from_config(self, gpt2_model_config_dict: Dict) -> GPT2LLM:
+    def get_gpt2_model_from_config(self, gpt2_model_config_dict: dict) -> GPT2LLM:
         class GPT2InstantationModel(BaseModel):
             model: PydanticPytorchModuleType
 
@@ -57,7 +56,7 @@ class TestFSDPToDiscCheckpointing:
         return model
 
     @pytest.fixture(scope="function")
-    def gpt2_model_config_dict(self) -> Dict:
+    def gpt2_model_config_dict(self) -> dict:
         config_file_path = working_dir / "gpt2_config.yaml"
         config_dict = load_app_config_dict(config_file_path=config_file_path)
         return config_dict
@@ -108,7 +107,7 @@ class TestFSDPToDiscCheckpointing:
         return [p.clone() for p in fsdp_wrapped_model.parameters() if p.requires_grad and p.numel() > 0]
 
     @staticmethod
-    def _generate_batch(gpt2_model_config: Dict):
+    def _generate_batch(gpt2_model_config: dict):
         # prepare input and targets
         data = torch.randint(
             0,  # lowest token_id
@@ -122,10 +121,10 @@ class TestFSDPToDiscCheckpointing:
 
     @staticmethod
     def _forward_backward_pass(
-        gpt2_model_config: Dict,
+        gpt2_model_config: dict,
         model: FSDP,
         optimizer: Optimizer,
-        batch_input_ids_dict: Dict,
+        batch_input_ids_dict: dict,
         batch_target_ids: torch.Tensor,
     ):
         ce_loss = CrossEntropyLoss()
@@ -148,7 +147,7 @@ class TestFSDPToDiscCheckpointing:
 
     @staticmethod
     def _assert_equality_optimizer_param_group(
-        optimizer_1_state_dict: Dict, optimizer_2_state_dict: Dict, must_be_equal: bool
+        optimizer_1_state_dict: dict, optimizer_2_state_dict: dict, must_be_equal: bool
     ):
         if must_be_equal:
             assert (
@@ -161,7 +160,7 @@ class TestFSDPToDiscCheckpointing:
 
     @staticmethod
     def _assert_equality_optimizer_state(
-        optimizer_1_state_dict: Dict, optimizer_2_state_dict: Dict, must_be_equal: bool
+        optimizer_1_state_dict: dict, optimizer_2_state_dict: dict, must_be_equal: bool
     ):
         optimizer_1_state = optimizer_1_state_dict["state"]
         optimizer_2_state = optimizer_2_state_dict["state"]
@@ -195,7 +194,7 @@ class TestFSDPToDiscCheckpointing:
         optimizer: Optimizer,
         temporary_checkpoint_folder_path: Path,
         gpt2_model_2: GPT2LLM,
-        gpt2_model_config_dict: Dict,
+        gpt2_model_config_dict: dict,
     ):
         experiment_id = "0"
         num_train_steps_done = 1

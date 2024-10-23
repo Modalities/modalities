@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Dict
 
 import torch
 from torch import nn
@@ -23,6 +22,7 @@ class TransformerBlock(nn.Module):
         dropout: float,
         ffn_hidden: int,
         with_context: bool,
+        is_audio_video: bool,
         attention_type: AttentionType,
         attention_config: AttentionConfig = None,
         add_extra_mlp: bool = False,
@@ -39,6 +39,8 @@ class TransformerBlock(nn.Module):
             dropout (float): The dropout rate.
             ffn_hidden (int): The number of hidden units in the feed-forward network.
             with_context (bool): Flag indicating whether to include context in the decoder.
+            is_audio_video (bool): Flag indicating whether an additional cross attention block is required for
+                data that consists of both audio and video from the same source.
             attention_type (AttentionType): The type of attention mechanism to use.
             attention_config (AttentionConfig, optional): The configuration for the attention mechanism.
             Defaults to None.
@@ -46,6 +48,7 @@ class TransformerBlock(nn.Module):
         """
         super().__init__()
         self.with_context = with_context
+        self.is_audio_video = is_audio_video
         self.add_extra_mlp = add_extra_mlp
 
         if activation == ActivationType.GELU:
@@ -76,13 +79,22 @@ class TransformerBlock(nn.Module):
             self.ln_4 = nn.LayerNorm(normalized_shape=n_embd, bias=bias, eps=epsilon)
             self.mlp_2 = mlp()
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
+            if self.is_audio_video:
+                self.cross_attn2 = MultiHeadAttention(
+                    n_embd=n_embd,
+                    n_head=n_head,
+                    bias=bias,
+                    attention_config=attention_config,
+                    attention_type=AttentionType.CROSS_ATTENTION,
+                )
+
+    def forward(self, x: torch.Tensor, context: list[torch.Tensor] | torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass of the TransformerBlock module.
 
         Args:
             x (torch.Tensor): Input tensor.
-            context (torch.Tensor, optional): Context tensor. Defaults to None.
+            context (list[torch.Tensor] | torch.Tensor, optional): Context tensor. Defaults to None.
 
         Returns:
             torch.Tensor: Output tensor.
@@ -91,8 +103,13 @@ class TransformerBlock(nn.Module):
         if not self.with_context or self.add_extra_mlp:
             x = x + self.mlp(self.ln_2(x))
         if self.with_context:
-            x = x + self.cross_attn(self.ln_3(x), context=context)
-            x = x + self.mlp_2(self.ln_4(x))
+            if isinstance(context, dict):
+                x = self.ln_3(x)
+                x = x + self.cross_attn(x, context=context["audio"]) + self.cross_attn2(x, context=context["video"])
+                x = x + self.mlp_2(self.ln_4(x))
+            else:
+                x = x + self.cross_attn(self.ln_3(x), context=context)
+                x = x + self.mlp_2(self.ln_4(x))
         return x
 
 
@@ -109,6 +126,7 @@ class MultiModalTextDecoder(NNModel):
         n_head: int,
         n_embd: int,
         ffn_hidden: int,
+        is_audio_video: bool,
         dropout: float,
         bias: bool,
         activation: ActivationType,
@@ -127,6 +145,8 @@ class MultiModalTextDecoder(NNModel):
             n_head (int): The number of attention heads.
             n_embd (int): The dimension of the embeddings.
             ffn_hidden (int): The size of the feed-forward network hidden layer.
+            is_audio_video (bool): Flag indicating whether an additional cross attention block is required for
+                data that consists of both audio and video from the same source.
             dropout (float): The dropout rate.
             bias (bool): Flag indicating whether to include bias terms.
             activation (ActivationType): The activation function to use.
@@ -154,6 +174,7 @@ class MultiModalTextDecoder(NNModel):
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
                             with_context=True,
+                            is_audio_video=is_audio_video,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
                             add_extra_mlp=False,
@@ -166,7 +187,7 @@ class MultiModalTextDecoder(NNModel):
         )
         self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the MultiModalTextDecoder module.
 

@@ -1,5 +1,3 @@
-from typing import Dict
-
 import torch
 from torch import nn
 
@@ -68,6 +66,7 @@ class TextDecoder(NNModel):
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
                             with_context=False,
+                            is_audio_video=False,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
                         )
@@ -77,7 +76,7 @@ class TextDecoder(NNModel):
             )
         )
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the TextDecoder module.
 

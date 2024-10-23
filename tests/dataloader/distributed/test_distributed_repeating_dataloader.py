@@ -8,7 +8,7 @@ import torch.distributed as dist
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
+from modalities.config.config import ProcessGroupBackendType, PydanticDataLoaderIFType
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
@@ -17,7 +17,7 @@ tmp_folder = working_dir / "../../tmp"
 
 
 class DataloaderInstantiationModel(BaseModel):
-    train_dataloader: PydanticLLMDataLoaderIFType
+    train_dataloader: PydanticDataLoaderIFType
 
 
 @pytest.mark.skipif(

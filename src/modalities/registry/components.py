@@ -22,6 +22,7 @@ from modalities.config.config import (
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
+    ClipLossConfig,
     CLMCrossEntropyLossConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
@@ -35,6 +36,8 @@ from modalities.config.config import (
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MultipleFunctionsLossConfig,
+    NCELossConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -45,19 +48,35 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    SimpleProgressSubscriberConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WebDataLoaderConfig,
     WeightInitializedModelConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
-from modalities.dataloader.dataset import DummyDatasetConfig
+from modalities.dataloader.dataset import (
+    AudioTransform,
+    AudioTransformConfig,
+    DummyDatasetConfig,
+    ImageTransform,
+    ImageTransformConfig,
+    MultimodalWebDataset,
+    MultimodalWebDatasetBuilder,
+    MultimodalWebDatasetBuilderConfig,
+    MultimodalWebDatasetConfig,
+    TextTransform,
+    TextTransformConfig,
+    VideoTransform,
+    VideoTransformConfig,
+)
 from modalities.dataloader.dataset_factory import DatasetFactory
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import ClipLoss, CLMCrossEntropyLoss, MultipleFunctionsLoss, NCELoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -142,6 +161,9 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity("loss", "nce_loss", NCELoss, NCELossConfig),
+    ComponentEntity("loss", "clip_loss", ClipLoss, ClipLossConfig),
+    ComponentEntity("loss", "multiple_functions_loss", MultipleFunctionsLoss, MultipleFunctionsLossConfig),
     # optmizers
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
@@ -175,6 +197,13 @@ COMPONENTS = [
         PackedMemMapDatasetMegatronConfig,
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
+    ComponentEntity("dataset", "web_dataset", MultimodalWebDataset, MultimodalWebDatasetConfig),
+    ComponentEntity("dataset", "web_dataset_builder", MultimodalWebDatasetBuilder, MultimodalWebDatasetBuilderConfig),
+    # Data transforms & augmentations
+    ComponentEntity("transform", "text_transform", TextTransform, TextTransformConfig),
+    ComponentEntity("transform", "image_transform", ImageTransform, ImageTransformConfig),
+    ComponentEntity("transform", "audio_transform", AudioTransform, AudioTransformConfig),
+    ComponentEntity("transform", "video_transform", VideoTransform, VideoTransformConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     # batch samplers
@@ -184,6 +213,7 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    ComponentEntity("data_loader", "web_dataloader", DataloaderFactory.get_web_dataloader, WebDataLoaderConfig),
     ComponentEntity(
         "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
     ),
@@ -213,6 +243,12 @@ COMPONENTS = [
         "dummy",
         ProgressSubscriberFactory.get_dummy_progress_subscriber,
         DummyProgressSubscriberConfig,
+    ),
+    ComponentEntity(
+        "progress_subscriber",
+        "simple",
+        ProgressSubscriberFactory.get_simple_progress_subscriber,
+        SimpleProgressSubscriberConfig,
     ),
     ComponentEntity(
         "progress_subscriber",
