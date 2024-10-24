@@ -50,7 +50,7 @@ def test_dropping_and_reusing(
         samples_left = len(dataset) - skip_num_global_samples
         padding_size = math.ceil(samples_left / num_replicas) * num_replicas - samples_left
         # when drop_last false, we reuse the last samples (i.e., maximum num_ranks -1)
-        # so that every data parallel ran, has a full last batch
+        # so that every data parallel ran has a full last batch
         padded_samples = dataset[:padding_size]
 
     assert dataset[skip_num_global_samples:cut_off_samples] + padded_samples == list(
