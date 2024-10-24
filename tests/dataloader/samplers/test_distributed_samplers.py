@@ -41,7 +41,7 @@ def test_dropping_and_reusing(
     if drop_last:
         # if drop_last is true, we drop the last samples so that every data parallel rank
         # has the same number of samples.
-        # Note that also means that the last, remaining samples (i.e., maximum num_ranks -1)
+        # Note that also means that the last, remaining samples (i.e., maximum num_replicas - 1)
         # are not used at all
         cut_off_samples = len(dataset) - (len(dataset) - skip_num_global_samples) % num_replicas
         padded_samples = []
