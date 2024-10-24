@@ -329,6 +329,7 @@ class EmbeddedStreamData:
 
         Args:
             data_path (Path): The path to the packed data file.
+            load_index (bool, optional): Whether to load the index. Defaults to True.
 
         Raises:
             FileNotFoundError: If the packed data file is not found at the specified path.

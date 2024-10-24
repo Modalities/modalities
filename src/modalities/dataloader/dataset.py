@@ -404,16 +404,16 @@ class CombinedDataset(Dataset):
             datasets (List[Dataset]): A list of datasets to combine.
         """
         self.datasets = datasets
-        self.cumulative_sizes = CombinedDataset._get_cummulated_sizes(datasets=datasets)
+        self.cumulative_sizes = CombinedDataset._get_cumulated_sizes(datasets=datasets)
 
     @staticmethod
-    def _get_cummulated_sizes(datasets: List[Dataset]) -> List[int]:
+    def _get_cumulated_sizes(datasets: List[Dataset]) -> List[int]:
         total = 0
-        cummulated_sizes = [0]
+        cumulated_sizes = [0]
         for dataset in datasets:
             total += len(dataset)
-            cummulated_sizes.append(total)
-        return cummulated_sizes
+            cumulated_sizes.append(total)
+        return cumulated_sizes
 
     def _find_dataset_idx(self, idx: int) -> int:
         for i, cumulative_size in enumerate(self.cumulative_sizes):
