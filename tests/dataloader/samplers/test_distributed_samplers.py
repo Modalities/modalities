@@ -39,7 +39,7 @@ def test_dropping_and_reusing(
     samples = [[dataset[i] for i in sampler] for sampler in samplers]
 
     if drop_last:
-        # when drop_last true, we drop the last samples so that every data parallel rank
+        # if drop_last is true, we drop the last samples so that every data parallel rank
         # has the same number of samples.
         # Note that also means that the last, remaining samples (i.e., maximum num_ranks -1)
         # are not used at all
