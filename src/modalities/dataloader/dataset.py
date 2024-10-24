@@ -392,7 +392,7 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
 class CombinedDataset(Dataset):
     """Combines multiple datasets into one large dataset at runtime.
 
-    Note: When using this class to combine multiple `PackedMemMapDatasetes`, then each packed sample
+    Note: When using this class to combine multiple `PackedMemMapDataset`s, then each packed sample
     is packed from a single dataset (i.e., the samples are not mixed between datasets).
     In the Dataloader a batch will still contain packed samples from different datasets.
     """

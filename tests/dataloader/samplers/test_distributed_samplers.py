@@ -12,7 +12,7 @@ from modalities.dataloader.samplers import ResumableDistributedSampler
         (30, 0, False, 0, True, 0),  # drop_last has  no effect because integer divisible
         (30, 0, False, 0, False, 9),
         (30, 0, False, 0, True, 9),  # drop_last has  no effect because integer divisible
-        (30, 0, False, 0, True, 10),  # drop_last has an effect because not integer divisible
+        (30, 0, False, 0, True, 10),  # drop_last has an effect because not integer divisible (2 samples dropped)
         (30, 0, False, 0, False, 10),  # we have to reuse the initial samples (1 sample)
     ],
 )
@@ -39,9 +39,9 @@ def test_dropping_and_reusing(
     samples = [[dataset[i] for i in sampler] for sampler in samplers]
 
     if drop_last:
-        # when drop_last true, we drop the last samples so that every data parallel rank
+        # if drop_last is true, we drop the last samples so that every data parallel rank
         # has the same number of samples.
-        # Note that also means that the last, remaining samples (i.e., maximum num_ranks -1)
+        # Note that also means that the last, remaining samples (i.e., maximum num_replicas - 1)
         # are not used at all
         cut_off_samples = len(dataset) - (len(dataset) - skip_num_global_samples) % num_replicas
         padded_samples = []
@@ -50,7 +50,7 @@ def test_dropping_and_reusing(
         samples_left = len(dataset) - skip_num_global_samples
         padding_size = math.ceil(samples_left / num_replicas) * num_replicas - samples_left
         # when drop_last false, we reuse the last samples (i.e., maximum num_ranks -1)
-        # so that every data parallel ran, has a full last batch
+        # so that every data parallel ran has a full last batch
         padded_samples = dataset[:padding_size]
 
     assert dataset[skip_num_global_samples:cut_off_samples] + padded_samples == list(
