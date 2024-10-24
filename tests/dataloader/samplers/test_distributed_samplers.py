@@ -12,7 +12,7 @@ from modalities.dataloader.samplers import ResumableDistributedSampler
         (30, 0, False, 0, True, 0),  # drop_last has  no effect because integer divisible
         (30, 0, False, 0, False, 9),
         (30, 0, False, 0, True, 9),  # drop_last has  no effect because integer divisible
-        (30, 0, False, 0, True, 10),  # drop_last has an effect because not integer divisible
+        (30, 0, False, 0, True, 10),  # drop_last has an effect because not integer divisible (2 samples dropped)
         (30, 0, False, 0, False, 10),  # we have to reuse the initial samples (1 sample)
     ],
 )
