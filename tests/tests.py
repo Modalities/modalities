@@ -106,9 +106,9 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
 
         # getting started example
         print("\n=== RUN GETTING STARTED EXAMPLE ===")
-        run_getting_started_example_directory = _ROOT_DIR / "examples" / "getting_started"
+        run_getting_started_example_directory = _ROOT_DIR / "tutorials" / "getting_started"
         run_getting_started_example_script = (
-            _ROOT_DIR / "examples" / "getting_started" / "run_getting_started_example.sh"
+            _ROOT_DIR / "tutorials" / "getting_started" / "run_getting_started_example.sh"
         )
         assert isfile(
             run_getting_started_example_script

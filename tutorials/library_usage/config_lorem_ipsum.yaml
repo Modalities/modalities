@@ -48,7 +48,7 @@ settings:
   training_progress: 
     global_num_seen_tokens: 0
     num_seen_steps: 0
-    local_num_seen_batches: 0
+    num_seen_samples: 0
     last_step: -1
 
 tokenizer:
@@ -101,16 +101,17 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            drop_last: true
-            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
