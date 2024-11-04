@@ -24,7 +24,7 @@ class ComponentFactory:
         are built from the config dictionary in a recursive manner.
 
         Args:
-            config_dict (dict[): Dictionary with the configuration of the components.
+            config_dict (dict): Dictionary with the configuration of the components.
             components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.
 
         Returns:

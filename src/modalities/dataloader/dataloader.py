@@ -15,7 +15,7 @@ class LLMDataLoader(DataLoader[T_co]):
         batch_sampler: ResumableBatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
-        sampler: Sampler | Iterable | None = None,
+        sampler: Optional[Sampler | Iterable] = None,
         num_workers: int = 0,
         collate_fn: Optional[_collate_fn_t] = None,
         pin_memory: bool = False,
@@ -37,7 +37,7 @@ class LLMDataLoader(DataLoader[T_co]):
             batch_sampler (ResumableBatchSampler): The batch sampler used for sampling batches.
             dataset (Dataset[T_co]): The dataset to load the data from.
             batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
-            sampler (Sampler | Iterable | None, optional): The sampler used for sampling data. Defaults to None.
+            sampler (Optional[Sampler | Iterable], optional): The sampler used for sampling data. Defaults to None.
             num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
             collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
               Defaults to None.
