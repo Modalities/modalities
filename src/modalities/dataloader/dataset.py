@@ -14,7 +14,7 @@ from transformers import BatchEncoding
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import EmbeddedStreamData
+from .packed_data_generator import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):
@@ -231,11 +231,11 @@ class PackedMemMapDatasetBase(Dataset):
         try:
             self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
             self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
-        except KeyError:
+        except KeyError as e:
             raise RuntimeError(
                 f"Encountered a required token representation with {self._token_size_in_bytes},"
                 " which is not supported. Consider using a smaller vocabulary."
-            )
+            ) from e
         self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
@@ -292,20 +292,23 @@ class PackedMemMapDatasetBase(Dataset):
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     """PackedMemMapDatasetContinuous class."""
 
-    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int):
+    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, reuse_last_target: bool = True):
         """
-        Initializes the PackedMemMapDatasetContinuous object.
+        Initializes a Dataset object. In case `reuse_last_target` is True,
+        we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
+        we don't reuse the last target in the next sample but never have the the first token of a sample as the target.
 
         Args:
-            raw_data_path (Path): Path to a packed binary file (*.pbin).
-                Use `modalities data pack_encoded_data` to create one based on a JSONL-file.
-            sample_key (str): The key to access the sample in the BatchEncoding.
-            block_size (int): The size of the block.
+            raw_data_path (Path): The path to the raw data.
+            sample_key (str): The key to access the sample data.
+            block_size (int): The size of each data block (equals to context size + 1).
+            reuse_last_target (bool, optional): Whether to reuse the last target. Defaults to True.
 
         Returns:
             None
         """
         self.block_size = block_size
+        self.reuse_last_target = reuse_last_target
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
     def _generate_packing_index(self) -> List[Tuple[int, int]]:
@@ -321,17 +324,29 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             )
         if self.block_size < 2:
             raise ValueError("Block size must be at least 2.")
-        # Given a fixed number of samples we can compute the total number of tokens as
-        # num_tokens = block_size + (block_size-1) * (num_samples-1)
-        # as the first sample always needs block_size many tokens and the following samples
-        # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
-        # of the subsequent sample).
-        num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
-        # given num_samples we calculate the starting index and length of each sample as tuple.
-        return [
-            ((i * self.block_size - i) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
-            for i in range(num_samples)
-        ]
+
+        if self.reuse_last_target:
+            # In this case we reuse the last target token as the first input token of the subsequent sample.
+            # Therfore, given a fixed number of samples we can compute the total number of tokens as
+            # num_tokens = block_size + (block_size-1) * (num_samples-1)
+            # as the first sample always needs block_size many tokens and the following samples
+            # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
+            # of the subsequent sample for pre-training data).
+            num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
+            # given num_samples we calculate the starting index and length of each sample as tuple.
+            packing_index = [
+                ((i * self.block_size - i) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
+                for i in range(num_samples)
+            ]
+        else:
+            # In this case, we do NOT reuse the last target tokes as the first input token of the subsequent sample
+            num_samples = total_tokens // self.block_size
+            packing_index = [
+                ((i * self.block_size) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
+                for i in range(num_samples)
+            ]
+
+        return packing_index
 
 
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
