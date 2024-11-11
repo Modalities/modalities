@@ -27,6 +27,7 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
         python -m pip install -e .[tests]
+        python -m pip install flash-attn --no-build-isolation
     - name: Run tests
       run: |
         pytest
