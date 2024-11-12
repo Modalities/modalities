@@ -59,7 +59,7 @@ Currently, the flash attention dependency cannot be installed without torch bein
 Until the flash attention developers fix this, we have to run
 
 ```sh
-pip install torch
+pip install torch~=2.4.1
 ```
 beforehand.
 
@@ -75,7 +75,7 @@ pip install -e .
 To install Modalities via pip, run
 
 ```sh
-pip install torch
+pip install torch~=2.4.1
 pip install modalities
 ```
 
