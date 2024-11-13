@@ -1,3 +1,4 @@
+import dataclasses
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
@@ -71,7 +72,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
         save_current = True
 
         if self.k > 0:
-            self.saved_step_checkpoints = [training_progress] + self.saved_step_checkpoints
+            self.saved_step_checkpoints = [dataclasses.replace(training_progress)] + self.saved_step_checkpoints
             if len(self.saved_step_checkpoints) > self.k:
                 # Delete oldest checkpoint
                 checkpoints_to_delete = [self.saved_step_checkpoints[-1]]
@@ -79,7 +80,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
         elif self.k == 0:
             save_current = False
         elif self.k == -1:
-            self.saved_step_checkpoints = [training_progress] + self.saved_step_checkpoints
+            self.saved_step_checkpoints = [dataclasses.replace(training_progress)] + self.saved_step_checkpoints
 
         return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=checkpoints_to_delete)
 
