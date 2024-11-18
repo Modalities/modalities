@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -11,16 +10,16 @@ from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
 
-OptimizerGroups = List[Dict[str, List[nn.Parameter] | float]]
+OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
 
 
 class OptimizerFactory:
     def get_adam(
         lr: float,
-        betas: Tuple[float, float],
+        betas: tuple[float, float],
         eps: float,
         weight_decay: float,
-        weight_decay_groups_excluded: List[str],
+        weight_decay_groups_excluded: list[str],
         wrapped_model: nn.Module,
     ) -> Optimizer:
         optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
@@ -29,10 +28,10 @@ class OptimizerFactory:
 
     def get_adam_w(
         lr: float,
-        betas: Tuple[float, float],
+        betas: tuple[float, float],
         eps: float,
         weight_decay: float,
-        weight_decay_groups_excluded: List[str],
+        weight_decay_groups_excluded: list[str],
         wrapped_model: nn.Module,
     ) -> Optimizer:
         optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
@@ -49,7 +48,7 @@ class OptimizerFactory:
         return wrapped_optimizer
 
 
-def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: List[str]) -> OptimizerGroups:
+def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]) -> OptimizerGroups:
     """
     divide model parameters into optimizer groups (with or without weight decay)
 
@@ -73,7 +72,7 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: List[str]) -> None:
+def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: list[str]) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -93,8 +92,8 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
 
 
 def _create_optimizer_groups(
-    model: FSDP, weight_decay: float, weight_decay_groups_excluded: List[str]
-) -> Tuple[OptimizerGroups, List[str]]:
+    model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]
+) -> tuple[OptimizerGroups, list[str]]:
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
@@ -118,8 +117,8 @@ def _create_optimizer_groups(
 
 
 def _filter_params_for_weight_decay_group(
-    params: Dict[str, List[nn.Parameter]], regex_expressions: List[str]
-) -> List[nn.Parameter]:
+    params: dict[str, list[nn.Parameter]], regex_expressions: list[str]
+) -> list[nn.Parameter]:
     """
     filter parameters by their name.
     a parameter is kept if and only if it contains at least one of the regex expressions.
@@ -139,7 +138,7 @@ def _print_params(params) -> None:
         print_rank_0(f"{i + 1} {name}")
 
 
-def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: List[str]) -> None:
+def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimizer_groups_names: list[str]) -> None:
     """
     for each optimizer group, the following is printed:
         - the number of modules

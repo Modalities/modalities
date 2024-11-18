@@ -1,5 +1,5 @@
 from math import floor
-from typing import Annotated, Dict, Optional, Tuple, Union
+from typing import Annotated, Optional
 
 import torch
 from einops.layers.torch import Rearrange
@@ -18,7 +18,7 @@ class VisionTransformerConfig(BaseModel):
     Args:
         sample_key (str): The key for the input sample.
         prediction_key (str): The key for the model prediction.
-        img_size (Union[Tuple[int, int], int], optional): The size of the input image. Defaults to 224.
+        img_size (tuple[int, int] | int, optional): The size of the input image. Defaults to 224.
         n_classes (int, optional): The number of output classes. Defaults to 1000.
         n_layer (int): The number of layers in the model. Defaults to 12.
         attention_config (AttentionConfig, optional): The configuration for the attention mechanism. Defaults to None.
@@ -34,7 +34,7 @@ class VisionTransformerConfig(BaseModel):
 
     sample_key: str
     prediction_key: str
-    img_size: Annotated[Union[Tuple[int, int], int], Field(ge=1)] = 224
+    img_size: Annotated[tuple[int, int] | int, Field(ge=1)] = 224
     n_classes: Optional[Annotated[int, Field(ge=1)]] = 1000
     n_layer: Annotated[int, Field(ge=1)] = 12
     attention_config: AttentionConfig = None
@@ -176,7 +176,7 @@ class VisionTransformer(nn.Module):
         self,
         sample_key: str,
         prediction_key: str,
-        img_size: Union[Tuple[int, int], int] = 224,
+        img_size: tuple[int, int] | int = 224,
         n_classes: int = 1000,
         n_layer: int = 12,
         attention_config: AttentionConfig = None,
@@ -196,7 +196,7 @@ class VisionTransformer(nn.Module):
         Args:
             sample_key (str): The key for the samples.
             prediction_key (str): The key for the predictions.
-            img_size (Union[Tuple[int, int], int], optional): The size of the input image. Defaults to 224.
+            img_size (tuple[int, int] | int, optional): The size of the input image. Defaults to 224.
             n_classes (int, optional): The number of classes. Defaults to 1000.
             n_layer (int, optional): The number of layers. Defaults to 12.
             attention_config (AttentionConfig, optional): The attention configuration. Defaults to None.
@@ -257,7 +257,7 @@ class VisionTransformer(nn.Module):
             x = block(x)
         return x
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the VisionTransformer module.
 
@@ -279,12 +279,12 @@ class VisionTransformer(nn.Module):
         return {self.prediction_key: x}
 
     @staticmethod
-    def _calculate_block_size(img_size: Tuple[int, int], patch_size: int, patch_stride: int, add_cls_token: bool):
+    def _calculate_block_size(img_size: tuple[int, int], patch_size: int, patch_stride: int, add_cls_token: bool):
         """
         Calculates the block size.
 
         Args:
-            img_size (Tuple[int, int]): The size of the input image.
+            img_size (tuple[int, int]): The size of the input image.
             patch_size (int): The size of each patch.
             patch_stride (int): The stride of each patch.
             add_cls_token (bool): Flag indicating whether to add a classification token.

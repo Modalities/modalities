@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, Tuple
+from typing import Annotated
 
 import torch
 from einops import repeat
@@ -181,7 +181,7 @@ class CoCa(NNModel):
             attention_config=text_decoder_config.attention_config,
         )
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the CoCa model.
 
@@ -200,7 +200,7 @@ class CoCa(NNModel):
             self.text_cls_prediction_key: text_cls_token,
         }
 
-    def _forward_encode_vision(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_vision(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input image using the vision encoder.
 
@@ -208,7 +208,7 @@ class CoCa(NNModel):
             inputs (dict[str, torch.Tensor]): Dictionary containing vision inputs.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
+            tuple[torch.Tensor, torch.Tensor]: Tuple containing encoded vision embeddings and classification token.
         """
         vision_embd = self.vision_encoder(inputs)[self.vision_embd_prediction_key]
         queries = repeat(self.vision_queries, "n d -> b n d", b=vision_embd.shape[0])
@@ -216,7 +216,7 @@ class CoCa(NNModel):
         vision_embd, vision_cls_token = vision_embd[:, :-1, :], vision_embd[:, -1:, :]
         return vision_embd, vision_cls_token
 
-    def _forward_encode_text(self, inputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _forward_encode_text(self, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Encodes the input text using the text decoder.
 
@@ -224,7 +224,7 @@ class CoCa(NNModel):
             inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
+            tuple[torch.Tensor, torch.Tensor]: A tuple containing the encoded text tensor
             and the classification token tensor.
         """
         text_embd = self.text_decoder(inputs)[self.text_embd_prediction_key]

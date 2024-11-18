@@ -1,6 +1,6 @@
 import dataclasses
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Optional
 
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
@@ -14,7 +14,7 @@ class CheckpointSavingStrategyIF(ABC):
     def get_checkpoint_instruction(
         self,
         training_progress: TrainingProgress,
-        evaluation_result: Optional[Dict[str, EvaluationResultBatch]] = None,
+        evaluation_result: Optional[dict[str, EvaluationResultBatch]] = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
@@ -22,7 +22,7 @@ class CheckpointSavingStrategyIF(ABC):
 
         Parameters:
             training_progress (TrainingProgress): The training progress.
-            evaluation_result (Dict[str, EvaluationResultBatch] | None, optional):
+            evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
             The evaluation result. Defaults to None.
             early_stoppping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.
@@ -46,13 +46,13 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
                 Set to a positive integer to save the specified number of
                 checkpointsStrategy for saving the k most recent checkpoints only.
         """
-        self.saved_step_checkpoints: List[TrainingProgress] = []
+        self.saved_step_checkpoints: list[TrainingProgress] = []
         self.k = k
 
     def get_checkpoint_instruction(
         self,
         training_progress: TrainingProgress,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: dict[str, EvaluationResultBatch] | None = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
@@ -60,7 +60,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
 
         Args:
             training_progress (TrainingProgress): The training progress.
-            evaluation_result (Dict[str, EvaluationResultBatch] | None, optional):
+            evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
                 The evaluation result. Defaults to None.
             early_stoppping_criterion_fulfilled (bool, optional):
                 Whether the early stopping criterion is fulfilled. Defaults to False.
@@ -68,7 +68,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
         Returns:
             CheckpointingInstruction: The generated checkpointing instruction.
         """
-        checkpoints_to_delete: List[TrainingProgress] = []
+        checkpoints_to_delete: list[TrainingProgress] = []
         save_current = True
 
         if self.k > 0:
@@ -101,7 +101,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
     def get_checkpoint_instruction(
         self,
         training_progress: TrainingProgress,
-        evaluation_result: Dict[str, EvaluationResultBatch] | None = None,
+        evaluation_result: dict[str, EvaluationResultBatch] | None = None,
         early_stoppping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
@@ -109,7 +109,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
 
         Args:
             training_progress (TrainingProgress): The training progress.
-            evaluation_result (Dict[str, EvaluationResultBatch] | None, optional):
+            evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
             The evaluation result. Defaults to None.
             early_stoppping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.

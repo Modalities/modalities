@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List
 
 from modalities.training.training_progress import TrainingProgress
 
@@ -11,8 +10,8 @@ class CheckpointingInstruction:
 
     Attributes:
         save_current (bool): Indicates whether to save the current checkpoint.
-        checkpoints_to_delete (List[TrainingProgress]): List of checkpoint IDs to delete.
+        checkpoints_to_delete (list[TrainingProgress]): List of checkpoint IDs to delete.
     """
 
     save_current: bool = False
-    checkpoints_to_delete: List[TrainingProgress] = field(default_factory=list)
+    checkpoints_to_delete: list[TrainingProgress] = field(default_factory=list)
