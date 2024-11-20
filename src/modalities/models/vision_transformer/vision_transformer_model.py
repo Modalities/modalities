@@ -18,7 +18,7 @@ class VisionTransformerConfig(BaseModel):
     Args:
         sample_key (str): The key for the input sample.
         prediction_key (str): The key for the model prediction.
-        img_size (tuple[int, int] | int optional): The size of the input image. Defaults to 224.
+        img_size (tuple[int, int] | int, optional): The size of the input image. Defaults to 224.
         n_classes (int, optional): The number of output classes. Defaults to 1000.
         n_layer (int): The number of layers in the model. Defaults to 12.
         attention_config (AttentionConfig, optional): The configuration for the attention mechanism. Defaults to None.
