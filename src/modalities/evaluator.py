@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable
 
 import torch
 import torch.distributed as dist
@@ -55,7 +55,7 @@ class Evaluator:
     def evaluate(
         self,
         model: nn.Module,
-        data_loaders: List[LLMDataLoader],
+        data_loaders: list[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
     ) -> dict[str, EvaluationResultBatch]:

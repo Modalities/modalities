@@ -75,7 +75,7 @@ class IdentityTransform(QueryKeyValueTransform):
             v (torch.Tensor): The value tensor.
 
         Returns:
-             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
         """
         return q, k, v
 
