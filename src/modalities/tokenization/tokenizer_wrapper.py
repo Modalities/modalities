@@ -22,6 +22,18 @@ class TokenizerWrapper(ABC):
         """
         raise NotImplementedError
 
+    def encode(self, text: str) -> list[int]:
+        """Tokenizes a text into a list of token IDs without considering
+        max_length, padding and truncation
+
+        Args:
+            text (str): Text to be tokenized.
+
+        Returns:
+            list[int]: List of token IDs.
+        """
+        raise NotImplementedError
+
     def decode(self, input_ids: list[int]) -> str:
         """Decodes a list of token IDs into the original text.
 
@@ -102,6 +114,9 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
+        self.bos_token = self.tokenizer.bos_token
+        self.eos_token = self.tokenizer.eos_token
+        self.eos_token_id = self.tokenizer.eos_token_id
 
     @property
     def vocab_size(self) -> int:
@@ -120,6 +135,19 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             dict[str, str | list[str]]: Special tokens dictionary.
         """
         return self.tokenizer.special_tokens_map
+
+    def encode(self, text: str) -> list[int]:
+        """Tokenizes a text into a list of token IDs without considering
+        max_length, padding and truncation
+
+        Args:
+            text (str): Text to be tokenized.
+
+        Returns:
+            list[int]: List of token IDs.
+        """
+        tokens = self.tokenizer(text)["input_ids"]
+        return tokens
 
     def tokenize(self, text: str) -> list[int]:
         """Tokenizes a text into a list of token IDs.
@@ -179,6 +207,9 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         """
         self.tokenizer = spm.SentencePieceProcessor()
         self.tokenizer.Load(tokenizer_model_file)
+        self.bos_token = "<s>"
+        self.eos_token = "</s>"
+        self.eos_token_id = self.tokenizer.piece_to_id([self.eos_token])[0]
 
     def tokenize(self, text: str) -> list[int]:
         """Tokenizes a text into a list of token IDs.
@@ -191,6 +222,18 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         """
         tokens = self.tokenizer.encode(text)
         return tokens
+
+    def encode(self, text: str) -> list[int]:
+        """Tokenizes a text into a list of token IDs without considering
+        max_length, padding and truncation
+
+        Args:
+            text (str): Text to be tokenized.
+
+        Returns:
+            list[int]: List of token IDs.
+        """
+        return self.tokenize(text)
 
     def decode(self, token_ids: list[int]) -> str:
         """Decodes a list of token IDs into the original text.

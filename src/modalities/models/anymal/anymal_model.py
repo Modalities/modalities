@@ -1,4 +1,4 @@
-from typing import Dict
+import os
 
 import torch
 from peft import LoraConfig, PeftModel, get_peft_model
@@ -34,7 +34,7 @@ class AnyMALConfig(BaseModel):
             config for Perceiver, which projects embeddings from the audio encoder
             to the text token embedding space
         video_encoder (`PydanticPytorchModuleType`), required if training a video-text model:
-            a trained video encoder 
+            a trained video encoder
         video_projector_config (`PerceiverConfig`), required if training an video-text model:
             config for Perceiver, which projects embeddings from the video encoder
             to the text token embedding space
@@ -79,7 +79,13 @@ class AnyMAL(NNModel):
         seed: int = None,
     ) -> None:
         weight_decay_groups = {
-            "linear": [r"image_projector.*attention", r"image_projector.*fc[12]", r"image_projector.output_proj", r"lora_A", r"lora_B"],
+            "linear": [
+                r"image_projector.*attention",
+                r"image_projector.*fc[12]",
+                r"image_projector.output_proj",
+                r"lora_A",
+                r"lora_B",
+            ],
             "embedding": [r"image_projector.positional_embedding_fn"],
             "norm": [r"image_projector.*norm", r"image_projector.*norm_latents"],
             "parameter": [r"image_projector.latents"],
@@ -87,13 +93,12 @@ class AnyMAL(NNModel):
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
         self.prediction_key = prediction_key
 
-        if (image_encoder is None and audio_encoder is None and video_encoder is None):
+        if image_encoder is None and audio_encoder is None and video_encoder is None:
             raise ValueError("At least one modality encoder should be specified.")
 
         if image_encoder is not None:
             if image_projector is None:
                 raise ValueError("Image projector should not be None.")
-            #self.modality_prediction_key = image_encoder.prediction_key
             self.image_encoder = image_encoder
             self.image_projector = image_projector
             for param in self.image_encoder.parameters():
@@ -101,7 +106,6 @@ class AnyMAL(NNModel):
         elif audio_encoder is not None:
             if audio_projector is None:
                 raise ValueError("Audio projector should not be None.")
-            #self.modality_prediction_key = audio_encoder.prediction_key
             self.audio_encoder = audio_encoder
             self.audio_projector = audio_projector
             for param in self.audio_encoder.parameters():
@@ -109,7 +113,6 @@ class AnyMAL(NNModel):
         elif video_encoder is not None:
             if video_projector is None:
                 raise ValueError("Video projector should not be None.")
-            #self.modality_prediction_key = audio_encoder.prediction_key
             self.video_encoder = video_encoder
             self.video_projector = video_projector
             for param in self.video_encoder.parameters():
@@ -123,8 +126,8 @@ class AnyMAL(NNModel):
         elif model_mode == AnyMALMode.INSTRUCTION_TUNING_TRAINING:
             peft_config = LoraConfig(
                 inference_mode=False,
-                r=8,
-                lora_alpha=32,
+                r=64,
+                lora_alpha=128,
                 lora_dropout=0.1,
                 target_modules=[
                     "q_proj",
@@ -142,7 +145,7 @@ class AnyMAL(NNModel):
             self.text_decoder = PeftModel.from_pretrained(self.text_decoder, os.path.dirname(lora_weights))
             self.text_decoder = self.text_decoder.merge_and_unload()
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         num_image_samples = 0
         num_audio_samples = 0
         num_video_samples = 0
@@ -163,7 +166,9 @@ class AnyMAL(NNModel):
         if num_image_samples:
             forward_kwargs = {"output_hidden_states": True}
             layer_idx = -2  # TODO make this configurable
-            image_emb = self.image_encoder(inputs, forward_kwargs)[self.image_encoder.prediction_key][layer_idx][:, 1:, :]
+            image_emb = self.image_encoder(inputs, forward_kwargs)[self.image_encoder.prediction_key][layer_idx][
+                :, 1:, :
+            ]
             proj_image_emb = self.image_projector(image_emb)
             if num_unimodal_samples:
                 dummy_proj_image_emb = torch.zeros(
@@ -185,8 +190,9 @@ class AnyMAL(NNModel):
         dec_inputs_kwargs = {
             "inputs_embeds": input_emb,
             "position_ids": pos,
-            "attention_mask": inputs["attention_mask"],
         }
+        if "attention_mask" in inputs:
+            dec_inputs_kwargs["attention_mask"] = inputs["attention_mask"]
 
         text_logits = self.text_decoder(dec_inputs, dec_inputs_kwargs)[self.text_decoder.prediction_key]
         return {self.prediction_key: text_logits}

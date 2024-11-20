@@ -606,8 +606,13 @@ class MultimodalTextTransform(Transform):
             if msg_id % 2 == 0:
                 msg_text = "[INST] %s [/INST] " % msg_text
             else:  # response
-                msg_text = msg_text + self.tokenizer.tokenizer.eos_token
-            msg_input_ids = self.tokenizer.tokenizer(msg_text, add_special_tokens=add_special_tokens).input_ids
+                msg_text = msg_text + self.tokenizer.eos_token
+
+            if add_special_tokens:
+                msg_text = self.tokenizer.bos_token + msg_text
+
+            msg_input_ids = self.tokenizer.encode(msg_text)
+
             if msg_id % 2 == 0:
                 msg_labels = [IGNORE_INDEX] * len(msg_input_ids)
             else:
@@ -628,7 +633,7 @@ class MultimodalTextTransform(Transform):
 
         if self.padding == "max_length":
             padding_size = self.max_length - len(labels)
-            input_ids.extend([self.tokenizer.tokenizer.eos_token_id] * padding_size)
+            input_ids.extend([self.tokenizer.eos_token_id] * padding_size)
             labels.extend([IGNORE_INDEX] * padding_size)
             attention_mask.extend([0] * padding_size)
         if self.truncation:
@@ -636,6 +641,34 @@ class MultimodalTextTransform(Transform):
             labels = labels[: self.max_length]
             attention_mask = attention_mask[: self.max_length]
         batch_encoding = BatchEncoding({"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask})
+        return batch_encoding
+
+    def get_prompt(self, conversation):
+        prompt = ""
+        for msg_id, message in enumerate(conversation):
+            msg_text = message["value"]
+            if "<image>" in msg_text:
+                msg_text = msg_text.replace("<image>", "").strip()
+            if "<audio>" in msg_text:
+                msg_text = msg_text.replace("<audio>", "").strip()
+            if "<video>" in msg_text:
+                msg_text = msg_text.replace("<video>", "").strip()
+
+            if msg_id == 0:
+                msg_text = self.system_instruction + msg_text
+            # user
+            if msg_id % 2 == 0:
+                msg_text = "[INST] %s [/INST] " % msg_text
+            else:  # response
+                msg_text = msg_text + self.tokenizer.eos_token
+            prompt += msg_text
+        return prompt
+
+    def get_encoding(self, msg_text):
+        msg_text = self.tokenizer.bos_token + msg_text
+        input_ids = self.tokenizer.encode(msg_text)
+        attention_mask = [1] * (len(input_ids) + self.n_image_tokens)
+        batch_encoding = BatchEncoding({"input_ids": input_ids, "attention_mask": attention_mask})
         return batch_encoding
 
 
@@ -1206,6 +1239,7 @@ class MultimodalWebDatasetConfig(BaseModel):
     builders: list[PydanticMultimodalWebDatasetBuilderIFType]
     batch_size: Optional[int] = None
     mixing_ratios: Optional[list[float]] = None
+    random_mix: Optional[bool] = False
     shardshuffle: int = 100
     repeat: bool = False
     resample: bool = True
@@ -1218,6 +1252,7 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
         builders: list[MultimodalWebDatasetBuilder],
         batch_size: int = None,
         mixing_ratios: Optional[list[float]] = None,
+        random_mix: Optional[bool] = False,
         shardshuffle: int = 100,
         repeat: bool = False,
         resample: bool = True,
@@ -1273,7 +1308,14 @@ class MultimodalWebDataset(wds.DataPipeline, wds.compat.FluidInterface):
             datasets = []
             for b in self.builders:
                 datasets.append(b.web_dataset)
-            dataset = FixedRatioRoundRobinMix(datasets, self.mixing_ratios, batch_size)  # Apply mixing at sample level
+            if random_mix:
+                dataset = wds.RandomMix(
+                    datasets, self.mixing_ratios, longest=True
+                )  # Apply mixing at sample level randomly
+            else:
+                dataset = FixedRatioRoundRobinMix(
+                    datasets, self.mixing_ratios, batch_size
+                )  # Apply mixing at sample level with fixed number of samples per buider
             self.pipeline.append(dataset)
         else:
             self.pipeline.extend(self.builders[0].web_dataset.pipeline)
