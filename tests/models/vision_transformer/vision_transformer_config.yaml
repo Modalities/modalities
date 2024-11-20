@@ -11,3 +11,5 @@ patch_stride: 16
 n_img_channels: 3
 add_cls_token: True
 bias: True
+num_video_frames: 1  
+n_latents: 64

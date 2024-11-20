@@ -24,12 +24,15 @@ class VisionTransformerConfig(BaseModel):
         attention_config (AttentionConfig, optional): The configuration for the attention mechanism. Defaults to None.
         n_head (int): The number of attention heads. Defaults to 8.
         n_embd (int): The dimensionality of the embedding. Defaults to 768.
+        ffn_hidden (int): The number of hidden units in the feed-forward network. Defaults to 3072.
         dropout (float): The dropout rate. Defaults to 0.0.
         patch_size (int): The size of the image patches. Defaults to 16.
         patch_stride (int): The stride of the image patches. Defaults to 16.
         n_img_channels (int): The number of image channels. Defaults to 3.
         add_cls_token (bool): Flag indicating whether to add a classification token. Defaults to True.
         bias (bool): Flag indicating whether to include bias terms. Defaults to True.
+        num_video_frames (int): the number of video frames in case of video input
+        n_latents: the number of latent queries used for the Perceiver block in case of video input. Defaults to 64.
     """
 
     sample_key: str
@@ -40,12 +43,15 @@ class VisionTransformerConfig(BaseModel):
     attention_config: AttentionConfig = None
     n_head: Annotated[int, Field(ge=1)] = 8
     n_embd: Annotated[int, Field(ge=1)] = 768
+    ffn_hidden: Annotated[int, Field(ge=1)] = 3072
     dropout: Annotated[float, Field(ge=0.0)] = 0.0
     patch_size: Annotated[int, Field(ge=1)] = 16
     patch_stride: Annotated[int, Field(ge=1)] = 16
     n_img_channels: Annotated[int, Field(ge=1)] = 3
     add_cls_token: bool = True
     bias: bool = True
+    num_video_frames: Annotated[int, Field(ge=0)] = 1
+    n_latents: Annotated[int, Field(ge=1)] = 64
 
 
 class ImagePatchEmbedding(nn.Module):
@@ -108,6 +114,56 @@ class ImagePatchEmbedding(nn.Module):
         return x
 
 
+class VideoPatchEmbedding(nn.Module):
+    def __init__(
+        self,
+        n_img_channels: int = 3,
+        n_embd: int = 768,
+        patch_size: int = 16,
+        patch_stride: int = 16,
+    ) -> None:
+        """
+        Initializes a VideoPatchEmbedding object.
+
+
+        Args:
+            n_img_channels (int): Number of image channels. Defaults to 3.
+            n_embd (int): Number of embedding dimensions. Defaults to 768.
+            patch_size (int): Patch size for convolutional layer. Defaults to 16.
+            patch_stride (int): Patch stride for convolutional layer. Defaults to 16.
+
+        Returns:
+            None
+        """
+        super().__init__()
+        self.input_rearrange = Rearrange("b T c h w -> b c T h w")
+        self.conv = nn.Conv3d(
+            in_channels=n_img_channels,
+            out_channels=n_embd,
+            kernel_size=(1, patch_size, patch_size),
+            stride=(1, patch_size, patch_stride),
+        )  # TODO: check the 3D conv again
+
+        # See https://github.com/arogozhnikov/einops/wiki/Using-torch.compile-with-einops
+        self.rearrange = Rearrange("b c T h w -> b T (h w) c")  # TODO: this might change when implementing dataloader
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the VideoPatchEmbedding.
+
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        x = self.input_rearrange(x)
+        x = self.conv(x)
+        x = self.rearrange(x)
+        return x  # [b T S D]
+
+
 class VisionTransformerBlock(nn.Module):
     """VisionTransformerBlock class."""
 
@@ -161,6 +217,69 @@ class VisionTransformerBlock(nn.Module):
         return x
 
 
+class PerceiverTransformerBlock(nn.Module):
+    """Perceiver Resampler
+
+    This is a transformer based architecture that performs cross and self attention to compress and embed video
+    or other high-dimensional inputs.
+    paper: 'Flamingo: a Visual Language Model for Few-Shot Learning'
+    Link: https://github.com/mlfoundations/open_flamingo
+    """
+
+    def __init__(
+        self,
+        n_embd: int = 768,
+        n_head: int = 8,
+        ffn_hidden: int = 3072,
+        bias: bool = True,
+        dropout: float = 0.0,
+        attention_config: AttentionConfig = None,
+    ) -> None:
+        """
+        Initializes a PerceiverTransformerBlock object.
+
+        Args:
+            n_embd (int, optional): The dimensionality of the embedding layer. Defaults to 768.
+            n_head (int, optional): The number of attention heads. Defaults to 8.
+            ffn_hidden (int, optional): The number of hidden units in the feed-forward network. Defaults to 3072.
+            bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.
+            dropout (float, optional): The dropout rate. Defaults to 0.0.
+            attention_config (AttentionConfig, optional): The configuration for the attention mechanism.
+            Defaults to None.
+
+        Returns:
+            None
+        """
+        super().__init__()
+        self.norm_latents = nn.LayerNorm(n_embd)
+        self.norm = nn.LayerNorm(n_embd)
+        self.attention = MultiHeadAttention(
+            n_embd=n_embd,
+            n_head=n_head,
+            attention_config=attention_config,
+            attention_type=AttentionType.CROSS_ATTENTION,
+        )
+        self.mlp = MLP(in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
+
+    def forward(self, x: torch.Tensor, latents: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the PerceiverTransformerBlock module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            latents (torch.Tensor): input latent array tensor
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        latents = self.norm_latents(latents)
+        x = self.norm(x)
+        context = torch.cat((x, latents), dim=-2)  # video features and the latent together
+        latents = latents + self.attention(latents, context=context)
+        latents = latents + self.mlp(latents)
+        return latents
+
+
 class VisionTransformer(nn.Module):
     """
     VisionTransformer class.
@@ -170,6 +289,8 @@ class VisionTransformer(nn.Module):
 
     Paper: `An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale`
     Link: https://arxiv.org/abs/2010.11929
+
+    This architecture is extended to encode videos using a Perceiver transformer model
     """
 
     def __init__(
@@ -189,6 +310,8 @@ class VisionTransformer(nn.Module):
         n_img_channels: int = 3,
         add_cls_token: bool = True,
         bias: bool = True,
+        num_video_frames: int = 1,  # 1: Image, >1: Video
+        n_latents: int = 64,
     ) -> None:
         """
         Initializes the VisionTransformer object.
@@ -209,22 +332,44 @@ class VisionTransformer(nn.Module):
             n_img_channels (int, optional): The number of image channels. Defaults to 3.
             add_cls_token (bool, optional): Flag indicating whether to add a classification token. Defaults to True.
             bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.
+            num_video_frames (int): Number of frames. Defaults to 1.
+            n_latents (int, optional): Size of latent array. Defaults to 64.
 
             Returns:
                 None
         """
         super().__init__()
         self.sample_key = sample_key
+        self.has_cls_token = add_cls_token
         self.prediction_key = prediction_key
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         self.block_size = self._calculate_block_size(self.img_size, patch_size, patch_stride, add_cls_token)
-
-        self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
-        self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)
         self.dropout = nn.Dropout(dropout)
+
+        self.head = None
+        if n_classes is not None:
+            self.norm = nn.LayerNorm(n_embd)
+            self.head = nn.Linear(in_features=n_embd, out_features=n_classes, bias=bias)
+
+        self.vision_input = "Image"
+        if num_video_frames > 1:  # video data
+            self.vision_input = "Video"
+            self.embedding_fn = VideoPatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride)  # [b T S D]
+            self.time_embd = nn.Parameter(torch.randn(num_video_frames, 1, n_embd))  # [T,1,d]
+            if add_cls_token:
+                n_latents += 1  # to count for a video level cls token
+                self.block_size -= 1
+            self.latents = nn.Parameter(torch.randn(n_latents, n_embd))  # [R,d]
+            self.rearrange = Rearrange("b T S D -> b (T S) D")
+        else:
+            self.embedding_fn = ImagePatchEmbedding(n_img_channels, n_embd, patch_size, patch_stride, add_cls_token)
+
+        self.positional_embedding_fn = nn.Embedding(num_embeddings=self.block_size, embedding_dim=n_embd)  # [S D]
+        block_classes = {"Video": PerceiverTransformerBlock, "Image": VisionTransformerBlock}
+
         self.blocks = nn.ModuleList(
             [
-                VisionTransformerBlock(
+                block_classes[self.vision_input](
                     n_embd=n_embd,
                     n_head=n_head,
                     ffn_hidden=ffn_hidden,
@@ -235,11 +380,6 @@ class VisionTransformer(nn.Module):
                 for _ in range(n_layer)
             ]
         )
-
-        self.head = None
-        if n_classes is not None:
-            self.norm = nn.LayerNorm(n_embd)
-            self.head = nn.Linear(in_features=n_embd, out_features=n_classes, bias=bias)
 
     def forward_images(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -257,6 +397,31 @@ class VisionTransformer(nn.Module):
             x = block(x)
         return x
 
+    def forward_videos(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode video data into a shorter sequence of tokens
+
+        Args:
+            x (torch.Tensor): images from multiple video frames
+                shape (b c T h w)
+                b: batch size
+                T: temporal dim
+                h,w: spatial dims (S=h*w)
+                c: embedding dim (D)
+
+        Returns:
+            torch.Tensor: latents
+                shape (b R D) R << T*S
+        """
+        x = self.embedding_fn(x)  # [b T S D]
+        b, T = x.shape[:2]
+        x = self.dropout(x + self.positional_embedding_fn.weight)
+        x = self.dropout(x + self.time_embd.repeat(b, 1, 1, 1))
+        x = self.rearrange(x)  # [b T*S D]
+        latents = self.latents.repeat(b, 1, 1)  # [b,R,d] with R<<T*S
+        for block in self.blocks:
+            latents = block(x, latents)
+        return latents
+
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the VisionTransformer module.
@@ -269,9 +434,12 @@ class VisionTransformer(nn.Module):
 
         """
         x = inputs[self.sample_key]
-        x = self.forward_images(x)
+        if self.vision_input == "Video":
+            x = self.forward_videos(x)
+        else:
+            x = self.forward_images(x)
         if self.head:
-            if self.embedding_fn.cls_token is not None:
+            if self.has_cls_token:
                 x = x[:, 0]
             else:
                 x = x.mean(dim=1)

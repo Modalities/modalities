@@ -50,8 +50,8 @@ class DatasetBatch(Batch, TorchDeviceMixin):
         return self.samples[key].device
 
     def __len__(self) -> int:
-        key = list(self.samples.keys())[0]
-        return self.samples[key].shape[self.batch_dim]
+        lengths = [self.samples[key].shape[self.batch_dim] for key in self.samples.keys()]
+        return max(lengths)
 
 
 @dataclass
@@ -89,8 +89,8 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
         return self.targets[key]
 
     def __len__(self) -> int:
-        key = list(self.predictions.keys())[0]
-        return self.predictions[key].shape[self.batch_dim]
+        lengths = [self.predictions[key].shape[self.batch_dim] for key in self.predictions.keys()]
+        return max(lengths)
 
 
 @dataclass

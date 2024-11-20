@@ -7,6 +7,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.subscriber_impl.progress_subscriber import (
     DummyProgressSubscriber,
     RichProgressSubscriber,
+    SimpleProgressSubscriber,
 )
 from modalities.logging_broker.subscriber_impl.results_subscriber import (
     DummyResultSubscriber,
@@ -34,6 +35,24 @@ class ProgressSubscriberFactory:
             eval_splits_num_steps = {dataloader.dataloader_tag: len(dataloader) for dataloader in eval_dataloaders}
 
             subscriber = RichProgressSubscriber(train_split_num_steps, eval_splits_num_steps)
+        else:
+            subscriber = ProgressSubscriberFactory.get_dummy_progress_subscriber()
+        return subscriber
+
+    @staticmethod
+    def get_simple_progress_subscriber(
+        eval_dataloaders: list[LLMDataLoader],
+        train_dataloader_tag: str,
+        num_seen_steps: int,
+        num_target_steps: int,
+        global_rank: int,
+    ) -> SimpleProgressSubscriber:
+        if global_rank == 0:
+            train_split_num_samples = {train_dataloader_tag: (num_target_steps)}
+
+            eval_splits_num_samples = {dataloader.dataloader_tag: len(dataloader) for dataloader in eval_dataloaders}
+
+            subscriber = SimpleProgressSubscriber(train_split_num_samples, eval_splits_num_samples)
         else:
             subscriber = ProgressSubscriberFactory.get_dummy_progress_subscriber()
         return subscriber

@@ -71,14 +71,55 @@ class CoCaCollatorFn(CollateFnIF):
         Raises:
             None.
         """
-        samples = {
-            sample_key: torch.stack([torch.tensor(d[sample_key]) for d in batch]) for sample_key in self.sample_keys
-        }
-        targets = {
-            target_key: torch.stack([torch.tensor(d[target_key]) for d in batch]) for target_key in self.target_keys
-        }
+        # only keys related to the other modalities (e.g. images, audio, video)
+        modality_keys = [key for key in self.sample_keys if key not in ["audio_len", self.text_sample_key]]
 
+        samples = {sample_key: [] for sample_key in self.sample_keys if sample_key != self.text_sample_key}
+        text_samples = {sample_key: [] for sample_key in modality_keys}
+        attention_masks = {sample_key: [] for sample_key in modality_keys}
+        # gather samples by modality
+        for sample in batch:
+            text_sample_added = False  # make sure text is only added once per sample
+            for sample_key in self.sample_keys:
+                if sample_key in sample:
+                    if sample_key in samples:
+                        samples[sample_key].append(self._prepare_sample(sample[sample_key]))
+                    if "attention_mask" in sample and sample_key in attention_masks and not text_sample_added:
+                        attention_masks[sample_key].append(self._prepare_sample(sample["attention_mask"]))
+                    if sample_key in text_samples and not text_sample_added:
+                        text_samples[sample_key].append(self._prepare_sample(sample[self.text_sample_key]))
+                        text_sample_added = True
+        # remove keys with no samples
+        for sample_key in modality_keys:
+            if len(text_samples[sample_key]) == 0:
+                del text_samples[sample_key]
+            if len(attention_masks[sample_key]) == 0:
+                del attention_masks[sample_key]
+        # stack samples by modality
+        for sample_key in self.sample_keys:
+            if sample_key in samples:
+                samples[sample_key] = torch.stack(samples[sample_key])
+            if sample_key in text_samples:
+                text_samples[sample_key] = torch.stack(text_samples[sample_key])
+            if sample_key in attention_masks:
+                attention_masks[sample_key] = torch.stack(attention_masks[sample_key])
+        # stack input_ids and attention masks for all modalities
+        samples[self.text_sample_key] = torch.cat([text_samples[sample_key] for sample_key in text_samples])
+        samples["attention_mask"] = torch.cat([attention_masks[sample_key] for sample_key in attention_masks])
+
+        targets = {}
         # Create target for text input
         targets[self.text_target_key] = samples[self.text_sample_key][:, 1:].clone().detach()
-        samples[self.text_sample_key] = samples[self.text_sample_key][:, :-1].clone().detach()
+        samples[self.text_sample_key] = samples[self.text_sample_key][:, :-1]
+
+        if "attention_mask" in batch[0]:
+            targets["attention_mask"] = samples["attention_mask"][:, 1:].clone().detach()
+            samples["attention_mask"] = samples["attention_mask"][:, :-1]
+
         return DatasetBatch(targets=targets, samples=samples)
+
+    @staticmethod
+    def _prepare_sample(x):
+        if isinstance(x, torch.Tensor):
+            return x
+        return torch.tensor(x)

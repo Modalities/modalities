@@ -14,8 +14,49 @@ class DummyProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
     def consume_message(self, message: Message[ProgressUpdate]):
         pass
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         pass
+
+
+class SimpleProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
+    """A subscriber object for the RichProgress observable."""
+
+    def __init__(
+        self,
+        train_split_num_samples: dict[str, int],
+        eval_splits_num_samples: dict[str, int],
+    ) -> None:
+        self.train_split_num_samples = train_split_num_samples
+        self.eval_splits_num_samples = eval_splits_num_samples
+
+    def consume_message(self, message: Message[ProgressUpdate]):
+        if not isinstance(message.payload, ProgressUpdate):
+            return
+
+        batch_progress = message.payload
+        completed_samples = 0
+        total_samples = 0
+
+        [batch_progress.dataloader_tag]
+
+        prefix = ""
+        if message.payload.experiment_status == ExperimentStatus.TRAIN:
+            prefix = "Train"
+            completed_samples = batch_progress.num_steps_done
+            total_samples = self.train_split_num_samples[batch_progress.dataloader_tag]
+
+        elif message.payload.experiment_status == ExperimentStatus.EVALUATION:
+            prefix = "Evaluation"
+            completed_samples = batch_progress.num_steps_done
+            total_samples = self.eval_splits_num_samples[batch_progress.dataloader_tag]
+
+        print(
+            f"{prefix}[{batch_progress.dataloader_tag}] "
+            f"[{completed_samples}/{total_samples} ({completed_samples*100/total_samples:.01f}%)]"
+        )
+
+    def consume_dict(self, mesasge_dict: dict[str, Any]):
+        raise NotImplementedError
 
 
 class RichProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):

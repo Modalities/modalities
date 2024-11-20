@@ -66,6 +66,7 @@ class TextDecoder(NNModel):
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
                             with_context=False,
+                            is_audio_video=False,
                             attention_type=AttentionType.CAUSAL_SELF_ATTENTION,
                             attention_config=attention_config,
                         )

@@ -1,5 +1,7 @@
+import multiprocessing
 from typing import Iterable, Optional
 
+import webdataset as wd
 from torch.utils.data import Dataset, DistributedSampler, Sampler
 from torch.utils.data.dataloader import DataLoader, _collate_fn_t, _worker_init_fn_t
 
@@ -11,7 +13,11 @@ except ImportError:  # torch >= 2.5
 from modalities.dataloader.samplers import ResumableBatchSampler
 
 
-class LLMDataLoader(DataLoader[T_co]):
+class DataLoaderIF:
+    pass
+
+
+class LLMDataLoader(DataLoaderIF):
     """LLMDataLoader is a custom DataLoader class that extends the PyTorch DataLoader class."""
 
     def __init__(
@@ -62,7 +68,9 @@ class LLMDataLoader(DataLoader[T_co]):
             None
         """
         assert batch_sampler is not None and batch_size == 1
-        super().__init__(
+        self._dataloader_tag = dataloader_tag
+        self._batch_size = batch_sampler.batch_size
+        self._torch_dataloader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
             shuffle=False,  # shuffling must be implemented on a dataset level
@@ -80,9 +88,6 @@ class LLMDataLoader(DataLoader[T_co]):
             persistent_workers=persistent_workers,
             pin_memory_device=pin_memory_device,
         )
-
-        self._dataloader_tag = dataloader_tag
-        self._batch_size = batch_sampler.batch_size
 
     @property
     def dataloader_tag(self) -> str:
@@ -125,6 +130,47 @@ class LLMDataLoader(DataLoader[T_co]):
         """
         self._batch_size = value
 
+    def __len__(self):
+        return self._torch_dataloader.__len__()
+
+    def __iter__(self):
+        return self._torch_dataloader.__iter__()
+
+    @property
+    def dataset(self) -> Dataset[T_co]:
+        return self._torch_dataloader.dataset
+
+    @property
+    def batch_sampler(self) -> ResumableBatchSampler:
+        return self._torch_dataloader.batch_sampler
+
+    @property
+    def sampler(self) -> Sampler | Iterable | None:
+        return self._torch_dataloader.sampler
+
+    @property
+    def collate_fn(self) -> _collate_fn_t:
+        return self._torch_dataloader.collate_fn
+
+    @property
+    def multiprocessing_context(self) -> str | multiprocessing.context.BaseContext:
+        return self._torch_dataloader.multiprocessing_context
+
+    @multiprocessing_context.setter
+    def multiprocessing_context(self, multiprocessing_context):
+        self._torch_dataloader.multiprocessing_context = multiprocessing_context
+
+    @property
+    def _auto_collation(self):
+        return self._torch_dataloader._auto_collation
+
+    @property
+    def _index_sampler(self):
+        return self._torch_dataloader._index_sampler
+
+    def check_worker_number_rationality(self):
+        return self._torch_dataloader.check_worker_number_rationality()
+
     @property
     def fast_forward_batch_id(self) -> int:
         """
@@ -133,15 +179,15 @@ class LLMDataLoader(DataLoader[T_co]):
         Returns:
             int: fast forward batch ID
         """
-        return self.batch_sampler.start_index
+        return self._torch_dataloader.batch_sampler.start_index
 
 
-class RepeatingDataLoader(LLMDataLoader[T_co]):
+class RepeatingDataLoader(LLMDataLoader):
     """
     RepeatingDataLoader is a custom DataLoader class that repeats the given dataloader
       for the specified number of epochs."""
 
-    def __init__(self, dataloader: LLMDataLoader[T_co], num_epochs: int, reshuffle_after_epoch: bool = False):
+    def __init__(self, dataloader: LLMDataLoader, num_epochs: int, reshuffle_after_epoch: bool = False):
         """
         Initializes a RepeatingDataLoader object that repeats the given dataloader for the specified number of epochs.
         This is especially useful for DataLoader types that we wish to automatically restart upon completion.
@@ -245,3 +291,68 @@ class RepeatingDataLoader(LLMDataLoader[T_co]):
             int: The total number of steps.
         """
         return self.num_epochs * len(self.dataloader)
+
+
+class WebDataLoader(DataLoaderIF):
+    """WebDataLoader is a custom DataLoader class that wraps the webdataset.WebLoader class."""
+
+    def __init__(
+        self,
+        dataloader_tag: str,
+        dataset: Dataset[T_co],
+        batch_size: Optional[int] = 1,
+        num_workers: int = 0,
+        collate_fn: Optional[_collate_fn_t] = None,
+        pin_memory: bool = False,
+        drop_last: bool = False,
+    ):
+        """Initializes WebDataLoader, which is a wrapper for webdataset.WebLoader.
+
+        Args:
+            dataloader_tag (str): The tag for the dataloader.
+            dataset (Dataset[T_co]): The dataset to load the data from.
+            batch_size (Optional[int], optional): The batch size. Defaults to 1.
+            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
+            collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
+              Defaults to None.
+            pin_memory (bool, optional): Flag indicating whether to pin the memory. Defaults to False.
+            drop_last (bool, optional): Flag indicating whether to drop the last incomplete batch. Defaults to False.
+        """
+        self.num_batches = len(dataset) // batch_size + int(not drop_last)
+        dataset = dataset.batched(batch_size, collation_fn=collate_fn)
+        self.webloader = wd.WebLoader(dataset=dataset, batch_size=None, num_workers=num_workers, pin_memory=pin_memory)
+        self.webloader = self.webloader.with_epoch(self.num_batches)
+        self.dataloader_tag = dataloader_tag
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return self.num_batches
+
+    def __iter__(self):
+        return iter(self.webloader)
+
+    @property
+    def batch_size(self) -> int:
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, value: int):
+        self._batch_size = value
+
+    @property
+    def fast_forward_sample_id(self) -> int:
+        """The sample id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward sample id
+        """
+        return 0  # self.batch_size * self.batch_sampler.start_index
+
+    @property
+    def fast_forward_batch_id(self) -> int:
+        """The batch id until which we fast-forward, as specified in the ResumableBatchSampler.
+
+        Returns:
+            int: fast forward batch id
+        """
+        return 0  # self.batch_sampler.start_index

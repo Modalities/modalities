@@ -181,6 +181,28 @@ class Aggregator(Generic[T]):
         return value
 
 
+def flatten_dict(d, parent_key="", sep="_"):
+    """
+    Flatten a nested dictionary.
+
+    Args:
+        d: The dictionary to flatten.
+        parent_key: The base key to use for concatenation.
+        sep: The separator to use between concatenated keys.
+
+    Return:
+        A flattened dictionary with concatenated keys.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
 def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch.nn.Module] | None:
     """From Accelerate source code
     (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
