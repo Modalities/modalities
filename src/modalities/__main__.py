@@ -132,7 +132,7 @@ def data():
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
+def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     """Utility CMD IF for indexing the confent of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
@@ -145,8 +145,12 @@ def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     Raises:
         ValueError: If the index file already exists.
     """
+    entry_point_data_create_raw_index(src_path=src_path, index_path=index_path)
 
+
+def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
+    os.makedirs(index_path.parent, exist_ok=True)
     if index_path.exists():
         raise ValueError("index already exists. delete it or specify different output folder.")
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader, OpenFileMode
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 
 
 def create_dummy_data(tmpdir_path: Path, content: str) -> Path:
@@ -58,7 +58,7 @@ def test_index_creation(tmpdir, dummy_content_text):
 def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length_from_index):
     raw_data_path = indexed_dummy_data_path.raw_data_path
     reader = LargeFileLinesReader(
-        raw_data_path, open_file_mode=OpenFileMode.READ_TEXT, use_sample_length_from_index=use_sample_length_from_index
+        raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding="utf-8"
     )
     assert raw_data_path.read_text().count("\n") == 12
     assert raw_data_path.read_text().rsplit("\n")[-1] == ""
@@ -69,6 +69,7 @@ def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length
         # all but the last sample should have a trailing "\n"-char
         # Since we don't know if the last document of  every JSONL file a trailing "\n"-char
         # we always read the last sample as defined by sample's length in the index (i.e., without any \n chars).
+        print(reader[0])
         assert all([item[-1] == "\n" for item in reader][:-1])
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
     assert len(reader) == 12
@@ -77,12 +78,9 @@ def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length
 
 def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path):
     raw_data_path = indexed_dummy_data_path.raw_data_path
-    reader_binary = LargeFileLinesReader(
-        raw_data_path, open_file_mode=OpenFileMode.READ_BINARY, use_sample_length_from_index=False
-    )
-    reader_text = LargeFileLinesReader(
-        raw_data_path, open_file_mode=OpenFileMode.READ_TEXT, use_sample_length_from_index=False
-    )
+    reader_binary = LargeFileLinesReader(raw_data_path, use_sample_length_from_index=False, encoding=None)
+    reader_text = LargeFileLinesReader(raw_data_path, use_sample_length_from_index=False, encoding="utf-8")
+
     for item_binary, item_text in zip(reader_binary, reader_text):
         assert item_binary.decode("utf_8") == item_text
 

@@ -1,3 +1,4 @@
+import mmap
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,11 +15,6 @@ class BaseReader(ABC):
         raise NotImplementedError
 
 
-class OpenFileMode:
-    READ_BINARY = "rb"
-    READ_TEXT = "r"
-
-
 class LargeFileLinesReader(BaseReader):
     """LargeFileLinesReader class that read lines from a large file efficiently."""
 
@@ -26,7 +22,7 @@ class LargeFileLinesReader(BaseReader):
         self,
         raw_data_path: Path,
         index_path: Optional[Path] = None,
-        open_file_mode: str = OpenFileMode.READ_TEXT,
+        encoding: Optional[str] = "utf-8",
         use_sample_length_from_index: bool = True,
     ):
         """
@@ -38,9 +34,15 @@ class LargeFileLinesReader(BaseReader):
                          and length of samples given in `raw_data_path`.
                          If not defined, an index next to `raw_data_path` is picked,
                          by replacing its suffix with ".idx".
+            encoding (Optional[str]): The encoding of the file (default: "utf-8").
+                         If encoding is None, the raw data is read as bytes.
+            use_sample_length_from_index (bool): If True, the sample length is taken from the index file
+                        i.e., the (offset, sample_length) pairs. If False, the sample length is calculated
+                        as the difference between the starting point of the next and the current sample.
         Returns:
             None
         """
+        self.encoding = encoding
         self.raw_data_path = raw_data_path
         self.index_path = self.default_index_path(self.raw_data_path, index_path)
         self.use_sample_length_from_index = use_sample_length_from_index
@@ -53,10 +55,11 @@ class LargeFileLinesReader(BaseReader):
         with self.index_path.open("rb") as f:
             self.index = pickle.load(f)
 
-        self.open_file_mode = open_file_mode
-        self.raw_data_fd = self.raw_data_path.open(self.open_file_mode)
+        self.raw_data_fd = self.raw_data_path.open("rb")
+        self.mmapped_data_file = mmap.mmap(self.raw_data_fd.fileno(), 0, access=mmap.ACCESS_READ)
 
     def close(self):
+        self.mmapped_data_file.close()
         self.raw_data_fd.close()
 
     @staticmethod
@@ -118,6 +121,8 @@ class LargeFileLinesReader(BaseReader):
     def _read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str | bytes:
         # Reads a specified number of bytes from a raw file starting from a given offset.
         # whence = 0 means offse calculated from the beginning of the file
-        self.raw_data_fd.seek(offset, 0)
-        data = self.raw_data_fd.read(sample_length_in_bytes)
+        data = self.mmapped_data_file[offset : offset + sample_length_in_bytes]
+        if self.encoding is not None:
+            data_decoded = data.decode(self.encoding)
+            return data_decoded
         return data
