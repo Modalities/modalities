@@ -5,6 +5,9 @@ settings:
   jq_pattern: .text
   num_cpus: ${node_env:num_cpus}
   eod_token: <|endoftext|>
+  processing_batch_size: 10
+  raw_samples_queue_size: 20
+  processed_samples_queue_size: 20
 
 tokenizer:
   component_key: tokenizer
