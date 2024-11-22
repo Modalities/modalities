@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Dict, List, Literal, Optional, Tuple
+from typing import Annotated, Literal, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -87,7 +87,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
 
 class FSDPCheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
-    block_names: List[str]
+    block_names: list[str]
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
 
@@ -122,19 +122,19 @@ class CheckpointSavingConfig(BaseModel):
 class AdamOptimizerConfig(BaseModel):
     lr: float
     wrapped_model: PydanticPytorchModuleType
-    betas: Tuple[float, float]
+    betas: tuple[float, float]
     eps: float
     weight_decay: float
-    weight_decay_groups_excluded: List[str]
+    weight_decay_groups_excluded: list[str]
 
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
     wrapped_model: PydanticPytorchModuleType
-    betas: Tuple[float, float]
+    betas: tuple[float, float]
     eps: float
     weight_decay: float
-    weight_decay_groups_excluded: List[str]
+    weight_decay_groups_excluded: list[str]
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -151,17 +151,17 @@ class StepLRSchedulerConfig(BaseModel):
 
 class OneCycleLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
-    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | List[Annotated[float, Field(strict=True, gt=0.0)]]
+    max_lr: Annotated[float, Field(strict=True, gt=0.0)] | list[Annotated[float, Field(strict=True, gt=0.0)]]
     total_steps: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     epochs: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
     cycle_momentum: bool = True
-    base_momentum: Annotated[float, Field(strict=True, gt=0)] | List[
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | list[
         Annotated[float, Field(strict=True, gt=0.0)]
     ] = 0.85
-    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | List[
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | list[
         Annotated[float, Field(strict=True, gt=0.0)]
     ] = 0.95
     div_factor: Annotated[float, Field(strict=True, gt=0.0)]
@@ -211,7 +211,7 @@ class FSDPWrappedModelConfig(BaseModel):
     sync_module_states: bool
     mixed_precision_settings: MixedPrecisionSettings
     sharding_strategy: ShardingStrategy
-    block_names: List[str]
+    block_names: list[str]
 
     @field_validator("mixed_precision_settings", mode="before")
     def parse_mixed_precision_setting_by_name(cls, name):
@@ -241,7 +241,7 @@ class WeightInitializedModelConfig(BaseModel):
 
 class ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDPModuleType
-    activation_checkpointing_modules: Optional[List[str]] = Field(default_factory=list)
+    activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
@@ -249,7 +249,7 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[Dict[str, str]] = None
+    special_tokens: Optional[dict[str, str]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
@@ -297,7 +297,7 @@ class PackedMemMapDatasetMegatronConfig(BaseModel):
 
 
 class CombinedDatasetConfig(BaseModel):
-    datasets: List[PydanticDatasetIFType]
+    datasets: list[PydanticDatasetIFType]
 
 
 class BatchSamplerConfig(BaseModel):
@@ -325,7 +325,7 @@ class DummyProgressSubscriberConfig(BaseModel):
 
 
 class RichProgressSubscriberConfig(BaseModel):
-    eval_dataloaders: Optional[List[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
+    eval_dataloaders: Optional[list[PydanticLLMDataLoaderIFType]] = Field(default_factory=list)
     train_dataloader_tag: str
     num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
     num_target_steps: Annotated[int, Field(strict=True, gt=0)]
@@ -350,7 +350,7 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
-def load_app_config_dict(config_file_path: Path) -> Dict:
+def load_app_config_dict(config_file_path: Path) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
     Modalities-specific variables.
@@ -359,7 +359,7 @@ def load_app_config_dict(config_file_path: Path) -> Dict:
         config_file_path (Path): YAML config file.
 
     Returns:
-        Dict: Dictionary representation of the config file.
+        dict: Dictionary representation of the config file.
     """
 
     def cuda_env_resolver_fun(var_name: str) -> int:

@@ -1,7 +1,7 @@
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 
 class BaseReader(ABC):
@@ -10,7 +10,7 @@ class BaseReader(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __getitem__(self, key: int | slice) -> str | List[str]:
+    def __getitem__(self, key: int | slice) -> str | list[str]:
         raise NotImplementedError
 
 
@@ -72,7 +72,7 @@ class LargeFileLinesReader(BaseReader):
         """
         return len(self.index)
 
-    def __getitem__(self, key: int | slice) -> str | List[str]:
+    def __getitem__(self, key: int | slice) -> str | list[str]:
         """
         Retrieves an item from the LargeFileLinesReader.
 
@@ -80,7 +80,7 @@ class LargeFileLinesReader(BaseReader):
             key (int | slice): The index or slice used to retrieve the item(s).
 
         Returns:
-            str | List[str]: The item(s) retrieved from the LargeFileLinesReader.
+            str | list[str]: The item(s) retrieved from the LargeFileLinesReader.
 
         Raises:
             IndexError: If the key is out of range.

@@ -1,7 +1,12 @@
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 from torch.utils.data import BatchSampler, Dataset, Sampler
-from torch.utils.data.dataloader import DataLoader, T_co, _collate_fn_t, _worker_init_fn_t
+from torch.utils.data.dataloader import DataLoader, _collate_fn_t, _worker_init_fn_t
+
+try:  # torch <= 2.4
+    from torch.utils.data.dataloader import T_co
+except ImportError:  # torch >= 2.5
+    from torch.utils.data.dataloader import _T_co as T_co
 
 
 class LLMDataLoader(DataLoader[T_co]):
@@ -13,7 +18,7 @@ class LLMDataLoader(DataLoader[T_co]):
         batch_sampler: BatchSampler,
         dataset: Dataset[T_co],
         batch_size: Optional[int] = 1,
-        sampler: Union[Sampler, Iterable, None] = None,
+        sampler: Optional[Sampler | Iterable] = None,
         num_workers: int = 0,
         collate_fn: Optional[_collate_fn_t] = None,
         pin_memory: bool = False,
@@ -35,7 +40,7 @@ class LLMDataLoader(DataLoader[T_co]):
             batch_sampler (BatchSampler): The batch sampler used for sampling batches.
             dataset (Dataset[T_co]): The dataset to load the data from.
             batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
-            sampler (Union[Sampler, Iterable, None], optional): The sampler used for sampling data. Defaults to None.
+            sampler (Optional[Sampler | Iterable], optional): The sampler used for sampling data. Defaults to None.
             num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
             collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.
               Defaults to None.

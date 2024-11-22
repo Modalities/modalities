@@ -6,7 +6,7 @@ import pickle
 import warnings
 from io import BufferedWriter
 from pathlib import Path
-from typing import Callable, Iterator, List, Optional, Tuple
+from typing import Callable, Iterator, Optional
 
 import jq
 import numpy as np
@@ -197,8 +197,8 @@ class PackedDataGenerator:
         def writer():
             # writes a batch received from the processed_samples_queue to the destination file
             def _write_batch(
-                batch: List[Tuple[int, bytes]], prev_line_id: int, curr_offset: int, index_list: List, f: BufferedWriter
-            ) -> Tuple[int, int]:
+                batch: list[tuple[int, bytes]], prev_line_id: int, curr_offset: int, index_list: list, f: BufferedWriter
+            ) -> tuple[int, int]:
                 # write the tokens for each document
                 for line_id, tokens_as_bytes in batch:
                     if prev_line_id + 1 != line_id:
@@ -293,7 +293,7 @@ class PackedDataGenerator:
                     f"Raised the following error: {exception=}"
                 )
 
-    def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: List[Tuple[int, int]]):
+    def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: list[tuple[int, int]]):
         # Update the length of the data section in the pre-allocated header of the destination file.
         # The data segment length is sum of the starting position and the length of the last document.
         length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
@@ -358,7 +358,7 @@ class EmbeddedStreamData:
                 pkl_encoded_index = f.read()
                 # contains the start offset and length of each segment
                 # as byte positions in the data section
-                self._index_base: List[Tuple[int, int]] = pickle.loads(pkl_encoded_index)
+                self._index_base: list[tuple[int, int]] = pickle.loads(pkl_encoded_index)
             else:
                 self._index_base = None
 
@@ -366,7 +366,7 @@ class EmbeddedStreamData:
             self._data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))
 
     @property
-    def index_base(self) -> List[Tuple[int, int]]:
+    def index_base(self) -> list[tuple[int, int]]:
         if self._index_base is None:
             raise ValueError("Index was not loaded. Set `load_index=True` during initialization.")
         return self._index_base
@@ -376,12 +376,12 @@ class EmbeddedStreamData:
         return self._data
 
 
-def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file: Path, chunk_size: int = 2048):
+def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file: Path, chunk_size: int = 2048):
     """
     Joins the embedded stream data into a single file.
 
     Args:
-        stream_data (List[EmbeddedStreamData]): A list of EmbeddedStreamData objects representing the stream data.
+        stream_data (list[EmbeddedStreamData]): A list of EmbeddedStreamData objects representing the stream data.
         target_file (Path): The target file to write the joined data to.
         chunk_size (int, optional): The size of each data chunk. Defaults to 2048.
 
@@ -405,7 +405,7 @@ def join_embedded_stream_data(stream_data: List[EmbeddedStreamData], target_file
 
     num_entries = sum(len(d.index_base) for d in stream_data)
 
-    def index_stream_generator() -> Iterator[Tuple[int, int]]:
+    def index_stream_generator() -> Iterator[tuple[int, int]]:
         # generates a stream of index offsets and segment lengths.
         curr_offset = 0
         for embedded_stream_data in stream_data:

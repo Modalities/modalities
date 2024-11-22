@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List
 
 
 class Component_V_W_X_IF:
@@ -30,7 +29,7 @@ class ComponentX(Component_V_W_X_IF):
 
 
 class ComponentY:
-    def __init__(self, val_y: str, multi_dependency: List[Component_V_W_X_IF]) -> None:
+    def __init__(self, val_y: str, multi_dependency: list[Component_V_W_X_IF]) -> None:
         self.val_y = val_y
         self.multi_dependency = multi_dependency
 
