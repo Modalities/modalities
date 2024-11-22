@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
@@ -111,7 +112,7 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
     packed_dataset = PackedMemMapDatasetContinuous(
-        default_packed_dataset_path, block_size=block_size, sample_key="input_ids"
+        default_packed_dataset_path, block_size=block_size, sample_key="input_ids", load_index=True
     )
 
     # read in the raw jsonl files for manual tokenization
@@ -241,3 +242,20 @@ def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrappe
 
     for sample, original_sample in zip(packed_dataset, jsonl_tokenized):
         assert sample["input_ids"].tolist() == original_sample
+
+
+@pytest.mark.parametrize(
+    "token_size_in_bytes, block_size, total_tokens", [(1, 32, 32), (2, 32, 512), (4, 32, 1000), (4, 32, 1234)]
+)
+def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, total_tokens: int):
+    num_samples = (total_tokens - block_size) // (block_size - 1) + 1
+    # given num_samples we calculate the starting index and length of each sample as tuple.
+    result_slow = [
+        ((i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes) for i in range(num_samples)
+    ]
+
+    result_vectorized = PackedMemMapDatasetContinuous._create_packed_index(
+        total_tokens=total_tokens, block_size=block_size, token_size_in_bytes=token_size_in_bytes
+    )
+
+    assert np.all(result_slow == result_vectorized)

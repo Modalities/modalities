@@ -47,14 +47,12 @@ settings:
       variant_key: num_seen_steps_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
-    local_num_seen_batches:   # for the dataloader
+    num_seen_samples:
       component_key: number_conversion
-      variant_key: local_num_batches_from_num_tokens
+      variant_key: num_samples_from_num_tokens
       config:
-        num_ranks: ${settings.cuda_env.world_size}
-        global_num_tokens: ${settings.training_progress.global_num_seen_tokens}
+        num_tokens: ${settings.training_progress.global_num_seen_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
     last_step:  # for the scheduler
       component_key: number_conversion
       variant_key: last_step_from_checkpoint_path
@@ -66,7 +64,7 @@ settings:
     model_checkpoint_path: eid_0-model-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin   
     optimizer_checkpoint_path: eid_0-optimizer-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin
 
-collate_fn:  
+collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
   config:
@@ -88,7 +86,6 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -100,16 +97,17 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            drop_last: true
-            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE

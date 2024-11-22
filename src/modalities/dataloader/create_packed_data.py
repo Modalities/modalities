@@ -323,12 +323,13 @@ class EmbeddedStreamData:
     TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES = 4
     HEADER_SIZE_IN_BYTES = DATA_SECTION_LENGTH_IN_BYTES + TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES
 
-    def __init__(self, data_path: Path):
+    def __init__(self, data_path: Path, load_index: Optional[bool] = True):
         """
         Initializes an EmbeddedStreamData object.
 
         Args:
             data_path (Path): The path to the packed data file.
+            load_index (bool, optional): Whether to load the index. Defaults to True.
 
         Raises:
             FileNotFoundError: If the packed data file is not found at the specified path.
@@ -352,14 +353,27 @@ class EmbeddedStreamData:
             self.token_size_in_bytes = int.from_bytes(token_size_as_bytes, byteorder="little", signed=False)
 
             # get index
-            f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
-            pkl_encoded_index = f.read()
-            # contains the start offset and length of each segment
-            # as byte positions in the data section
-            self.index_base: list[tuple[int, int]] = pickle.loads(pkl_encoded_index)
+            if load_index:
+                f.seek(self.HEADER_SIZE_IN_BYTES + self.data_len)
+                pkl_encoded_index = f.read()
+                # contains the start offset and length of each segment
+                # as byte positions in the data section
+                self._index_base: list[tuple[int, int]] = pickle.loads(pkl_encoded_index)
+            else:
+                self._index_base = None
 
             # initialize memmapped data section
-            self.data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))
+            self._data = np.memmap(self._data_path, mode="r", offset=self.HEADER_SIZE_IN_BYTES, shape=(self.data_len,))
+
+    @property
+    def index_base(self) -> list[tuple[int, int]]:
+        if self._index_base is None:
+            raise ValueError("Index was not loaded. Set `load_index=True` during initialization.")
+        return self._index_base
+
+    @property
+    def data(self) -> np.ndarray:
+        return self._data
 
 
 def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file: Path, chunk_size: int = 2048):
