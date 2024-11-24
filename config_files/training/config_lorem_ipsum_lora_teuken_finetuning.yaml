@@ -1,0 +1,328 @@
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+  training:
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 25
+    evaluation_interval_in_steps: 40
+    global_num_seen_tokens: 0
+    activation_checkpointing_modules: [ ]
+    gradient_acc_steps: 10
+    local_train_micro_batch_size: 2
+    sequence_length: 2048
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpointing_path: /raid/s3/opengptx/models/modalities/teuken_fine_tuned
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: mask_loss_collator_wrapper
+  config:
+    wrapped_collate_fn:
+      component_key: collate_fn
+      variant_key: gpt_2_llm_collator
+      config:
+        sample_key: ${settings.referencing_keys.sample_key}
+        target_key: ${settings.referencing_keys.target_key}
+    target_keys_to_mask:
+      - ${settings.referencing_keys.target_key}
+    loss_ignore_index: -100
+    mask_tokens:
+      b_include_to_loss_token: <|im_start|>
+      e_include_to_loss_token: <|im_end|>
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+
+val_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+
+test_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    sequence_length: ${settings.training.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.training.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+val_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "val"
+    dataset:
+      instance_key: val_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 2
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            dataset:
+              instance_key: val_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    shuffle: false
+    dataloader_tag: "test"
+    dataset:
+      instance_key: test_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 2
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            dataset:
+              instance_key: test_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
+  - instance_key: test_dataloader
+    pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: 5
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: fsdp
+      config:
+        checkpoint_path: ${settings.paths.checkpointing_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+        get_num_tokens_from_num_steps_callable:
+          component_key: number_conversion
+          variant_key: num_tokens_from_num_steps_callable
+          config:
+            num_ranks: ${settings.cuda_env.world_size}
+            local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+            sequence_length: ${settings.training.sequence_length}
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: target_ids
+    prediction_key: logits
+
+
+huggingface_smol_llm_model:
+  component_key: model
+  variant_key: huggingface_pretrained_model
+  config:
+    model_type: AutoModelForCausalLM
+    model_name: openGPT-X/Teuken-7B-base-v0.4
+    prediction_key: logits
+    huggingface_prediction_subscription_key: logits
+    sample_key: input_ids
+
+checkpointed_model:
+  component_key: model
+  variant_key: checkpointed
+  config:
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: 0
+        precision: FP_32
+    model:
+      instance_key: huggingface_smol_llm_model
+      pass_type: BY_REFERENCE
+    checkpoint_path: /raid/s3/opengptx/models/hub/models--openGPT-X--Teuken-7B-base-v0.4/snapshots/94d8f829a6ad352609d7a48e731b1a5b50dc4642/pytorch_model.bin
+
+lora_model:
+  component_key: model
+  variant_key: lora
+  config:
+    alpha: 1
+    r: 2
+    target_layers:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+    model:
+      instance_key: huggingface_smol_llm_model
+      pass_type: BY_REFERENCE
+
+wrapped_model:
+  component_key: model
+  variant_key: fsdp_wrapped
+  config:
+    model:
+      instance_key: lora_model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: FP_32
+    sharding_strategy: FULL_SHARD
+    block_names: [ LlamaDecoderLayer ]
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_sp_tokenizer
+  config:
+    tokenizer_model_file: /raid/s3/opengptx/models/hub/models--openGPT-X--Teuken-7B-base-v0.4/snapshots/94d8f829a6ad352609d7a48e731b1a5b50dc4642/gptx_tokenizer.py
+#    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
+#    padding: false
+#    truncation: false
+
+scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: 276
+    pct_start: 0.01
+    anneal_strategy: cos
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0001
+    betas: [ 0.9, 0.95 ]
+    eps: 1e-8
+    weight_decay: 1e-1
+    weight_decay_groups_excluded: [ ]
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp
+  config:
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+
+batch_progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    global_num_seen_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.training.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training.global_num_seen_tokens}
+        sequence_length: ${settings.training.sequence_length}
+    gradient_acc_steps: ${settings.training.gradient_acc_steps}
+    train_dataloader:
+      instance_key: train_dataloader
+      pass_type: BY_REFERENCE
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: modalities_lorem_ipsum
+    mode: ONLINE
+    experiment_id: ${settings.experiment_id}
+    directory: "."
+    config_file_path: ${settings.config_file_path}
