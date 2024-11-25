@@ -44,7 +44,7 @@ train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_train.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -53,7 +53,7 @@ val_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -62,7 +62,7 @@ test_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb-edu-CC-MAIN-2013-20.pbin
+    raw_data_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_test.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
     reuse_last_target: false
@@ -252,12 +252,12 @@ wrapped_model:
 
 tokenizer:
   component_key: tokenizer
-  variant_key: pretrained_sp_tokenizer
+  variant_key: pretrained_hf_tokenizer
   config:
-    tokenizer_model_file: /raid/s3/opengptx/models/hub/models--openGPT-X--Teuken-7B-base-v0.4/snapshots/94d8f829a6ad352609d7a48e731b1a5b50dc4642/gptx_tokenizer.py
-#    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
-#    padding: false
-#    truncation: false
+#    tokenizer_model_file: /raid/s3/opengptx/models/hub/models--openGPT-X--Teuken-7B-base-v0.4/snapshots/94d8f829a6ad352609d7a48e731b1a5b50dc4642/gptx_tokenizer.py
+    pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
+    padding: false
+    truncation: false
 
 scheduler:
   component_key: scheduler
