@@ -22,23 +22,10 @@ settings:
 
 collate_fn:
   component_key: collate_fn
-  variant_key: mask_loss_collator_wrapper
+  variant_key: gpt_2_llm_collator
   config:
-    wrapped_collate_fn:
-      component_key: collate_fn
-      variant_key: gpt_2_llm_collator
-      config:
-        sample_key: ${settings.referencing_keys.sample_key}
-        target_key: ${settings.referencing_keys.target_key}
-    target_keys_to_mask:
-      - ${settings.referencing_keys.target_key}
-    loss_ignore_index: -100
-    mask_tokens:
-      b_include_to_loss_token: <|im_start|>
-      e_include_to_loss_token: <|im_end|>
-    tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
 
 train_dataset:
   component_key: dataset
@@ -254,7 +241,6 @@ tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-#    tokenizer_model_file: /raid/s3/opengptx/models/hub/models--openGPT-X--Teuken-7B-base-v0.4/snapshots/94d8f829a6ad352609d7a48e731b1a5b50dc4642/gptx_tokenizer.py
     pretrained_model_name_or_path: ${huggingface_smol_llm_model.config.model_name}
     padding: false
     truncation: false
