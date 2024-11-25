@@ -1,15 +1,19 @@
 settings:
-  src_path: data/lorem_ipsum.jsonl
-  dst_path: data/lorem_ipsum.pbin
-  index_path: data/lorem_ipsum.idx
+  src_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.jsonl
+  dst_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.pbin
+  index_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.idx
   jq_pattern: .text
   num_cpus: ${node_env:num_cpus}
   eod_token: <|endoftext|>
+  processing_batch_size: 10
+  raw_samples_queue_size: 300
+  processed_samples_queue_size: 300
+  sequence_length: 2048
 
 tokenizer:
   component_key: tokenizer
   variant_key: pretrained_hf_tokenizer
   config:
-    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    pretrained_model_name_or_path: openGPT-X/Teuken-7B-base-v0.4
     padding: false
     truncation: false
