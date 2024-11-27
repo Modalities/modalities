@@ -113,8 +113,11 @@ class LargeFileLinesReader(BaseReader):
         # If use_sample_length_from_index = False, we calculate the sample length as the difference between the
         # starting point of the next and the current sample.
         # This allows for reading in the entire sample including the newline character.
-        if not self.use_sample_length_from_index and key + 1 < len(self.index):
-            sample_length_in_bytes = self.index[key + 1][0] - self.index[key][0]
+        if not self.use_sample_length_from_index:
+            if key + 1 < len(self.index):
+                sample_length_in_bytes = self.index[key + 1][0] - self.index[key][0]
+            else:
+                sample_length_in_bytes = len(self.mmapped_data_file) - offset
 
         return self._read_from_raw_file(offset, sample_length_in_bytes)
 

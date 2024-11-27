@@ -63,14 +63,18 @@ def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length
     assert raw_data_path.read_text().count("\n") == 12
     assert raw_data_path.read_text().rsplit("\n")[-1] == ""
     if use_sample_length_from_index:
-        print([item[-1] for item in reader])
-        assert all([item[-1] != "\n" for item in reader])
+        for item in reader:
+            # make sure that we load valid json
+            json.loads(item)
+            assert item[-1] != "\n"
     else:
-        # all but the last sample should have a trailing "\n"-char
-        # Since we don't know if the last document of  every JSONL file a trailing "\n"-char
-        # we always read the last sample as defined by sample's length in the index (i.e., without any \n chars).
-        print(reader[0])
-        assert all([item[-1] == "\n" for item in reader][:-1])
+        # all samples must have a trailing "\n"-char
+        # This is especially important when we sample rows to create sub datasets
+        # If the last line does not have a trailing "\n"-char, then two samples can get merged into one
+        for item in reader:
+            assert item[-1] == "\n"
+            json.loads(item[:-1])
+
     # content of dummy data contains trailing "\n"-char. Expected amount of samples therefore == amount of lines - 1
     assert len(reader) == 12
     assert all(map(len, reader))
@@ -83,6 +87,7 @@ def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path
 
     for item_binary, item_text in zip(reader_binary, reader_text):
         assert item_binary.decode("utf_8") == item_text
+        assert item_text.endswith("\n")
 
 
 def test_large_file_lines_reader_missing_source_data(tmpdir, dummy_data_path):
