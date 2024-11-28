@@ -133,7 +133,7 @@ def data():
     help="output path for index. will use parent directory of src_path if none.",
 )
 def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
-    """Utility CMD IF for indexing the confent of a large jsonl-file.
+    """Utility CMD IF for indexing the content of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
     It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.

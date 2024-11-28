@@ -98,7 +98,7 @@ class LargeFileLinesReader(BaseReader):
         Retrieves an item from the LargeFileLinesReader.
 
         Args:
-            key (int): The index or slice used to retrieve the item(s).
+            key (int): The index used to retrieve the item.
 
         Returns:
             str | bytes: The item retrieved from the LargeFileLinesReader.
