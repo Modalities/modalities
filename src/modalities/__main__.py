@@ -152,7 +152,7 @@ def entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     os.makedirs(index_path.parent, exist_ok=True)
     if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
+        raise ValueError(f"Index already exists in {index_path}. Delete it or specify different output folder.")
 
     print(f"reading raw data from {src_path}")
     print(f"writing index to {index_path}")

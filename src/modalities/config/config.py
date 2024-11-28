@@ -265,6 +265,17 @@ class DistributedSamplerConfig(BaseModel):
     drop_last: Literal[True] = True
 
 
+class ResumableDistributedSamplerConfig(BaseModel):
+    dataset: PydanticDatasetIFType
+    rank: Annotated[int, Field(strict=True, ge=0)]
+    num_replicas: Annotated[int, Field(strict=True, ge=0)] = None
+    epoch: Annotated[int, Field(strict=True, ge=0)] = 0
+    shuffle: Optional[bool] = False
+    seed: Optional[int] = 0
+    drop_last: Literal[True] = True
+    skip_num_global_samples: Annotated[int, Field(strict=True, ge=0)] = 0
+
+
 class MemMapDatasetConfig(BaseModel):
     raw_data_path: FilePath
     index_path: Optional[FilePath] = None
@@ -285,15 +296,14 @@ class PackedMemMapDatasetMegatronConfig(BaseModel):
     sample_key: str
 
 
+class CombinedDatasetConfig(BaseModel):
+    datasets: list[PydanticDatasetIFType]
+
+
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]
     drop_last: Literal[True] = True
-
-
-class ResumableBatchSamplerConfig(BaseModel):
-    sampler: PydanticSamplerIFType
-    start_index: Annotated[int, Field(strict=True, gt=0)]
 
 
 class GPT2LLMCollateFnConfig(BaseModel):
@@ -308,14 +318,6 @@ class LLMDataLoaderConfig(BaseModel):
     collate_fn: Optional[PydanticCollateFnIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
-    skip_num_batches: Optional[int] = 0
-    fixed_num_batches: Optional[int] = None
-
-
-class RepeatingDataLoaderConfig(BaseModel):
-    dataloader: PydanticLLMDataLoaderIFType
-    reshuffle_after_epoch: Optional[bool] = False
-    num_epochs: Annotated[int, Field(strict=True, ge=1)]
 
 
 class DummyProgressSubscriberConfig(BaseModel):
