@@ -91,7 +91,7 @@ This PR mainly addresses the warmstart of model training, e.g., after GPU crashe
 ## PR #269 Large file reader efficiency improvements and byte reading support
 
 This PR makes the LargeFileLinesReader about 50% faster by using mmap instead of file seek operations. 
-We can also now configure the encoding used for reading the documents. If encoding is specifically set to None (default it utf-8), we return the document as a byte string not enforcing any encoding. This is especially helful when we e.g., sample from the data and want to create a subset of the dataset. In this case, we can just pass around the bytes representation. 
+We can also now configure the encoding used for reading the documents. If encoding is specifically set to None (default is utf-8), we return the document as a byte string not enforcing any encoding. This is especially helpful when we e.g., sample from the data and want to create a subset of the dataset. In this case, we can just pass around the bytes representation. 
 
 
 **Breaking Changes**
