@@ -80,17 +80,26 @@ def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length
     assert all(map(len, reader))
 
 
-def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path):
+@pytest.mark.parametrize(
+    "use_sample_length_from_index",
+    [True, False],
+)
+def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path, use_sample_length_from_index: bool):
     raw_data_path = indexed_dummy_data_path.raw_data_path
-    reader_binary = LargeFileLinesReader(raw_data_path, use_sample_length_from_index=False, encoding=None)
-    reader_text = LargeFileLinesReader(raw_data_path, use_sample_length_from_index=False, encoding="utf-8")
+    reader_binary = LargeFileLinesReader(
+        raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding=None
+    )
+    reader_text = LargeFileLinesReader(
+        raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding="utf-8"
+    )
 
     for item_binary, item_text in zip(reader_binary, reader_text):
         assert item_binary.decode("utf_8") == item_text
-        assert item_text.endswith("\n")
+        # make sure that when we use sample length from index, we do not have a trailing "\n"-char
+        assert use_sample_length_from_index == (not item_text.endswith("\n"))
 
 
-def test_large_file_lines_reader_missing_source_data(tmpdir, dummy_data_path):
+def test_large_file_lines_reader_missing_source_data(dummy_data_path):
     raw_data_path = dummy_data_path.raw_data_path
     raw_data_path.unlink(missing_ok=True)
     assert not raw_data_path.exists()

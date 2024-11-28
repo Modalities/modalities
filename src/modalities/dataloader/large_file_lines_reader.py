@@ -123,7 +123,6 @@ class LargeFileLinesReader(BaseReader):
 
     def _read_from_raw_file(self, offset: int, sample_length_in_bytes: int) -> str | bytes:
         # Reads a specified number of bytes from a raw file starting from a given offset.
-        # whence = 0 means offse calculated from the beginning of the file
         data = self.mmapped_data_file[offset : offset + sample_length_in_bytes]
         if self.encoding is not None:
             data_decoded = data.decode(self.encoding)
