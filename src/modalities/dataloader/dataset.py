@@ -206,7 +206,7 @@ class PackedMemMapDatasetBase(Dataset):
     }
     type_converter_for_torch = {1: np.uint8, 2: np.int32, 4: np.int64}
 
-    def __init__(self, raw_data_path: Path, sample_key: str):
+    def __init__(self, raw_data_path: Path, sample_key: str, load_index: Optional[bool] = True):
         """
         Initializes the PackedMemMapDatasetBase object.
 
@@ -214,6 +214,7 @@ class PackedMemMapDatasetBase(Dataset):
             raw_data_path (Path): Path to a packed binary file (*.pbin).
                 Use `modalities data pack_encoded_data` to create one based on a JSONL-file.
             sample_key (str): The key to access the sample in the BatchEncoding.
+            load_index (bool, optional): Flag indicating whether to load the index. Defaults to True.
 
         Raises:
             RuntimeError: If the token representation with the given size is not supported.
@@ -226,16 +227,16 @@ class PackedMemMapDatasetBase(Dataset):
                   this needs to get replaced with a list of sample keys!
         """
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
-        self._embedded_stream_data = EmbeddedStreamData(raw_data_path)
+        self._embedded_stream_data = EmbeddedStreamData(raw_data_path, load_index=load_index)
         self._token_size_in_bytes = self._embedded_stream_data.token_size_in_bytes
         try:
             self._token_dtype_on_disk = self.np_dtype_of_tokens_on_disk_from_bytes[self._token_size_in_bytes]
             self._token_dtype_in_ram = self.type_converter_for_torch[self._token_size_in_bytes]
-        except KeyError:
+        except KeyError as e:
             raise RuntimeError(
                 f"Encountered a required token representation with {self._token_size_in_bytes},"
                 " which is not supported. Consider using a smaller vocabulary."
-            )
+            ) from e
         self._index = self._generate_packing_index()
 
     def _generate_packing_index(self) -> list[tuple[int, int]]:
@@ -292,7 +293,7 @@ class PackedMemMapDatasetBase(Dataset):
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     """PackedMemMapDatasetContinuous class."""
 
-    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int):
+    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, load_index: Optional[bool] = False):
         """
         Initializes the PackedMemMapDatasetContinuous object.
 
@@ -301,12 +302,38 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
                 Use `modalities data pack_encoded_data` to create one based on a JSONL-file.
             sample_key (str): The key to access the sample in the BatchEncoding.
             block_size (int): The size of the block.
+            load_index (bool, optional): Flag indicating whether to load the index.
+                This is only needed for debugging purposes to index the original documents.
+                The continuous packing does not need to load the index and should be
+                deactivated as it significantly increases the instantiation time. Defaults to False.
 
         Returns:
             None
         """
         self.block_size = block_size
-        super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
+        # TODO passing the load_index flag does not really comply with the inversion
+        # of control principle. We should refactor this in the future.
+        super().__init__(raw_data_path=raw_data_path, sample_key=sample_key, load_index=load_index)
+
+    @staticmethod
+    def _create_packed_index(total_tokens: int, block_size: int, token_size_in_bytes: int) -> list[tuple[int, int]]:
+        # Given a fixed number of samples we can compute the total number of tokens as
+        # num_tokens = block_size + (block_size-1) * (num_samples-1)
+        # as the first sample always needs block_size many tokens and the following samples
+        # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
+        # of the subsequent sample).
+        num_samples = (total_tokens - block_size) // (block_size - 1) + 1
+        # create an index array of the form [0, 1, 2, ..., num_samples-1]
+        i_array = np.arange(num_samples)
+        # Vectorized operations
+        # create the starting byte position of each sample
+        first_component = (i_array * block_size - i_array) * token_size_in_bytes
+        # create the second component, which is the length of each sample in bytes
+        second_component = np.full(num_samples, block_size * token_size_in_bytes)
+
+        # Combine both components into a 2D array of tuples (or list of tuples if needed)
+        result = np.stack((first_component, second_component), axis=1)
+        return result
 
     def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
@@ -321,17 +348,9 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             )
         if self.block_size < 2:
             raise ValueError("Block size must be at least 2.")
-        # Given a fixed number of samples we can compute the total number of tokens as
-        # num_tokens = block_size + (block_size-1) * (num_samples-1)
-        # as the first sample always needs block_size many tokens and the following samples
-        # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
-        # of the subsequent sample).
-        num_samples = (total_tokens - self.block_size) // (self.block_size - 1) + 1
-        # given num_samples we calculate the starting index and length of each sample as tuple.
-        return [
-            ((i * self.block_size - i) * self._token_size_in_bytes, self.block_size * self._token_size_in_bytes)
-            for i in range(num_samples)
-        ]
+
+        result = self._create_packed_index(total_tokens, self.block_size, self._token_size_in_bytes)
+        return result
 
 
 class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
@@ -368,3 +387,46 @@ class PackedMemMapDatasetMegatron(PackedMemMapDatasetBase):
                     curr_offset = segment_offset
                     curr_len = segment_len
         return index
+
+
+class CombinedDataset(Dataset):
+    """Combines multiple datasets into one large dataset at runtime.
+
+    Note: When using this class to combine multiple `PackedMemMapDataset`s, then each packed sample
+    is packed from a single dataset (i.e., the samples are not mixed between datasets).
+    In the Dataloader a batch will still contain packed samples from different datasets.
+    """
+
+    def __init__(self, datasets: list[Dataset]):
+        """Initializes the CombinedDataset object, combining multiple datasets.
+
+        Args:
+            datasets (list[Dataset]): A list of datasets to combine.
+        """
+        self.datasets = datasets
+        self.cumulative_sizes = CombinedDataset._get_cumulated_sizes(datasets=datasets)
+
+    @staticmethod
+    def _get_cumulated_sizes(datasets: list[Dataset]) -> list[int]:
+        total = 0
+        cumulated_sizes = [0]
+        for dataset in datasets:
+            total += len(dataset)
+            cumulated_sizes.append(total)
+        return cumulated_sizes
+
+    def _find_dataset_idx(self, idx: int) -> int:
+        for i, cumulative_size in enumerate(self.cumulative_sizes):
+            if idx < cumulative_size:
+                return i - 1
+        raise IndexError(f"Index {idx} is out of bounds.")
+
+    def __len__(self) -> int:
+        return self.cumulative_sizes[-1]
+
+    def __getitem__(self, idx: int) -> dict:
+        dataset_idx = self._find_dataset_idx(idx)
+        local_idx = idx - self.cumulative_sizes[dataset_idx]
+
+        sample = self.datasets[dataset_idx][local_idx]
+        return sample

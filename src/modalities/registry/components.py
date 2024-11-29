@@ -23,6 +23,7 @@ from modalities.config.config import (
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
+    CombinedDatasetConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DistributedSamplerConfig,
@@ -40,7 +41,7 @@ from modalities.config.config import (
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
-    RepeatingDataLoaderConfig,
+    ResumableDistributedSamplerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
@@ -53,6 +54,7 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
@@ -87,6 +89,7 @@ from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumTokensConfig,
     NumberConversion,
     NumberConversionFromCheckpointPathConfig,
+    NumSamplesFromNumTokensConfig,
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
     NumStepsFromRawDatasetIndexConfig,
@@ -175,8 +178,12 @@ COMPONENTS = [
         PackedMemMapDatasetMegatronConfig,
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
+    ComponentEntity("dataset", "combined", DatasetFactory.get_combined_dataset, CombinedDatasetConfig),
     # samplers
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
+    ComponentEntity(
+        "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
+    ),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
@@ -184,9 +191,6 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
-    ComponentEntity(
-        "data_loader", "repeating_data_loader", DataloaderFactory.get_repeating_dataloader, RepeatingDataLoaderConfig
-    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
@@ -254,6 +258,12 @@ COMPONENTS = [
         "local_num_batches_from_num_tokens",
         NumberConversion.get_local_num_batches_from_num_tokens,
         LocalNumBatchesFromNumTokensConfig,
+    ),
+    ComponentEntity(
+        "number_conversion",
+        "num_samples_from_num_tokens",
+        NumberConversion.get_num_samples_from_num_tokens,
+        NumSamplesFromNumTokensConfig,
     ),
     ComponentEntity(
         "number_conversion",

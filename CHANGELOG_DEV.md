@@ -65,7 +65,7 @@ This [PR](https://github.com/Modalities/modalities/pull/236) removes all code re
 
 **Breaking changes:** 
 * None
-* 
+ 
 
 ## PR #254 Warmstart infrastructure switch
 
@@ -86,6 +86,29 @@ This PR mainly addresses the warmstart of model training, e.g., after GPU crashe
 **Breaking Changes**
 * the settings part of the configs have been completely refactored
 
+
+
+## PR #261 Dataloader inefficiencies fix and combined dataset feature
+
+This PR addresses issue #258 (inefficiencies in the dataloader) and additionally introduces a combined dataset, where a dataset can now comprise a list of datasets and iterate over them.
+As part of fixing the dataloader inefficiencies, we now implement the sample skipping functionality not on the dataloader level  anymore but in an adapted version of the PyTorch `DistributedSampler`. I reran a warm start and the learning is equivalent to a full, non-warmstarted run. 
+
+<img width="1415" alt="Screenshot 2024-09-27 at 10 36 19" src="https://github.com/user-attachments/assets/65dfb1ed-e96b-4f50-a127-bc9d240ddff9">
+
+
+**General Changes**
+* Introduced `ResumableDistributedSampler` which is a copy of the PyTorch `DistributedSampler` added with the feature to skip samples. This is from now on used for warmstarts instead of the `skip_num_samples` in the Dataloader. In case of skipping samples, the dataloader had to instantiate a `ResumableBatchSampler` which was internally iterating over all the dataset indices. For small datasets this was fine, but for larger datasets (in the trillion token range) this became a bottleneck at instantiation time:
+https://github.com/Modalities/modalities/blob/b79d04d3e92d0845c5ec91f8dd41176fd543cb23/src/modalities/dataloader/samplers.py#L25-L28
+Skipping in the  `ResumableDistributedSampler` is skipping in O(1) now. The `ResumableBatchSampler` was removed from the codebase.
+* Replaced the packed index generation routine (inefficient due to for loop)
+https://github.com/Modalities/modalities/blob/b79d04d3e92d0845c5ec91f8dd41176fd543cb23/src/modalities/dataloader/dataset.py#L331-L334
+with a vectorized version.
+* added new `NumberConversion` routine `num_samples_from_num_tokens `
+
+**Breaking Changes**
+* Removed RepeatingDataloader, as a feature that was never actively used for running multiple epochs and had complex maintenance when refactoring the sampling. If needed we could reimpliment it. 
+*  In the settings, the `training_progress` section has now `num_seen_samples` instead of `local_num_seen_batches `, as skipping is now done on the Sampler level and not on the dataloader level anymore
+* `batch_size ` and `fast_forward_batch_id ` fields in the `LLMDataLoader ` are not neede anymore and were removed.
 
 
 ## PR #269 Large file reader efficiency improvements and byte reading support

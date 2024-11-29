@@ -20,6 +20,11 @@ class LocalNumBatchesFromNumTokensConfig(BaseModel):
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
 
 
+class NumSamplesFromNumTokensConfig(BaseModel):
+    num_tokens: Annotated[int, Field(strict=True, ge=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
+
+
 class NumStepsFromNumSamplesConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
@@ -97,6 +102,20 @@ class NumberConversion:
             int: Number of local batches for single rank.
         """
         return (global_num_samples) // num_ranks // local_micro_batch_size
+
+    @staticmethod
+    def get_num_samples_from_num_tokens(num_tokens: int, sequence_length: int) -> int:
+        """Calculates the number of samples given the global number of tokens and sequence length.
+
+        Args:
+            num_tokens (int): Global number of tokens.
+            sequence_length (int): Sequence length of the model.
+
+        Returns:
+            int: Number of samples.
+        """
+        num_samples = num_tokens // sequence_length
+        return num_samples
 
     @staticmethod
     def get_local_num_batches_from_num_tokens(
