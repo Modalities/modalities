@@ -146,3 +146,6 @@ def test_load_lora_model_from_checkpointed_lora_model(checkpoint_path):
     # 1. load model from data/checkpoints/lora_training.yaml and the corresponding bin files
     # 2. check if the model is a lora model
     ...
+
+
+def test_load_lora_model_from_hugging_face_checkpoint(): ...  # todo
