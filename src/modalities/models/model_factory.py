@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 import torch
 import torch.distributed as dist
@@ -7,6 +8,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.models.lora.utils import convert_to_lora
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
@@ -131,4 +133,19 @@ class ModelFactory:
                     "Activation checkpointing can only be applied to FSDP-wrapped models! "
                     f"Current model type: {type(model)}"
                 )
+        return model
+
+    @staticmethod
+    def get_lora_model(
+        model: nn.Module,
+        r: int,
+        alpha: int,
+        target_layers: List[str],
+    ) -> nn.Module:
+        model = convert_to_lora(
+            model=model,
+            r=r,
+            alpha=alpha,
+            target_layers=target_layers,
+        )
         return model

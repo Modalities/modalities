@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, List
 
 import torch
 from omegaconf import OmegaConf
@@ -158,12 +158,12 @@ class OneCycleLRSchedulerConfig(BaseModel):
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
     cycle_momentum: bool = True
-    base_momentum: Annotated[float, Field(strict=True, gt=0)] | list[
-        Annotated[float, Field(strict=True, gt=0.0)]
-    ] = 0.85
-    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | list[
-        Annotated[float, Field(strict=True, gt=0.0)]
-    ] = 0.95
+    base_momentum: Annotated[float, Field(strict=True, gt=0)] | list[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.85
+    )
+    max_momentum: Annotated[float, Field(strict=True, gt=0.0)] | list[Annotated[float, Field(strict=True, gt=0.0)]] = (
+        0.95
+    )
     div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     three_phase: bool = False
@@ -348,6 +348,13 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
     global_rank: int
+
+
+class LoraConfig(BaseModel):
+    alpha: int
+    r: int
+    target_layers: List[str]
+    model: PydanticPytorchModuleType
 
 
 def load_app_config_dict(config_file_path: Path) -> dict:

@@ -50,6 +50,7 @@ from modalities.config.config import (
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
+    LoraConfig,
 )
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
@@ -136,6 +137,7 @@ COMPONENTS = [
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity("model", "lora", ModelFactory.get_lora_model, LoraConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
