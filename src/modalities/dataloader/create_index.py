@@ -112,6 +112,8 @@ class IndexGenerator:
                 if self._check_for_parallel_errors():
                     return
                 if fin.tell() == self._total_num_chars:
+                    if line[-1] == "\n":
+                        line = line[:-1]
                     self._queue_of_raw_lines.put((cursor, line))
                     break
                 line_without_newline_char = line[:-1]
