@@ -8,6 +8,7 @@ import pytest
 
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from tests.conftest import DataPathCollection
 
 
 def create_dummy_data(tmpdir_path: Path, content: str) -> Path:
@@ -55,7 +56,7 @@ def test_index_creation(tmpdir, dummy_content_text):
     "use_sample_length_from_index",
     [True, False],
 )
-def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length_from_index):
+def test_large_file_lines_reader_text(indexed_dummy_data_path: DataPathCollection, use_sample_length_from_index: bool):
     raw_data_path = indexed_dummy_data_path.raw_data_path
     reader = LargeFileLinesReader(
         raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding="utf-8"
@@ -84,7 +85,9 @@ def test_large_file_lines_reader_text(indexed_dummy_data_path, use_sample_length
     "use_sample_length_from_index",
     [True, False],
 )
-def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path, use_sample_length_from_index: bool):
+def test_large_file_lines_reader_binary_text_equivalence(
+    indexed_dummy_data_path: DataPathCollection, use_sample_length_from_index: bool
+):
     raw_data_path = indexed_dummy_data_path.raw_data_path
     reader_binary = LargeFileLinesReader(
         raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding=None
@@ -99,7 +102,7 @@ def test_large_file_lines_reader_binary_text_equivalence(indexed_dummy_data_path
         assert use_sample_length_from_index == (not item_text.endswith("\n"))
 
 
-def test_large_file_lines_reader_missing_source_data(dummy_data_path):
+def test_large_file_lines_reader_missing_source_data(dummy_data_path: DataPathCollection):
     raw_data_path = dummy_data_path.raw_data_path
     raw_data_path.unlink(missing_ok=True)
     assert not raw_data_path.exists()

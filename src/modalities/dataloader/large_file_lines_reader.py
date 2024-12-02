@@ -11,7 +11,7 @@ class BaseReader(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __getitem__(self, key: int | slice) -> str | list[str]:
+    def __getitem__(self, key: int) -> str | list[str]:
         raise NotImplementedError
 
 
