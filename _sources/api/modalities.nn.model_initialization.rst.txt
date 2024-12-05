@@ -1,0 +1,45 @@
+modalities.nn.model\_initialization package
+===========================================
+
+Submodules
+----------
+
+modalities.nn.model\_initialization.composed\_initialization module
+-------------------------------------------------------------------
+
+.. automodule:: modalities.nn.model_initialization.composed_initialization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.nn.model\_initialization.initialization\_if module
+-------------------------------------------------------------
+
+.. automodule:: modalities.nn.model_initialization.initialization_if
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.nn.model\_initialization.initialization\_routines module
+-------------------------------------------------------------------
+
+.. automodule:: modalities.nn.model_initialization.initialization_routines
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+modalities.nn.model\_initialization.parameter\_name\_filters module
+-------------------------------------------------------------------
+
+.. automodule:: modalities.nn.model_initialization.parameter_name_filters
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.nn.model_initialization
+   :members:
+   :undoc-members:
+   :show-inheritance:
