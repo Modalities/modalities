@@ -119,3 +119,12 @@ We can also now configure the encoding used for reading the documents. If encodi
 
 **Breaking Changes**
 * None
+
+
+## PR #280 Bugfix: the number of bytes per token were wrongly calculated
+
+This PR fixes the bytes per token calculation.
+Generally, we estimate how many bytes are needed to encode the full range of the vocabulary. 
+E.g., for a vocab size > 65536, we need 3 bytes for each token in the pbin file. 
+
+The calculation was wrong but coincidentally correct for the GPT2 tokenizer. 
