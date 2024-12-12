@@ -67,7 +67,7 @@ class PackedDataGenerator:
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
-        self._reader = LargeFileLinesReader(src_path, index_path=index_path)
+        self._reader = LargeFileLinesReader(src_path, index_path=index_path)  # reads string with utf-8 encoding
         self._total_num_of_tokens = 0
         self._raw_samples_queue = multiprocessing.Queue(maxsize=raw_samples_queue_size)
         self.processed_samples_queue = multiprocessing.Queue(maxsize=processed_samples_queue_size)
@@ -251,7 +251,6 @@ class PackedDataGenerator:
         def reader():
             batch = []
             for line_id, line in tqdm(enumerate(self._reader), desc="Reading jsonl", disable=True):
-                # line = self._reader[line_id]
                 batch.append((line_id, line))
                 if len(batch) % self.processing_batch_size == 0:
                     self._raw_samples_queue.put(batch)
@@ -290,7 +289,7 @@ class PackedDataGenerator:
                 )
             except Exception as exception:
                 warnings.warn(
-                    f"Could not process line of number {line_id} within process {process_id}. "
+                    f"Could not process line {line_id} in {self.src_path} within process {process_id}. "
                     f"Raised the following error: {exception=}"
                 )
                 traceback.print_exc()
