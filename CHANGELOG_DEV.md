@@ -121,7 +121,7 @@ We can also now configure the encoding used for reading the documents. If encodi
 * None
 
 
-## PR #280 Bugfix: the number of bytes per token were wrongly calculated
+## PR #280 Bug fix: the number of bytes per token were wrongly calculated
 
 This PR fixes the bytes per token calculation.
 Generally, we estimate how many bytes are needed to encode the full range of the vocabulary. 
@@ -131,9 +131,26 @@ The calculation was wrong but coincidentally correct for the GPT2 tokenizer.
 
 
 
-## PR #281: The char-based index is not always consistent with the byte-based index.
+## PR #281: Bug fix: The char-based index is not always consistent with the byte-based index.
 
 The first character of the string "ø This is..." is written on disc as two bytes, namely \xc3\xb8, when encoded as utf-8. 
 Therefore, the byte-based index has one more byte/char than the char-based index. 
 
 For consistency, we don't consider any char-based indexes anymore and always refer to byte-based indexes. 
+
+
+## PR #282: Bug fix: Enforce power of 2 number of bytes per token
+
+
+Previously, the number of bytes per token was calculated by `math.ceil(log_2(vocab_size)/8)`, leading to ranges between 1 and 4 bytes. 
+However, the dataset implementation only support 1, 2 and 4 bytes per token, as defined here
+
+https://github.com/Modalities/modalities/blob/0483362abac93e45850e56adaea7921e96836d59/src/modalities/dataloader/dataset.py#L202-L206
+
+and 
+
+https://github.com/Modalities/modalities/blob/0483362abac93e45850e56adaea7921e96836d59/src/modalities/dataloader/dataset.py#L233-L234
+
+I added a switch case that maps to the respective byte sizes, when packing the data.
+
+This adds some inefficiencies as a vobabulary size > 65536 already requires 4 bytes per token, effectively doubling the storage requirements. 
