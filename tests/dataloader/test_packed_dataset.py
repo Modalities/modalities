@@ -263,7 +263,7 @@ def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, to
 
 @pytest.mark.parametrize(
     "vocab_size, expected_num_bytes",
-    [(254, 1), (255, 1), (256, 1), (257, 2), (65534, 2), (65535, 2), (65536, 2), (65537, 3)],
+    [(254, 1), (255, 1), (256, 1), (257, 2), (65534, 2), (65535, 2), (65536, 2), (65537, 4), (65538, 4), (10000000, 4)],
 )
 def test__get_required_num_of_bytes_to_repr(vocab_size: int, expected_num_bytes: int):
     num_bytes = PackedDataGenerator._get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
