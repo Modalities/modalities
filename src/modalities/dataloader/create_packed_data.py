@@ -323,7 +323,10 @@ class PackedDataGenerator:
         tokens = self.tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
-        return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
+        token_byte_string = b"".join(map(self._encoded_token_to_bytes, tokens))
+        if not token_byte_string.endswith(self._encoded_eos_token_as_bytes):
+            token_byte_string = token_byte_string + self._encoded_eos_token_as_bytes
+        return token_byte_string
 
 
 class EmbeddedStreamData:
