@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC
 from typing import Optional
 
@@ -8,11 +9,12 @@ from transformers import AutoTokenizer
 class TokenizerWrapper(ABC):
     """Abstract interface for tokenizers."""
 
-    def tokenize(self, text: str) -> list[int]:
+    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
+            add_special_tokens (bool, optional): Flag whether to add special tokens. Defaults to True.
 
         Raises:
             NotImplementedError: Must be implemented by a subclass.
@@ -62,6 +64,20 @@ class TokenizerWrapper(ABC):
         """
         raise NotImplementedError
 
+    def is_special_token_id(self, token_id: int) -> bool:
+        """Returns whether a token ID is a special token ID.
+
+        Args:
+            token_id (int): Token ID to check.
+
+        Raises:
+            NotImplementedError: Must be implemented by a subclass.
+
+        Returns:
+            bool: Flag whether the token ID is a special token ID.
+        """
+        raise NotImplementedError
+
 
 class PreTrainedHFTokenizer(TokenizerWrapper):
     """Wrapper for pretrained Hugging Face tokenizers."""
@@ -102,6 +118,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding
+        self.special_token_ids = set(self.tokenizer.all_special_ids)
 
     @property
     def vocab_size(self) -> int:
@@ -121,11 +138,12 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         """
         return self.tokenizer.special_tokens_map
 
-    def tokenize(self, text: str) -> list[int]:
+    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
+            add_special_tokens (bool, optional): Flag whether to add special tokens. Defaults to True.
 
         Returns:
             list[int]: List of token IDs.
@@ -135,6 +153,7 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             max_length=self.max_length,
             padding=self.padding,
             truncation=self.truncation,
+            add_special_tokens=add_special_tokens,
         )["input_ids"]
         return tokens
 
@@ -167,6 +186,17 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             raise ValueError("Token is not represented by a single token id!")
         return token_id
 
+    def is_special_token_id(self, token_id: int) -> bool:
+        """Returns whether a token ID is a special token ID.
+
+        Args:
+            token_id (int): Token ID to check.
+
+        Returns:
+            bool: Flag whether the token ID is a special token ID.
+        """
+        return token_id in self.special_token_ids
+
 
 class PreTrainedSPTokenizer(TokenizerWrapper):
     """Wrapper for pretrained SentencePiece tokenizers."""
@@ -180,15 +210,19 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         self.tokenizer = spm.SentencePieceProcessor()
         self.tokenizer.Load(tokenizer_model_file)
 
-    def tokenize(self, text: str) -> list[int]:
+    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
+            add_special_tokens (bool, optional): Flag whether to add special tokens.
+                WARNING: This attribute is ignored currently. Defaults to True.
 
         Returns:
             list[int]: List of token IDs.
         """
+        warnings.warn("The attribute `add_special_tokens` is not used in this implementation.")
+
         tokens = self.tokenizer.encode(text)
         return tokens
 
