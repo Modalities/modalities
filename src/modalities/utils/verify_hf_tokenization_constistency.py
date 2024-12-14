@@ -93,7 +93,9 @@ def verify_pbin(src_path: Path, pbin_path: Path, eod_token: str, hf_tokenizer_na
         if recomputed_sample[-1] != eod_token_id:
             assert recomputed_sample[-1] not in special_tokens
             if i == 0:
-                warnings.warn("The last token of the tokenized string is not the eod token")
+                warnings.warn(
+                    f"The tokenizer {tokenizer.name_or_path} does not add the eod token at the end of the string!"
+                )
             assert len(pbin_sample) - 1 == len(recomputed_sample)
             assert all(pbin_sample[:-1] == recomputed_sample)
         else:
