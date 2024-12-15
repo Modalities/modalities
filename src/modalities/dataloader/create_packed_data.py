@@ -64,16 +64,6 @@ class PackedDataGenerator:
         self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
         eod_token_id = self.tokenizer.get_token_id(self.eod_token)
-        # check if eod token is a special token
-        encoded_eod_token = self.tokenizer.tokenize(eod_token, add_special_tokens=False)
-        if not self.tokenizer.is_special_token_id(eod_token_id):
-            raise ValueError(
-                f"EOD token is not a special token. (EOD token: {self.eod_token}, token_id: {eod_token_id})"
-            )
-        if len(encoded_eod_token) != 1:
-            raise ValueError(
-                f"EOD token is not a single token. (EOD token: {self.eod_token}, token_ids: {encoded_eod_token})"
-            )
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(eod_token_id)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
