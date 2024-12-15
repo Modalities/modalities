@@ -9,12 +9,11 @@ from transformers import AutoTokenizer
 class TokenizerWrapper(ABC):
     """Abstract interface for tokenizers."""
 
-    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
+    def tokenize(self, text: str) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
-            add_special_tokens (bool, optional): Flag whether to add special tokens. Defaults to True.
 
         Raises:
             NotImplementedError: Must be implemented by a subclass.
@@ -138,12 +137,11 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
         """
         return self.tokenizer.special_tokens_map
 
-    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
+    def tokenize(self, text: str) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
-            add_special_tokens (bool, optional): Flag whether to add special tokens. Defaults to True.
 
         Returns:
             list[int]: List of token IDs.
@@ -153,7 +151,6 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             max_length=self.max_length,
             padding=self.padding,
             truncation=self.truncation,
-            add_special_tokens=add_special_tokens,
         )["input_ids"]
         return tokens
 
@@ -182,8 +179,10 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             int: Token ID.
         """
         token_id = self.tokenizer.convert_tokens_to_ids(token)
-        if isinstance(token_id, list):
+        if token_id is None:
             raise ValueError("Token is not represented by a single token id!")
+        elif token_id == self.tokenizer.unk_token_id:
+            warnings.warn(f"The provided eod token {token} has the same token id ({token_id}) as the unk token")
         return token_id
 
     def is_special_token_id(self, token_id: int) -> bool:
@@ -210,21 +209,17 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         self.tokenizer = spm.SentencePieceProcessor()
         self.tokenizer.Load(tokenizer_model_file)
 
-    def tokenize(self, text: str, add_special_tokens: bool = True) -> list[int]:
+    def tokenize(self, text: str) -> list[int]:
         """Tokenizes a text into a list of token IDs.
 
         Args:
             text (str): Text to be tokenized.
-            add_special_tokens (bool, optional): Flag whether to add special tokens.
-                WARNING: This attribute is ignored currently. Defaults to True.
 
         Returns:
             list[int]: List of token IDs.
         """
-        warnings.warn("The attribute `add_special_tokens` is not used in this implementation.")
-
-        tokens = self.tokenizer.encode(text)
-        return tokens
+        token_ids = self.tokenizer.Encode(text)
+        return token_ids
 
     def decode(self, token_ids: list[int]) -> str:
         """Decodes a list of token IDs into the original text.
@@ -235,7 +230,7 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         Returns:
             str: Decoded text.
         """
-        decoded_text = self.tokenizer.decode(token_ids)
+        decoded_text = self.tokenizer.Decode(token_ids)
         return decoded_text
 
     @property
@@ -263,3 +258,17 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         if piece_id == self.tokenizer.unk_id():
             raise ValueError("Token is not represented by a single token id!")
         return piece_id
+
+    def is_special_token_id(self, token_id: int) -> bool:
+        """Returns whether a token ID is a special token ID.
+
+        Args:
+            token_id (int): Token ID to check.
+
+        Raises:
+            NotImplementedError: Must be implemented by a subclass.
+
+        Returns:
+            bool: Flag whether the token ID is a special token ID.
+        """
+        return self.tokenizer.IsControl(token_id)
