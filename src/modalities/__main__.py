@@ -158,8 +158,9 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     Args:
         config_path (FilePath): Path to the config file describing the tokenization setup.
     """
+    config_dict = load_app_config_dict(config_path)
 
-    pack_encoded_data(config_path=config_path)
+    pack_encoded_data(config_dict=config_dict)
 
 
 @data.command(name="merge_packed_data")
