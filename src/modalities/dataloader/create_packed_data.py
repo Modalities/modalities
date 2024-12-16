@@ -85,7 +85,7 @@ class PackedDataGenerator:
         Returns:
             int: The number of bytes required to represent the integer.
         """
-        # we currently only supoprt token sizes of 1, 2 and 4 bytes, as implemented here:
+        # we currently only support token sizes of 1, 2 and 4 bytes, as implemented here:
         # https://github.com/Modalities/modalities/blob/fix_char_bytes_indexation_mismatch/src/modalities/dataloader/dataset.py#L202
         num_bytes = math.ceil(math.log2(int_to_get_repr) / 8)
         if num_bytes == 1:
