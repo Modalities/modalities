@@ -59,10 +59,17 @@ def _verify_index(src_path: Path, index_path: Path):
     with open(index_path, "rb") as f:
         jsonl_index = pickle.load(f)
 
+    assert (
+        len(jsonl_binary_string.split(b"\n")) - int(jsonl_binary_string.endswith(b"\n"))
+        == len(binary_string_list)
+        == len(string_list)
+        == len(jsonl_index)
+    )
+
     for i, (offset, length) in tqdm.tqdm(enumerate(jsonl_index), desc="Verifying index"):
         # check that the index works correctly on the binary data
         binary_string = binary_string_list[i]
-        if binary_string_list[i].endswith(b"\n"):
+        if binary_string.endswith(b"\n"):
             binary_string = binary_string[:-1]
         assert jsonl_binary_string[offset : offset + length] == binary_string
 
@@ -95,7 +102,7 @@ def _verify_pbin(
         assert pbin_sample[-1] == eod_token_id
         assert pbin_sample[-2] != eod_token_id
 
-        # we need to check if tokenizer addas the eod token as
+        # we need to check if tokenizer adds the eod token as
         # some tokenizers don't add the eod token at the end of the string
         # whereas modalities always adds the eod token at the end of the string
         if recomputed_sample[-1] != eod_token_id:
@@ -158,7 +165,7 @@ def verify_tokenization_consistency(
     jsonl_text_key: str,
 ):
     """Verifies that the indexation and tokenization is consistent.
-    This function applis the indexation and tokenization routines and then verifies
+    This function applies the indexation and tokenization routines and then verifies
     that the index always captures entire samples and that the tokens in the JSON
     are correctly determined.
     For an example verification check out the test_end_to_end_indexation_and_tokenization_consistency test

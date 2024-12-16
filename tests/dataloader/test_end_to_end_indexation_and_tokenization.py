@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from modalities.utils.verify_tokenization_constistency import (
+from modalities.utils.verify_tokenization_consistency import (
     TokenizerTypes,
     build_hf_tokenization_components,
     build_sp_tokenization_components,

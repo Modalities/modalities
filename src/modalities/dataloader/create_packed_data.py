@@ -64,7 +64,7 @@ class PackedDataGenerator:
         self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
         eod_token_id = self.tokenizer.get_token_id(self.eod_token)
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(eod_token_id)
+        self._encoded_eod_token_as_bytes = self._encoded_token_to_bytes(eod_token_id)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)  # reads string with utf-8 encoding
@@ -324,8 +324,8 @@ class PackedDataGenerator:
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
         token_byte_string = b"".join(map(self._encoded_token_to_bytes, tokens))
-        if not token_byte_string.endswith(self._encoded_eos_token_as_bytes):
-            token_byte_string = token_byte_string + self._encoded_eos_token_as_bytes
+        if not token_byte_string.endswith(self._encoded_eod_token_as_bytes):
+            token_byte_string = token_byte_string + self._encoded_eod_token_as_bytes
         return token_byte_string
 
 
