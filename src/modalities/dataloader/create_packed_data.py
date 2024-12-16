@@ -3,6 +3,7 @@ import math
 import multiprocessing
 import os
 import pickle
+import traceback
 import warnings
 from io import BufferedWriter
 from pathlib import Path
@@ -84,7 +85,7 @@ class PackedDataGenerator:
         Returns:
             int: The number of bytes required to represent the integer.
         """
-        return math.ceil(math.log(math.log2(int_to_get_repr), 8))
+        return math.ceil(math.log2(int_to_get_repr) / 8)
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
@@ -292,6 +293,7 @@ class PackedDataGenerator:
                     f"Could not process line of number {line_id} within process {process_id}. "
                     f"Raised the following error: {exception=}"
                 )
+                traceback.print_exc()
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: list[tuple[int, int]]):
         # Update the length of the data section in the pre-allocated header of the destination file.
