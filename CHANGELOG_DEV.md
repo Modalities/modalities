@@ -154,3 +154,13 @@ https://github.com/Modalities/modalities/blob/0483362abac93e45850e56adaea7921e96
 I added a switch case that maps to the respective byte sizes, when packing the data.
 
 This adds some inefficiencies as a vobabulary size > 65536 already requires 4 bytes per token, effectively doubling the storage requirements. 
+
+
+## PR #283: Bug fix: Only append eod token once when packing / tokenizing
+
+Some HF tokenisers such as `xlm-roberta-large` add special tokens (e.g., eod token) automatically when encoding text, whereas others, such as `gpt2`, do not add special tokens. 
+
+This side-effect in the transformers library has lead to the eod token being appended twice when tokenizing / packing our data. We added a check for this and only append the eod token once now:
+https://github.com/Modalities/modalities/blob/1c1ccdc973283c45bc8c9fadf4d20f03e435cd04/src/modalities/dataloader/create_packed_data.py#L327-L330
+
+Additionally, I added a script that verifies the consistency of the indexation and tokenization of a given JSONL file. We run the indexation and tokenization routines in modalities and compare it to tokenized JSONL file to which we applied the HF tokenizer directly. 
