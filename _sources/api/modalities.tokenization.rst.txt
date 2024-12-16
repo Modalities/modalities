@@ -1,0 +1,21 @@
+modalities.tokenization package
+===============================
+
+Submodules
+----------
+
+modalities.tokenization.tokenizer\_wrapper module
+-------------------------------------------------
+
+.. automodule:: modalities.tokenization.tokenizer_wrapper
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.tokenization
+   :members:
+   :undoc-members:
+   :show-inheritance:

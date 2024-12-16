@@ -1,0 +1,21 @@
+modalities.models.huggingface\_adapters package
+===============================================
+
+Submodules
+----------
+
+modalities.models.huggingface\_adapters.hf\_adapter module
+----------------------------------------------------------
+
+.. automodule:: modalities.models.huggingface_adapters.hf_adapter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.huggingface_adapters
+   :members:
+   :undoc-members:
+   :show-inheritance:

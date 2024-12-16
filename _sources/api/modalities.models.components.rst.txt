@@ -1,0 +1,21 @@
+modalities.models.components package
+====================================
+
+Submodules
+----------
+
+modalities.models.components.layer\_norms module
+------------------------------------------------
+
+.. automodule:: modalities.models.components.layer_norms
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.components
+   :members:
+   :undoc-members:
+   :show-inheritance:
