@@ -56,8 +56,6 @@ def get_model_from_config(config: dict, model_type: ModelTypeEnum):
     return getattr(components, model_type.value)
 
 
-
-
 def get_tokenizer_from_config(config: dict, tokenizer_type: str):
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
