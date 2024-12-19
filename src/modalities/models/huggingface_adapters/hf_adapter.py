@@ -306,17 +306,6 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
     def unk_token_length(self):
         return len(self.sp_model.tokenizer.encode(str(self.unk_token)))
 
-    # def __getstate__(self):
-    #     state = self.__dict__.copy()
-    #     state["sp_model"] = None
-    #     state["sp_model_proto"] = self.sp_model.tokenizer.serialized_model_proto()
-    #     return state
-    #
-    # def __setstate__(self, d):
-    #     self.__dict__.update(d)
-    #     self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
-    #     self.sp_model.LoadFromSerializedProto(self.sp_model_proto)
-
     @property
     def vocab_size(self):
         """Returns vocab size"""
