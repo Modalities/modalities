@@ -3,6 +3,7 @@ import math
 import multiprocessing
 import os
 import pickle
+import traceback
 import warnings
 from io import BufferedWriter
 from pathlib import Path
@@ -66,7 +67,7 @@ class PackedDataGenerator:
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
-        self._reader = LargeFileLinesReader(src_path, index_path=index_path)
+        self._reader = LargeFileLinesReader(src_path, index_path=index_path)  # reads string with utf-8 encoding
         self._total_num_of_tokens = 0
         self._raw_samples_queue = multiprocessing.Queue(maxsize=raw_samples_queue_size)
         self.processed_samples_queue = multiprocessing.Queue(maxsize=processed_samples_queue_size)
@@ -84,7 +85,17 @@ class PackedDataGenerator:
         Returns:
             int: The number of bytes required to represent the integer.
         """
-        return math.ceil(math.log(math.log2(int_to_get_repr), 8))
+        # we currently only support token sizes of 1, 2 and 4 bytes, as implemented here:
+        # https://github.com/Modalities/modalities/blob/fix_char_bytes_indexation_mismatch/src/modalities/dataloader/dataset.py#L202
+        num_bytes = math.ceil(math.log2(int_to_get_repr) / 8)
+        if num_bytes == 1:
+            return 1
+        elif num_bytes == 2:
+            return 2
+        elif num_bytes <= 4:
+            return 4
+        else:
+            raise ValueError("Currently only support token byte sizes of 1, 2, and 4.")
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
@@ -250,7 +261,6 @@ class PackedDataGenerator:
         def reader():
             batch = []
             for line_id, line in tqdm(enumerate(self._reader), desc="Reading jsonl", disable=True):
-                # line = self._reader[line_id]
                 batch.append((line_id, line))
                 if len(batch) % self.processing_batch_size == 0:
                     self._raw_samples_queue.put(batch)
@@ -289,9 +299,10 @@ class PackedDataGenerator:
                 )
             except Exception as exception:
                 warnings.warn(
-                    f"Could not process line of number {line_id} within process {process_id}. "
+                    f"Could not process line {line_id} in {self.src_path} within process {process_id}. "
                     f"Raised the following error: {exception=}"
                 )
+                traceback.print_exc()
 
     def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: list[tuple[int, int]]):
         # Update the length of the data section in the pre-allocated header of the destination file.

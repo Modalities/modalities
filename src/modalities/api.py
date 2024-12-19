@@ -8,7 +8,6 @@ from pydantic import FilePath
 import modalities.inference.inference as inference
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
 from modalities.config.instantiation_models import PackedDatasetComponentsInstantiationModel
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
@@ -71,14 +70,14 @@ def convert_pytorch_to_hf_checkpoint(
     return hf_model
 
 
-def pack_encoded_data(config_path: FilePath):
+def pack_encoded_data(config_dict: dict):
     """Packs and encodes an indexed, large jsonl-file.
     (see also `create_index` for more information)
     Returns .pbin-file, which can be inserted into a training process directly
     and does not require its original jsonl-file or the respective index file anymore.
 
     Args:
-        config_path (FilePath): Path to the config file describing the tokenization setup.
+        config_dict (dict): Dictionary containing the configuration for the packed data generation.
     """
 
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
@@ -87,11 +86,10 @@ def pack_encoded_data(config_path: FilePath):
     #  One would requires an object of it to instantiate the ResolverRegistry.
     #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    config = load_app_config_dict(config_path)
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
+        config_dict=config_dict, components_model_type=PackedDatasetComponentsInstantiationModel
     )
 
     generator = PackedDataGenerator(
