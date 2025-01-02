@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LargeFileLinesReaderTypes
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator, validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
@@ -192,19 +193,62 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
 
 class PackedDatasetComponentsInstantiationModel(BaseModel):
-    class PackedDatasetSettings(BaseModel):
-        src_path: FilePath
-        dst_path: Optional[Path] = None
-        index_path: Optional[FilePath] = None
-        jq_pattern: str
-        num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
-        eod_token: str
-        processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
-        raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-        processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
+    
+    class ReaderWorkerSettings(BaseModel):
+        class ReaderSettings(BaseModel):
+            class LocalReaderArgs(BaseModel):
+                raw_data_path: Path
+                index_path: Optional[Path] = None
+                encoding: Optional[str] = "utf-8"
 
-    tokenizer: PydanticTokenizerIFType
-    settings: PackedDatasetSettings
+            class GlobalReaderArgs(BaseModel):
+                global_inorder_index_path: Path
+                raw_data_file_list_path: Path
+                raw_data_root_path: Path
+                global_shuffle_index_path: Optional[Path] = None
+                encoding: Optional[str] = "utf-8"
+
+            reader_type: LargeFileLinesReaderTypes
+            reader_args: LocalReaderArgs | GlobalReaderArgs
+        
+        num_reader_processes: Annotated[int, Field(strict=True, ge=1)]
+        reader_settings: ReaderSettings
+    
+    class TokenizerWorkerSettings(BaseModel):
+        class TokenizerSettings(BaseModel):
+            tokenizer: PydanticTokenizerIFType
+            eod_token: str
+            jq_pattern: str
+        
+        num_tokenizer_processes: Annotated[int, Field(strict=True, ge=1)]
+        tokenizer_settings: TokenizerSettings
+
+    
+    class WriterWorkerSettings(BaseModel):
+        dst_path: Path
+        index_start: Annotated[int, Field(strict=True, ge=0)]
+
+
+        @field_validator("dst_path")
+        def ensure_path_does_not_exist(cls, value):
+            path = Path(value)  # Convert to Path object if it's a string
+            if path.exists():
+                raise ValueError(f"The filepath '{path}' already exists.")
+            return path 
+
+    paths: dict[str, Path]
+    reader_worker_settings: ReaderWorkerSettings
+    tokenizer_worker_settings: TokenizerWorkerSettings
+    writer_worker_settings: WriterWorkerSettings
+    tokenizer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
+    writer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
+    index_start: Annotated[int, Field(strict=True, ge=0)]
+    num_samples: Annotated[int, Field(strict=True, ge=1)]
+    batch_size: Annotated[int, Field(strict=True, ge=1)]
+    logging_interval: Annotated[int, Field(strict=True, ge=1)]
+
+    
+
 
 
 class TextGenerationInstantiationModel(BaseModel):

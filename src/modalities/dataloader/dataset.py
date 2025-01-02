@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Optional
 
 import jq
+from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import EmbeddedStreamData
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
 import numpy as np
 from pydantic import BaseModel
 from torch.utils.data.dataset import Dataset as TorchdataSet
@@ -13,8 +15,6 @@ from transformers import BatchEncoding
 
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
-from ..dataloader.large_file_lines_reader import LargeFileLinesReader
-from .create_packed_data import EmbeddedStreamData
 
 
 class Dataset(TorchdataSet):
@@ -163,7 +163,7 @@ class MemMapDataset(Dataset):
         """
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key)
 
-        self.reader = LargeFileLinesReader(self.raw_data_path, index_path=index_path)
+        self.reader = LocalLargeFileLinesReader(self.raw_data_path, index_path=index_path)
         self.jq_filter = jq.compile(jq_pattern)
         self.tokenizer = tokenizer
 

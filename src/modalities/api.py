@@ -2,22 +2,45 @@
 
 import os
 from pathlib import Path
+from typing import Optional
 
+from modalities.dataloader.preprocessing.tokenization.create_packed_data import PackedDataGenerator
+from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import (
+    EmbeddedStreamData,
+    join_embedded_stream_data,
+)
+from modalities.dataloader.preprocessing.tokenization.tokenization_processes import (
+    ProcessFactory,
+    ProgressLoggingWorker,
+    get_required_num_of_bytes_to_repr,
+)
+from modalities.utils.logging import get_logger
 from pydantic import FilePath
 
 import modalities.inference.inference as inference
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.instantiation_models import PackedDatasetComponentsInstantiationModel
-from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.preprocessing.indexation.create_index import IndexGenerator
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+import multiprocessing as mp
+import shutil
+
+from enum import Enum
 
 
-def create_raw_data_index(src_path: Path, index_path: Path):
+class FileExistencePolicy(Enum):
+    SKIP = "skip"
+    ERROR = "error"
+    OVERRIDE = "override"
+
+
+def create_raw_data_index(
+    src_path: Path, index_path: Path, file_existence_policy: FileExistencePolicy = FileExistencePolicy.ERROR
+):
     """Creates the index file for the content of a large jsonl-file. The index file
     contains the byte-offsets and lengths of each line in the jsonl-file.
     Background is the ability to further process the respective file without loading it,
@@ -31,13 +54,24 @@ def create_raw_data_index(src_path: Path, index_path: Path):
     Raises:
         ValueError: If the index file already exists.
     """
-    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
-    os.makedirs(index_path.parent, exist_ok=True)
+    index_path = LocalLargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
+        if file_existence_policy == FileExistencePolicy.SKIP:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Skipping index creation.")
+            return
+        elif file_existence_policy == FileExistencePolicy.OVERRIDE:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Overriding it.")
+            os.remove(index_path)
+        elif file_existence_policy == FileExistencePolicy.ERROR:
+            raise ValueError("index already exists. delete it or specify different output folder.")
+        else:
+            raise ValueError(f"Unknown file existence policy: {file_existence_policy}")
 
-    print(f"reading raw data from {src_path}")
-    print(f"writing index to {index_path}")
+    get_logger(name="main").info(
+        f"Reading raw data from {str(src_path)} and" f" writing index to {str(index_path)} ..."
+    )
+    os.makedirs(index_path.parent, exist_ok=True)
+
     generator = IndexGenerator(src_path)
     generator.create_index(index_path)
 
@@ -88,22 +122,70 @@ def pack_encoded_data(config_dict: dict):
     #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
+    instantion_model: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
         config_dict=config_dict, components_model_type=PackedDatasetComponentsInstantiationModel
     )
 
-    generator = PackedDataGenerator(
-        components.settings.src_path,
-        index_path=components.settings.index_path,
-        tokenizer=components.tokenizer,
-        eod_token=components.settings.eod_token,
-        jq_pattern=components.settings.jq_pattern,
-        number_of_processes=components.settings.num_cpus,
-        processing_batch_size=components.settings.processing_batch_size,
-        raw_samples_queue_size=components.settings.raw_samples_queue_size,
-        processed_samples_queue_size=components.settings.processed_samples_queue_size,
+    # build the queues
+    reader_q, tokenizer_q, writer_q, logging_message_q = ProcessFactory.get_process_queues(
+        writer_q_maxsize=instantion_model.writer_q_maxsize, tokenizer_q_maxsize=instantion_model.tokenizer_q_maxsize
     )
-    generator.run(components.settings.dst_path)
+
+    # build the workers
+    stop_event = mp.Event()
+    token_size_in_bytes = get_required_num_of_bytes_to_repr(
+        instantion_model.tokenizer_worker_settings.tokenizer_settings.tokenizer.vocab_size
+    )
+
+    reader_workers = ProcessFactory.get_reader_workers(
+        rw_settings=instantion_model.reader_worker_settings,
+        reader_q=reader_q,
+        tokenizer_q=tokenizer_q,
+        logging_message_q=logging_message_q,
+        stop_event=stop_event,
+    )
+
+    tokenizer_workers = ProcessFactory.get_tokenizer_workers(
+        tw_settings=instantion_model.tokenizer_worker_settings,
+        tokenizer_q=tokenizer_q,
+        writer_q=writer_q,
+        logging_message_q=logging_message_q,
+        token_size_in_bytes=token_size_in_bytes,
+        stop_event=stop_event,
+    )
+
+    writer_worker = ProcessFactory.get_writer_worker(
+        writer_q=writer_q,
+        logging_message_q=logging_message_q,
+        token_size_in_bytes=token_size_in_bytes,
+        ww_settings=instantion_model.writer_worker_settings,
+        stop_event=stop_event,
+    )
+
+    progress_logging_worker = ProgressLoggingWorker(
+        logging_message_q=logging_message_q,
+        reader_q=reader_q,
+        tokenizer_q=tokenizer_q,
+        writer_q=writer_q,
+        total_num_samples=instantion_model.num_samples,
+        stop_event=stop_event,
+        logging_interval=instantion_model.logging_interval,
+    )
+
+    generator = PackedDataGenerator(
+        reader_workers=reader_workers,
+        tokenizer_workers=tokenizer_workers,
+        writer_worker=writer_worker,
+        progress_logging_worker=progress_logging_worker,
+        reader_q=reader_q,
+        tokenizer_q=tokenizer_q,
+        writer_q=writer_q,
+        logging_message_q=logging_message_q,
+        index_start=instantion_model.index_start,
+        num_samples=instantion_model.num_samples,
+        batch_size=instantion_model.batch_size,
+    )
+    generator.run()
 
 
 def merge_packed_data_files(src_paths: list[Path], target_path: Path):

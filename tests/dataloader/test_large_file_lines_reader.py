@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
 from tests.conftest import DataPathCollection
 
 
@@ -75,7 +75,7 @@ def test_index_creation(tmpdir, dummy_binary_content: bytes):
 )
 def test_large_file_lines_reader_text(indexed_dummy_data_path: DataPathCollection, use_sample_length_from_index: bool):
     raw_data_path = indexed_dummy_data_path.raw_data_path
-    reader = LargeFileLinesReader(
+    reader = LocalLargeFileLinesReader(
         raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding="utf-8"
     )
     assert raw_data_path.read_text().count("\n") == 12
@@ -106,10 +106,10 @@ def test_large_file_lines_reader_binary_text_equivalence(
     indexed_dummy_data_path: DataPathCollection, use_sample_length_from_index: bool
 ):
     raw_data_path = indexed_dummy_data_path.raw_data_path
-    reader_binary = LargeFileLinesReader(
+    reader_binary = LocalLargeFileLinesReader(
         raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding=None
     )
-    reader_text = LargeFileLinesReader(
+    reader_text = LocalLargeFileLinesReader(
         raw_data_path, use_sample_length_from_index=use_sample_length_from_index, encoding="utf-8"
     )
 
@@ -124,4 +124,4 @@ def test_large_file_lines_reader_missing_source_data(dummy_data_path: DataPathCo
     raw_data_path.unlink(missing_ok=True)
     assert not raw_data_path.exists()
     with pytest.raises(FileNotFoundError):
-        LargeFileLinesReader(raw_data_path, dummy_data_path.index_path)
+        LocalLargeFileLinesReader(raw_data_path, dummy_data_path.index_path)

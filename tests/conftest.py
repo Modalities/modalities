@@ -11,9 +11,9 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import load_app_config_dict
-from modalities.dataloader.create_index import IndexGenerator
+from modalities.dataloader.preprocessing.indexation.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -67,7 +67,7 @@ def dummy_data_path(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
+    index_path = LocalLargeFileLinesReader.default_index_path(dummy_data_path)
     index_path.unlink(missing_ok=True)
     return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
 
@@ -77,7 +77,7 @@ def dummy_data_path_long(tmpdir) -> DataPathCollection:
     source_raw_dummy_data_path = _ROOT_DIR / Path("./data/lorem_ipsum_long.jsonl")
     dummy_data_path = Path(tmpdir, source_raw_dummy_data_path.name)
     dummy_data_path.write_text(source_raw_dummy_data_path.read_text())
-    index_path = LargeFileLinesReader.default_index_path(dummy_data_path)
+    index_path = LocalLargeFileLinesReader.default_index_path(dummy_data_path)
     index_path.unlink(missing_ok=True)
     return DataPathCollection(raw_data_path=dummy_data_path, index_path=index_path)
 
