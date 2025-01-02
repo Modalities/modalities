@@ -9,6 +9,7 @@ from typing import Type
 
 import click
 import click_pathlib
+from modalities.utils.logging import get_logger
 from pydantic import BaseModel, FilePath
 
 from modalities.api import (
@@ -148,7 +149,7 @@ def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
 
 
 @data.command(name="pack_encoded_data")
-@click.argument("config_path", type=FilePath)
+@click.option("--config_path", type=FilePath, required=True)
 def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     """Utility to encode an indexed, large jsonl-file.
     (see also `create_index` for more information)
@@ -158,6 +159,7 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     Args:
         config_path (FilePath): Path to the config file describing the tokenization setup.
     """
+    get_logger().info(f"Loading config from {config_path}.")
     config_dict = load_app_config_dict(config_path)
 
     pack_encoded_data(config_dict=config_dict)

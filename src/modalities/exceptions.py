@@ -24,3 +24,9 @@ class OptimizerError(Exception):
 
 class ConfigError(Exception):
     pass
+
+class EmptySampleError(RuntimeError):
+    pass
+
+class ReaderIndexationError(Exception):
+    pass
