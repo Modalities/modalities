@@ -1,19 +1,22 @@
-from dataclasses import dataclass
 import mmap
 import pickle
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Optional
-from modalities.exceptions import ReaderIndexationError
+
 import numpy as np
-from enum import Enum
+
+from modalities.exceptions import ReaderIndexationError
+
 
 @dataclass
 class Sample:
     # If the index is not shuffled, then the incrementeal_line_id
     # points to the position in the dataset
-    # If the index is shuffled, then the incremental_line_id 
-    # points to the position in the shuffled index and the 
+    # If the index is shuffled, then the incremental_line_id
+    # points to the position in the shuffled index and the
     # shuffled_line_id points to the position in the original index
     incremental_line_id: int
     raw_data_path: Path
@@ -21,6 +24,7 @@ class Sample:
     sample_length_in_bytes: int
     content_raw: str | bytes
     content_tokenized: Optional[bytes] = None
+    token_size_in_bytes: Optional[int] = None
     shuffled_line_id: Optional[int] = None
 
 
@@ -142,7 +146,7 @@ class LocalLargeFileLinesReader(BaseReader):
         return Sample(
             raw_data_path=self.raw_data_path,
             incremental_line_id=key,
-            shuffled_line_id=key,   # TODO so far we don't support shuffling here!
+            shuffled_line_id=key,  # TODO so far we don't support shuffling here!
             offset=offset,
             sample_length_in_bytes=sample_length_in_bytes,
             content_raw=content,
@@ -229,7 +233,7 @@ class GlobalLargeFileLinesReader(BaseReader):
 
         """
         try:
-            if self.global_shuffle_index is not None: 
+            if self.global_shuffle_index is not None:
                 mapped_key = self.global_shuffle_index[key]
             else:
                 mapped_key = key
@@ -260,7 +264,6 @@ class LargeFileLinesReaderTypes(Enum):
 
 
 class LargeFileLinesReaderFactory:
-
     @staticmethod
     def get_local_reader(
         raw_data_path: Path,
