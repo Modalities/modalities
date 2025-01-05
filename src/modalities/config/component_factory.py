@@ -75,7 +75,7 @@ class ComponentFactory:
                 # instantiate component config
                 component_key = current_component_config["component_key"]
                 variant_key = current_component_config["variant_key"]
-                current_component_config = self._instantiate_component_config(
+                current_component_config = self.instantiate_component_config(
                     component_key=component_key,
                     variant_key=variant_key,
                     config_dict=materialized_component_config["config"],
@@ -139,7 +139,7 @@ class ComponentFactory:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return {"instance_key", "pass_type"} == config_dict.keys()
 
-    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: dict) -> BaseModel:
+    def instantiate_component_config(self, component_key: str, variant_key: str, config_dict: dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
         self._assert_valid_config_keys(
             component_key=component_key,
