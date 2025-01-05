@@ -1,9 +1,7 @@
-import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
-from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LargeFileLinesReaderTypes
-from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator, validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
 from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingIFType,
@@ -17,10 +15,10 @@ from modalities.config.pydanctic_if_types import (
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
-    PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataset import Dataset
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LargeFileLinesReaderTypes
 from modalities.util import warn_rank_0
 
 
@@ -192,8 +190,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         return self
 
 
-class PackedDatasetComponentsInstantiationModel(BaseModel):
-    
+class TokenizationInstantiationModel(BaseModel):
     class ReaderWorkerSettings(BaseModel):
         class ReaderSettings(BaseModel):
             class LocalReaderArgs(BaseModel):
@@ -210,31 +207,34 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
 
             reader_type: LargeFileLinesReaderTypes
             reader_args: LocalReaderArgs | GlobalReaderArgs
-        
-        num_reader_processes: Annotated[int, Field(strict=True, ge=1)]
+
+        num_workers: Annotated[int, Field(strict=True, ge=1)]
         reader_settings: ReaderSettings
-    
+
     class TokenizerWorkerSettings(BaseModel):
         class TokenizerSettings(BaseModel):
-            tokenizer: PydanticTokenizerIFType
+            class TokenizerInstantitionSettings(BaseModel):
+                tokenizer_component_key: str
+                tokenizer_variant_key: str
+                config: dict[str, Any]
+
+            tokenizer_instantiation_settings: TokenizerInstantitionSettings
             eod_token: str
             jq_pattern: str
-        
-        num_tokenizer_processes: Annotated[int, Field(strict=True, ge=1)]
+
+        num_workers: Annotated[int, Field(strict=True, ge=1)]
         tokenizer_settings: TokenizerSettings
 
-    
     class WriterWorkerSettings(BaseModel):
         dst_path: Path
         index_start: Annotated[int, Field(strict=True, ge=0)]
-
 
         @field_validator("dst_path")
         def ensure_path_does_not_exist(cls, value):
             path = Path(value)  # Convert to Path object if it's a string
             if path.exists():
                 raise ValueError(f"The filepath '{path}' already exists.")
-            return path 
+            return path
 
     paths: dict[str, Path]
     reader_worker_settings: ReaderWorkerSettings
@@ -246,9 +246,8 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
     num_samples: Annotated[int, Field(strict=True, ge=1)]
     batch_size: Annotated[int, Field(strict=True, ge=1)]
     logging_interval: Annotated[int, Field(strict=True, ge=1)]
-
-    
-
+    in_q_timeout: Annotated[int, Field(strict=True, ge=0)]
+    out_q_timeout: Annotated[int, Field(strict=True, ge=0)]
 
 
 class TextGenerationInstantiationModel(BaseModel):
