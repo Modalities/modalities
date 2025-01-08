@@ -2,6 +2,8 @@ import multiprocessing as mp
 from dataclasses import dataclass
 from typing import Callable
 
+import tqdm
+
 from modalities.dataloader.preprocessing.queued_processing.queued_processing import Processor
 from modalities.utils.logging import get_logger
 
@@ -35,9 +37,10 @@ class ProcessController:
 
         # wait for the processors to finish
         for step in self._pipeline_steps:
-            for _ in step.processors:
+            get_logger().info(f"Stopping {step.name} processes...")
+            for _ in tqdm.tqdm(step.processors, desc=f"Poisoning {step.name} processes"):
                 step.input_queue.put(None)
             get_logger().info(f"Waiting for processors in step {step.name} to finish")
 
-            for processor in step.processors:
+            for processor in tqdm.tqdm(step.processors, desc=f"Joining {step.name} processes"):
                 processor.join()

@@ -68,10 +68,10 @@ class Processor(mp.Process):
                 try:
                     item = self._consumer.get_item(stop_event=self._stop_event)
                 except ProcessorStopEventException:
-                    get_logger().info(f"{self._process_id} stopped due to forced stop event")
+                    get_logger().info(f"{self._process_type}:{self._process_id} received forced stop event")
                     break
                 if item is None:
-                    get_logger().info(f"{self._process_id} received regular poison pill, exiting...")
+                    get_logger().info(f"{self._process_type}:{self._process_id} received regular poison pill")
                     self._strategy.finalize()
                     break
                 try:
@@ -90,9 +90,17 @@ class Processor(mp.Process):
                 if processed_sub_items is None:
                     continue
                 else:
-                    # place the processed  sub items in the correct out queues
-                    for destination_q_key, processed_sub_item in processed_sub_items.items():
-                        if destination_q_key == self._logging_message_q_key:
-                            processed_sub_item.process_id = self._process_id
-                            processed_sub_item.process_type = self._process_type
-                        self._producers[destination_q_key].put_item(processed_sub_item, stop_event=self._stop_event)
+                    try:
+                        # place the processed sub items in the correct out queues
+                        for destination_q_key, processed_sub_item in processed_sub_items.items():
+                            if destination_q_key == self._logging_message_q_key:
+                                processed_sub_item.process_id = self._process_id
+                                processed_sub_item.process_type = self._process_type
+                            if destination_q_key == "writing_q_key":
+                                continue
+                            self._producers[destination_q_key].put_item(processed_sub_item, stop_event=self._stop_event)
+
+                    except ProcessorStopEventException:
+                        get_logger().info(f"{self._process_type}:{self._process_id} received forced stop event")
+                        break
+        get_logger().info(f"{self._process_type}:{self._process_id} exiting...")
