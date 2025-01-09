@@ -36,3 +36,11 @@ class ReaderIndexationError(Exception):
 
 class ProcessorStopEventException(Exception):
     pass
+
+
+class ProcessorException(Exception):
+    pass
+
+
+class ProcessingStrategyDoneException(Exception):
+    pass
