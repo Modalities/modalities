@@ -3,27 +3,25 @@ import multiprocessing as mp
 import os
 import pickle
 import time
-from dataclasses import dataclass
-from enum import Enum
 from io import BufferedWriter
 from pathlib import Path
-from typing import Optional, Type
+from typing import Type
 
 import jq
-import tqdm
 from data_quality_ablations.utils.logging import get_logger
 from pydantic import BaseModel
 
-from modalities.config.component_factory import ComponentFactory
 from modalities.config.instantiation_models import TokenizationInstantiationModel
 from modalities.dataloader.preprocessing.queued_processing.processing_strategy_if import ProcessingStrategyIF
+from modalities.dataloader.preprocessing.queued_processing.queue_items import ProgressMessage, ReadingJob
 from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import EmbeddedStreamData
 from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import (
     BaseReader,
     LargeFileLinesReaderFactory,
     LargeFileLinesReaderTypes,
-    Sample,
 )
+from modalities.dataloader.preprocessing.tokenization.queue_items import Sample
+from modalities.dataloader.preprocessing.tokenization.worker_types import WorkerTypes
 from modalities.exceptions import EmptySampleError
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -53,37 +51,29 @@ def get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
         raise ValueError("Currently only support token byte sizes of 1, 2, and 4.")
 
 
-def populate_reader_q(
-    reader_q: mp.Queue, index_start: int, num_samples: int, num_reader_processes: int, batch_size: int
-):
-    # populate the reader queue with the line_ids that we want to tokenize
-
-    for i in tqdm.tqdm(
-        range(index_start, index_start + num_samples, batch_size), desc="Filling up reader queue with line ids"
+class PopulatingStrategy(ProcessingStrategyIF):
+    def __init__(
+        self, reader_q_key: str, logging_message_q_key: str, index_start: int, num_samples: int, batch_size: int
     ):
-        reader_q.put(ReadingJob(sample_id=i, batch_size=batch_size))
-    for _ in range(num_reader_processes):
-        reader_q.put(None)
+        self._reader_q_key = reader_q_key
+        self._logging_message_q_key = logging_message_q_key
+        self._batch_size = batch_size
+        self._reading_range = range(index_start, index_start + num_samples, batch_size)
 
+    def __enter__(self):
+        return self
 
-@dataclass
-class ReadingJob:
-    sample_id: int
-    batch_size: int
+    def finalize(self):
+        pass
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
-class WorkerTypes(Enum):
-    READER = "READER"
-    TOKENIZER = "TOKENIZER"
-    WRITER = "WRITER"
-
-
-@dataclass
-class ProgressMessage:
-    worker_type: WorkerTypes
-    num_samples: int
-    process_type: Optional[str] = None
-    process_id: Optional[str] = None
+    def process(self) -> dict[str, ReadingJob | ProgressMessage]:
+        sample_id = next(self._reading_range)
+        reading_job = ReadingJob(sample_id=sample_id, batch_size=self._batch_size)
+        progress_message = ProgressMessage(WorkerTypes.POPULATOR, num_samples=self._batch_size)
+        return {self._reader_q_key: reading_job, self._logging_message_q_key: progress_message}
 
 
 class ReadingStrategy(ProcessingStrategyIF):
@@ -131,15 +121,17 @@ class TokenizingStrategy(ProcessingStrategyIF):
 
     def __enter__(self):
         registry = Registry(COMPONENTS)
-        component_factory = ComponentFactory(registry=registry)
-        self._tokenizer: TokenizerWrapper = component_factory.instantiate_component_config(
+        tokenizer_type: Type[TokenizerWrapper] = registry.get_component(
             component_key=self._tokenizer_instantiation_setings.tokenizer_component_key,
             variant_key=self._tokenizer_instantiation_setings.tokenizer_variant_key,
-            config_dict=self._tokenizer_instantiation_setings.config,
         )
+        self._tokenizer: TokenizerWrapper = tokenizer_type(**self._tokenizer_instantiation_setings.config)
+
         encoded_eod_token = self._tokenizer.get_token_id(self._eod_token)
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self._token_size_in_bytes = get_required_num_of_bytes_to_repr(self._tokenizer.vocab_size)
+        self._encoded_eos_token_as_bytes = TokenizingStrategy._encoded_token_to_bytes(
+            token_size_in_bytes=self._token_size_in_bytes, encoded_token=encoded_eod_token
+        )
         return self
 
     def finalize(self):
@@ -155,7 +147,7 @@ class TokenizingStrategy(ProcessingStrategyIF):
             sample.content_tokenized = processed_line
             sample.token_size_in_bytes = self._token_size_in_bytes
             batch_processed.append(sample)
-        progress_message = ProgressMessage(WorkerTypes.TOKENIZER, self.process_id, len(batch_processed))
+        progress_message = ProgressMessage(WorkerTypes.TOKENIZER, num_samples=len(batch_processed))
         return {self._writer_q_key: batch_processed, self._logging_message_q_key: progress_message}
 
     def _process_line(self, line: str) -> bytes:
@@ -163,14 +155,18 @@ class TokenizingStrategy(ProcessingStrategyIF):
         jq_retrieved_text = self._jq_filter.input_text(line).first()
         if jq_retrieved_text is None:
             raise ValueError(f"jq was not able extract the text using the expression: {self._jq_filter}")
-        tokens = self.tokenizer.tokenize(jq_retrieved_text)
+        tokens = self._tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
-        return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
+        return (
+            b"".join(map(self._encoded_token_to_bytes, [self._token_size_in_bytes] * len(tokens), tokens))
+            + self._encoded_eos_token_as_bytes
+        )
 
-    def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
+    @staticmethod
+    def _encoded_token_to_bytes(token_size_in_bytes: int, encoded_token: int) -> bytes:
         # Converts an encoded token to its bytes representaion.
-        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
+        return encoded_token.to_bytes(token_size_in_bytes, byteorder="little", signed=False)
 
 
 class WritingStrategy(ProcessingStrategyIF):
@@ -203,7 +199,7 @@ class WritingStrategy(ProcessingStrategyIF):
     def finalize(self):
         # check that the index list IS NOT empty and the batch_dict IS empty
         # i.e., all batches have been written to the file
-        if len(self._index_list) == 0 or len(self._batch_dict) >= 0:
+        if len(self._index_list) == 0 or len(self._batch_dict) > 0:
             raise ValueError(
                 f"Could not finalize writing strategy. Index list is empty or batch_dict is not empty. "
                 f"Index list: {len(self._index_list)}, batch_dict: {self._batch_dict.keys()}"
@@ -248,8 +244,8 @@ class WritingStrategy(ProcessingStrategyIF):
                 batch, self._prev_line_id, self._curr_offset, self._index_list, self._dst_fd
             )
             num_samples_written += len(batch)
-        progress_message = ProgressMessage(WorkerTypes.WRITER, self.process_id, num_samples_written)
-        return {self._logging_key: progress_message}
+        progress_message = ProgressMessage(WorkerTypes.WRITER, num_samples=num_samples_written)
+        return {self._logging_message_q_key: progress_message}
 
     # writes a batch received from the writer_q to the destination file
     @staticmethod
@@ -308,7 +304,7 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
     def process(self, item: ProgressMessage) -> dict:
         self._add_progress_message(item)
         passed_time = time.time() - self._last_logged
-        if passed_time > self._logging_interval or self._last_step:
+        if passed_time > self._logging_interval:
             self._log_and_reset(passed_time)
             self._last_logged = time.time()
 
@@ -351,9 +347,8 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
         logging_message += "\n"
 
         logging_message += "Queues: \n"
-        logging_message += f"\tReader queue: {self._reader_q.qsize()} batches (approx.)\n"
-        logging_message += f"\tTokenizer queue: {self._tokenizer_q.qsize()} batches (approx.)\n"
-        logging_message += f"\tWriter queue: {self._writer_q.qsize()} batches (approx.)\n"
+        for q_key, q in self._q_dict.items():
+            logging_message += f"\t{q_key}: {q.qsize()} batches (approx.)\n"
 
         get_logger().info(logging_message)
 
@@ -365,6 +360,18 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
 
 
 class ProcessingStrategyFactory:
+    @staticmethod
+    def get_populating_strategy(
+        reader_q_key: str, logging_message_q_key: str, index_start: int, num_samples: int, batch_size: int
+    ) -> PopulatingStrategy:
+        return PopulatingStrategy(
+            reader_q_key=reader_q_key,
+            logging_message_q_key=logging_message_q_key,
+            index_start=index_start,
+            num_samples=num_samples,
+            batch_size=batch_size,
+        )
+
     @staticmethod
     def get_reader_strategy(
         reader_settings: TokenizationInstantiationModel.ReaderWorkerSettings.ReaderSettings,
@@ -395,7 +402,7 @@ class ProcessingStrategyFactory:
         logging_message_q_key: str,
     ) -> TokenizingStrategy:
         tokenizing_strategy = TokenizingStrategy(
-            tokenizer_instantiation_setings=tokenizer_settings.tokenizer_instantiation_settings,
+            ti_settings=tokenizer_settings.tokenizer_instantiation_settings,
             eod_token=tokenizer_settings.eod_token,
             jq_pattern=tokenizer_settings.jq_pattern,
             writer_q_key=writer_q_key,
@@ -413,6 +420,17 @@ class ProcessingStrategyFactory:
             logging_message_q_key=logging_message_q_key,
         )
         return writing_strategy
+
+    def get_progress_logging_strategy(
+        logging_interval: int,
+        total_num_samples: int,
+        q_dict: dict[str, mp.Queue],
+    ) -> ProgressLoggingStrategy:
+        return ProgressLoggingStrategy(
+            logging_interval=logging_interval,
+            total_num_samples=total_num_samples,
+            q_dict=q_dict,
+        )
 
     @staticmethod
     def get_process_queues(tokenizer_q_maxsize: int, writer_q_maxsize) -> tuple[mp.Queue, mp.Queue, mp.Queue]:
