@@ -1,31 +1,14 @@
 import mmap
 import pickle
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
+from modalities.dataloader.preprocessing.tokenization.queue_items import Sample
 from modalities.exceptions import ReaderIndexationError
-
-
-@dataclass
-class Sample:
-    # If the index is not shuffled, then the incrementeal_line_id
-    # points to the position in the dataset
-    # If the index is shuffled, then the incremental_line_id
-    # points to the position in the shuffled index and the
-    # shuffled_line_id points to the position in the original index
-    incremental_line_id: int
-    raw_data_path: Path
-    offset: int
-    sample_length_in_bytes: int
-    content_raw: str | bytes
-    content_tokenized: Optional[bytes] = None
-    token_size_in_bytes: Optional[int] = None
-    shuffled_line_id: Optional[int] = None
 
 
 class BaseReader(ABC):
@@ -245,7 +228,9 @@ class GlobalLargeFileLinesReader(BaseReader):
 
         with open(abs_raw_file_path, "rb") as fd:
             raw_data_mmap = mmap.mmap(fd.fileno(), 0, access=mmap.ACCESS_READ)
-            content = raw_data_mmap[offset : offset + sample_length_in_bytes]
+            content = bytes(raw_data_mmap[offset : offset + sample_length_in_bytes])
+            raw_data_mmap.close()  # Explicitly close mmap
+
         if self.encoding is not None:
             content = content.decode(self.encoding)
         return Sample(

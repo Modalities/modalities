@@ -13,20 +13,17 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.instantiation_models import TokenizationInstantiationModel
 from modalities.dataloader.preprocessing.indexation.create_index import IndexGenerator
 from modalities.dataloader.preprocessing.queued_processing.process_controller import PipelineStep, ProcessController
-from modalities.dataloader.preprocessing.queued_processing.queued_processing import Processor
+from modalities.dataloader.preprocessing.queued_processing.processors import Processor
 from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import (
     EmbeddedStreamData,
     join_embedded_stream_data,
 )
 from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
-from modalities.dataloader.preprocessing.tokenization.tokenization_strategies import (
-    ProcessingStrategyFactory,
-    WorkerTypes,
-    populate_reader_q,
-)
+from modalities.dataloader.preprocessing.tokenization.strategies import ProcessingStrategyFactory, WorkerTypes
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.utils.env_variables import temporary_env_vars_decorator
 from modalities.utils.logging import get_logger
 
 
@@ -102,6 +99,9 @@ def convert_pytorch_to_hf_checkpoint(
     return hf_model
 
 
+# not setting this can cause deadlocks when using hf's "FastTokenizers". See also:
+# https://stackoverflow.com/questions/62691279/how-to-disable-tokenizers-parallelism-true-false-warning/67254879#67254879
+@temporary_env_vars_decorator({"TOKENIZERS_PARALLELISM": "false"})
 def pack_encoded_data(config_dict: dict):
     """Packs and encodes an indexed, large jsonl-file.
     (see also `create_index` for more information)
@@ -111,13 +111,6 @@ def pack_encoded_data(config_dict: dict):
     Args:
         config_dict (dict): Dictionary containing the configuration for the packed data generation.
     """
-
-    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
-    #  we can currently not rely on the existing class resolver.
-    #  This is based on its connection to the overall `AppConfig`.
-    #  One would requires an object of it to instantiate the ResolverRegistry.
-    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
-    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
     instantion_model: TokenizationInstantiationModel = component_factory.build_components(
@@ -131,13 +124,30 @@ def pack_encoded_data(config_dict: dict):
 
     # build the workers
     stop_event = mp.Event()
-
+    reader_q_key = "reader_q"
     tokenizer_q_key = "tokenizer_q"
     writer_q_key = "writer_q"
     logging_message_q_key = "logging_message_q"
 
-    reader_settings = instantion_model.reader_worker_settings.reader_settings
+    populating_worker = Processor(
+        out_qs={reader_q_key: reader_q, logging_message_q_key: logging_message_q},
+        in_q_timeout=instantion_model.in_q_timeout,
+        out_q_timeout=instantion_model.out_q_timeout,
+        strategy=ProcessingStrategyFactory.get_populating_strategy(
+            reader_q_key=reader_q_key,
+            logging_message_q_key=logging_message_q_key,
+            index_start=instantion_model.index_start,
+            num_samples=instantion_model.num_samples,
+            batch_size=instantion_model.batch_size,
+        ),
+        process_type=WorkerTypes.POPULATOR,
+        process_id=0,
+        logging_message_q_key=logging_message_q_key,
+        set_stop_event_on_processing_error=True,
+        stop_event=stop_event,
+    )
 
+    reader_settings = instantion_model.reader_worker_settings.reader_settings
     reader_workers = [
         Processor(
             in_q=reader_q,
@@ -150,6 +160,7 @@ def pack_encoded_data(config_dict: dict):
             process_type=WorkerTypes.READER,
             process_id=i,
             logging_message_q_key=logging_message_q_key,
+            set_stop_event_on_processing_error=False,
             stop_event=stop_event,
         )
         for i in range(instantion_model.reader_worker_settings.num_workers)
@@ -169,6 +180,7 @@ def pack_encoded_data(config_dict: dict):
             process_type=WorkerTypes.TOKENIZER,
             process_id=i,
             logging_message_q_key=logging_message_q_key,
+            set_stop_event_on_processing_error=False,
             stop_event=stop_event,
         )
         for i in range(instantion_model.tokenizer_worker_settings.num_workers)
@@ -185,25 +197,39 @@ def pack_encoded_data(config_dict: dict):
         process_type=WorkerTypes.WRITER,
         process_id=0,
         logging_message_q_key=logging_message_q_key,
+        set_stop_event_on_processing_error=True,
+        stop_event=stop_event,
+    )
+
+    logging_worker = Processor(
+        in_q=logging_message_q,
+        out_qs={},
+        in_q_timeout=instantion_model.in_q_timeout,
+        out_q_timeout=instantion_model.out_q_timeout,
+        strategy=ProcessingStrategyFactory.get_progress_logging_strategy(
+            logging_interval=instantion_model.logging_interval,
+            total_num_samples=instantion_model.num_samples,
+            q_dict={
+                reader_q_key: reader_q,
+                tokenizer_q_key: tokenizer_q,
+                writer_q_key: writer_q,
+                logging_message_q_key: logging_message_q,
+            },
+        ),
+        process_type=WorkerTypes.LOGGING,
+        process_id=0,
         stop_event=stop_event,
     )
 
     pipeline_steps = [
+        PipelineStep(name="populating", input_queue=None, processors=[populating_worker]),
         PipelineStep(name="reading", input_queue=reader_q, processors=reader_workers),
         PipelineStep(name="tokenizing", input_queue=tokenizer_q, processors=tokenizer_workers),
         PipelineStep(name="writing", input_queue=writer_q, processors=[writer_worker]),
+        PipelineStep(name="logging", input_queue=logging_message_q, processors=[logging_worker]),
     ]
 
-    def populate():
-        populate_reader_q(
-            reader_q=reader_q,
-            index_start=instantion_model.index_start,
-            num_samples=instantion_model.num_samples,
-            num_reader_processes=instantion_model.reader_worker_settings.num_workers,
-            batch_size=instantion_model.batch_size,
-        )
-
-    process_controller = ProcessController(pipeline_steps=pipeline_steps, populate_jobs=populate)
+    process_controller = ProcessController(pipeline_steps=pipeline_steps)
     process_controller.run()
 
 
