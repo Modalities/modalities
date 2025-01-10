@@ -85,6 +85,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
 from modalities.loss_functions import ClipLoss, CLMCrossEntropyLoss, MultipleFunctionsLoss, NCELoss
 from modalities.models.anymal.anymal_model import AnyMAL, AnyMALConfig
 from modalities.models.anymal.collator import AnyMALCollateFnConfig, AnyMALCollatorFn
+from modalities.models.anymal.projector import MLPProjector, MLPProjectorConfig
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
@@ -173,6 +174,7 @@ COMPONENTS = [
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     ComponentEntity("model", "anymal", AnyMAL, AnyMALConfig),
     ComponentEntity("model", "perceiver", Perceiver, PerceiverConfig),
+    ComponentEntity("model", "mlp_projector", MLPProjector, MLPProjectorConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",

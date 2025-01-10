@@ -83,6 +83,8 @@ class AnyMAL(NNModel):
                 r"image_projector.*attention",
                 r"image_projector.*fc[12]",
                 r"image_projector.output_proj",
+                r"image_projector.fc1",
+                r"image_projector.fc2",
                 r"lora_A",
                 r"lora_B",
             ],
@@ -181,7 +183,7 @@ class AnyMAL(NNModel):
         text_emb = self.text_decoder.get_input_embeddings()(inputs[self.text_decoder.sample_key])
         # prepend projected modality embeddings to token embeddings
 
-        # <bos emb> <image emd> <text emb>
+        # <bos emb> <image emb> <text emb>
         input_emb = torch.cat((text_emb[:, :1], proj_image_emb, text_emb[:, 1:]), axis=1)
 
         pos = torch.arange(0, input_emb.shape[1], dtype=torch.long, device=input_emb.device)
