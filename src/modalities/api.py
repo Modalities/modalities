@@ -218,18 +218,19 @@ def pack_encoded_data(config_dict: dict):
         ),
         process_type=WorkerTypes.LOGGING,
         process_id=0,
+        set_stop_event_on_processing_error=False,
         stop_event=stop_event,
     )
 
     pipeline_steps = [
-        PipelineStep(name="populating", input_queue=None, processors=[populating_worker]),
-        PipelineStep(name="reading", input_queue=reader_q, processors=reader_workers),
-        PipelineStep(name="tokenizing", input_queue=tokenizer_q, processors=tokenizer_workers),
-        PipelineStep(name="writing", input_queue=writer_q, processors=[writer_worker]),
-        PipelineStep(name="logging", input_queue=logging_message_q, processors=[logging_worker]),
+        PipelineStep(name="populating", input_queue=None, processors=[populating_worker], poisonable=False),
+        PipelineStep(name="reading", input_queue=reader_q, processors=reader_workers, poisonable=True),
+        PipelineStep(name="tokenizing", input_queue=tokenizer_q, processors=tokenizer_workers, poisonable=True),
+        PipelineStep(name="writing", input_queue=writer_q, processors=[writer_worker], poisonable=True),
+        PipelineStep(name="logging", input_queue=logging_message_q, processors=[logging_worker], poisonable=True),
     ]
 
-    process_controller = ProcessController(pipeline_steps=pipeline_steps)
+    process_controller = ProcessController(pipeline_steps=pipeline_steps, stop_event=stop_event)
     process_controller.run()
 
 
