@@ -1,9 +1,9 @@
 from abc import ABC
-from typing import Any
+from typing import Any, Optional
 
 
 class ProcessingStrategyIF(ABC):
-    def process(self, item: Any) -> dict[str, Any] | None:
+    def process(self, item: Optional[Any] = None) -> dict[str, Any] | None:
         raise NotImplementedError
 
     def __enter__(self):
@@ -13,4 +13,4 @@ class ProcessingStrategyIF(ABC):
         raise NotImplementedError
 
     def __exit__(self, exc_type, exc_value, traceback):
-        raise
+        raise NotImplementedError
