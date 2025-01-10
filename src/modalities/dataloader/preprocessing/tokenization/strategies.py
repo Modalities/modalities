@@ -22,7 +22,7 @@ from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader im
 )
 from modalities.dataloader.preprocessing.tokenization.queue_items import Sample
 from modalities.dataloader.preprocessing.tokenization.worker_types import WorkerTypes
-from modalities.exceptions import EmptySampleError
+from modalities.exceptions import EmptySampleError, ProcessingStrategyDoneException
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
@@ -58,7 +58,7 @@ class PopulatingStrategy(ProcessingStrategyIF):
         self._reader_q_key = reader_q_key
         self._logging_message_q_key = logging_message_q_key
         self._batch_size = batch_size
-        self._reading_range = range(index_start, index_start + num_samples, batch_size)
+        self._reading_iter = iter(range(index_start, index_start + num_samples, batch_size))
 
     def __enter__(self):
         return self
@@ -70,7 +70,10 @@ class PopulatingStrategy(ProcessingStrategyIF):
         pass
 
     def process(self) -> dict[str, ReadingJob | ProgressMessage]:
-        sample_id = next(self._reading_range)
+        try:
+            sample_id = next(self._reading_iter)
+        except StopIteration:
+            raise ProcessingStrategyDoneException("PopulatingStrategy done.")
         reading_job = ReadingJob(sample_id=sample_id, batch_size=self._batch_size)
         progress_message = ProgressMessage(WorkerTypes.POPULATOR, num_samples=self._batch_size)
         return {self._reader_q_key: reading_job, self._logging_message_q_key: progress_message}
@@ -307,6 +310,7 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
         if passed_time > self._logging_interval:
             self._log_and_reset(passed_time)
             self._last_logged = time.time()
+        return {}
 
     def _add_progress_message(self, progress_message: ProgressMessage):
         if progress_message.worker_type not in self._worker_to_pid_to_num_samples:

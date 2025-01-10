@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 
 class ProcessingStrategyIF(ABC):
-    def process(self, item: Optional[Any] = None) -> dict[str, Any] | None:
+    def process(self, item: Optional[Any] = None) -> dict[str, Any]:
         raise NotImplementedError
 
     def __enter__(self):

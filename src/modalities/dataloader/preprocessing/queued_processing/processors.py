@@ -13,6 +13,7 @@ class QueueConsumer:
     def __init__(self, in_q: mp.Queue, in_q_timeout: int):
         self._in_q = in_q
         self._in_q_timeout = in_q_timeout
+        self._consumed_items = 0
 
     def get_item(self, stop_event: Event) -> Any:
         while not stop_event.is_set():
@@ -20,6 +21,9 @@ class QueueConsumer:
                 item = self._in_q.get(timeout=self._in_q_timeout)
             except queue.Empty:
                 continue
+            if item is None:
+                pass
+            self._consumed_items += 1
             return item
         raise ProcessorStopEventException("Stop event was set")
 
@@ -65,6 +69,8 @@ class Processor(mp.Process):
         self._process_id = process_id
         self.exit_on_processing_error = set_stop_event_on_processing_error
         self._logging_message_q_key = logging_message_q_key
+        # if the consumer is None, we are the first processor in the pipeline and we need to generate the items
+        self._processing_fun = self._generate_item if self._consumer is None else self._process_item
 
     @property
     def process_id(self) -> str:
@@ -78,27 +84,32 @@ class Processor(mp.Process):
     def full_name(self) -> str:
         return f"{self._process_type}:{self._process_id}"
 
-    def _generate_item(self) -> dict[str, Any]:
-        processed_sub_items: dict[str, Any] = self._strategy.process()
-        return processed_sub_items
-
-    def _process_item(self, item: Any) -> dict[str, Any] | None:
+    def _generate_item(self):
         try:
-            if item is None:
-                get_logger().info(f"{self.full_name} received regular poison pill")
-                self._strategy.finalize()
+            processed_sub_items: dict[str, Any] = self._strategy.process()
+        except ProcessingStrategyDoneException as e:
+            self._strategy.finalize()
+            get_logger().info(f"{self.full_name} received done (iterator exhausted). Exiting...")
+            raise e
+        self._forward_sub_items(processed_sub_items)
+
+    def _process_item(self):
+        item = self._consumer.get_item(stop_event=self._stop_event)
+        if item is None:
+            self._strategy.finalize()
+            raise ProcessingStrategyDoneException(f"{self.full_name} received done (poison pill).")
+        # process the item
+        try:
             processed_sub_items: dict[str, Any] | None = self._strategy.process(item)
         except Exception as e:
             get_logger().error(f"{self.full_name} failed to process item {item}. Error: {e}")
             if self.exit_on_processing_error:
                 raise ProcessorException(f"{self.full_name} failed to process item {item}.") from e
-            else:
-                return None
-        return processed_sub_items
+            return  # continue with the next item
+        # forward the processed sub items to the respective queues
+        self._forward_sub_items(processed_sub_items)
 
-    def _forward_sub_items(self, processed_sub_items: dict[str, Any] | None):
-        if processed_sub_items is None:
-            return
+    def _forward_sub_items(self, processed_sub_items: dict[str, Any]):
         # place the processed sub items in the correct out queues
         for destination_q_key, processed_sub_item in processed_sub_items.items():
             if destination_q_key == self._logging_message_q_key:
@@ -110,18 +121,9 @@ class Processor(mp.Process):
         try:
             with self._strategy:
                 while True:
-                    if self._consumer is None:
-                        # if there is no consumer, we are the first processor and need to generate the items
-                        try:
-                            processed_sub_items: dict[str, Any] = self._generate_item()
-                        except ProcessingStrategyDoneException:
-                            get_logger().info(f"{self.full_name} received done. Exiting...")
-                            break
-                    else:
-                        item = self._consumer.get_item(stop_event=self._stop_event)
-                        processed_sub_items: dict[str, Any] = self._process_item(item)
-                    self._forward_sub_items(processed_sub_items)
-
+                    self._processing_fun()
+        except ProcessingStrategyDoneException:
+            pass
         except ProcessorStopEventException:
             # if the stop event was set, some process in the pipeline failed and we need to exit
             get_logger().info(f"{self.full_name} received forced stop event. Exiting...")
