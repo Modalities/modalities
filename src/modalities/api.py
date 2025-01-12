@@ -119,7 +119,9 @@ def pack_encoded_data(config_dict: dict):
 
     # build the queues
     reader_q, tokenizer_q, writer_q, logging_message_q = ProcessingStrategyFactory.get_process_queues(
-        writer_q_maxsize=instantion_model.writer_q_maxsize, tokenizer_q_maxsize=instantion_model.tokenizer_q_maxsize
+        reader_q_maxsize=instantion_model.reader_q_maxsize,
+        writer_q_maxsize=instantion_model.writer_q_maxsize,
+        tokenizer_q_maxsize=instantion_model.tokenizer_q_maxsize,
     )
 
     # build the workers
@@ -136,9 +138,9 @@ def pack_encoded_data(config_dict: dict):
         strategy=ProcessingStrategyFactory.get_populating_strategy(
             reader_q_key=reader_q_key,
             logging_message_q_key=logging_message_q_key,
-            index_start=instantion_model.index_start,
-            num_samples=instantion_model.num_samples,
-            batch_size=instantion_model.batch_size,
+            index_start=instantion_model.populate_worker_settings.index_start,
+            num_samples=instantion_model.populate_worker_settings.num_samples,
+            batch_size=instantion_model.populate_worker_settings.batch_size,
         ),
         process_type=WorkerTypes.POPULATOR,
         process_id=0,
@@ -207,8 +209,8 @@ def pack_encoded_data(config_dict: dict):
         in_q_timeout=instantion_model.in_q_timeout,
         out_q_timeout=instantion_model.out_q_timeout,
         strategy=ProcessingStrategyFactory.get_progress_logging_strategy(
-            logging_interval=instantion_model.logging_interval,
-            total_num_samples=instantion_model.num_samples,
+            logging_interval=instantion_model.logging_worker_settings.logging_interval,
+            total_num_samples=instantion_model.logging_worker_settings.num_samples,
             q_dict={
                 reader_q_key: reader_q,
                 tokenizer_q_key: tokenizer_q,

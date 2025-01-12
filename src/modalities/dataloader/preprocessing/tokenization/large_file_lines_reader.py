@@ -6,12 +6,13 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from pydantic import BaseModel
 
 from modalities.dataloader.preprocessing.tokenization.queue_items import Sample
 from modalities.exceptions import ReaderIndexationError
 
 
-class BaseReader(ABC):
+class BaseReaderIF(ABC):
     @abstractmethod
     def __len__(self) -> int:
         raise NotImplementedError
@@ -21,7 +22,7 @@ class BaseReader(ABC):
         raise NotImplementedError
 
 
-class LocalLargeFileLinesReader(BaseReader):
+class LocalLargeFileLinesReader(BaseReaderIF):
     """LargeFileLinesReader class that read lines from a large file efficiently."""
 
     def __init__(
@@ -144,7 +145,7 @@ class LocalLargeFileLinesReader(BaseReader):
         return data
 
 
-class GlobalLargeFileLinesReader(BaseReader):
+class GlobalLargeFileLinesReader(BaseReaderIF):
     """LargeFileLinesReader class that read lines from a large file efficiently."""
 
     def __init__(
@@ -246,6 +247,25 @@ class GlobalLargeFileLinesReader(BaseReader):
 class LargeFileLinesReaderTypes(Enum):
     LOCAL = "LOCAL"
     GLOBAL = "GLOBAL"
+
+
+class IndexTypes(Enum):
+    LOCAL = "LOCAL"
+    GLOBAL = "GLOBAL"
+
+
+class LocalLargeFileLinesReaderConfig(BaseModel):
+    raw_data_path: Path
+    index_path: Optional[Path] = None
+    encoding: Optional[str] = "utf-8"
+
+
+class GlobalLargeFileLinesReaderConfig(BaseModel):
+    global_inorder_index_path: Path
+    raw_data_file_list_path: Path
+    raw_data_root_path: Path
+    global_shuffle_index_path: Optional[Path] = None
+    encoding: Optional[str] = "utf-8"
 
 
 class LargeFileLinesReaderFactory:

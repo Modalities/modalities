@@ -54,6 +54,11 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import (
+    GlobalLargeFileLinesReaderConfig,
+    LargeFileLinesReaderFactory,
+    LocalLargeFileLinesReaderConfig,
+)
 from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -87,14 +92,16 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
-    NumberConversion,
     NumberConversionFromCheckpointPathConfig,
     NumSamplesFromNumTokensConfig,
+    NumSamplesFromReaderConfig,
     NumStepsFromNumSamplesConfig,
     NumStepsFromNumTokensConfig,
     NumStepsFromRawDatasetIndexConfig,
     NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuousConfig,
+    PreprocessingNumberConversion,
+    TrainingNumberConversion,
 )
 
 
@@ -246,83 +253,102 @@ COMPONENTS = [
         "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # large file lines reader
+    ComponentEntity(
+        "large_file_lines_reader",
+        "local",
+        LargeFileLinesReaderFactory.get_local_reader,
+        LocalLargeFileLinesReaderConfig,
+    ),
+    ComponentEntity(
+        "large_file_lines_reader",
+        "global",
+        LargeFileLinesReaderFactory.get_local_reader,
+        GlobalLargeFileLinesReaderConfig,
+    ),
     # Number conversion
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "local_num_batches_from_num_samples",
-        NumberConversion.get_local_num_batches_from_num_samples,
+        TrainingNumberConversion.get_local_num_batches_from_num_samples,
         LocalNumBatchesFromNumSamplesConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "local_num_batches_from_num_tokens",
-        NumberConversion.get_local_num_batches_from_num_tokens,
+        TrainingNumberConversion.get_local_num_batches_from_num_tokens,
         LocalNumBatchesFromNumTokensConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_samples_from_num_tokens",
-        NumberConversion.get_num_samples_from_num_tokens,
+        TrainingNumberConversion.get_num_samples_from_num_tokens,
         NumSamplesFromNumTokensConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_steps_from_num_samples",
-        NumberConversion.get_num_steps_from_num_samples,
+        TrainingNumberConversion.get_num_steps_from_num_samples,
         NumStepsFromNumSamplesConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_steps_from_num_tokens",
-        NumberConversion.get_num_steps_from_num_tokens,
+        TrainingNumberConversion.get_num_steps_from_num_tokens,
         NumStepsFromNumTokensConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_tokens_from_num_steps",
-        NumberConversion.get_num_tokens_from_num_steps,
+        TrainingNumberConversion.get_num_tokens_from_num_steps,
         NumTokensFromNumStepsConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "last_step_from_checkpoint_path",
-        NumberConversion.get_last_step_from_checkpoint_path,
+        TrainingNumberConversion.get_last_step_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_seen_steps_from_checkpoint_path",
-        NumberConversion.get_num_seen_steps_from_checkpoint_path,
+        TrainingNumberConversion.get_num_seen_steps_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "global_num_seen_tokens_from_checkpoint_path",
-        NumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
+        TrainingNumberConversion.get_global_num_seen_tokens_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_target_steps_from_checkpoint_path",
-        NumberConversion.get_num_target_steps_from_checkpoint_path,
+        TrainingNumberConversion.get_num_target_steps_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "global_num_target_tokens_from_checkpoint_path",
-        NumberConversion.get_global_num_target_tokens_from_checkpoint_path,
+        TrainingNumberConversion.get_global_num_target_tokens_from_checkpoint_path,
         NumberConversionFromCheckpointPathConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_tokens_from_packed_mem_map_dataset_continuous",
-        NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
+        TrainingNumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous,
         NumTokensFromPackedMemMapDatasetContinuousConfig,
     ),
     ComponentEntity(
-        "number_conversion",
+        "training_number_conversion",
         "num_steps_from_raw_dataset_index",
-        NumberConversion.get_num_steps_from_raw_dataset_index,
+        TrainingNumberConversion.get_num_steps_from_raw_dataset_index,
         NumStepsFromRawDatasetIndexConfig,
+    ),
+    ComponentEntity(
+        "preprocessing_number_conversion",
+        "num_samples",
+        PreprocessingNumberConversion.get_num_samples_from_reader,
+        NumSamplesFromReaderConfig,
     ),
 ]

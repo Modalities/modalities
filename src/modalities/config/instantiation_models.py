@@ -191,6 +191,11 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
 
 class TokenizationInstantiationModel(BaseModel):
+    class PopulateWorkerSettings(BaseModel):
+        num_samples: Annotated[int, Field(strict=True, ge=1)]
+        batch_size: Annotated[int, Field(strict=True, ge=1)]
+        index_start: Optional[Annotated[int, Field(strict=True, ge=0)]] = 0
+
     class ReaderWorkerSettings(BaseModel):
         class ReaderSettings(BaseModel):
             class LocalReaderArgs(BaseModel):
@@ -236,16 +241,19 @@ class TokenizationInstantiationModel(BaseModel):
                 raise ValueError(f"The filepath '{path}' already exists.")
             return path
 
+    class LoggingWorkerSettings(BaseModel):
+        logging_interval: Annotated[int, Field(strict=True, ge=1)]
+        num_samples: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
+
     paths: dict[str, Path]
+    populate_worker_settings: PopulateWorkerSettings
     reader_worker_settings: ReaderWorkerSettings
     tokenizer_worker_settings: TokenizerWorkerSettings
     writer_worker_settings: WriterWorkerSettings
+    logging_worker_settings: LoggingWorkerSettings
+    reader_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
     tokenizer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
     writer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
-    index_start: Annotated[int, Field(strict=True, ge=0)]
-    num_samples: Annotated[int, Field(strict=True, ge=1)]
-    batch_size: Annotated[int, Field(strict=True, ge=1)]
-    logging_interval: Annotated[int, Field(strict=True, ge=1)]
     in_q_timeout: Annotated[int, Field(strict=True, ge=0)]
     out_q_timeout: Annotated[int, Field(strict=True, ge=0)]
 

@@ -16,7 +16,7 @@ from modalities.dataloader.preprocessing.queued_processing.processing_strategy_i
 from modalities.dataloader.preprocessing.queued_processing.queue_items import ProgressMessage, ReadingJob
 from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import EmbeddedStreamData
 from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import (
-    BaseReader,
+    BaseReaderIF,
     LargeFileLinesReaderFactory,
     LargeFileLinesReaderTypes,
 )
@@ -81,7 +81,7 @@ class PopulatingStrategy(ProcessingStrategyIF):
 
 class ReadingStrategy(ProcessingStrategyIF):
     def __init__(
-        self, reader_type: Type[BaseReader], reader_args: BaseModel, tokenizer_q_key: str, logging_message_q_key: str
+        self, reader_type: Type[BaseReaderIF], reader_args: BaseModel, tokenizer_q_key: str, logging_message_q_key: str
     ):
         self._reader_type = reader_type
         self._reader_args = reader_args
@@ -437,8 +437,10 @@ class ProcessingStrategyFactory:
         )
 
     @staticmethod
-    def get_process_queues(tokenizer_q_maxsize: int, writer_q_maxsize) -> tuple[mp.Queue, mp.Queue, mp.Queue]:
-        reader_q = mp.Queue()  # containes line_ids to be read
+    def get_process_queues(
+        reader_q_maxsize: int, tokenizer_q_maxsize: int, writer_q_maxsize
+    ) -> tuple[mp.Queue, mp.Queue, mp.Queue, mp.Queue]:
+        reader_q = mp.Queue(maxsize=reader_q_maxsize)  # containes line_ids to be read
         tokenizer_q = mp.Queue(maxsize=tokenizer_q_maxsize)  # contains (line_id, line) pairs to be tokenized
         writer_q = mp.Queue(maxsize=writer_q_maxsize)  # contains (line_id, tokenized_line) to be written to disc
         logging_message_q = mp.Queue()

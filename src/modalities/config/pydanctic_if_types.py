@@ -14,6 +14,7 @@ from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import BaseReaderIF
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -65,3 +66,4 @@ PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(tor
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
 PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThirdPartyTypeIF(ModelInitializationIF)]
+PydanticBaseReaderIFType = Annotated[BaseReaderIF, PydanticThirdPartyTypeIF(BaseReaderIF)]
