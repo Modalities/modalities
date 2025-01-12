@@ -1,10 +1,13 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
 from pydantic import BaseModel, Field
 
+from modalities.config.pydanctic_if_types import PydanticBaseReaderIFType
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import BaseReaderIF
 
 
 class LocalNumBatchesFromNumSamplesConfig(BaseModel):
@@ -67,7 +70,13 @@ class NumStepsFromRawDatasetIndexConfig(BaseModel):
     gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
 
 
-class NumberConversion:
+class NumSamplesFromReaderConfig(BaseModel):
+    reader: PydanticBaseReaderIFType
+    index_start: Annotated[int, Field(strict=True, ge=0)] = 0
+    num_samples: Annotated[int, Field(strict=True, ge=1)] = None
+
+
+class TrainingNumberConversion:
     @staticmethod
     def _get_checkpoint_parameter_value(pattern: str, string: str) -> int:
         matches = re.findall(pattern, string)
@@ -134,7 +143,7 @@ class NumberConversion:
             int: Number of local batches for single rank.
         """
         global_num_samples = global_num_tokens // sequence_length
-        return NumberConversion.get_local_num_batches_from_num_samples(
+        return TrainingNumberConversion.get_local_num_batches_from_num_samples(
             num_ranks=num_ranks, global_num_samples=global_num_samples, local_micro_batch_size=local_micro_batch_size
         )
 
@@ -178,7 +187,7 @@ class NumberConversion:
             int: Number of steps.
         """
         global_num_samples = global_num_tokens // sequence_length
-        return NumberConversion.get_num_steps_from_num_samples(
+        return TrainingNumberConversion.get_num_steps_from_num_samples(
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             global_num_samples=global_num_samples,
@@ -221,7 +230,7 @@ class NumberConversion:
         """
         # Regex pattern to match 'num_steps_' followed by digits
         pattern = r"seen_steps_(\d+)"
-        num_seen_steps = NumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
+        num_seen_steps = TrainingNumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
         return num_seen_steps - 1
 
     @staticmethod
@@ -236,7 +245,7 @@ class NumberConversion:
         """
         # Regex pattern to match 'num_steps_' followed by digits
         pattern = r"seen_steps_(\d+)"
-        num_seen_steps = NumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
+        num_seen_steps = TrainingNumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
         return num_seen_steps
 
     @staticmethod
@@ -251,7 +260,7 @@ class NumberConversion:
         """
         # Regex pattern to match 'num_steps_' followed by digits
         pattern = r"seen_tokens_(\d+)"
-        num_seen_tokens = NumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
+        num_seen_tokens = TrainingNumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
         return num_seen_tokens
 
     @staticmethod
@@ -266,16 +275,18 @@ class NumberConversion:
         """
         # Regex pattern to match 'num_steps_' followed by digits
         pattern = r"target_tokens_(\d+)"
-        num_target_tokens = NumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
+        num_target_tokens = TrainingNumberConversion._get_checkpoint_parameter_value(pattern, str(checkpoint_path))
         return num_target_tokens
 
     @staticmethod
     def get_num_target_steps_from_checkpoint_path(checkpoint_path: Path) -> int:
-        tokens_per_step = NumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path) / (
-            NumberConversion.get_last_step_from_checkpoint_path(checkpoint_path) + 1
+        tokens_per_step = TrainingNumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path) / (
+            TrainingNumberConversion.get_last_step_from_checkpoint_path(checkpoint_path) + 1
         )
 
-        global_num_target_tokens = NumberConversion.get_global_num_target_tokens_from_checkpoint_path(checkpoint_path)
+        global_num_target_tokens = TrainingNumberConversion.get_global_num_target_tokens_from_checkpoint_path(
+            checkpoint_path
+        )
 
         num_target_steps = global_num_target_tokens // tokens_per_step
         if isinstance(num_target_steps, float) and not num_target_steps.is_integer():
@@ -315,7 +326,7 @@ class NumberConversion:
             raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text"
         )
         global_num_tokens_dataset = len(dataset) * sequence_length
-        num_steps = NumberConversion.get_num_steps_from_num_tokens(
+        num_steps = TrainingNumberConversion.get_num_steps_from_num_tokens(
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             global_num_tokens=global_num_tokens_dataset,
@@ -323,7 +334,7 @@ class NumberConversion:
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
-        global_num_tokens_actual = NumberConversion.get_num_tokens_from_num_steps(
+        global_num_tokens_actual = TrainingNumberConversion.get_num_tokens_from_num_steps(
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             sequence_length=sequence_length,
@@ -356,10 +367,25 @@ class NumberConversion:
         """
         index = DatasetFactory.get_raw_index(raw_index_path=raw_index_path)
         num_samples = len(index)
-        num_steps = NumberConversion.get_num_steps_from_num_samples(
+        num_steps = TrainingNumberConversion.get_num_steps_from_num_samples(
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             global_num_samples=num_samples,
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
         return num_steps
+
+
+class PreprocessingNumberConversion:
+    @lru_cache(maxsize=128)
+    @staticmethod
+    def get_num_samples_from_reader(reader: BaseReaderIF, index_start: int = 0, num_samples: int = None):
+        max_num_samples = len(reader) - index_start
+        if num_samples is not None and num_samples > max_num_samples:
+            raise ValueError(
+                f"num_samples ({num_samples}) is greater than the maximum number of samples "
+                f"(len(large_file_lines_reader) - index_start = {max_num_samples})"
+            )
+        if num_samples is None:
+            num_samples = max_num_samples
+        return num_samples
