@@ -123,7 +123,7 @@ class TokenizingStrategy(ProcessingStrategyIF):
         self._logging_message_q_key = logging_message_q_key
         self._tokenizer = None
         self._token_size_in_bytes = None
-        self._encoded_eos_token_as_bytes = None
+        self._encoded_eod_token_as_bytes = None
 
     def __enter__(self):
         registry = Registry(COMPONENTS)
@@ -133,10 +133,10 @@ class TokenizingStrategy(ProcessingStrategyIF):
         )
         self._tokenizer: TokenizerWrapper = tokenizer_type(**self._tokenizer_instantiation_setings.config)
 
-        encoded_eod_token = self._tokenizer.get_token_id(self._eod_token)
         self._token_size_in_bytes = get_required_num_of_bytes_to_repr(self._tokenizer.vocab_size)
-        self._encoded_eos_token_as_bytes = TokenizingStrategy._encoded_token_to_bytes(
-            token_size_in_bytes=self._token_size_in_bytes, encoded_token=encoded_eod_token
+        eod_token_id = self._tokenizer.get_token_id(self._eod_token)
+        self._encoded_eod_token_as_bytes = TokenizingStrategy._encoded_token_to_bytes(
+            token_size_in_bytes=self._token_size_in_bytes, encoded_token=eod_token_id
         )
         return self
 
@@ -164,10 +164,13 @@ class TokenizingStrategy(ProcessingStrategyIF):
         tokens = self._tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
-        return (
-            b"".join(map(self._encoded_token_to_bytes, [self._token_size_in_bytes] * len(tokens), tokens))
-            + self._encoded_eos_token_as_bytes
+
+        token_byte_string = b"".join(
+            map(self._encoded_token_to_bytes, [self._token_size_in_bytes] * len(tokens), tokens)
         )
+        if not token_byte_string.endswith(self._encoded_eod_token_as_bytes):
+            token_byte_string = token_byte_string + self._encoded_eod_token_as_bytes
+        return token_byte_string
 
     @staticmethod
     def _encoded_token_to_bytes(token_size_in_bytes: int, encoded_token: int) -> bytes:

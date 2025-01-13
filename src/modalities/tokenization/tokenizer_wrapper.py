@@ -260,7 +260,7 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
         if not isinstance(piece_id, int):
             raise ValueError("Token cannot be represented by a single token ID!")
         if piece_id == self.tokenizer.unk_id():
-            raise ValueError("Token  cannot be represented by a single token id!")
+            raise ValueError("Token cannot be represented by a single token id!")
         return piece_id
 
     def is_special_token_id(self, token_id: int) -> bool:
