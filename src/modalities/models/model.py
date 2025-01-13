@@ -75,18 +75,20 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU class to define the SwiGLU activation function."""
 
-    def __init__(self, n_embd: int, bias: bool):
+    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool):
         """
         Initializes the SwiGLU object.
 
         Args:
             n_embd (int): The number of embedding dimensions.
+            ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
+            Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
             bias (bool): Whether to include bias terms in the linear layers.
         """
 
         super().__init__()
 
-        hidden_dim = SwiGLU._get_hidden_dim(n_embd)
+        hidden_dim = SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden)
 
         self.W = nn.Linear(
             in_features=n_embd,
@@ -106,7 +108,7 @@ class SwiGLU(nn.Module):
         )
 
     @staticmethod
-    def _get_hidden_dim(n_embd: int) -> int:
+    def _get_hidden_dim(ffn_hidden: int) -> int:
         # Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
 
         # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
@@ -115,7 +117,7 @@ class SwiGLU(nn.Module):
         # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
         # Besides, we ensure that hidden_dim is the smallest multiple of
         # 256 that is greater than or equal the provided hidden_dim
-        return 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+        return 256 * ((int(2 * ffn_hidden / 3) + 256 - 1) // 256)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

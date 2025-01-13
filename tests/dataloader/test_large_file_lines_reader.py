@@ -27,7 +27,7 @@ def create_dummy_data(tmpdir_path: Path, byte_content: bytes) -> Path:
         b"It also includes malformatted json chars, like\n{{\nbut does not come with a trailing newline char...",
     ],
 )
-def test_index_creation(tmpdir, dummy_binary_content: bytes):
+def test_index_creation(tmpdir: Path, dummy_binary_content: bytes):
     # dumps the dummy content to a file
     # e.g. the line "ø This is \na du"  is represented by the hex string:
     # c3 b8 20 54 68 69 73 20  69 73 20 0a 61 20 64 75
