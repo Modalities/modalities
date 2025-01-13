@@ -7,11 +7,12 @@ from pathlib import Path
 
 from pydantic import FilePath
 
+import modalities.dataloader.preprocessing.indexation.global_indexation as global_indexation
 import modalities.inference.inference as inference
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.instantiation_models import TokenizationInstantiationModel
-from modalities.dataloader.preprocessing.indexation.create_index import IndexGenerator
+from modalities.dataloader.preprocessing.indexation.local_indexation import IndexGenerator
 from modalities.dataloader.preprocessing.queued_processing.process_controller import PipelineStep, ProcessController
 from modalities.dataloader.preprocessing.queued_processing.processors import Processor
 from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import (
@@ -72,12 +73,14 @@ def create_local_index(
 
 
 def create_global_index(file_list_path: Path, root_index_path: Path, global_index_root_path: Path) -> Path:
-    global_index_file_path = create_global_index(file_list_path, root_index_path, global_index_root_path)
+    global_index_file_path = global_indexation.create_global_index(
+        file_list_path, root_index_path, global_index_root_path
+    )
     return global_index_file_path
 
 
 def create_shuffled_global_index(global_index_file_path: Path) -> Path:
-    global_shuffled_index_file_path = create_shuffled_global_index(global_index_file_path)
+    global_shuffled_index_file_path = global_indexation.create_shuffled_global_index(global_index_file_path)
     return global_shuffled_index_file_path
 
 

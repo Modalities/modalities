@@ -29,7 +29,7 @@ train_dataset:
     sample_key:  ${settings.referencing_keys.sample_key}
 
 skip_num_samples: 
-  component_key: number_conversion
+ component_key: training_number_conversion
   variant_key: num_samples_from_num_tokens
   config:
     num_tokens: ${settings.training.global_num_seen_tokens}
