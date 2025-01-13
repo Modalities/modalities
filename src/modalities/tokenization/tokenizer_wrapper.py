@@ -179,6 +179,8 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             int: Token ID.
         """
         token_id = self.tokenizer.convert_tokens_to_ids(token)
+        if not isinstance(token_id, int):
+            raise ValueError("Token is not represented by a single token id!")
         if token_id is None:
             raise ValueError("Token is not represented by a single token id!")
         elif token_id == self.tokenizer.unk_token_id:
@@ -255,8 +257,10 @@ class PreTrainedSPTokenizer(TokenizerWrapper):
             int: Token ID.
         """
         piece_id = self.tokenizer.PieceToId(token)
+        if not isinstance(piece_id, int):
+            raise ValueError("Token cannot be represented by a single token ID!")
         if piece_id == self.tokenizer.unk_id():
-            raise ValueError("Token is not represented by a single token id!")
+            raise ValueError("Token  cannot be represented by a single token id!")
         return piece_id
 
     def is_special_token_id(self, token_id: int) -> bool:
