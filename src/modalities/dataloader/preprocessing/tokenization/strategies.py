@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Type
 
 import jq
-from data_quality_ablations.utils.logging import get_logger
 from pydantic import BaseModel
 
 from modalities.config.instantiation_models import TokenizationInstantiationModel
@@ -26,6 +25,7 @@ from modalities.exceptions import EmptySampleError, ProcessingStrategyDoneExcept
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
+from modalities.utils.logging import get_logger
 
 
 def get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
@@ -72,8 +72,8 @@ class PopulatingStrategy(ProcessingStrategyIF):
     def process(self) -> dict[str, ReadingJob | ProgressMessage]:
         try:
             sample_id = next(self._reading_iter)
-        except StopIteration:
-            raise ProcessingStrategyDoneException("PopulatingStrategy done.")
+        except StopIteration as e:
+            raise ProcessingStrategyDoneException("PopulatingStrategy done.") from e
         reading_job = ReadingJob(sample_id=sample_id, batch_size=self._batch_size)
         progress_message = ProgressMessage(WorkerTypes.POPULATOR, num_samples=self._batch_size)
         return {self._reader_q_key: reading_job, self._logging_message_q_key: progress_message}
@@ -121,6 +121,9 @@ class TokenizingStrategy(ProcessingStrategyIF):
         self._jq_filter = jq.compile(jq_pattern)
         self._writer_q_key = writer_q_key
         self._logging_message_q_key = logging_message_q_key
+        self._tokenizer = None
+        self._token_size_in_bytes = None
+        self._encoded_eos_token_as_bytes = None
 
     def __enter__(self):
         registry = Registry(COMPONENTS)
@@ -177,13 +180,20 @@ class WritingStrategy(ProcessingStrategyIF):
         self._dst_path = dst_path
         self._index_start = index_start
         self._logging_message_q_key = logging_message_q_key
+        self._dst_fd = None
+        self._finalized = None
+        self._curr_offset = None
+        self._prev_line_id = None
+        self._batch_dict = None
+        self._index_list = None
+        self._has_seen_first_batch = None
 
         if not self._dst_path.parent.exists():
             self._dst_path.parent.mkdir(parents=True, exist_ok=True)
 
     def __enter__(self):
         self._dst_fd = self._dst_path.open("wb")
-        self.finalized = False
+        self._finalized = False
         # allocate first self.header_size_in_bytes bytes for header (encodes length of data section)
         # not possible to prepend header after determining size of data section
         self._dst_fd.write((0).to_bytes(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"))
@@ -212,10 +222,10 @@ class WritingStrategy(ProcessingStrategyIF):
             self._dst_fd.write(pickle.dumps(self._index_list))
             self._dst_fd.close()
             self._update_data_length_in_pre_allocated_header(self._dst_path, self._index_list)
-            self.finalized = True
+            self._finalized = True
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self.finalized:
+        if not self._finalized:
             self._dst_fd.close()
             # if the process was stopped due to a stop event or the index list is empty, we remove the file
             get_logger(name="main").warning(
@@ -293,6 +303,7 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
         self._worker_to_pid_to_num_samples: dict[WorkerTypes, dict[int, int]] = {}
         self._worker_type_to_processed_num_samples = {worker_type: 0 for worker_type in WorkerTypes}
         self._q_dict = q_dict
+        self._last_logged = None
 
     def __enter__(self):
         self._last_logged = time.time()
@@ -354,7 +365,7 @@ class ProgressLoggingStrategy(ProcessingStrategyIF):
         for q_key, q in self._q_dict.items():
             logging_message += f"\t{q_key}: {q.qsize()} batches (approx.)\n"
 
-        get_logger().info(logging_message)
+        get_logger().info("%s", logging_message)
 
         # reset values
         for worker_type in self._worker_to_pid_to_num_samples.keys():
@@ -400,6 +411,7 @@ class ProcessingStrategyFactory:
         else:
             raise ValueError(f"Reader type {reader_type} is not supported.")
 
+    @staticmethod
     def get_tokenizer_strategy(
         tokenizer_settings: TokenizationInstantiationModel.TokenizerWorkerSettings.TokenizerSettings,
         writer_q_key: str,
@@ -414,6 +426,7 @@ class ProcessingStrategyFactory:
         )
         return tokenizing_strategy
 
+    @staticmethod
     def get_writing_strategy(
         ww_settings: TokenizationInstantiationModel.WriterWorkerSettings,
         logging_message_q_key: str,
@@ -425,6 +438,7 @@ class ProcessingStrategyFactory:
         )
         return writing_strategy
 
+    @staticmethod
     def get_progress_logging_strategy(
         logging_interval: int,
         total_num_samples: int,
