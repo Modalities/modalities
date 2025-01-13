@@ -50,7 +50,7 @@ class TransformerBlock(nn.Module):
         if activation == ActivationType.GELU:
             mlp = partial(MLP, in_features=n_embd, hidden_features=ffn_hidden, bias=bias, dropout=dropout)
         elif activation == ActivationType.SWIGLU:
-            mlp = partial(SwiGLU, n_embd=n_embd, bias=bias)
+            mlp = partial(SwiGLU, n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError(f"activation type {activation} not implemented")
 
