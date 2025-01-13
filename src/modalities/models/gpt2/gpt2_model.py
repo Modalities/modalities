@@ -693,7 +693,7 @@ class GPT2Block(nn.Module):
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation_type == ActivationType.SWIGLU:
-            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
+            self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
 
