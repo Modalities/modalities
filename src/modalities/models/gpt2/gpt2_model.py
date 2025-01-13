@@ -1,3 +1,4 @@
+import logging
 import math
 from copy import deepcopy
 from enum import Enum
@@ -5,18 +6,21 @@ from typing import Annotated
 
 import torch
 import torch.nn as nn
-
-try:
-    from flash_attn import flash_attn_func
-except ModuleNotFoundError:
-    flash_attn_func = None
-
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
+
+try:
+    from flash_attn import flash_attn_func
+except ModuleNotFoundError:
+    flash_attn_func = None
+
+# Logger configuration
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -681,6 +685,7 @@ class GPT2Block(nn.Module):
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
+        self._check_ffn_hidden_dim(n_embd=n_embd, ffn_hidden=ffn_hidden)
         self.attn = CausalSelfAttention(
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
@@ -696,6 +701,15 @@ class GPT2Block(nn.Module):
             self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
+
+    def _check_ffn_hidden_dim(self, n_embd: int, ffn_hidden: int) -> None:
+        expected_hidden_dim = 4 * n_embd
+
+        if ffn_hidden != expected_hidden_dim:
+            logger.warning(
+                f"Expected `ffn_hidden` to be 4 * `n_embd` ({expected_hidden_dim}), "
+                f"but got `n_embd = {n_embd}` and `ffn_hidden = {ffn_hidden}`."
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
