@@ -1,14 +1,14 @@
-import json
 import os
 import pickle as pkl
 import queue
 import threading
 import time
 from pathlib import Path
+
 import jq
+from tqdm import tqdm
 
 from modalities.utils.logging import get_logger
-from tqdm import tqdm
 
 
 class IndexGenerator:
@@ -104,12 +104,16 @@ class IndexGenerator:
                 if len(jq_retrieved_text) > 0:
                     self._index_map.append((line_start_byte_pos, len(line)))
                 else:
-                    get_logger(name="main").warning(f'Faulty line {line_id} (no text) in {str(self.src_file)}, skipping...')
+                    get_logger(name="main").warning(
+                        f"Faulty line {line_id} (no text) in {str(self.src_file)}, skipping..."
+                    )
             else:
                 if self.drop_faulty_entries:
-                    get_logger(name="main").warning(f'Faulty line {line_id} (parsing error) in {str(self.src_file)}, skipping...')
+                    get_logger(name="main").warning(
+                        f"Faulty line {line_id} (parsing error) in {str(self.src_file)}, skipping..."
+                    )
                 else:
-                    get_logger(name="main").warning(f'Faulty line {line_id} (parsing error), stopping...')
+                    get_logger(name="main").warning(f"Faulty line {line_id} (parsing error), stopping...")
                     err = ValueError(f'Faulty line "{line} in {str(self.src_file)}')
                     self._exception_buffer.append(err)
 

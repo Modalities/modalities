@@ -29,7 +29,7 @@ settings:
     sequence_length: 256
   training_target:
     num_target_tokens:      
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_tokens_from_num_steps
       config:
         num_steps: ${settings.training_target.num_target_steps}
@@ -38,7 +38,7 @@ settings:
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_steps_from_raw_dataset_index
       config:
         raw_index_path: ${settings.paths.index_path}

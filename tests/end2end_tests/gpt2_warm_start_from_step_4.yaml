@@ -27,28 +27,28 @@ settings:
     sequence_length: 256
   training_target:
     num_target_tokens:
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: global_num_target_tokens_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
     num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_target_steps_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
   training_progress: 
     global_num_seen_tokens:   # used below
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: global_num_seen_tokens_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
     num_seen_steps:  # for the batch progress subscriber
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_seen_steps_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
     num_seen_samples:
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_samples_from_num_tokens
       config:
         num_tokens: ${settings.training_progress.global_num_seen_tokens}

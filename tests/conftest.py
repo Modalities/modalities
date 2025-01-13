@@ -11,8 +11,8 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import load_app_config_dict
-from modalities.dataloader.preprocessing.indexation.create_index import IndexGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.dataloader.preprocessing.indexation.local_indexation import IndexGenerator
 from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
