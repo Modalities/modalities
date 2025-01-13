@@ -123,7 +123,7 @@ class HFModelAdapter(PreTrainedModel):
             raise NotImplementedError
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
-        if not return_dict:
+        if return_dict:
             return ModalitiesModelOutput(**model_forward_output)
         else:
             return model_forward_output[self.prediction_key]
@@ -374,3 +374,28 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
         """Converts an index (integer) in a token (str) using the vocab."""
         token = self.sp_model.tokenizer.IdToPiece(index)
         return token
+
+    def convert_tokens_to_string(self, tokens):
+        """Converts a sequence of tokens (string) in a single string."""
+        # since we manually add the prefix space, we have to remove it when decoding
+        if tokens[0].startswith(SPIECE_UNDERLINE) and self.add_prefix_space:
+            tokens[0] = tokens[0][1:]
+
+        current_sub_tokens = []
+        out_string = ""
+        prev_is_special = False
+        for i, token in enumerate(tokens):
+            # make sure that special tokens are not decoded using sentencepiece model
+            if token in self.all_special_tokens:
+                if not prev_is_special and i != 0 and self.legacy:
+                    out_string += " "
+                out_string += self.sp_model.decode(current_sub_tokens) + token
+                prev_is_special = True
+                current_sub_tokens = []
+            else:
+                if prev_is_special and i == 1 and self.add_prefix_space and not token.startswith(SPIECE_UNDERLINE):
+                    out_string += " "
+                current_sub_tokens.append(token)
+                prev_is_special = False
+        out_string += self.sp_model.decode(current_sub_tokens)
+        return out_string
