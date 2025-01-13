@@ -27,16 +27,16 @@ class PackedDataGenerator:
     """Reads in a JSONL file and the corresponding index file and packs the dataset for LLM training."""
 
     def __init__(
-        self,
-        src_path: FilePath,
-        tokenizer: TokenizerWrapper,
-        eod_token: str,
-        number_of_processes: int,
-        jq_pattern: str,
-        processing_batch_size: int,
-        raw_samples_queue_size: int,
-        processed_samples_queue_size: int,
-        index_path: Optional[FilePath] = None,
+            self,
+            src_path: FilePath,
+            tokenizer: TokenizerWrapper,
+            eod_token: str,
+            number_of_processes: int,
+            jq_pattern: str,
+            processing_batch_size: int,
+            raw_samples_queue_size: int,
+            processed_samples_queue_size: int,
+            index_path: Optional[FilePath] = None,
     ):
         """
         Initializes a PackedDataGenerator object.
@@ -61,7 +61,8 @@ class PackedDataGenerator:
         self.src_path = src_path
         self.tokenizer = tokenizer
         self.eod_token = eod_token
-        self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
+        self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(
+            self.tokenizer.vocab_size)  # todo revert/change self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
         encoded_eod_token = self.tokenizer.get_token_id(self.eod_token)
         self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
         self.jq_filter = jq.compile(jq_pattern)
@@ -84,7 +85,7 @@ class PackedDataGenerator:
         Returns:
             int: The number of bytes required to represent the integer.
         """
-        return math.ceil(math.log(math.log2(int_to_get_repr), 8))
+        return math.ceil(math.log2(int_to_get_repr + 1) / 8)
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
@@ -197,7 +198,8 @@ class PackedDataGenerator:
         def writer():
             # writes a batch received from the processed_samples_queue to the destination file
             def _write_batch(
-                batch: list[tuple[int, bytes]], prev_line_id: int, curr_offset: int, index_list: list, f: BufferedWriter
+                    batch: list[tuple[int, bytes]], prev_line_id: int, curr_offset: int, index_list: list,
+                    f: BufferedWriter
             ) -> tuple[int, int]:
                 # write the tokens for each document
                 for line_id, tokens_as_bytes in batch:
@@ -401,7 +403,7 @@ def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file
     token_size_in_bytes = stream_data[0].token_size_in_bytes
 
     num_data_chunks = sum(math.ceil(d.data_len / chunk_size) for d in stream_data)
-    data_stream_generator = (d.data[i : i + chunk_size] for d in stream_data for i in range(0, d.data_len, chunk_size))
+    data_stream_generator = (d.data[i: i + chunk_size] for d in stream_data for i in range(0, d.data_len, chunk_size))
 
     num_entries = sum(len(d.index_base) for d in stream_data)
 
@@ -424,7 +426,7 @@ def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file
 
         joint_index = [entry for entry in tqdm(index_stream_generator(), total=num_entries, desc="Concatenating Index")]
         pickled_index = pickle.dumps(joint_index)
-        pickled_index_as_chunks = (pickled_index[i : i + chunk_size] for i in range(0, len(pickled_index), chunk_size))
+        pickled_index_as_chunks = (pickled_index[i: i + chunk_size] for i in range(0, len(pickled_index), chunk_size))
         num_index_chunks = math.ceil(len(pickled_index) / chunk_size)
         for index_chunk in tqdm(pickled_index_as_chunks, total=num_index_chunks, desc="Writing Index Chunks..."):
             fout.write(index_chunk)

@@ -1,0 +1,27 @@
+settings:
+  src_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.jsonl
+  dst_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.pbin #todo make the pbin files for train and val as well.
+  index_path: /raid/s3/opengptx/maxr/ogptx/modalities/data/fineweb/fineweb_edu_data/fineweb-edu-CC-MAIN_val.idx
+  jq_pattern: .text
+  num_cpus: ${node_env:num_cpus}
+  eod_token: <|endoftext|>
+  processing_batch_size: 10
+  raw_samples_queue_size: 20
+  processed_samples_queue_size: 20
+
+
+#tokenizer:
+#  component_key: tokenizer
+#  variant_key: pretrained_sp_tokenizer
+#  config:
+#    tokenizer_model_file: /raid/s3/opengptx/alexj/opengptx/models_to_evaluate/modalities/2.7B_EN_DCLM_modalities_version_0.3.2/en_32k_tokenizer.model
+
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: openGPT-X/Teuken-7B-sigma-instruct-commercial-v0.6
+    padding: false
+    truncation: false
+
