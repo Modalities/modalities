@@ -20,7 +20,7 @@ xlm_roberta_large_settings = TokenizerSettings(
 )
 sentence_piece_settings = TokenizerSettings(
     tokenizer_type=TokenizerTypes.sentence_piece,
-    tokenizer_name_or_path="../data/tokenizer/sentencepiece_dclm/en_32k_tokenizer.model",
+    tokenizer_name_or_path="data/tokenizer/sentencepiece_dclm/en_32k_tokenizer.model",
 )
 
 
@@ -29,13 +29,13 @@ sentence_piece_settings = TokenizerSettings(
     [
         # without errors
         # test with the actual eod token
-        (gpt2_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "<|endoftext|>", False, None),
-        (xlm_roberta_large_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "</s>", False, None),
-        (sentence_piece_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "</s>", False, None),
+        (gpt2_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "<|endoftext|>", False, None),
+        (xlm_roberta_large_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "</s>", False, None),
+        (sentence_piece_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "</s>", False, None),
         # without \n in the last line
         (
             gpt2_settings,
-            Path("data/datasets/lorem_ipsum_without_last_newline.jsonl"),
+            Path("tests/data/datasets/lorem_ipsum_without_last_newline.jsonl"),
             "text",
             "<|endoftext|>",
             False,
@@ -43,7 +43,7 @@ sentence_piece_settings = TokenizerSettings(
         ),
         (
             xlm_roberta_large_settings,
-            Path("data/datasets/lorem_ipsum_without_last_newline.jsonl"),
+            Path("tests/data/datasets/lorem_ipsum_without_last_newline.jsonl"),
             "text",
             "</s>",
             False,
@@ -51,27 +51,34 @@ sentence_piece_settings = TokenizerSettings(
         ),
         (
             sentence_piece_settings,
-            Path("data/datasets/lorem_ipsum_without_last_newline.jsonl"),
+            Path("tests/data/datasets/lorem_ipsum_without_last_newline.jsonl"),
             "text",
             "</s>",
             False,
             None,
         ),
-        (gpt2_settings, Path("data/datasets/danish_test_dataset.jsonl"), "text", "<|endoftext|>", False, None),
-        (xlm_roberta_large_settings, Path("data/datasets/danish_test_dataset.jsonl"), "text", "</s>", False, None),
-        (sentence_piece_settings, Path("data/datasets/danish_test_dataset.jsonl"), "text", "</s>", False, None),
+        (gpt2_settings, Path("tests/data/datasets/danish_test_dataset.jsonl"), "text", "<|endoftext|>", False, None),
+        (
+            xlm_roberta_large_settings,
+            Path("tests/data/datasets/danish_test_dataset.jsonl"),
+            "text",
+            "</s>",
+            False,
+            None,
+        ),
+        (sentence_piece_settings, Path("tests/data/datasets/danish_test_dataset.jsonl"), "text", "</s>", False, None),
         # we also accept tokens as eod token that are not the original eod token or any other special token
         # A normal token such as "a" will pass through. It is the users obligation to pick the correct eod token
         # for a given tokenizer. The reason is that there is no way to get this information for all tokenizer
         # implementations regarding the true eod token!
-        (gpt2_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
-        (xlm_roberta_large_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
-        (sentence_piece_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
+        (gpt2_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
+        (xlm_roberta_large_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
+        (sentence_piece_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "a", False, None),
         # with errors / warnings
         # eod token is not a single token
         (
             gpt2_settings,
-            Path("data/datasets/lorem_ipsum_long.jsonl"),
+            Path("tests/data/datasets/lorem_ipsum_long.jsonl"),
             "text",
             "abc123",
             False,
@@ -79,7 +86,7 @@ sentence_piece_settings = TokenizerSettings(
         ),
         (
             xlm_roberta_large_settings,
-            Path("data/datasets/lorem_ipsum_long.jsonl"),
+            Path("tests/data/datasets/lorem_ipsum_long.jsonl"),
             "text",
             "abc123",
             False,
@@ -87,7 +94,7 @@ sentence_piece_settings = TokenizerSettings(
         ),
         # with errors
         # eod token is not a single token
-        (sentence_piece_settings, Path("data/datasets/lorem_ipsum_long.jsonl"), "text", "abc123", True, None),
+        (sentence_piece_settings, Path("tests/data/datasets/lorem_ipsum_long.jsonl"), "text", "abc123", True, None),
     ],
 )
 def test_end_to_end_indexation_and_tokenization_consistency(
