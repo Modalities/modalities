@@ -1,23 +1,42 @@
 #!/usr/bin/env python
 
+import multiprocessing as mp
 import os
+from enum import Enum
 from pathlib import Path
 
 from pydantic import FilePath
 
+import modalities.dataloader.preprocessing.indexation.global_indexation as global_indexation
 import modalities.inference.inference as inference
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.instantiation_models import PackedDatasetComponentsInstantiationModel
-from modalities.dataloader.create_index import IndexGenerator
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
-from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.config.instantiation_models import TokenizationInstantiationModel
+from modalities.dataloader.preprocessing.indexation.local_indexation import IndexGenerator
+from modalities.dataloader.preprocessing.queued_processing.process_controller import PipelineStep, ProcessController
+from modalities.dataloader.preprocessing.queued_processing.processors import Processor
+from modalities.dataloader.preprocessing.tokenization.embedded_stream_data import (
+    EmbeddedStreamData,
+    join_embedded_stream_data,
+)
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LocalLargeFileLinesReader
+from modalities.dataloader.preprocessing.tokenization.strategies import ProcessingStrategyFactory, WorkerTypes
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.utils.env_variables import temporary_env_vars_decorator
+from modalities.utils.logging import get_logger
 
 
-def create_raw_data_index(src_path: Path, index_path: Path):
+class FileExistencePolicy(Enum):
+    SKIP = "skip"
+    ERROR = "error"
+    OVERRIDE = "override"
+
+
+def create_local_index(
+    src_path: Path, index_path: Path, file_existence_policy: FileExistencePolicy = FileExistencePolicy.ERROR
+):
     """Creates the index file for the content of a large jsonl-file. The index file
     contains the byte-offsets and lengths of each line in the jsonl-file.
     Background is the ability to further process the respective file without loading it,
@@ -31,15 +50,38 @@ def create_raw_data_index(src_path: Path, index_path: Path):
     Raises:
         ValueError: If the index file already exists.
     """
-    index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
-    os.makedirs(index_path.parent, exist_ok=True)
+    index_path = LocalLargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
+        if file_existence_policy == FileExistencePolicy.SKIP:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Skipping index creation.")
+            return
+        elif file_existence_policy == FileExistencePolicy.OVERRIDE:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Overriding it.")
+            os.remove(index_path)
+        elif file_existence_policy == FileExistencePolicy.ERROR:
+            raise ValueError("index already exists. delete it or specify different output folder.")
+        else:
+            raise ValueError(f"Unknown file existence policy: {file_existence_policy}")
 
-    print(f"reading raw data from {src_path}")
-    print(f"writing index to {index_path}")
+    get_logger(name="main").info(
+        f"Reading raw data from {str(src_path)} and" f" writing index to {str(index_path)} ..."
+    )
+    os.makedirs(index_path.parent, exist_ok=True)
+
     generator = IndexGenerator(src_path)
     generator.create_index(index_path)
+
+
+def create_global_index(file_list_path: Path, root_index_path: Path, global_index_root_path: Path) -> Path:
+    global_index_file_path = global_indexation.create_global_index(
+        file_list_path, root_index_path, global_index_root_path
+    )
+    return global_index_file_path
+
+
+def create_shuffled_global_index(global_index_file_path: Path) -> Path:
+    global_shuffled_index_file_path = global_indexation.create_shuffled_global_index(global_index_file_path)
+    return global_shuffled_index_file_path
 
 
 def generate_text(config_file_path: FilePath):
@@ -70,6 +112,9 @@ def convert_pytorch_to_hf_checkpoint(
     return hf_model
 
 
+# not setting this can cause deadlocks when using hf's "FastTokenizers". See also:
+# https://stackoverflow.com/questions/62691279/how-to-disable-tokenizers-parallelism-true-false-warning/67254879#67254879
+@temporary_env_vars_decorator({"TOKENIZERS_PARALLELISM": "false"})
 def pack_encoded_data(config_dict: dict):
     """Packs and encodes an indexed, large jsonl-file.
     (see also `create_index` for more information)
@@ -79,31 +124,129 @@ def pack_encoded_data(config_dict: dict):
     Args:
         config_dict (dict): Dictionary containing the configuration for the packed data generation.
     """
-
-    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
-    #  we can currently not rely on the existing class resolver.
-    #  This is based on its connection to the overall `AppConfig`.
-    #  One would requires an object of it to instantiate the ResolverRegistry.
-    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
-    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)
-    components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
-        config_dict=config_dict, components_model_type=PackedDatasetComponentsInstantiationModel
+    instantion_model: TokenizationInstantiationModel = component_factory.build_components(
+        config_dict=config_dict, components_model_type=TokenizationInstantiationModel
     )
 
-    generator = PackedDataGenerator(
-        components.settings.src_path,
-        index_path=components.settings.index_path,
-        tokenizer=components.tokenizer,
-        eod_token=components.settings.eod_token,
-        jq_pattern=components.settings.jq_pattern,
-        number_of_processes=components.settings.num_cpus,
-        processing_batch_size=components.settings.processing_batch_size,
-        raw_samples_queue_size=components.settings.raw_samples_queue_size,
-        processed_samples_queue_size=components.settings.processed_samples_queue_size,
+    # build the queues
+    reader_q, tokenizer_q, writer_q, logging_message_q = ProcessingStrategyFactory.get_process_queues(
+        reader_q_maxsize=instantion_model.reader_q_maxsize,
+        writer_q_maxsize=instantion_model.writer_q_maxsize,
+        tokenizer_q_maxsize=instantion_model.tokenizer_q_maxsize,
     )
-    generator.run(components.settings.dst_path)
+
+    # build the workers
+    stop_event = mp.Event()
+    reader_q_key = "reader_q"
+    tokenizer_q_key = "tokenizer_q"
+    writer_q_key = "writer_q"
+    logging_message_q_key = "logging_message_q"
+
+    populating_worker = Processor(
+        out_qs={reader_q_key: reader_q, logging_message_q_key: logging_message_q},
+        in_q_timeout=instantion_model.in_q_timeout,
+        out_q_timeout=instantion_model.out_q_timeout,
+        strategy=ProcessingStrategyFactory.get_populating_strategy(
+            reader_q_key=reader_q_key,
+            logging_message_q_key=logging_message_q_key,
+            index_start=instantion_model.populate_worker_settings.index_start,
+            num_samples=instantion_model.populate_worker_settings.num_samples,
+            batch_size=instantion_model.populate_worker_settings.batch_size,
+        ),
+        process_type=WorkerTypes.POPULATOR,
+        process_id=0,
+        logging_message_q_key=logging_message_q_key,
+        set_stop_event_on_processing_error=True,
+        stop_event=stop_event,
+    )
+
+    reader_settings = instantion_model.reader_worker_settings.reader_settings
+    reader_workers = [
+        Processor(
+            in_q=reader_q,
+            out_qs={tokenizer_q_key: tokenizer_q, logging_message_q_key: logging_message_q},
+            in_q_timeout=instantion_model.in_q_timeout,
+            out_q_timeout=instantion_model.out_q_timeout,
+            strategy=ProcessingStrategyFactory.get_reader_strategy(
+                reader_settings, tokenizer_q_key=tokenizer_q_key, logging_message_q_key=logging_message_q_key
+            ),
+            process_type=WorkerTypes.READER,
+            process_id=i,
+            logging_message_q_key=logging_message_q_key,
+            set_stop_event_on_processing_error=False,
+            stop_event=stop_event,
+        )
+        for i in range(instantion_model.reader_worker_settings.num_workers)
+    ]
+
+    tokenizer_workers = [
+        Processor(
+            in_q=tokenizer_q,
+            out_qs={writer_q_key: writer_q, logging_message_q_key: logging_message_q},
+            in_q_timeout=instantion_model.in_q_timeout,
+            out_q_timeout=instantion_model.out_q_timeout,
+            strategy=ProcessingStrategyFactory.get_tokenizer_strategy(
+                tokenizer_settings=instantion_model.tokenizer_worker_settings.tokenizer_settings,
+                writer_q_key=writer_q_key,
+                logging_message_q_key=logging_message_q_key,
+            ),
+            process_type=WorkerTypes.TOKENIZER,
+            process_id=i,
+            logging_message_q_key=logging_message_q_key,
+            set_stop_event_on_processing_error=False,
+            stop_event=stop_event,
+        )
+        for i in range(instantion_model.tokenizer_worker_settings.num_workers)
+    ]
+
+    writer_worker = Processor(
+        in_q=writer_q,
+        out_qs={logging_message_q_key: logging_message_q},
+        in_q_timeout=instantion_model.in_q_timeout,
+        out_q_timeout=instantion_model.out_q_timeout,
+        strategy=ProcessingStrategyFactory.get_writing_strategy(
+            ww_settings=instantion_model.writer_worker_settings, logging_message_q_key=logging_message_q_key
+        ),
+        process_type=WorkerTypes.WRITER,
+        process_id=0,
+        logging_message_q_key=logging_message_q_key,
+        set_stop_event_on_processing_error=True,
+        stop_event=stop_event,
+    )
+
+    logging_worker = Processor(
+        in_q=logging_message_q,
+        out_qs={},
+        in_q_timeout=instantion_model.in_q_timeout,
+        out_q_timeout=instantion_model.out_q_timeout,
+        strategy=ProcessingStrategyFactory.get_progress_logging_strategy(
+            logging_interval=instantion_model.logging_worker_settings.logging_interval,
+            total_num_samples=instantion_model.logging_worker_settings.num_samples,
+            q_dict={
+                reader_q_key: reader_q,
+                tokenizer_q_key: tokenizer_q,
+                writer_q_key: writer_q,
+                logging_message_q_key: logging_message_q,
+            },
+        ),
+        process_type=WorkerTypes.LOGGING,
+        process_id=0,
+        set_stop_event_on_processing_error=False,
+        stop_event=stop_event,
+    )
+
+    pipeline_steps = [
+        PipelineStep(name="populating", input_queue=None, processors=[populating_worker], poisonable=False),
+        PipelineStep(name="reading", input_queue=reader_q, processors=reader_workers, poisonable=True),
+        PipelineStep(name="tokenizing", input_queue=tokenizer_q, processors=tokenizer_workers, poisonable=True),
+        PipelineStep(name="writing", input_queue=writer_q, processors=[writer_worker], poisonable=True),
+        PipelineStep(name="logging", input_queue=logging_message_q, processors=[logging_worker], poisonable=True),
+    ]
+
+    process_controller = ProcessController(pipeline_steps=pipeline_steps, stop_event=stop_event)
+    process_controller.run()
 
 
 def merge_packed_data_files(src_paths: list[Path], target_path: Path):

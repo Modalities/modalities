@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from modalities.dataloader.dataset_factory import DatasetFactory
-from modalities.utils.number_conversion import NumberConversion
+from modalities.utils.number_conversion import TrainingNumberConversion
 
 
 @pytest.mark.parametrize(
@@ -15,7 +15,9 @@ def test_get_local_num_batches_from_num_samples(
     num_ranks: int, global_num_samples: int, local_micro_batch_size: int, expected: int
 ):
     assert (
-        NumberConversion.get_local_num_batches_from_num_samples(num_ranks, global_num_samples, local_micro_batch_size)
+        TrainingNumberConversion.get_local_num_batches_from_num_samples(
+            num_ranks, global_num_samples, local_micro_batch_size
+        )
         == expected
     )
 
@@ -28,7 +30,7 @@ def test_get_local_num_batches_from_num_tokens(
     num_ranks: int, global_num_tokens: int, sequence_length: int, local_micro_batch_size: int, expected: int
 ):
     assert (
-        NumberConversion.get_local_num_batches_from_num_tokens(
+        TrainingNumberConversion.get_local_num_batches_from_num_tokens(
             num_ranks, global_num_tokens, sequence_length, local_micro_batch_size
         )
         == expected
@@ -47,7 +49,7 @@ def test_get_num_steps_from_num_samples(
     expected: int,
 ):
     assert (
-        NumberConversion.get_num_steps_from_num_samples(
+        TrainingNumberConversion.get_num_steps_from_num_samples(
             num_ranks, local_micro_batch_size, global_num_samples, gradient_accumulation_steps
         )
         == expected
@@ -76,7 +78,7 @@ def test_get_num_steps_from_num_tokens(
     expected: int,
 ):
     assert (
-        NumberConversion.get_num_steps_from_num_tokens(
+        TrainingNumberConversion.get_num_steps_from_num_tokens(
             num_ranks, local_micro_batch_size, global_num_tokens, sequence_length, gradient_accumulation_steps
         )
         == expected
@@ -101,7 +103,7 @@ def test_get_num_tokens_from_num_steps(
     expected: int,
 ):
     assert (
-        NumberConversion.get_num_tokens_from_num_steps(
+        TrainingNumberConversion.get_num_tokens_from_num_steps(
             num_steps=num_steps,
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
@@ -141,9 +143,9 @@ def test_get_last_step_from_checkpoint_path(checkpoint_path: Path, expected: int
     if expected_exception:
         # Expecting an exception for this test case
         with pytest.raises(expected_exception):
-            NumberConversion.get_last_step_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_last_step_from_checkpoint_path(checkpoint_path=checkpoint_path)
     else:
-        assert NumberConversion.get_last_step_from_checkpoint_path(checkpoint_path=checkpoint_path) == expected
+        assert TrainingNumberConversion.get_last_step_from_checkpoint_path(checkpoint_path=checkpoint_path) == expected
 
 
 @pytest.mark.parametrize(
@@ -175,9 +177,12 @@ def test_get_num_seen_steps_from_checkpoint_path(checkpoint_path: Path, expected
     if expected_exception:
         # Expecting an exception for this test case
         with pytest.raises(expected_exception):
-            NumberConversion.get_num_seen_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_num_seen_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
     else:
-        assert NumberConversion.get_num_seen_steps_from_checkpoint_path(checkpoint_path=checkpoint_path) == expected
+        assert (
+            TrainingNumberConversion.get_num_seen_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            == expected
+        )
 
 
 @pytest.mark.parametrize(
@@ -211,10 +216,10 @@ def test_get_global_num_seen_tokens_from_checkpoint_path(
     if expected_exception:
         # Expecting an exception for this test case
         with pytest.raises(expected_exception):
-            NumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
     else:
         assert (
-            NumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_global_num_seen_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
             == expected
         )
 
@@ -250,10 +255,10 @@ def test_get_global_num_target_tokens_from_checkpoint_path(
     if expected_exception:
         # Expecting an exception for this test case
         with pytest.raises(expected_exception):
-            NumberConversion.get_global_num_target_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_global_num_target_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
     else:
         assert (
-            NumberConversion.get_global_num_target_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_global_num_target_tokens_from_checkpoint_path(checkpoint_path=checkpoint_path)
             == expected
         )
 
@@ -287,9 +292,12 @@ def test_get_num_target_steps_from_checkpoint_path(checkpoint_path: Path, expect
     if expected_exception:
         # Expecting an exception for this test case
         with pytest.raises(expected_exception):
-            NumberConversion.get_num_target_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            TrainingNumberConversion.get_num_target_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
     else:
-        assert NumberConversion.get_num_target_steps_from_checkpoint_path(checkpoint_path=checkpoint_path) == expected
+        assert (
+            TrainingNumberConversion.get_num_target_steps_from_checkpoint_path(checkpoint_path=checkpoint_path)
+            == expected
+        )
 
 
 @pytest.mark.parametrize(
@@ -336,7 +344,7 @@ def test_get_num_tokens_from_packed_mem_map_dataset_continuous(
     )
 
     assert (
-        NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous(
+        TrainingNumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous(
             dataset_path=dataset_path,
             sequence_length=sequence_length,
             num_ranks=num_ranks,
@@ -369,7 +377,7 @@ def test_num_steps_from_raw_dataset_index(
     with open(raw_index_path, "rb") as f:
         index_length = len(pickle.load(f))
 
-    num_steps_from_number_conversion = NumberConversion.get_num_steps_from_raw_dataset_index(
+    num_steps_from_number_conversion = TrainingNumberConversion.get_num_steps_from_raw_dataset_index(
         raw_index_path=raw_index_path,
         num_ranks=num_ranks,
         local_micro_batch_size=local_micro_batch_size,

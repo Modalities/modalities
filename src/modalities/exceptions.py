@@ -24,3 +24,23 @@ class OptimizerError(Exception):
 
 class ConfigError(Exception):
     pass
+
+
+class EmptySampleError(RuntimeError):
+    pass
+
+
+class ReaderIndexationError(Exception):
+    pass
+
+
+class ProcessorStopEventException(Exception):
+    pass
+
+
+class ProcessorException(Exception):
+    pass
+
+
+class ProcessingStrategyDoneException(Exception):
+    pass

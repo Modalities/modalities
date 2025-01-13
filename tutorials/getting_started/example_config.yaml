@@ -28,7 +28,7 @@ settings:
     sequence_length: 512
   training_target:
     num_target_tokens:      
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_tokens_from_packed_mem_map_dataset_continuous
       config:
         dataset_path: ${settings.paths.train_dataset_path}
@@ -37,7 +37,7 @@ settings:
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
+     component_key: training_number_conversion
       variant_key: num_steps_from_num_tokens
       config:
         num_ranks: ${settings.cuda_env.world_size}

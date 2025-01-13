@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
@@ -16,10 +15,10 @@ from modalities.config.pydanctic_if_types import (
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
-    PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataset import Dataset
+from modalities.dataloader.preprocessing.tokenization.large_file_lines_reader import LargeFileLinesReaderTypes
 from modalities.util import warn_rank_0
 
 
@@ -191,20 +190,72 @@ class TrainingComponentsInstantiationModel(BaseModel):
         return self
 
 
-class PackedDatasetComponentsInstantiationModel(BaseModel):
-    class PackedDatasetSettings(BaseModel):
-        src_path: FilePath
-        dst_path: Optional[Path] = None
-        index_path: Optional[FilePath] = None
-        jq_pattern: str
-        num_cpus: Annotated[int, Field(strict=True, ge=1)] = os.cpu_count()
-        eod_token: str
-        processing_batch_size: Annotated[int, Field(strict=True, ge=1)]
-        raw_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
-        processed_samples_queue_size: Annotated[int, Field(strict=True, ge=1)]
+class TokenizationInstantiationModel(BaseModel):
+    class PopulateWorkerSettings(BaseModel):
+        num_samples: Annotated[int, Field(strict=True, ge=1)]
+        batch_size: Annotated[int, Field(strict=True, ge=1)]
+        index_start: Optional[Annotated[int, Field(strict=True, ge=0)]] = 0
 
-    tokenizer: PydanticTokenizerIFType
-    settings: PackedDatasetSettings
+    class ReaderWorkerSettings(BaseModel):
+        class ReaderSettings(BaseModel):
+            class LocalReaderArgs(BaseModel):
+                raw_data_path: Path
+                index_path: Optional[Path] = None
+                encoding: Optional[str] = "utf-8"
+
+            class GlobalReaderArgs(BaseModel):
+                global_inorder_index_path: Path
+                raw_data_file_list_path: Path
+                raw_data_root_path: Path
+                global_shuffle_index_path: Optional[Path] = None
+                encoding: Optional[str] = "utf-8"
+
+            reader_type: LargeFileLinesReaderTypes
+            reader_args: LocalReaderArgs | GlobalReaderArgs
+
+        num_workers: Annotated[int, Field(strict=True, ge=1)]
+        reader_settings: ReaderSettings
+
+    class TokenizerWorkerSettings(BaseModel):
+        class TokenizerSettings(BaseModel):
+            class TokenizerInstantitionSettings(BaseModel):
+                tokenizer_component_key: str
+                tokenizer_variant_key: str
+                config: dict[str, Any]
+
+            tokenizer_instantiation_settings: TokenizerInstantitionSettings
+            eod_token: str
+            jq_pattern: str
+
+        num_workers: Annotated[int, Field(strict=True, ge=1)]
+        tokenizer_settings: TokenizerSettings
+
+    class WriterWorkerSettings(BaseModel):
+        dst_path: Path
+        index_start: Annotated[int, Field(strict=True, ge=0)]
+
+        @field_validator("dst_path")
+        def ensure_path_does_not_exist(cls, value):
+            path = Path(value)  # Convert to Path object if it's a string
+            if path.exists():
+                raise ValueError(f"The filepath '{path}' already exists.")
+            return path
+
+    class LoggingWorkerSettings(BaseModel):
+        logging_interval: Annotated[int, Field(strict=True, ge=1)]
+        num_samples: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
+
+    paths: dict[str, Path]
+    populate_worker_settings: PopulateWorkerSettings
+    reader_worker_settings: ReaderWorkerSettings
+    tokenizer_worker_settings: TokenizerWorkerSettings
+    writer_worker_settings: WriterWorkerSettings
+    logging_worker_settings: LoggingWorkerSettings
+    reader_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
+    tokenizer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
+    writer_q_maxsize: Annotated[int, Field(strict=True, ge=1)]
+    in_q_timeout: Annotated[int, Field(strict=True, ge=0)]
+    out_q_timeout: Annotated[int, Field(strict=True, ge=0)]
 
 
 class TextGenerationInstantiationModel(BaseModel):
