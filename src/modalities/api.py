@@ -33,7 +33,7 @@ class FileExistencePolicy(Enum):
     OVERRIDE = "override"
 
 
-def create_raw_data_index(
+def create_local_index(
     src_path: Path, index_path: Path, file_existence_policy: FileExistencePolicy = FileExistencePolicy.ERROR
 ):
     """Creates the index file for the content of a large jsonl-file. The index file
@@ -69,6 +69,16 @@ def create_raw_data_index(
 
     generator = IndexGenerator(src_path)
     generator.create_index(index_path)
+
+
+def create_global_index(file_list_path: Path, root_index_path: Path, global_index_root_path: Path) -> Path:
+    global_index_file_path = create_global_index(file_list_path, root_index_path, global_index_root_path)
+    return global_index_file_path
+
+
+def create_shuffled_global_index(global_index_file_path: Path) -> Path:
+    global_shuffled_index_file_path = create_shuffled_global_index(global_index_file_path)
+    return global_shuffled_index_file_path
 
 
 def generate_text(config_file_path: FilePath):

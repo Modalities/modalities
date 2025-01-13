@@ -9,12 +9,13 @@ from typing import Type
 
 import click
 import click_pathlib
-from modalities.utils.logging import get_logger
 from pydantic import BaseModel, FilePath
 
 from modalities.api import (
     convert_pytorch_to_hf_checkpoint,
-    create_raw_data_index,
+    create_global_index,
+    create_local_index,
+    create_shuffled_global_index,
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
@@ -35,6 +36,7 @@ from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
+from modalities.utils.logging import get_logger
 
 
 @click.group()
@@ -124,7 +126,7 @@ def data():
     pass
 
 
-@data.command(name="create_raw_index")
+@data.command(name="create_local_index")
 @click.argument("src_path", type=Path)
 @click.option(
     "--index_path",
@@ -132,7 +134,7 @@ def data():
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
+def CMD_entry_point_data_create_local_index(src_path: Path, index_path: Path):
     """Utility CMD for indexing the content of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
@@ -145,7 +147,23 @@ def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     Raises:
         ValueError: If the index file already exists.
     """
-    create_raw_data_index(src_path=src_path, index_path=index_path)
+    create_local_index(src_path=src_path, index_path=index_path)
+
+
+@data.command(name="create_global_index")
+@click.option("--file_list_path", type=Path, required=True)
+@click.option("--root_index_path", type=Path, required=True)
+@click.option("--global_index_root_path", type=Path, required=True)
+def CMD_entry_point_create_global_index(file_list_path: Path, root_index_path: Path, global_index_root_path: Path):
+    create_global_index(
+        file_list_path=file_list_path, root_index_path=root_index_path, global_index_root_path=global_index_root_path
+    )
+
+
+@data.command(name="create_shuffled_global_index")
+@click.option("--global_index_file_path", type=Path, required=True)
+def CMD_entry_point_create_shuffled_global_index(global_index_file_path: Path):
+    create_shuffled_global_index(global_index_file_path=global_index_file_path)
 
 
 @data.command(name="pack_encoded_data")
