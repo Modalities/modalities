@@ -113,18 +113,3 @@ def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
     # Step 6: Signal the writer process to finish
     queue.put(None)
     writer.join()
-
-
-# Example usage
-if __name__ == "__main__":
-    # Example input file containing header, data, and index segments
-    data_path = Path("combined_file.bin")
-
-    # Example output file for shuffled data
-    output_path = Path("shuffled_combined_file.bin")
-
-    # Batch size for multiprocessing
-    batch_size = 100  # Adjust based on the number of documents and system resources
-
-    # Call the shuffle function with EmbeddedStreamData
-    shuffle_tokenized_data(data_path, output_path, batch_size)
