@@ -8,15 +8,13 @@ from pathlib import Path
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
 
-def _process_batch_with_embedded_stream(
-    batch: list[tuple[int, int]], data: EmbeddedStreamData
-) -> tuple[bytes, list[int]]:
+def _process_batch(batch: list[tuple[int, int]], data: bytes) -> tuple[bytes, list[int]]:
     """
     Process a batch of index entries to extract documents and create a new index.
 
     Args:
         batch (list[tuple[int, int]]): List of index entries [(start, length), ...].
-        data (EmbeddedStreamData): Instance of EmbeddedStreamData for accessing the data segment.
+        data (bytes): Byte stream of the entire data loaded in memory.
 
     Returns:
         tuple[bytes, list[int]]: A tuple containing the processed data (bytes) and the list of document lengths.
@@ -25,9 +23,9 @@ def _process_batch_with_embedded_stream(
     document_lengths = []
 
     for start, length in batch:
-        # Use memmap to read the document from the data segment
-        document = data._data[start : start + length]
-        processed_data.append(document.tobytes())  # Convert from memmap slice to bytes
+        # Access the data slice directly from the in-memory bytes
+        document = data[start : start + length]
+        processed_data.append(document)  # Already bytes
 
         # Record the length of the document
         document_lengths.append(length)
@@ -68,7 +66,7 @@ def _writer_process(output_path: Path, queue: Queue, header_data: bytes) -> None
 
 
 def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
-    """Shuffle data and index segments using EmbeddedStreamData for efficient data access.
+    """Shuffle data and index segments loaded fully into memory.
     Shuffled data is written to a new file with the postfix "_shuffled".
 
     Args:
@@ -78,36 +76,44 @@ def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
     Returns:
         None
     """
-    # Step 1: Initialize EmbeddedStreamData
-    data = EmbeddedStreamData(input_data_path)
+    # Step 1: Load the entire data into memory
+    with input_data_path.open("rb") as f:
+        # Read the header
+        data_section_length_in_bytes = f.read(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES)
+        data_len = int.from_bytes(data_section_length_in_bytes, byteorder="little")
+
+        token_size_as_bytes = f.read(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES)
+
+        # Load the data
+        data = f.read(data_len)
+
+        # Load the index
+        pkl_encoded_index = f.read()
+        index_base = pickle.loads(pkl_encoded_index)
 
     # Step 2: Shuffle the index
-    shuffled_index = data._index_base[:]
-    random.shuffle(shuffled_index)
+    random.shuffle(index_base)
 
     # Step 3: Divide the shuffled index into batches
-    batches = [shuffled_index[i : i + batch_size] for i in range(0, len(shuffled_index), batch_size)]
+    batches = [index_base[i : i + batch_size] for i in range(0, len(index_base), batch_size)]
 
     # Step 4: Prepare for multiprocessing and writing
     queue = Queue()
 
-    header_data = data.data_len.to_bytes(
-        EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
-    ) + data.token_size_in_bytes.to_bytes(EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES, byteorder="little")
-
-    # Get the stem (file name without the extension) and the suffix (extension)
+    # Create the output file path with the postfix "_shuffled"
     stem = input_data_path.stem
     suffix = input_data_path.suffix
-
-    # Create the output file path with the postfix "_shuffled"
     output_data_path = input_data_path.with_name(f"{stem}_shuffled{suffix}")
+
+    # Prepare the header data
+    header_data = data_section_length_in_bytes + token_size_as_bytes
 
     writer = Process(target=_writer_process, args=(output_data_path, queue, header_data))
     writer.start()
 
     # Step 5: Use multiprocessing to process batches
     with multiprocessing.Pool() as pool:
-        for result in pool.imap(partial(_process_batch_with_embedded_stream, data=data), batches):
+        for result in pool.imap(partial(_process_batch, data=data), batches):
             queue.put(result)
 
     # Step 6: Signal the writer process to finish
