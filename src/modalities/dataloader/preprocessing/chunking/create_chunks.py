@@ -3,7 +3,7 @@ import math
 
 class Chunking:
     @staticmethod
-    def _get_chunk_range(num_chunks: int, num_samples: int, chunk_id: int) -> list[int]:
+    def get_chunk_range(num_chunks: int, num_samples: int, chunk_id: int) -> list[int]:
         # get the maximum chunk size given the number of samples and number of chunks
         chunk_size_complete = math.ceil(num_samples / num_chunks)
 

@@ -267,27 +267,54 @@ class PackedMemMapDatasetBase(Dataset):
         Raises:
             ValueError: If the length of the sample in bytes is not a multiple of `self._token_size_in_bytes`.
         """
-        self._check_if_inbounds(idx)
+
+        if isinstance(idx, int):
+            self._check_if_inbounds(idx)
+            # (offset_in_bytes, length_in_bytes)
+            item_positions: list[tuple[int, int]] = [self._index[idx]]
+        elif isinstance(idx, slice):
+            start = idx.start if idx.start is not None else 0
+            stop = idx.stop if idx.stop is not None else len(self)
+            self._check_if_inbounds(start)
+            self._check_if_inbounds(stop - 1)
+            if idx.step is not None and idx.step != 1:
+                raise ValueError("Slicing with step != 0 is not supported.")
+            item_positions = self._index[start:stop]
+        else:
+            raise TypeError(f"Invalid argument type: {type(idx)}")
         # offset and length in bytes
-        offset_in_bytes, length_in_bytes = self._index[idx]
-        if length_in_bytes % self._token_size_in_bytes != 0:
-            raise ValueError(
-                f"Length of the sample in bytes is not a multiple of {self._token_size_in_bytes}."
-                f"Offset in bytes: {offset_in_bytes}, Length in bytes: {length_in_bytes}"
-            )
+        for offset_in_bytes, length_in_bytes in item_positions:
+            if length_in_bytes % self._token_size_in_bytes != 0:
+                raise ValueError(
+                    f"Length of the sample in bytes is not a multiple of {self._token_size_in_bytes}."
+                    f"Offset in bytes: {offset_in_bytes}, Length in bytes: {length_in_bytes}"
+                )
         # numpy frombuffer takes the memmap object as the buffer
         # and indices the data section with the given offset (in bytes)
         # and length in indices of type self._token_dtype_on_disk
+        num_bytes_stop = item_positions[-1][0] + item_positions[-1][1]
+        num_bytes_start = item_positions[0][0]
+        length_in_bytes = num_bytes_stop - num_bytes_start
         num_tokens = length_in_bytes // self._token_size_in_bytes
         tokens = np.frombuffer(
             buffer=self._embedded_stream_data.data,
             dtype=self._token_dtype_on_disk,
             count=num_tokens,
-            offset=offset_in_bytes,
+            offset=num_bytes_start,
         )
         # torch can't convert most uint-formats, therefore we infer regular int types
         tokens = tokens.astype(self._token_dtype_in_ram)
-        return BatchEncoding(data={self.sample_key: tokens})
+
+        documents = []
+        for offset_in_bytes, length_in_bytes in item_positions:
+            token_start = (offset_in_bytes - num_bytes_start) // self._token_size_in_bytes
+            token_end = (offset_in_bytes + length_in_bytes - num_bytes_start) // self._token_size_in_bytes
+            documents.append(tokens[token_start:token_end])
+
+        if isinstance(idx, int):
+            return BatchEncoding(data={self.sample_key: documents[0]})
+        else:
+            return BatchEncoding(data={self.sample_key: documents})
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
