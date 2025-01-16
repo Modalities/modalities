@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+from enum import Enum
 from pathlib import Path
 
 from pydantic import FilePath
@@ -15,9 +16,18 @@ from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.utils.logging import get_logger
 
 
-def create_raw_data_index(src_path: Path, index_path: Path):
+class FileExistencePolicy(Enum):
+    SKIP = "skip"
+    ERROR = "error"
+    OVERRIDE = "override"
+
+
+def create_raw_data_index(
+    src_path: Path, index_path: Path, file_existence_policy: FileExistencePolicy = FileExistencePolicy.ERROR
+):
     """Creates the index file for the content of a large jsonl-file. The index file
     contains the byte-offsets and lengths of each line in the jsonl-file.
     Background is the ability to further process the respective file without loading it,
@@ -32,12 +42,23 @@ def create_raw_data_index(src_path: Path, index_path: Path):
         ValueError: If the index file already exists.
     """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
-    os.makedirs(index_path.parent, exist_ok=True)
     if index_path.exists():
-        raise ValueError("index already exists. delete it or specify different output folder.")
+        if file_existence_policy == FileExistencePolicy.SKIP:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Skipping index creation.")
+            return
+        elif file_existence_policy == FileExistencePolicy.OVERRIDE:
+            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Overriding it.")
+            os.remove(index_path)
+        elif file_existence_policy == FileExistencePolicy.ERROR:
+            raise ValueError("index already exists. delete it or specify different output folder.")
+        else:
+            raise ValueError(f"Unknown file existence policy: {file_existence_policy}")
 
-    print(f"reading raw data from {src_path}")
-    print(f"writing index to {index_path}")
+    get_logger(name="main").info(
+        f"Reading raw data from {str(src_path)} and" f" writing index to {str(index_path)} ..."
+    )
+    os.makedirs(index_path.parent, exist_ok=True)
+
     generator = IndexGenerator(src_path)
     generator.create_index(index_path)
 
