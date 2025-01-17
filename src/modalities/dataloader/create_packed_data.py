@@ -99,7 +99,7 @@ class PackedDataGenerator:
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
-        Converts an encoded token to its byte representaion.
+        Converts an encoded token to its byte representation.
 
         Args:
             encoded_token (int): The encoded token to be converted.

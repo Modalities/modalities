@@ -71,7 +71,7 @@ from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
 )
 def test__get_chunk_range(num_chunks: int, num_samples: int, expected_chunk_indices: list[list[int]]):
     chunk_indices = [
-        Chunking._get_chunk_range(num_chunks=num_chunks, num_samples=num_samples, chunk_id=chunk_id)
+        Chunking.get_chunk_range_(num_chunks=num_chunks, num_samples=num_samples, chunk_id=chunk_id)
         for chunk_id in range(num_chunks)
     ]
     assert chunk_indices == expected_chunk_indices
