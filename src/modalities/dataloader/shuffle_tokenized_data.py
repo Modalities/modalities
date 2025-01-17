@@ -1,68 +1,39 @@
-import multiprocessing
 import pickle
 import random
-from functools import partial
-from multiprocessing import Process, Queue
 from pathlib import Path
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
 
-def _process_batch(batch: list[tuple[int, int]], data: bytes) -> tuple[bytes, list[int]]:
-    """
-    Process a batch of index entries to extract documents and create a new index.
+def _process_batch(
+    batch: list[tuple[int, int]], data: bytes, start_position: int
+) -> tuple[bytes, list[tuple[int, int]]]:
+    """Process a batch of index entries to extract documents and create a new index.
 
     Args:
         batch (list[tuple[int, int]]): List of index entries [(start, length), ...].
         data (bytes): Byte stream of the entire data loaded in memory.
+        start_position (int): The starting position for this batch in the byte stream.
 
     Returns:
-        tuple[bytes, list[int]]: A tuple containing the processed data (bytes) and the list of document lengths.
+        tuple[bytes, list[tuple[int, int]]]: A tuple containing the processed data (bytes)
+        and the new index [(position, length), ...].
     """
     processed_data = []
-    document_lengths = []
+    new_index = []
+
+    current_position = start_position
 
     for start, length in batch:
         # Access the data slice directly from the in-memory bytes
         document = data[start : start + length]
         processed_data.append(document)  # Already bytes
 
-        # Record the length of the document
-        document_lengths.append(length)
+        # Record the current position and length in the new index
+        new_index.append((current_position, length))
+        current_position += length
 
-    return b"".join(processed_data), document_lengths
-
-
-def _writer_process(output_path: Path, queue: Queue, header_data: bytes) -> None:
-    """Process to write processed data and index to the output file incrementally.
-
-    Args:
-        output_path (Path): Path to the output file.
-        queue (Queue): Queue containing processed data and document lengths.
-        header_data (bytes): Header data to write initially.
-
-    Returns:
-        None
-    """
-    with output_path.open("wb") as f:
-        # Write the header data
-        f.write(header_data)
-        current_position = 0
-        final_index = []
-
-        while True:
-            item = queue.get()
-            # Sentinel value to indicate completion
-            if item is None:
-                break
-
-            data_segment, lengths = item
-            f.write(data_segment)
-            final_index.extend((current_position, length) for length in lengths)
-            current_position += len(data_segment)
-
-        # Write the final index to the file
-        f.write(pickle.dumps(final_index))
+    return b"".join(processed_data), new_index
 
 
 def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
@@ -97,25 +68,25 @@ def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
     # Step 3: Divide the shuffled index into batches
     batches = [index_base[i : i + batch_size] for i in range(0, len(index_base), batch_size)]
 
-    # Step 4: Prepare for multiprocessing and writing
-    queue = Queue()
-
-    # Create the output file path with the postfix "_shuffled"
+    # Step 4: Prepare the output file
     stem = input_data_path.stem
     suffix = input_data_path.suffix
     output_data_path = input_data_path.with_name(f"{stem}_shuffled{suffix}")
 
-    # Prepare the header data
     header_data = data_section_length_in_bytes + token_size_as_bytes
 
-    writer = Process(target=_writer_process, args=(output_data_path, queue, header_data))
-    writer.start()
+    with output_data_path.open("wb") as f:
+        # Write the header data
+        f.write(header_data)
+        current_position = 0
+        final_index = []
 
-    # Step 5: Use multiprocessing to process batches
-    with multiprocessing.Pool() as pool:
-        for result in pool.imap(partial(_process_batch, data=data), batches):
-            queue.put(result)
+        # Process and write each batch sequentially
+        for batch in batches:
+            data_segment, new_index = _process_batch(batch, data, current_position)
+            f.write(data_segment)
+            final_index.extend(new_index)
+            current_position += len(data_segment)
 
-    # Step 6: Signal the writer process to finish
-    queue.put(None)
-    writer.join()
+        # Write the final index to the file
+        f.write(pickle.dumps(final_index))
