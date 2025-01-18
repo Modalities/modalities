@@ -54,7 +54,7 @@ class TokenizedFileWriter:
             return encoded_token.to_bytes(token_size_in_bytes, byteorder="little", signed=False)
 
         num_documents = len(token_data)
-        write_batch_size = num_documents // 100
+        write_batch_size = math.ceil(num_documents / 100)
         samples = []
         index_list = []
         curr_offset = 0
