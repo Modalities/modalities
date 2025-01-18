@@ -13,6 +13,13 @@ class TokenizedFileWriter:
     def write_tokenized_dataset(
         tokenized_dataset: list[np.ndarray], tokenized_dataset_file_path: Path, vocab_size: int
     ) -> None:
+        """Writes a tokenized dataset to disc in the custom pbin file format.
+
+        Args:
+            tokenized_dataset (list[np.ndarray]): The tokenized dataset to write to disc.
+            tokenized_dataset_file_path (Path): The path to the tokenized dataset file.
+            vocab_size (int): The size of the vocabulary used to encode the tokens.
+        """
         token_size_in_bytes = TokenizedFileWriter._get_required_num_of_bytes_to_repr(vocab_size)
         with tokenized_dataset_file_path.open("wb") as chunk_file:
             TokenizedFileWriter._write_initial_header_segment(chunk_file, token_size_in_bytes)
@@ -51,7 +58,11 @@ class TokenizedFileWriter:
     ) -> list[tuple[int, int]]:
         def encoded_token_to_bytes(encoded_token: int, token_size_in_bytes: int) -> bytes:
             # Converts an token_ids to its byte representation.
-            return encoded_token.to_bytes(token_size_in_bytes, byteorder="little", signed=False)
+            try:
+                token_bytes = encoded_token.to_bytes(token_size_in_bytes, byteorder="little", signed=False)
+            except OverflowError as e:
+                raise ValueError(f"Token {encoded_token} cannot be represented by {token_size_in_bytes} bytes.") from e
+            return token_bytes
 
         num_documents = len(token_data)
         write_batch_size = math.ceil(num_documents / 100)
