@@ -111,9 +111,10 @@ def create_shuffled_dataset_chunk(
         file_samples: list[np.ndarray] = Chunking.get_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
         samples.extend(file_samples)
 
-    shuffled_samples: list[np.ndarray] = Chunking.shuffle_file_chunks(samples)
+    # samples are shuffled in place
+    Chunking.shuffle_file_chunks_in_place(samples)
     TokenizedFileWriter.write_tokenized_dataset(
-        tokenized_dataset=shuffled_samples, tokenized_dataset_file_path=chunk_file_path, vocab_size=vocab_size
+        tokenized_dataset=samples, tokenized_dataset_file_path=chunk_file_path, vocab_size=vocab_size
     )
 
 

@@ -39,6 +39,5 @@ class Chunking:
         return chunk
 
     @staticmethod
-    def shuffle_file_chunks(file_chunks: list[np.ndarray]) -> list[np.ndarray]:
+    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray]) -> list[np.ndarray]:
         np.random.shuffle(file_chunks)
-        return file_chunks

@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pytest
 from transformers import BatchEncoding
@@ -128,3 +130,21 @@ def test_get_file_chunk(dataset: list[list[int]], num_chunks: int, chunk_id: int
     chunk_recalculated = dataset[chunk_range[0] : chunk_range[1]][dataset.sample_key]
 
     assert chunk == chunk_recalculated
+
+
+@pytest.mark.parametrize(
+    "file_chunks",
+    [
+        (np.arange(1000).reshape(200, -1).tolist()),  # 200 samples, 5 tokens per sample
+        ([]),
+    ],
+)
+def test_shuffle_file_chunks_in_place(file_chunks: list[list[int]]):
+    file_chunks_copy = copy.deepcopy(file_chunks)
+
+    Chunking.shuffle_file_chunks_in_place(file_chunks)
+    if len(file_chunks) > 0:
+        assert file_chunks_copy != file_chunks
+        assert sorted(file_chunks_copy) == sorted(file_chunks)
+    else:
+        assert len(file_chunks) == 0
