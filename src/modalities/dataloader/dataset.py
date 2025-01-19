@@ -258,12 +258,12 @@ class PackedMemMapDatasetBase(Dataset):
         """
         return len(self._index)
 
-    def __getitem__(self, idx: int) -> BatchEncoding:
+    def __getitem__(self, idx: int | slice) -> BatchEncoding:
         """
-        Retrieves the item at the given index.
+        Retrieves the item at the given index or a slice of items.
 
         Args:
-            idx (int): The index of the item to retrieve.
+            idx (int | sclice): The index of the item to retrieve or slice of items.
 
         Returns:
             BatchEncoding: The retrieved item as a BatchEncoding object.
@@ -278,9 +278,15 @@ class PackedMemMapDatasetBase(Dataset):
             item_positions: list[tuple[int, int]] = [self._index[idx]]
         elif isinstance(idx, slice):
             start = idx.start if idx.start is not None else 0
+            start = start if start >= 0 else len(self) + start
             stop = idx.stop if idx.stop is not None else len(self)
+            stop = stop if stop >= 0 else len(self) + stop
             self._check_if_inbounds(start)
             self._check_if_inbounds(stop - 1)
+            if start == stop:
+                return BatchEncoding(data={self.sample_key: []})
+            if start > stop:
+                raise ValueError(f"Start index ({start}) must be smaller than stop index ({stop}).")
             if idx.step is not None and idx.step != 1:
                 raise ValueError("Slicing with step != 0 is not supported.")
             item_positions = self._index[start:stop]

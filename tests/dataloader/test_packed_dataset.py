@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Type
 
 import numpy as np
 import pytest
@@ -213,11 +214,8 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
         collator(list(batch))
 
 
-def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
-    # In this test, we create a packed dataset from a long jsonl file
-    # and iterate over the packed dataset to check if the tokenization is correct.
-    # We do so by manually tokenizing the jsonl file and comparing the tokenized
-    # output with the packed dataset
+@pytest.fixture
+def packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer) -> PackedMemMapDatasetBase:
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_data_path_long.raw_data_path,
         tokenizer=wrapped_gpt2_tokenizer,
@@ -232,16 +230,68 @@ def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrappe
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
-    packed_dataset = PackedMemMapDatasetBase(default_packed_dataset_path, sample_key="input_ids")
+    dataset = PackedMemMapDatasetBase(default_packed_dataset_path, sample_key="input_ids")
+    return dataset
+
+
+@pytest.fixture
+def tokenized_jsonl_data(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer) -> list[list[int]]:
     # read in the raw jsonl files for manual tokenization
-    with open(indexed_dummy_data_path_long.raw_data_path) as f:
+    with open(indexed_dummy_data_path_long.raw_data_path, "r", encoding="utf-8") as f:
         jsonl_list = [json.loads(line)["text"] for line in f]
 
     eod_token_id = wrapped_gpt2_tokenizer.get_token_id("<|endoftext|>")
     jsonl_tokenized = [wrapped_gpt2_tokenizer.tokenize(v) + [eod_token_id] for v in jsonl_list]
+    return jsonl_tokenized
 
-    for sample, original_sample in zip(packed_dataset, jsonl_tokenized):
+
+def test_original_samples_in_packed_dataset(
+    packed_dataset: PackedMemMapDatasetBase, tokenized_jsonl_data: list[list[int]]
+):
+    # In this test, we create a packed dataset from a long jsonl file
+    # and iterate over the packed dataset to check if the tokenization is correct.
+    # We do so by manually tokenizing the jsonl file and comparing the tokenized
+    # output with the packed dataset
+
+    for sample, original_sample in zip(packed_dataset, tokenized_jsonl_data):
         assert sample["input_ids"].tolist() == original_sample
+
+
+@pytest.mark.parametrize(
+    "slice, expected_error",
+    [
+        ((0, 10), None),
+        ((0, 100), None),
+        ((0, 500), None),
+        ((0, 501), IndexError),
+        ((5, 10), None),
+        ((5, 100), None),
+        ((5, 500), None),
+        ((5, 501), IndexError),
+        ((5, -1), None),
+        ((-3, -1), None),
+        ((3, 1), ValueError),
+        ((3, None), None),
+        ((None, None), None),
+        ((500, 501), IndexError),
+        ((450, 450), None),
+    ],
+)
+def test_original_samples_in_packed_dataset_slicing(
+    packed_dataset: PackedMemMapDatasetBase,
+    tokenized_jsonl_data: list[list[int]],
+    slice: tuple[int, int],
+    expected_error: Type[Exception],
+):
+    if expected_error is not None:
+        with pytest.raises(expected_error):
+            packed_dataset[slice[0] : slice[1]]
+        return
+
+    for sample, original_sample in zip(
+        packed_dataset[slice[0] : slice[1]]["input_ids"], tokenized_jsonl_data[slice[0] : slice[1]]
+    ):
+        assert sample.tolist() == original_sample
 
 
 @pytest.mark.parametrize(
