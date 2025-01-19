@@ -6,21 +6,30 @@ from pathlib import Path
 import numpy as np
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
+from modalities.utils.logging import get_logger
 
 
 class TokenizedFileWriter:
     @staticmethod
     def write_tokenized_dataset(
-        tokenized_dataset: list[np.ndarray], tokenized_dataset_file_path: Path, vocab_size: int
+        tokenized_dataset: list[np.ndarray], tokenized_dataset_file_path: Path, token_size_in_bytes: int = None
     ) -> None:
         """Writes a tokenized dataset to disc in the custom pbin file format.
 
         Args:
             tokenized_dataset (list[np.ndarray]): The tokenized dataset to write to disc.
             tokenized_dataset_file_path (Path): The path to the tokenized dataset file.
-            vocab_size (int): The size of the vocabulary used to encode the tokens.
+            token_size_in_bytes (int): The number of bytes for a single token.
         """
-        token_size_in_bytes = TokenizedFileWriter._get_required_num_of_bytes_to_repr(vocab_size)
+
+        if token_size_in_bytes is None:
+            get_logger().warning(
+                "Token size in bytes not provided, calculating token size based on the maximum token in the dataset."
+            )
+            token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(
+                np.max([np.max(sample) for sample in tokenized_dataset])
+            )
+
         with tokenized_dataset_file_path.open("wb") as chunk_file:
             TokenizedFileWriter._write_initial_header_segment(chunk_file, token_size_in_bytes)
             index_list = TokenizedFileWriter._write_data_segment(chunk_file, tokenized_dataset, token_size_in_bytes)
@@ -85,7 +94,7 @@ class TokenizedFileWriter:
         return index_list
 
     @staticmethod
-    def _get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
+    def get_required_num_of_bytes_to_repr(int_to_get_repr: int) -> int:
         """
         Calculates the required number of bytes to represent an integer.
 

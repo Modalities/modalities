@@ -96,7 +96,12 @@ def convert_pytorch_to_hf_checkpoint(
 
 
 def create_shuffled_dataset_chunk(
-    file_path_list: list[Path], chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
+    file_path_list: list[Path],
+    chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    vocab_size: int,
+    shuffle: bool = True,
 ):
     """Creates a shuffled dataset chunk.
     Given a dataset consisting of multiple tokenized pbin files, this function
@@ -111,10 +116,18 @@ def create_shuffled_dataset_chunk(
         file_samples: list[np.ndarray] = Chunking.get_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
         samples.extend(file_samples)
 
+    if len(samples) == 0:
+        raise ValueError(
+            f"Chunk {chunk_id} has no samples. Please decrease the number of chunks to less than {chunk_id}."
+        )
+
     # samples are shuffled in place
-    Chunking.shuffle_file_chunks_in_place(samples)
+    if shuffle:
+        Chunking.shuffle_file_chunks_in_place(samples)
+
+    token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(vocab_size)
     TokenizedFileWriter.write_tokenized_dataset(
-        tokenized_dataset=samples, tokenized_dataset_file_path=chunk_file_path, vocab_size=vocab_size
+        tokenized_dataset=samples, tokenized_dataset_file_path=chunk_file_path, token_size_in_bytes=token_size_in_bytes
     )
 
 

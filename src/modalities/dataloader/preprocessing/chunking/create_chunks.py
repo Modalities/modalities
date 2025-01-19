@@ -35,6 +35,8 @@ class Chunking:
     @staticmethod
     def get_file_chunk(dataset: PackedMemMapDatasetBase, num_chunks: int, chunk_id: int) -> list[np.ndarray]:
         chunk_range = Chunking._get_chunk_range(num_chunks=num_chunks, num_samples=len(dataset), chunk_id=chunk_id)
+        if chunk_range[0] == chunk_range[1]:
+            return []
         chunk = dataset[chunk_range[0] : chunk_range[1]][dataset.sample_key]
         return chunk
 

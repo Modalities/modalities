@@ -239,6 +239,10 @@ class PackedMemMapDatasetBase(Dataset):
             ) from e
         self._index = self._generate_packing_index()
 
+    @property
+    def token_size_in_bytes(self) -> int:
+        return self._token_size_in_bytes
+
     def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
         # The index is list of tuples, where each tuple contains the offset and length in bytes.

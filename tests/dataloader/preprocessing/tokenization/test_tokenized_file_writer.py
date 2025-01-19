@@ -23,8 +23,11 @@ def test_write_tokenized_dataset_via_existing_pbin_file(pbin_file_path: Path, vo
     assert len(in_memory_dataset) == num_documents
     with tempfile.NamedTemporaryFile() as temp_file:
         temp_file_path = Path(temp_file.name)
+        token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(vocab_size)
         TokenizedFileWriter.write_tokenized_dataset(
-            tokenized_dataset=in_memory_dataset, tokenized_dataset_file_path=temp_file_path, vocab_size=vocab_size
+            tokenized_dataset=in_memory_dataset,
+            tokenized_dataset_file_path=temp_file_path,
+            token_size_in_bytes=token_size_in_bytes,
         )
 
         # hash both files
@@ -69,13 +72,19 @@ def test_write_tokenized_dataset(dataset: list[np.ndarray], vocab_size: int, exp
         temp_file_path = Path(temp_file.name)
         if expect_error:
             with pytest.raises(ValueError):
+                token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(vocab_size)
                 TokenizedFileWriter.write_tokenized_dataset(
-                    tokenized_dataset=dataset, tokenized_dataset_file_path=temp_file_path, vocab_size=vocab_size
+                    tokenized_dataset=dataset,
+                    tokenized_dataset_file_path=temp_file_path,
+                    token_size_in_bytes=token_size_in_bytes,
                 )
             return
         else:
+            token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(vocab_size)
             TokenizedFileWriter.write_tokenized_dataset(
-                tokenized_dataset=dataset, tokenized_dataset_file_path=temp_file_path, vocab_size=vocab_size
+                tokenized_dataset=dataset,
+                tokenized_dataset_file_path=temp_file_path,
+                token_size_in_bytes=token_size_in_bytes,
             )
 
         new_dataset = PackedMemMapDatasetBase(raw_data_path=temp_file_path, sample_key=sample_key, load_index=True)[:][
