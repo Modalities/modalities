@@ -272,7 +272,7 @@ class PackedMemMapDatasetBase(Dataset):
             ValueError: If the length of the sample in bytes is not a multiple of `self._token_size_in_bytes`.
         """
 
-        if isinstance(idx, int):
+        if isinstance(idx, int) or isinstance(idx, np.integer):
             self._check_if_inbounds(idx)
             # (offset_in_bytes, length_in_bytes)
             item_positions: list[tuple[int, int]] = [self._index[idx]]
