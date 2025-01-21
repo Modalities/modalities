@@ -70,7 +70,7 @@ def shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, batch_
     random.shuffle(index_base)
 
     # Step 3: Divide the shuffled index into batches
-    batches = [index_base[i : i + batch_size] for i in range(0, len(index_base), batch_size)]
+    batches: list[list[tuple[int, int]]] = [index_base[i : i + batch_size] for i in range(0, len(index_base), batch_size)]
 
     header_data = data_section_length_in_bytes + token_size_as_bytes
 
