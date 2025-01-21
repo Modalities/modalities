@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Type
 
 import numpy as np
 import pytest
@@ -258,36 +257,30 @@ def test_original_samples_in_packed_dataset(
 
 
 @pytest.mark.parametrize(
-    "slice, expected_error",
+    "slice",
     [
-        ((0, 10), None),
-        ((0, 100), None),
-        ((0, 500), None),
-        ((0, 501), IndexError),
-        ((5, 10), None),
-        ((5, 100), None),
-        ((5, 500), None),
-        ((5, 501), IndexError),
-        ((5, -1), None),
-        ((-3, -1), None),
-        ((3, 1), ValueError),
-        ((3, None), None),
-        ((None, None), None),
-        ((500, 501), IndexError),
-        ((450, 450), None),
+        (0, 10),
+        (0, 100),
+        (0, 500),
+        (0, 501),
+        (5, 10),
+        (5, 100),
+        (5, 500),
+        (5, 501),
+        (5, -1),
+        (-3, -1),
+        (3, 1),
+        (3, None),
+        (None, None),
+        (500, 501),
+        (450, 450),
     ],
 )
 def test_original_samples_in_packed_dataset_slicing(
     packed_dataset: PackedMemMapDatasetBase,
     tokenized_jsonl_data: list[list[int]],
     slice: tuple[int, int],
-    expected_error: Type[Exception],
 ):
-    if expected_error is not None:
-        with pytest.raises(expected_error):
-            packed_dataset[slice[0] : slice[1]]
-        return
-
     for sample, original_sample in zip(
         packed_dataset[slice[0] : slice[1]]["input_ids"], tokenized_jsonl_data[slice[0] : slice[1]]
     ):

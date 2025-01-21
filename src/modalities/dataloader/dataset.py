@@ -31,11 +31,6 @@ class Dataset(TorchdataSet):
         self.raw_data_path = raw_data_path
         self.sample_key = sample_key
 
-    def _check_if_inbounds(self, idx: int):
-        # check if the provided index is within the bounds of the dataset.
-        if not 0 <= idx < len(self):
-            raise IndexError
-
 
 class DummySampleDataType(str, Enum):
     """
@@ -273,32 +268,18 @@ class PackedMemMapDatasetBase(Dataset):
         """
 
         if isinstance(idx, int) or isinstance(idx, np.integer):
-            self._check_if_inbounds(idx)
             # (offset_in_bytes, length_in_bytes)
             item_positions: list[tuple[int, int]] = [self._index[idx]]
         elif isinstance(idx, slice):
-            start = idx.start if idx.start is not None else 0
-            start = start if start >= 0 else len(self) + start
-            stop = idx.stop if idx.stop is not None else len(self)
-            stop = stop if stop >= 0 else len(self) + stop
-            self._check_if_inbounds(start)
-            self._check_if_inbounds(stop - 1)
-            if start == stop:
-                return BatchEncoding(data={self.sample_key: []})
-            if start > stop:
-                raise ValueError(f"Start index ({start}) must be smaller than stop index ({stop}).")
             if idx.step is not None and idx.step != 1:
-                raise ValueError("Slicing with step != 0 is not supported.")
-            item_positions = self._index[start:stop]
+                raise ValueError("Slicing with step != 1 is not supported.")
+            item_positions = self._index[idx]
         else:
             raise TypeError(f"Invalid argument type: {type(idx)}")
-        # offset and length in bytes
-        for offset_in_bytes, length_in_bytes in item_positions:
-            if length_in_bytes % self._token_size_in_bytes != 0:
-                raise ValueError(
-                    f"Length of the sample in bytes is not a multiple of {self._token_size_in_bytes}."
-                    f"Offset in bytes: {offset_in_bytes}, Length in bytes: {length_in_bytes}"
-                )
+
+        if len(item_positions) == 0:
+            return BatchEncoding(data={self.sample_key: []})
+
         # numpy frombuffer takes the memmap object as the buffer
         # and indices the data section with the given offset (in bytes)
         # and length in indices of type self._token_dtype_on_disk
