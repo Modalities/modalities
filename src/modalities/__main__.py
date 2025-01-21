@@ -192,7 +192,7 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
 @click.option(
     "--batch-size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
 )
-def shuffle_tokenized_data_entrypoint(input_data_path: Path, batch_size: int) -> None:
+def CMD_shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
     """Entrypoint for shuffling tokenized data.
 
     Args:
