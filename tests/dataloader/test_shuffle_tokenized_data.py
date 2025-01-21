@@ -71,8 +71,8 @@ def test_shuffle_tokenized_data(tmp_path, encoding_set_up):
 
         with output_path.open("rb") as f:
             # Validate header and data
-            data_section_length_as_bytes = f.read(len(data_section_length_as_bytes))
-            assert data_section_length_as_bytes == data_section_length_as_bytes
+            data_section_length_as_bytes_written = f.read(EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES)
+            assert data_section_length_as_bytes_written == data_section_length_as_bytes
             assert f.read(len(token_size_as_bytes)) == token_size_as_bytes
             data_len = int.from_bytes(data_section_length_as_bytes, byteorder="little")
             data_written = f.read(data_len)
