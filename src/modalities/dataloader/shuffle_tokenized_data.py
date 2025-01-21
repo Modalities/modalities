@@ -37,8 +37,11 @@ def _process_batch(
 
 
 def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
-    """Shuffle data and index segments loaded fully into memory.
-    Shuffled data is written to a new file with the postfix "_shuffled".
+    """Shuffles a tokenized file (.pbin).
+    Shuffled data is written to the specified output file.
+    
+    Note that the tokenized data is fully materialized in-memory.
+
 
     Args:
         input_data_path (Path): Path to the tokenized data (.pbin).
