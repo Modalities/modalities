@@ -122,7 +122,7 @@ def test_skipped_and_distributed_dataloader_from_config():
         sampled_pair = [torch.tensor(dataset[idx]["input_ids"]) for idx in batch_indices]
         # we stack the two samples into a batch and remove the last token from each sample
         # to get a proper "training" sample without the final target
-        samples_pair_tensor = torch.stack(sampled_pair, dim=1).squeeze(dim=0)[:, :-1]
+        samples_pair_tensor = torch.stack(sampled_pair, dim=0)[:, :-1]
         batches_recomputed_rank_0.append(samples_pair_tensor)
 
     batches_recomputed_rank_1 = []
@@ -130,7 +130,7 @@ def test_skipped_and_distributed_dataloader_from_config():
         sampled_pair = [torch.tensor(dataset[idx]["input_ids"]) for idx in batch_indices]
         # we stack the two samples into a batch and remove the last token from each sample
         # to get a proper "training" sample without the final target
-        samples_pair_tensor = torch.stack(sampled_pair, dim=1).squeeze(dim=0)[:, :-1]
+        samples_pair_tensor = torch.stack(sampled_pair, dim=0)[:, :-1]
         batches_recomputed_rank_1.append(samples_pair_tensor)
 
     for batch_1, batch_2 in zip(batches_rank_0, batches_recomputed_rank_0):

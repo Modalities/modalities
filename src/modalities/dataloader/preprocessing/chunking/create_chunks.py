@@ -21,6 +21,12 @@ class Chunking:
         if num_complete_chunks == 0:
             num_complete_chunks = num_chunks
 
+        # Calculate the start and end index of the chunk
+        # The first num_complete_chunks chunks have the maximum chunk size and the
+        # remaining ones have chunk_size_complete - 1
+        # If the chunk_id is larger than num_complete_chunks, we need calculate the starting position of the chunk
+        # by adding chunk_id many offsets of size chunk_size_complete and (chunk_id - num_complete_chunks) many
+        # offsets of size chunk_size_complete - 1
         start = chunk_size_complete * min(num_complete_chunks, chunk_id) + max((chunk_id - num_complete_chunks), 0) * (
             chunk_size_complete - 1
         )
@@ -41,5 +47,5 @@ class Chunking:
         return chunk
 
     @staticmethod
-    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray]) -> list[np.ndarray]:
+    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray]):
         np.random.shuffle(file_chunks)

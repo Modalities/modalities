@@ -97,7 +97,7 @@ def convert_pytorch_to_hf_checkpoint(
 
 def create_shuffled_dataset_chunk(
     file_path_list: list[Path],
-    chunk_file_path: Path,
+    output_chunk_file_path: Path,
     chunk_id: int,
     num_chunks: int,
     vocab_size: int,
@@ -108,12 +108,24 @@ def create_shuffled_dataset_chunk(
     creates a shuffled dataset chunk for a given chunk id.
     From each tokenized pbin file, the respective chunk is extracted, shuffled
     and written to a new pbin file.
+
+    Args:
+        file_path_list (list[Path]): List of paths to the tokenized input pbin files.
+        output_chunk_file_path (Path): Path to the output chunk which will be stored in pbin format.
+        chunk_id (int): The id of the chunk to create.
+        num_chunks (int): The total number of chunks to create.
+        vocab_size (int): The size of the vocabulary.
+        shuffle (bool, optional): Flag indicating whether we want to shuffle the chunk. Defaults to True.
+
+    Raises:
+        ValueError: _description_
     """
-    sample_key = "text"
     samples = []
     for file_path in file_path_list:
-        dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key=sample_key, load_index=True)
-        file_samples: list[np.ndarray] = Chunking.get_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
+        dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
+        file_samples: list[np.ndarray] = Chunking.get_file_chunk(
+            dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
+        )
         samples.extend(file_samples)
 
     if len(samples) == 0:
@@ -123,11 +135,13 @@ def create_shuffled_dataset_chunk(
 
     # samples are shuffled in place
     if shuffle:
-        Chunking.shuffle_file_chunks_in_place(samples)
+        Chunking.shuffle_file_chunks_in_place(file_chunks=samples)
 
-    token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(vocab_size)
+    token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
     TokenizedFileWriter.write_tokenized_dataset(
-        tokenized_dataset=samples, tokenized_dataset_file_path=chunk_file_path, token_size_in_bytes=token_size_in_bytes
+        tokenized_dataset=samples,
+        tokenized_dataset_file_path=output_chunk_file_path,
+        token_size_in_bytes=token_size_in_bytes,
     )
 
 

@@ -267,15 +267,13 @@ class PackedMemMapDatasetBase(Dataset):
             ValueError: If the length of the sample in bytes is not a multiple of `self._token_size_in_bytes`.
         """
 
-        if isinstance(idx, int) or isinstance(idx, np.integer):
+        if not isinstance(idx, slice):
             # (offset_in_bytes, length_in_bytes)
             item_positions: list[tuple[int, int]] = [self._index[idx]]
-        elif isinstance(idx, slice):
+        else:
             if idx.step is not None and idx.step != 1:
                 raise ValueError("Slicing with step != 1 is not supported.")
             item_positions = self._index[idx]
-        else:
-            raise TypeError(f"Invalid argument type: {type(idx)}")
 
         if len(item_positions) == 0:
             return BatchEncoding(data={self.sample_key: []})
@@ -302,7 +300,10 @@ class PackedMemMapDatasetBase(Dataset):
             token_end = (offset_in_bytes + length_in_bytes - num_bytes_start) // self._token_size_in_bytes
             documents.append(tokens[token_start:token_end])
 
-        if isinstance(idx, int):
+        # TODO: the return type is inconsistent here.
+        # If idx is an integer, we return a BatchEncoding with a single document.
+        # If idx is a slice, we return a BatchEncoding with a list of documents.
+        if not isinstance(idx, slice):
             return BatchEncoding(data={self.sample_key: documents[0]})
         else:
             return BatchEncoding(data={self.sample_key: documents})

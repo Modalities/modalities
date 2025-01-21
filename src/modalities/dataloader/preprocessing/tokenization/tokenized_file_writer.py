@@ -12,7 +12,10 @@ from modalities.utils.logging import get_logger
 class TokenizedFileWriter:
     @staticmethod
     def write_tokenized_dataset(
-        tokenized_dataset: list[np.ndarray], tokenized_dataset_file_path: Path, token_size_in_bytes: int = None
+        tokenized_dataset: list[np.ndarray],
+        tokenized_dataset_file_path: Path,
+        write_batch_size: int = 10000,
+        token_size_in_bytes: int = None,
     ) -> None:
         """Writes a tokenized dataset to disc in the custom pbin file format.
 
@@ -32,7 +35,12 @@ class TokenizedFileWriter:
 
         with tokenized_dataset_file_path.open("wb") as chunk_file:
             TokenizedFileWriter._write_initial_header_segment(chunk_file, token_size_in_bytes)
-            index_list = TokenizedFileWriter._write_data_segment(chunk_file, tokenized_dataset, token_size_in_bytes)
+            index_list = TokenizedFileWriter._write_data_segment(
+                file_descriptor=chunk_file,
+                token_data=tokenized_dataset,
+                token_size_in_bytes=token_size_in_bytes,
+                write_batch_size=write_batch_size,
+            )
             TokenizedFileWriter._write_index_segment(chunk_file, index_list)
         TokenizedFileWriter._update_data_length_in_initial_header(tokenized_dataset_file_path, index_list)
 
@@ -63,7 +71,7 @@ class TokenizedFileWriter:
 
     @staticmethod
     def _write_data_segment(
-        file_descriptor, token_data: list[np.ndarray], token_size_in_bytes: int
+        file_descriptor, token_data: list[np.ndarray], token_size_in_bytes: int, write_batch_size: int
     ) -> list[tuple[int, int]]:
         def encoded_token_to_bytes(encoded_token: int, token_size_in_bytes: int) -> bytes:
             # Converts an token_ids to its byte representation.
@@ -73,8 +81,6 @@ class TokenizedFileWriter:
                 raise ValueError(f"Token {encoded_token} cannot be represented by {token_size_in_bytes} bytes.") from e
             return token_bytes
 
-        num_documents = len(token_data)
-        write_batch_size = math.ceil(num_documents / 100)
         samples = []
         index_list = []
         curr_offset = 0

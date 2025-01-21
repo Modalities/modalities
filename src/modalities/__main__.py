@@ -166,13 +166,13 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
 
 @data.command(name="create_shuffled_dataset_chunk")
 @click.option(
-    "--file_list_path",
+    "--input_file_list_path",
     type=Path,
     required=True,
     help="Path to the file containing the list of files to be chunked.",
 )
 @click.option(
-    "--chunk_file_path",
+    "--output_chunk_file_path",
     type=Path,
     required=True,
     help="Path where the chunked dataset will be saved.",
@@ -196,15 +196,15 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     help="The size of the vocabulary.",
 )
 def CMD_create_shuffled_dataset_chunk(
-    file_list_path: Path, chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
+    input_file_list_path: Path, output_chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
 ):
-    with open(file_list_path, "r", encoding="utf-8") as f:
+    with open(input_file_list_path, "r", encoding="utf-8") as f:
         file_path_list = f.readlines()
     file_path_list = [Path(file_path.strip()) for file_path in file_path_list]
 
     create_shuffled_dataset_chunk(
         file_path_list=file_path_list,
-        chunk_file_path=chunk_file_path,
+        output_chunk_file_path=output_chunk_file_path,
         chunk_id=chunk_id,
         num_chunks=num_chunks,
         vocab_size=vocab_size,

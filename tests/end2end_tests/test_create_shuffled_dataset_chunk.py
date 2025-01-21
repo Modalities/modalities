@@ -69,7 +69,7 @@ def test_create_shuffled_dataset_chunk(
             chunk_file_path = parent_dir / f"chunk_{chunk_id}.pbin"
             create_shuffled_dataset_chunk(
                 file_path_list=pbin_file_path_list,
-                chunk_file_path=chunk_file_path,
+                output_chunk_file_path=chunk_file_path,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
                 vocab_size=vocab_size,
