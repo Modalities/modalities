@@ -190,19 +190,26 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
     help="Path to a tokenized file (.pbin).",
 )
 @click.option(
+    "--output_data_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to write the shuffled tokenized data (.pbin).",
+)
+@click.option(
     "--batch-size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
 )
-def CMD_shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
+def CMD_shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, batch_size: int) -> None:
     """Entrypoint for shuffling tokenized data.
 
     Args:
         input_data_path (Path): The path to the input tokenized data (.pbin).
+        output_data_path (Path): Path to write the shuffled tokenized data (.pbin).
         batch_size (int): The size of the batches to shuffle.
 
     Returns:
         None
     """
-    shuffle_tokenized_data(input_data_path=input_data_path, batch_size=batch_size)
+    shuffle_tokenized_data(input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size)
 
 
 class Main:

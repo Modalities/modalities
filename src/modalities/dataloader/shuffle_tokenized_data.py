@@ -36,15 +36,16 @@ def _process_batch(
     return b"".join(processed_data), new_index
 
 
-def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
+def shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, batch_size: int) -> None:
     """Shuffles a tokenized file (.pbin).
     Shuffled data is written to the specified output file.
-    
+
     Note that the tokenized data is fully materialized in-memory.
 
 
     Args:
         input_data_path (Path): Path to the tokenized data (.pbin).
+        output_data_path (Path): Path to write the shuffled tokenized data.
         batch_size (int): Number of documents to process per batch.
 
     Returns:
@@ -70,11 +71,6 @@ def shuffle_tokenized_data(input_data_path: Path, batch_size: int) -> None:
 
     # Step 3: Divide the shuffled index into batches
     batches = [index_base[i : i + batch_size] for i in range(0, len(index_base), batch_size)]
-
-    # Step 4: Prepare the output file
-    stem = input_data_path.stem
-    suffix = input_data_path.suffix
-    output_data_path = input_data_path.with_name(f"{stem}_shuffled{suffix}")
 
     header_data = data_section_length_in_bytes + token_size_as_bytes
 
