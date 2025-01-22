@@ -14,6 +14,7 @@ from pydantic import BaseModel, FilePath
 from modalities.api import (
     convert_pytorch_to_hf_checkpoint,
     create_raw_data_index,
+    create_shuffled_dataset_chunk,
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
@@ -162,6 +163,53 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     config_dict = load_app_config_dict(config_path)
 
     pack_encoded_data(config_dict=config_dict)
+
+
+@data.command(name="create_shuffled_dataset_chunk")
+@click.option(
+    "--input_file_list_path",
+    type=Path,
+    required=True,
+    help="Path to the file containing the list of files to be chunked.",
+)
+@click.option(
+    "--output_chunk_file_path",
+    type=Path,
+    required=True,
+    help="Path where the chunked dataset will be saved.",
+)
+@click.option(
+    "--chunk_id",
+    type=int,
+    required=True,
+    help="The id of the chunk to be created.",
+)
+@click.option(
+    "--num_chunks",
+    type=int,
+    required=True,
+    help="The number of chunks to create.",
+)
+@click.option(
+    "--vocab_size",
+    type=int,
+    required=True,
+    help="The size of the vocabulary.",
+)
+def CMD_create_shuffled_dataset_chunk(
+    input_file_list_path: Path, output_chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
+):
+    with open(input_file_list_path, "r", encoding="utf-8") as f:
+        file_path_list = f.readlines()
+    file_path_list = [Path(file_path.strip()) for file_path in file_path_list]
+
+    create_shuffled_dataset_chunk(
+        file_path_list=file_path_list,
+        output_chunk_file_path=output_chunk_file_path,
+        chunk_id=chunk_id,
+        num_chunks=num_chunks,
+        vocab_size=vocab_size,
+    )
 
 
 @data.command(name="merge_packed_data")

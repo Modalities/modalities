@@ -99,7 +99,7 @@ class PackedDataGenerator:
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
-        Converts an encoded token to its byte representaion.
+        Converts an encoded token to its byte representation.
 
         Args:
             encoded_token (int): The encoded token to be converted.
@@ -108,7 +108,13 @@ class PackedDataGenerator:
             bytes: The byte representation of the token.
 
         """
-        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
+        try:
+            token_bytes = encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
+        except OverflowError as e:
+            raise ValueError(
+                f"Token {encoded_token} cannot be represented by {self._token_size_in_bytes} bytes."
+            ) from e
+        return token_bytes
 
     def _default_destination_path(self, destination_path: Optional[Path] = None) -> Path:
         """

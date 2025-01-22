@@ -4,6 +4,7 @@ import os
 from enum import Enum
 from pathlib import Path
 
+import numpy as np
 from pydantic import FilePath
 
 import modalities.inference.inference as inference
@@ -12,7 +13,10 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.instantiation_models import PackedDatasetComponentsInstantiationModel
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
+from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
+from modalities.dataloader.preprocessing.tokenization.tokenized_file_writer import TokenizedFileWriter
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -89,6 +93,56 @@ def convert_pytorch_to_hf_checkpoint(
     hf_model = cp.convert_pytorch_to_hf_checkpoint(prediction_key=prediction_key)
     print(f"Model was successfully converted and saved to {output_hf_checkpoint_dir}")
     return hf_model
+
+
+def create_shuffled_dataset_chunk(
+    file_path_list: list[Path],
+    output_chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    vocab_size: int,
+    shuffle: bool = True,
+):
+    """Creates a shuffled dataset chunk.
+    Given a dataset consisting of multiple tokenized pbin files, this function
+    creates a shuffled dataset chunk for a given chunk id.
+    From each tokenized pbin file, the respective chunk is extracted, shuffled
+    and written to a new pbin file.
+
+    Args:
+        file_path_list (list[Path]): List of paths to the tokenized input pbin files.
+        output_chunk_file_path (Path): Path to the output chunk which will be stored in pbin format.
+        chunk_id (int): The id of the chunk to create.
+        num_chunks (int): The total number of chunks to create.
+        vocab_size (int): The size of the vocabulary.
+        shuffle (bool, optional): Flag indicating whether we want to shuffle the chunk. Defaults to True.
+
+    Raises:
+        ValueError: _description_
+    """
+    samples = []
+    for file_path in file_path_list:
+        dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
+        file_samples: list[np.ndarray] = Chunking.get_file_chunk(
+            dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
+        )
+        samples.extend(file_samples)
+
+    if len(samples) == 0:
+        raise ValueError(
+            f"Chunk {chunk_id} has no samples. Please decrease the number of chunks to less than {chunk_id}."
+        )
+
+    # samples are shuffled in place
+    if shuffle:
+        Chunking.shuffle_file_chunks_in_place(file_chunks=samples)
+
+    token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
+    TokenizedFileWriter.write_tokenized_dataset(
+        tokenized_dataset=samples,
+        tokenized_dataset_file_path=output_chunk_file_path,
+        token_size_in_bytes=token_size_in_bytes,
+    )
 
 
 def pack_encoded_data(config_dict: dict):

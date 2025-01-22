@@ -31,11 +31,6 @@ class Dataset(TorchdataSet):
         self.raw_data_path = raw_data_path
         self.sample_key = sample_key
 
-    def _check_if_inbounds(self, idx: int):
-        # check if the provided index is within the bounds of the dataset.
-        if not 0 <= idx < len(self):
-            raise IndexError
-
 
 class DummySampleDataType(str, Enum):
     """
@@ -239,6 +234,10 @@ class PackedMemMapDatasetBase(Dataset):
             ) from e
         self._index = self._generate_packing_index()
 
+    @property
+    def token_size_in_bytes(self) -> int:
+        return self._token_size_in_bytes
+
     def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
         # The index is list of tuples, where each tuple contains the offset and length in bytes.
@@ -254,12 +253,12 @@ class PackedMemMapDatasetBase(Dataset):
         """
         return len(self._index)
 
-    def __getitem__(self, idx: int) -> BatchEncoding:
+    def __getitem__(self, idx: int | slice) -> BatchEncoding:
         """
-        Retrieves the item at the given index.
+        Retrieves the item at the given index or a slice of items.
 
         Args:
-            idx (int): The index of the item to retrieve.
+            idx (int | sclice): The index of the item to retrieve or slice of items.
 
         Returns:
             BatchEncoding: The retrieved item as a BatchEncoding object.
@@ -267,27 +266,47 @@ class PackedMemMapDatasetBase(Dataset):
         Raises:
             ValueError: If the length of the sample in bytes is not a multiple of `self._token_size_in_bytes`.
         """
-        self._check_if_inbounds(idx)
-        # offset and length in bytes
-        offset_in_bytes, length_in_bytes = self._index[idx]
-        if length_in_bytes % self._token_size_in_bytes != 0:
-            raise ValueError(
-                f"Length of the sample in bytes is not a multiple of {self._token_size_in_bytes}."
-                f"Offset in bytes: {offset_in_bytes}, Length in bytes: {length_in_bytes}"
-            )
+
+        if not isinstance(idx, slice):
+            # (offset_in_bytes, length_in_bytes)
+            item_positions: list[tuple[int, int]] = [self._index[idx]]
+        else:
+            if idx.step is not None and idx.step != 1:
+                raise ValueError("Slicing with step != 1 is not supported.")
+            item_positions = self._index[idx]
+
+        if len(item_positions) == 0:
+            return BatchEncoding(data={self.sample_key: []})
+
         # numpy frombuffer takes the memmap object as the buffer
         # and indices the data section with the given offset (in bytes)
         # and length in indices of type self._token_dtype_on_disk
+        num_bytes_stop = item_positions[-1][0] + item_positions[-1][1]
+        num_bytes_start = item_positions[0][0]
+        length_in_bytes = num_bytes_stop - num_bytes_start
         num_tokens = length_in_bytes // self._token_size_in_bytes
         tokens = np.frombuffer(
             buffer=self._embedded_stream_data.data,
             dtype=self._token_dtype_on_disk,
             count=num_tokens,
-            offset=offset_in_bytes,
+            offset=num_bytes_start,
         )
         # torch can't convert most uint-formats, therefore we infer regular int types
         tokens = tokens.astype(self._token_dtype_in_ram)
-        return BatchEncoding(data={self.sample_key: tokens})
+
+        documents = []
+        for offset_in_bytes, length_in_bytes in item_positions:
+            token_start = (offset_in_bytes - num_bytes_start) // self._token_size_in_bytes
+            token_end = (offset_in_bytes + length_in_bytes - num_bytes_start) // self._token_size_in_bytes
+            documents.append(tokens[token_start:token_end])
+
+        # TODO: the return type is inconsistent here.
+        # If idx is an integer, we return a BatchEncoding with a single document.
+        # If idx is a slice, we return a BatchEncoding with a list of documents.
+        if not isinstance(idx, slice):
+            return BatchEncoding(data={self.sample_key: documents[0]})
+        else:
+            return BatchEncoding(data={self.sample_key: documents})
 
 
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
