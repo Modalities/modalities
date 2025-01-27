@@ -15,8 +15,6 @@ def calculate_hashed_seed(input_data: list[str], max_seed: int = 2**32 - 1) -> i
     hash_strings = [_hash_string(x) for x in input_data]
 
     hash_sum = sum([int(x, 16) for x in hash_strings])
-    print(hash_sum)
-    print(type(hash_sum))
 
     seed = hash_sum % max_seed  # Ensure the seed fits within the max_seed range
 
