@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 
 import numpy as np
+from data_quality_ablations.utils.seeding import calculate_seed
 from pydantic import FilePath
 
 import modalities.inference.inference as inference
@@ -17,6 +18,7 @@ from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
 from modalities.dataloader.preprocessing.tokenization.tokenized_file_writer import TokenizedFileWriter
+from modalities.dataloader.shuffle_tokenized_data import TokenizedDataShuffler
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
@@ -27,6 +29,32 @@ class FileExistencePolicy(Enum):
     SKIP = "skip"
     ERROR = "error"
     OVERRIDE = "override"
+
+
+def enforce_file_existence_policy(file_path: Path, file_existence_policy: FileExistencePolicy) -> bool:
+    """Enforces the file existence policy. Function returns True, if processing should continue. Otherwise False.
+
+    Args:
+        file_path (Path): File path to the file to check.
+        file_existence_policy (FileExistencePolicy): The file existence policy.
+
+    Raises:
+        ValueError: Raised if the file existence policy is unknown or the policy requires to raise a ValueError.
+
+    Returns:
+        bool: True if processing should continue, otherwise False.
+    """
+    if file_existence_policy == FileExistencePolicy.SKIP:
+        get_logger(name="main").warning(f"File already exists at {str(file_path)}. Skipping ...")
+        return False
+    elif file_existence_policy == FileExistencePolicy.OVERRIDE:
+        get_logger(name="main").warning(f"File already exists at {str(file_path)}. Overriding it.")
+        os.remove(file_path)
+        return True
+    elif file_existence_policy == FileExistencePolicy.ERROR:
+        raise ValueError("File already exists. Delete it or specify different output folder.")
+    else:
+        raise ValueError(f"Unknown file existence policy: {file_existence_policy}")
 
 
 def create_raw_data_index(
@@ -47,16 +75,8 @@ def create_raw_data_index(
     """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        if file_existence_policy == FileExistencePolicy.SKIP:
-            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Skipping index creation.")
+        if not enforce_file_existence_policy(index_path, file_existence_policy):
             return
-        elif file_existence_policy == FileExistencePolicy.OVERRIDE:
-            get_logger(name="main").warning(f"Index already exists at {str(index_path)}. Overriding it.")
-            os.remove(index_path)
-        elif file_existence_policy == FileExistencePolicy.ERROR:
-            raise ValueError("index already exists. delete it or specify different output folder.")
-        else:
-            raise ValueError(f"Unknown file existence policy: {file_existence_policy}")
 
     get_logger(name="main").info(
         f"Reading raw data from {str(src_path)} and" f" writing index to {str(index_path)} ..."
@@ -95,13 +115,38 @@ def convert_pytorch_to_hf_checkpoint(
     return hf_model
 
 
+def shuffle_tokenized_data(
+    input_data_path: Path,
+    output_data_path: Path,
+    batch_size: int,
+    file_existence_policy: FileExistencePolicy,
+    seed: int = None,
+):
+    """Shuffles a tokenized file (.pbin) and stores it on disc.
+
+    Args:
+        input_data_path (Path): Filepath to the tokenized data (.pbin).
+        output_data_path (Path): Filepath to write the shuffled tokenized data.
+        batch_size (int): Number of documents to process per batch.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
+    """
+    if output_data_path.exists():
+        if not enforce_file_existence_policy(output_data_path, file_existence_policy):
+            return
+
+    TokenizedDataShuffler.shuffle_tokenized_data(
+        input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size, seed=seed
+    )
+
+
 def create_shuffled_dataset_chunk(
     file_path_list: list[Path],
     output_chunk_file_path: Path,
     chunk_id: int,
     num_chunks: int,
     vocab_size: int,
-    shuffle: bool = True,
+    file_existence_policy: FileExistencePolicy,
+    global_seed: int = None,
 ):
     """Creates a shuffled dataset chunk.
     Given a dataset consisting of multiple tokenized pbin files, this function
@@ -115,11 +160,16 @@ def create_shuffled_dataset_chunk(
         chunk_id (int): The id of the chunk to create.
         num_chunks (int): The total number of chunks to create.
         vocab_size (int): The size of the vocabulary.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.
         shuffle (bool, optional): Flag indicating whether we want to shuffle the chunk. Defaults to True.
 
     Raises:
-        ValueError: _description_
+        ValueError: If the chunk has no samples.
     """
+    if output_chunk_file_path.exists():
+        if not enforce_file_existence_policy(output_chunk_file_path, file_existence_policy):
+            return
+
     samples = []
     for file_path in file_path_list:
         dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
@@ -134,8 +184,8 @@ def create_shuffled_dataset_chunk(
         )
 
     # samples are shuffled in place
-    if shuffle:
-        Chunking.shuffle_file_chunks_in_place(file_chunks=samples)
+    seed = calculate_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
+    Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
 
     token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
     TokenizedFileWriter.write_tokenized_dataset(
@@ -145,7 +195,10 @@ def create_shuffled_dataset_chunk(
     )
 
 
-def pack_encoded_data(config_dict: dict):
+def pack_encoded_data(
+    config_dict: dict,
+    file_existence_policy: FileExistencePolicy,
+):
     """Packs and encodes an indexed, large jsonl-file.
     (see also `create_index` for more information)
     Returns .pbin-file, which can be inserted into a training process directly
@@ -166,6 +219,10 @@ def pack_encoded_data(config_dict: dict):
     components: PackedDatasetComponentsInstantiationModel = component_factory.build_components(
         config_dict=config_dict, components_model_type=PackedDatasetComponentsInstantiationModel
     )
+
+    if components.settings.dst_path.exists():
+        if not enforce_file_existence_policy(components.settings.dst_path, file_existence_policy):
+            return
 
     generator = PackedDataGenerator(
         components.settings.src_path,
