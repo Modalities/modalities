@@ -302,7 +302,7 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
     help="Path to write the shuffled tokenized data (.pbin).",
 )
 @click.option(
-    "--batch-size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
+    "--batch_size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
 )
 @click.option(
     "--file_existence_policy",
@@ -323,7 +323,7 @@ def CMD_shuffle_tokenized_data(
 
     Args:
         input_data_path (Path): The path to the input tokenized data (.pbin).
-        output_data_path (Path): Path to write the shuffled tokenized data (.pbin).
+        output_data_path (Path): File path to write the shuffled tokenized data (.pbin).
         batch_size (int): The size of the batches to shuffle.
         file_existence_policy (FileExistencePolicy): Policy for handling existing files.
         seed (int): The seed for shuffling the data.

@@ -125,8 +125,8 @@ def shuffle_tokenized_data(
     """Shuffles a tokenized file (.pbin) and stores it on disc.
 
     Args:
-        input_data_path (Path): Filepath to the tokenized data (.pbin).
-        output_data_path (Path): Filepath to write the shuffled tokenized data.
+        input_data_path (Path): File path to the tokenized data (.pbin).
+        output_data_path (Path): File path to write the shuffled tokenized data.
         batch_size (int): Number of documents to process per batch.
         file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
     """
