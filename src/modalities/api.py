@@ -5,7 +5,6 @@ from enum import Enum
 from pathlib import Path
 
 import numpy as np
-from data_quality_ablations.utils.seeding import calculate_seed
 from pydantic import FilePath
 
 import modalities.inference.inference as inference
@@ -23,6 +22,7 @@ from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.utils.logging import get_logger
+from modalities.utils.seeding import calculate_hashed_seed
 
 
 class FileExistencePolicy(Enum):
@@ -184,7 +184,7 @@ def create_shuffled_dataset_chunk(
         )
 
     # samples are shuffled in place
-    seed = calculate_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
+    seed = calculate_hashed_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
     Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
 
     token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
