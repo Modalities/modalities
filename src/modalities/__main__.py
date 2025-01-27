@@ -190,6 +190,12 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath, file_existence_poli
     help="Path to the file containing the list of files to be chunked.",
 )
 @click.option(
+    "--input_data_root_path",
+    type=Path,
+    required=True,
+    help="Directory path to the root of the input data.",
+)
+@click.option(
     "--output_chunk_file_path",
     type=Path,
     required=True,
@@ -227,6 +233,7 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath, file_existence_poli
 )
 def CMD_create_shuffled_dataset_chunk(
     input_file_list_path: Path,
+    input_data_root_path: Path,
     output_chunk_file_path: Path,
     chunk_id: int,
     num_chunks: int,
@@ -238,6 +245,7 @@ def CMD_create_shuffled_dataset_chunk(
 
     Args:
         input_file_list_path (Path): Relative file path to the list of files to be chunked.
+        input_data_root_path (Path): Path to the root directory that contains the files to be chunked.
         output_chunk_file_path (Path): File path to the chunked dataset.
         chunk_id (int): The id of the chunk to be created.
         num_chunks (int): Number of chunks in total.
@@ -249,7 +257,7 @@ def CMD_create_shuffled_dataset_chunk(
 
     with open(input_file_list_path, "r", encoding="utf-8") as f:
         file_path_list = f.readlines()
-    file_path_list = [Path(file_path.strip()) for file_path in file_path_list]
+    file_path_list = [input_data_root_path / Path(file_path.strip()) for file_path in file_path_list]
 
     create_shuffled_dataset_chunk(
         file_path_list=file_path_list,
