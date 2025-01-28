@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 
 import numpy as np
+import tqdm
 from pydantic import FilePath
 
 import modalities.inference.inference as inference
@@ -171,7 +172,7 @@ def create_shuffled_dataset_chunk(
 
     samples = []
     token_size_in_bytes = None
-    for file_path in file_path_list:
+    for file_path in tqdm.tqdm(file_path_list, desc=f"Loading file chunks of {chunk_id=}"):
         dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
         if token_size_in_bytes is None:
             token_size_in_bytes = dataset.token_size_in_bytes
@@ -189,14 +190,17 @@ def create_shuffled_dataset_chunk(
         )
 
     # samples are shuffled in place
+    get_logger(name="main").info(f"Shuffling chunk {chunk_id} ...")
     seed = calculate_hashed_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
     Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
 
+    get_logger(name="main").info(f"Writing chunk {chunk_id} to {str(output_chunk_file_path)} ...")
     TokenizedFileWriter.write_tokenized_dataset(
         tokenized_dataset=samples,
         tokenized_dataset_file_path=output_chunk_file_path,
         token_size_in_bytes=token_size_in_bytes,
     )
+    get_logger(name="main").info(f"Chunk {chunk_id} was successfully written to {str(output_chunk_file_path)}.")
 
 
 def pack_encoded_data(
