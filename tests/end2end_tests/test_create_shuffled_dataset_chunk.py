@@ -52,8 +52,6 @@ def pbin_file_path_list(files_num_documents: list[int]) -> list[Path]:
         (901, 1, True),
         (5000, 1, True),
         (5, 1, False),
-        (5, 1, False),
-        (1, 1, False),
         (1, 1, False),
     ],
 )
@@ -106,8 +104,16 @@ def test_create_shuffled_dataset_chunk(
         tokenized_dataset = dataset[:]["text"]
         tokenized_datasets.extend(tokenized_dataset)
 
-    # check that the chunks are equivalent to the original pbin files
+    # check that the sorted chunks are equivalent to the original pbin files
     sorted_combined_chunks = list(sorted(chunks_combined, key=lambda x: x[0]))
     sorted_dataset = list(sorted(tokenized_datasets, key=lambda x: x[0]))
     for i in range(len(sorted_combined_chunks)):
         assert all(sorted_combined_chunks[i] == sorted_dataset[i])
+
+    # check that the unsorted chunkds are not equivalent to the original pbin files
+    num_documents_equivalent = 0
+    for i in range(len(chunks_combined)):
+        if len(chunks_combined[i]) == len(tokenized_datasets[i]):
+            num_documents_equivalent += int(all(chunks_combined[i] == tokenized_datasets[i]))
+
+    assert num_documents_equivalent < len(chunks_combined)
