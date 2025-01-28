@@ -237,7 +237,6 @@ def CMD_create_shuffled_dataset_chunk(
     output_chunk_file_path: Path,
     chunk_id: int,
     num_chunks: int,
-    vocab_size: int,
     file_existence_policy: FileExistencePolicy,
     global_seed: int,
 ):
@@ -249,7 +248,6 @@ def CMD_create_shuffled_dataset_chunk(
         output_chunk_file_path (Path): File path to the chunked dataset.
         chunk_id (int): The id of the chunk to be created.
         num_chunks (int): Number of chunks in total.
-        vocab_size (int): The size of the vocabulary.
         file_existence_policy (FileExistencePolicy): Policy for handling existing files.
         global_seed (int): The global seed to use for shuffling.
     """
@@ -264,7 +262,6 @@ def CMD_create_shuffled_dataset_chunk(
         output_chunk_file_path=output_chunk_file_path,
         chunk_id=chunk_id,
         num_chunks=num_chunks,
-        vocab_size=vocab_size,
         file_existence_policy=file_existence_policy,
         global_seed=global_seed,
     )

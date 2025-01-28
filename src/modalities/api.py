@@ -144,7 +144,6 @@ def create_shuffled_dataset_chunk(
     output_chunk_file_path: Path,
     chunk_id: int,
     num_chunks: int,
-    vocab_size: int,
     file_existence_policy: FileExistencePolicy,
     global_seed: int = None,
 ):
@@ -171,8 +170,14 @@ def create_shuffled_dataset_chunk(
             return
 
     samples = []
+    token_size_in_bytes = None
     for file_path in file_path_list:
         dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
+        if token_size_in_bytes is None:
+            token_size_in_bytes = dataset.token_size_in_bytes
+        elif token_size_in_bytes != dataset.token_size_in_bytes:
+            raise ValueError("All datasets must have the same token size in bytes.")
+
         file_samples: list[np.ndarray] = Chunking.get_file_chunk(
             dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
         )
@@ -187,7 +192,6 @@ def create_shuffled_dataset_chunk(
     seed = calculate_hashed_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
     Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
 
-    token_size_in_bytes = TokenizedFileWriter.get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
     TokenizedFileWriter.write_tokenized_dataset(
         tokenized_dataset=samples,
         tokenized_dataset_file_path=output_chunk_file_path,
