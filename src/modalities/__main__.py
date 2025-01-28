@@ -249,7 +249,9 @@ def CMD_create_shuffled_dataset_chunk(
 
     with open(input_file_list_path, "r", encoding="utf-8") as f:
         file_path_list = f.readlines()
-    file_path_list = [input_data_root_path / Path(file_path.strip()) for file_path in file_path_list]
+    file_path_list = [
+        input_data_root_path / Path(file_path.strip()).with_suffix(".pbin") for file_path in file_path_list
+    ]
 
     create_shuffled_dataset_chunk(
         file_path_list=file_path_list,
