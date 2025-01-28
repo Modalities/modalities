@@ -214,12 +214,6 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath, file_existence_poli
     help="The number of chunks to create.",
 )
 @click.option(
-    "--vocab_size",
-    type=int,
-    required=True,
-    help="The size of the vocabulary.",
-)
-@click.option(
     "--file_existence_policy",
     type=click.Choice([policy.value for policy in FileExistencePolicy]),
     default=FileExistencePolicy.ERROR.value,
