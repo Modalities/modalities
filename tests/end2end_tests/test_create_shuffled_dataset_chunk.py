@@ -57,7 +57,6 @@ def pbin_file_path_list(files_num_documents: list[int]) -> list[Path]:
 )
 def test_create_shuffled_dataset_chunk(
     pbin_file_path_list: list[Path],
-    files_num_documents: list[int],
     num_chunks: int,
     global_seed: int,
     expect_error: bool,
@@ -65,7 +64,6 @@ def test_create_shuffled_dataset_chunk(
     def create_chunks(
         num_chunks: int,
         pbin_file_path_list: list[Path],
-        vocab_size: int,
     ) -> list[np.ndarray]:
         chunks = []
         parent_dir = pbin_file_path_list[0].parent
@@ -76,7 +74,6 @@ def test_create_shuffled_dataset_chunk(
                 output_chunk_file_path=chunk_file_path,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
-                vocab_size=vocab_size,
                 file_existence_policy=FileExistencePolicy.ERROR,
                 global_seed=global_seed,
             )
@@ -85,13 +82,11 @@ def test_create_shuffled_dataset_chunk(
             chunks.append(tokenized_dataset)
         return chunks
 
-    vocab_size = sum(files_num_documents)
-
     if expect_error:
         with pytest.raises(ValueError):
-            create_chunks(num_chunks, pbin_file_path_list, vocab_size)
+            create_chunks(num_chunks, pbin_file_path_list)
         return
-    chunks = create_chunks(num_chunks, pbin_file_path_list, vocab_size)
+    chunks = create_chunks(num_chunks, pbin_file_path_list)
 
     chunks_combined = []
     for i in range(num_chunks):
