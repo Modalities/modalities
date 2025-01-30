@@ -185,6 +185,15 @@ class ConstantLRSchedulerConfig(BaseModel):
     verbose: bool = False
 
 
+class LinearLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    start_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    end_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    total_iters: Annotated[int, Field(strict=True, gt=0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+    verbose: bool = False
+    
+
 class CosineAnnealingLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
     t_max: Annotated[int, Field(strict=True, gt=0)]
