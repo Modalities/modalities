@@ -59,7 +59,6 @@ class IndexGenerator:
         processor.join()
         if self._exception_buffer:
             raise self._exception_buffer[0]
-        print(f"Created index of length {len(self._index_map)}")
         target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
 
     def _indexer_thread(self):
