@@ -187,7 +187,7 @@ class ConstantLRSchedulerConfig(BaseModel):
 
 class LinearLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
-    start_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
+    start_factor: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     end_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
