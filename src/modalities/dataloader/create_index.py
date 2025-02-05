@@ -6,7 +6,7 @@ import threading
 import warnings
 from pathlib import Path
 
-from tqdm import tqdm
+from modalities.utils.logging import get_logger
 
 
 class IndexGenerator:
@@ -60,6 +60,7 @@ class IndexGenerator:
         if self._exception_buffer:
             raise self._exception_buffer[0]
         target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
+        get_logger().info(f"Index file created at {target_path_for_index_file}")
 
     def _indexer_thread(self):
         # This method is responsible for indexing the lines in the queue and parsing them as JSON.
@@ -93,7 +94,7 @@ class IndexGenerator:
                     self._exception_buffer.append(err)
 
         self._index_map = []
-        for line_start_idx, line in tqdm(queue_generator(), desc="Processed Lines"):
+        for line_start_idx, line in queue_generator():
             if self._check_for_parallel_errors():
                 return
             parse_line_as_json(line_start_idx, line)
