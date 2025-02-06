@@ -35,6 +35,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     LLMDataLoaderConfig,
+    LinearLRSchedulerConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
@@ -155,6 +156,7 @@ COMPONENTS = [
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
     ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
+    ComponentEntity("scheduler", "linear_lr", torch.optim.lr_scheduler.LinearLR, LinearLRSchedulerConfig),
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig

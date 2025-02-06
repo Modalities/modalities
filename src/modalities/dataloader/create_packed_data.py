@@ -63,8 +63,8 @@ class PackedDataGenerator:
         self.tokenizer = tokenizer
         self.eod_token = eod_token
         self._token_size_in_bytes = self._get_required_num_of_bytes_to_repr(self.tokenizer.vocab_size)
-        encoded_eod_token = self.tokenizer.get_token_id(self.eod_token)
-        self._encoded_eos_token_as_bytes = self._encoded_token_to_bytes(encoded_eod_token)
+        eod_token_id = self.tokenizer.get_token_id(self.eod_token)
+        self._encoded_eod_token_as_bytes = self._encoded_token_to_bytes(eod_token_id)
         self.jq_filter = jq.compile(jq_pattern)
         self._number_of_processes = number_of_processes
         self._reader = LargeFileLinesReader(src_path, index_path=index_path)  # reads string with utf-8 encoding
@@ -99,7 +99,7 @@ class PackedDataGenerator:
 
     def _encoded_token_to_bytes(self, encoded_token: int) -> bytes:
         """
-        Converts an encoded token to its byte representaion.
+        Converts an encoded token to its byte representation.
 
         Args:
             encoded_token (int): The encoded token to be converted.
@@ -108,7 +108,13 @@ class PackedDataGenerator:
             bytes: The byte representation of the token.
 
         """
-        return encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
+        try:
+            token_bytes = encoded_token.to_bytes(self._token_size_in_bytes, byteorder="little", signed=False)
+        except OverflowError as e:
+            raise ValueError(
+                f"Token {encoded_token} cannot be represented by {self._token_size_in_bytes} bytes."
+            ) from e
+        return token_bytes
 
     def _default_destination_path(self, destination_path: Optional[Path] = None) -> Path:
         """
@@ -323,7 +329,10 @@ class PackedDataGenerator:
         tokens = self.tokenizer.tokenize(jq_retrieved_text)
         if len(tokens) == 0:
             raise EmptySampleError("Received empty sample...")
-        return b"".join(map(self._encoded_token_to_bytes, tokens)) + self._encoded_eos_token_as_bytes
+        token_byte_string = b"".join(map(self._encoded_token_to_bytes, tokens))
+        if not token_byte_string.endswith(self._encoded_eod_token_as_bytes):
+            token_byte_string = token_byte_string + self._encoded_eod_token_as_bytes
+        return token_byte_string
 
 
 class EmbeddedStreamData:

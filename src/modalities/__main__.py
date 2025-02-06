@@ -14,6 +14,7 @@ from pydantic import BaseModel, FilePath
 from modalities.api import (
     convert_pytorch_to_hf_checkpoint,
     create_raw_data_index,
+    create_shuffled_dataset_chunk,
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
@@ -22,6 +23,7 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
+from modalities.dataloader.shuffle_tokenized_data import shuffle_tokenized_data
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
@@ -163,6 +165,53 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     pack_encoded_data(config_dict=config_dict)
 
 
+@data.command(name="create_shuffled_dataset_chunk")
+@click.option(
+    "--input_file_list_path",
+    type=Path,
+    required=True,
+    help="Path to the file containing the list of files to be chunked.",
+)
+@click.option(
+    "--output_chunk_file_path",
+    type=Path,
+    required=True,
+    help="Path where the chunked dataset will be saved.",
+)
+@click.option(
+    "--chunk_id",
+    type=int,
+    required=True,
+    help="The id of the chunk to be created.",
+)
+@click.option(
+    "--num_chunks",
+    type=int,
+    required=True,
+    help="The number of chunks to create.",
+)
+@click.option(
+    "--vocab_size",
+    type=int,
+    required=True,
+    help="The size of the vocabulary.",
+)
+def CMD_create_shuffled_dataset_chunk(
+    input_file_list_path: Path, output_chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
+):
+    with open(input_file_list_path, "r", encoding="utf-8") as f:
+        file_path_list = f.readlines()
+    file_path_list = [Path(file_path.strip()) for file_path in file_path_list]
+
+    create_shuffled_dataset_chunk(
+        file_path_list=file_path_list,
+        output_chunk_file_path=output_chunk_file_path,
+        chunk_id=chunk_id,
+        num_chunks=num_chunks,
+        vocab_size=vocab_size,
+    )
+
+
 @data.command(name="merge_packed_data")
 @click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
 @click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
@@ -179,6 +228,36 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
         target_path (Path): The path to the merged pbin-file, that will be created.
     """
     merge_packed_data_files(src_paths=src_paths, target_path=target_path)
+
+
+@data.command(name="shuffle_tokenized_data")
+@click.option(
+    "--input_data_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a tokenized file (.pbin).",
+)
+@click.option(
+    "--output_data_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to write the shuffled tokenized data (.pbin).",
+)
+@click.option(
+    "--batch-size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
+)
+def CMD_shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, batch_size: int) -> None:
+    """Entrypoint for shuffling tokenized data.
+
+    Args:
+        input_data_path (Path): The path to the input tokenized data (.pbin).
+        output_data_path (Path): Path to write the shuffled tokenized data (.pbin).
+        batch_size (int): The size of the batches to shuffle.
+
+    Returns:
+        None
+    """
+    shuffle_tokenized_data(input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size)
 
 
 class Main:

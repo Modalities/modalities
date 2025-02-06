@@ -1,6 +1,7 @@
 import dataclasses
 import os
 import pickle
+import string
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -12,6 +13,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
+from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.evaluator import Evaluator
@@ -223,3 +225,15 @@ def set_env_cpu(monkeypatch):
     else:
         # see https://pytorch.org/docs/2.4/_modules/torch/cuda.html#device_count
         torch.cuda._cached_device_count = None
+
+
+@pytest.fixture
+def encoding_set_up():
+    # Define the vocabulary
+    vocabulary = {char: idx for idx, char in enumerate(string.ascii_lowercase)}
+
+    # Ensure num_bytes_per_token is valid
+    num_bytes_per_token = PackedDataGenerator._get_required_num_of_bytes_to_repr(len(vocabulary))
+    assert num_bytes_per_token == 1  # This assertion will fail within the test framework if incorrect
+
+    return vocabulary, num_bytes_per_token

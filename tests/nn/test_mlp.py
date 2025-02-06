@@ -14,14 +14,16 @@ def test_mlp_forward():
 
 def test_SwiGLU_forward():
     n_embd = 512
+    ffn_hidden = 4 * n_embd
     bias = True
-    mlp = SwiGLU(n_embd, bias)
+    mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
 
     hidden_dim = 1536
-    assert SwiGLU._get_hidden_dim(n_embd) == hidden_dim
+    assert SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden) == hidden_dim
 
     n_embd = 511
-    assert SwiGLU._get_hidden_dim(n_embd) == hidden_dim
+    ffn_hidden = 4 * n_embd
+    assert SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden) == hidden_dim
 
     n_embd = 512
 

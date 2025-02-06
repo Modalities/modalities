@@ -1,3 +1,4 @@
+import logging
 import math
 from copy import deepcopy
 from enum import Enum
@@ -5,18 +6,21 @@ from typing import Annotated
 
 import torch
 import torch.nn as nn
-
-try:
-    from flash_attn import flash_attn_func
-except ModuleNotFoundError:
-    flash_attn_func = None
-
 from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
+
+try:
+    from flash_attn import flash_attn_func
+except ModuleNotFoundError:
+    flash_attn_func = None
+
+# Logger configuration
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
@@ -89,7 +93,7 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
         """
         Initializes the RotaryTransform object.
 
@@ -97,11 +101,12 @@ class RotaryTransform(QueryKeyValueTransform):
             n_embd (int): The size of the embedding dimension.
             n_head (int): The number of attention heads.
             seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
+            base_freq (int): Base frequency for RoPE. Defaults to 10000.
         """
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -238,12 +243,14 @@ class AttentionConfig(BaseModel):
                 n_embd (int): Number of embeddings.
                 n_head (int): Number of attention heads.
                 seq_length_dim (int): Dimension of the sequence length.
+                base_freq (int): Base frequency for RoPE.
 
             """
 
             n_embd: Annotated[int, Field(strict=True, ge=0)]
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
+            base_freq: Annotated[int, Field(strict=True, ge=10000)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
@@ -681,6 +688,7 @@ class GPT2Block(nn.Module):
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
+        self._check_ffn_hidden_dim(n_embd=n_embd, ffn_hidden=ffn_hidden)
         self.attn = CausalSelfAttention(
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
@@ -693,9 +701,18 @@ class GPT2Block(nn.Module):
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation_type == ActivationType.SWIGLU:
-            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
+            self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
+
+    def _check_ffn_hidden_dim(self, n_embd: int, ffn_hidden: int) -> None:
+        expected_hidden_dim = 4 * n_embd
+
+        if ffn_hidden != expected_hidden_dim:
+            logger.warning(
+                f"Expected `ffn_hidden` to be 4 * `n_embd` ({expected_hidden_dim}), "
+                f"but got `n_embd = {n_embd}` and `ffn_hidden = {ffn_hidden}`."
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
