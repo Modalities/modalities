@@ -192,7 +192,7 @@ class LinearLRSchedulerConfig(BaseModel):
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
     verbose: bool = False
-    
+
 
 class CosineAnnealingLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
@@ -263,6 +263,10 @@ class PreTrainedHFTokenizerConfig(BaseModel):
 
 class PreTrainedSPTokenizerConfig(BaseModel):
     tokenizer_model_file: str
+
+
+class SequentialSamplerConfig(BaseModel):
+    data_source: PydanticDatasetIFType
 
 
 class DistributedSamplerConfig(BaseModel):
