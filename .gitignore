@@ -162,4 +162,3 @@ noteboks/*
 tests/tmp/*
 *wandb_storage*
 .coverage/*
-eurolingua/
