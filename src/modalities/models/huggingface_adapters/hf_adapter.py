@@ -7,7 +7,6 @@ import torch
 from transformers import PretrainedConfig, PreTrainedModel
 from transformers.utils import ModelOutput
 
-from modalities.exceptions import ConfigError
 from modalities.models.model import NNModel
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
@@ -27,10 +26,11 @@ class HFModelAdapterConfig(PretrainedConfig):
         Raises:
             ConfigError: If the config is not passed in HFModelAdapterConfig.
         """
+        if "config" not in kwargs:
+            raise ValueError("Config is not passed in HFModelAdapterConfig.")
         super().__init__(**kwargs)
         # self.config is added by the super class via kwargs
-        if self.config is None:
-            raise ConfigError("Config is not passed in HFModelAdapterConfig.")
+        assert self.config is not None, "Config is not passed in HFModelAdapterConfig."
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
         self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
