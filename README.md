@@ -321,9 +321,10 @@ Thanks so much to all of our amazing contributors!
 ## Citation
 
     @misc{modalities,
-      title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
-      author={Max Lübbering and Mehdi Ali and Felix Stollenwerk and Michael Fromm and Alexander Arno Weber and Richard Rutmann},
-      year={2024},
-      howpublished={\url{https://github.com/Modalities/modalities}},
-      url="https://github.com/Modalities/modalities",
+          title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
+          author={Lübbering, Max and Ali, Mehdi and Stollenwerk, Felix and Fromm, Michael and Weber, Alexander Arno and Rutmann, Richard},
+          year={2024},
+          howpublished={\url{https://github.com/Modalities/modalities}},
+          url="https://github.com/Modalities/modalities",
     }
+    
