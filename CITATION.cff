@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: If you use this software, please cite both the article from preferred-citation and the software itself.
+authors:
+  - family-names: Lübbering
+    given-names: Max
+  - family-names: Ali
+    given-names: Mehdi
+  - family-names: Stollenwerk
+    given-names: Felix
+  - family-names: Fromm
+    given-names: Michael
+  - family-names: Weber
+    given-names: Alexander Arno
+  - family-names: Rutmann
+    given-names: Richard
+title: 'Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.'
+version: 0.3.2
+url: https://github.com/Modalities/modalities
+date-released: '2024-12-02'
+preferred-citation:
+  authors:
+    - family-names: Lübbering
+      given-names: Max
+    - family-names: Ali
+      given-names: Mehdi
+    - family-names: Stollenwerk
+      given-names: Felix
+    - family-names: Fromm
+      given-names: Michael
+    - family-names: Weber
+      given-names: Alexander Arno
+    - family-names: Rutmann
+      given-names: Richard
+  title: 'Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.'
+  url: https://github.com/Modalities/modalities
+  type: generic
+  year: '2024'
+  conference: {}
+  publisher: {}

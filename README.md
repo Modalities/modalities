@@ -318,3 +318,13 @@ Thanks so much to all of our amazing contributors!
   <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
 </a>
 
+## Citation
+
+    @misc{modalities,
+          title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
+          author={Lübbering, Max and Ali, Mehdi and Stollenwerk, Felix and Fromm, Michael and Weber, Alexander Arno and Rutmann, Richard},
+          year={2024},
+          howpublished={\url{https://github.com/Modalities/modalities}},
+          url="https://github.com/Modalities/modalities",
+    }
+    
