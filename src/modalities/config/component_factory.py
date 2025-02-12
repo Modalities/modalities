@@ -1,6 +1,7 @@
 from typing import Any, Type, TypeVar
 
 from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 
 from modalities.registry.registry import Registry
 from modalities.util import print_rank_0
@@ -30,7 +31,11 @@ class ComponentFactory:
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.
         """
-        component_names = list(components_model_type.model_fields.keys())
+        component_names = [
+            name
+            for name, field in components_model_type.model_fields.items()
+            if field.default is PydanticUndefined  # Field has no default value
+        ]
         component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
         components = components_model_type(**component_dict)
         return components

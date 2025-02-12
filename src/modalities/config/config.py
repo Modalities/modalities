@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Callable, Literal, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -363,18 +363,32 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
-def load_app_config_dict(config_file_path: Path) -> dict:
+def load_app_config_dict(config_file_path: Path, resolver_name_to_fun: dict[str, Callable] = None) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
     Modalities-specific variables.
 
     Args:
         config_file_path (Path): YAML config file.
+        resolver_name_to_fun (dict[str, Callable], optional): Dictionary mapping resolver names to resolver functions.
 
     Returns:
         dict: Dictionary representation of the config file.
     """
 
+    cfg = OmegaConf.load(config_file_path)
+
+    if resolver_name_to_fun is not None:
+        for resolver_name, resolver_fun in resolver_name_to_fun.items():
+            OmegaConf.register_new_resolver(resolver_name, resolver_fun, replace=True)
+
+    resolve = resolver_name_to_fun is not None
+    config_dict = OmegaConf.to_container(cfg, resolve=resolve)
+
+    return config_dict
+
+
+def load_resolved_app_config_dict(config_file_path: Path) -> dict:
     def cuda_env_resolver_fun(var_name: str) -> int:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
@@ -391,13 +405,10 @@ def load_app_config_dict(config_file_path: Path) -> dict:
         if var_name == "num_cpus":
             return os.cpu_count()
 
-    OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    OmegaConf.register_new_resolver(
-        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
-    )
-    OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
+    resolver_name_to_fun = {
+        "cuda_env": cuda_env_resolver_fun,
+        "modalities_env": partial(modalities_env_resolver_fun, config_file_path=config_file_path),
+        "node_env": node_env_resolver_fun,
+    }
 
-    cfg = OmegaConf.load(config_file_path)
-    config_dict = OmegaConf.to_container(cfg, resolve=True)
-
-    return config_dict
+    return load_resolved_app_config_dict(config_file_path=config_file_path, resolver_name_to_fun=resolver_name_to_fun)
