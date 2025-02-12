@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from modalities.__main__ import Main, load_app_config_dict
+from modalities.__main__ import Main, load_resolved_app_config_dict
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
@@ -14,7 +14,7 @@ from tests.conftest import _ROOT_DIR
 def test_coca():
     # Create model
     config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
     coca_config = CoCaConfig.model_validate(config_dict)
     model = CoCa(**dict(coca_config))
 
@@ -58,7 +58,7 @@ def test_e2e_coca_training_run_without_checkpoint(monkeypatch):
 
     # Load config
     dummy_config_path = _ROOT_DIR / Path("config_files/training/config_example_coca.yaml")
-    config_dict = load_app_config_dict(dummy_config_path)
+    config_dict = load_resolved_app_config_dict(dummy_config_path)
 
     # Disable checkpointing
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 0

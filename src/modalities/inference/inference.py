@@ -5,7 +5,7 @@ from typing import Optional
 from pydantic import FilePath
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, load_resolved_app_config_dict
 from modalities.config.instantiation_models import TextGenerationInstantiationModel
 from modalities.inference.text.config import TextInferenceComponentConfig
 from modalities.inference.text.inference_component import TextInferenceComponent
@@ -16,7 +16,7 @@ from modalities.running_env.env_utils import is_running_with_torchrun
 
 
 def generate_text(config_path: FilePath, registry: Optional[Registry] = None):
-    config_dict = load_app_config_dict(config_path)
+    config_dict = load_resolved_app_config_dict(config_path)
     if registry is None:
         registry = Registry(COMPONENTS)
     registry.add_entity(

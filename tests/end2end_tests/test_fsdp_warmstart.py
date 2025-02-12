@@ -9,7 +9,7 @@ import torch
 import torch.distributed as dist
 from pydantic import BaseModel
 
-from modalities.__main__ import Main, load_app_config_dict
+from modalities.__main__ import Main, load_resolved_app_config_dict
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoaderIFType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
@@ -70,7 +70,7 @@ class TestWarmstart:
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
             gpt2_8_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path)
+            gpt2_8_steps_config_dict = load_resolved_app_config_dict(gpt2_8_steps_config_file_path)
 
             # adopt the checkpoint path
             checkpoint_path = temp_dir
@@ -87,7 +87,9 @@ class TestWarmstart:
 
             # config for one step model
             gpt2_warm_start_after_4_steps_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(gpt2_warm_start_after_4_steps_config_file_path)
+            gpt2_warm_start_after_4_steps_dict = load_resolved_app_config_dict(
+                gpt2_warm_start_after_4_steps_config_file_path
+            )
 
             # adopt the checkpoint path
             experiment_id_1 = "1"
@@ -182,11 +184,11 @@ class TestWarmstart:
     def test_warmstart_dataloader(self):
         # non-skipped config
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        gpt2_two_steps_config_dict = load_resolved_app_config_dict(gpt2_two_steps_config_file_path)
 
         # skipped config
         gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
+        gpt2_warm_start_from_step_1_dict = load_resolved_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
 
         main_obj_1 = Main(gpt2_two_steps_config_file_path)
         main_obj_1.config_dict = gpt2_two_steps_config_dict

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from modalities.__main__ import load_app_config_dict
+from modalities.__main__ import load_resolved_app_config_dict
 from modalities.models.vision_transformer.vision_transformer_model import VisionTransformer, VisionTransformerConfig
 from tests.conftest import _ROOT_DIR
 
@@ -11,7 +11,7 @@ from tests.conftest import _ROOT_DIR
 def test_vision_transformer():
     # Create model
     config_file_path = _ROOT_DIR / Path("tests/models/vision_transformer/vision_transformer_config.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
     config = VisionTransformerConfig.model_validate(config_dict)
     model = VisionTransformer(**dict(config))
 

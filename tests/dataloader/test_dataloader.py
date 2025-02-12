@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from torch.utils.data import BatchSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import load_resolved_app_config_dict
 from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
@@ -61,7 +61,7 @@ def test_skipped_and_distributed_dataloader_from_config():
     root_dir = Path(__file__).parents[0]
 
     config_path = root_dir / "yaml_configs/skipped_dataloader.yaml"
-    config_dict = load_app_config_dict(config_path)
+    config_dict = load_resolved_app_config_dict(config_path)
 
     registry = Registry(COMPONENTS)
     component_factory = ComponentFactory(registry=registry)

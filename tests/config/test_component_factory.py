@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import load_resolved_app_config_dict
 from modalities.registry.components import ComponentEntity
 from modalities.registry.registry import Registry
 from tests.config.components import ComponentV, ComponentW, ComponentX, ComponentY
@@ -35,7 +35,7 @@ def component_factory() -> ComponentFactory:
 def test_backward_reference(config_file_path: Path, component_factory: ComponentFactory):
     component_names = ["comp_x_1", "comp_y_1"]
 
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
@@ -54,7 +54,7 @@ def test_backward_reference(config_file_path: Path, component_factory: Component
 def test_non_existing_reference(config_file_path: Path, component_factory: ComponentFactory):
     component_names = ["comp_x_1", "comp_y_1"]
 
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
 
     with pytest.raises(KeyError):
         component_factory._build_config(config_dict=config_dict, component_names=component_names)
@@ -69,7 +69,7 @@ def test_non_existing_reference(config_file_path: Path, component_factory: Compo
 def test_hierarchical_component_instantiation(config_file_path: Path, component_factory: ComponentFactory):
     component_names = ["comp_y_1"]
 
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
 
@@ -87,7 +87,7 @@ def test_hierarchical_component_instantiation(config_file_path: Path, component_
 def test_component_filter(config_file_path: Path, component_factory: ComponentFactory):
     component_names = ["comp_y_1"]
 
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "comp_y_1" in components
@@ -106,7 +106,7 @@ def test_component_filter(config_file_path: Path, component_factory: ComponentFa
 def test_single_component(config_file_path: Path, component_factory: ComponentFactory):
     component_names = ["custom_comp_1"]
 
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
 
     components = component_factory._build_config(config_dict=config_dict, component_names=component_names)
     assert "custom_comp_1" in components

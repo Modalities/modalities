@@ -9,7 +9,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from torch.types import Number
 
-from modalities.__main__ import load_app_config_dict
+from modalities.__main__ import load_resolved_app_config_dict
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2LLM
@@ -46,7 +46,7 @@ def get_model_from_config(model_config_dict: dict) -> GPT2LLM:
 def _load_gpt2(mixed_precision_settings: MixedPrecisionSettings) -> FSDP:
     """load gpt2 model from config and fsdp-wrap it"""
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_mfu.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
     # config_dict = _replace_config_dict(config_dict, _initialization_type='scaled', _std='auto')
 
     gpt2_model = get_model_from_config(config_dict)

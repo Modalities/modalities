@@ -7,7 +7,7 @@ from transformers import AutoConfig, AutoModelForCausalLM
 
 from modalities.checkpointing.checkpoint_conversion import CheckpointConversion
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import load_resolved_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 from modalities.models.model import NNModel
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
@@ -48,7 +48,7 @@ def config_file_path(config_file_name: str) -> Path:
 
 @pytest.fixture()
 def config_dict(config_file_path: Path) -> dict:
-    return load_app_config_dict(config_file_path=config_file_path)
+    return load_resolved_app_config_dict(config_file_path=config_file_path)
 
 
 @pytest.fixture()

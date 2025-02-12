@@ -11,7 +11,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import load_resolved_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
@@ -54,7 +54,7 @@ def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    config_dict = load_app_config_dict(dummy_config_path)
+    config_dict = load_resolved_app_config_dict(dummy_config_path)
     return config_dict
 
 

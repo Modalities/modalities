@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from modalities.config.config import load_app_config_dict
+from modalities.config.config import load_resolved_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter, HFModelAdapterConfig
 
 
@@ -27,7 +27,7 @@ class CheckpointConversion:
         if not config_file_path.exists():
             raise ValueError(f"Could not find {config_file_path}.")
 
-        self.config_dict = load_app_config_dict(config_file_path)
+        self.config_dict = load_resolved_app_config_dict(config_file_path)
 
     def convert_pytorch_to_hf_checkpoint(self, prediction_key: str) -> HFModelAdapter:
         """

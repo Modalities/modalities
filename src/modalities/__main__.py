@@ -21,7 +21,7 @@ from modalities.api import (
 )
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.config import ProcessGroupBackendType, load_resolved_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
 from modalities.dataloader.shuffle_tokenized_data import shuffle_tokenized_data
 from modalities.evaluator import Evaluator
@@ -160,7 +160,7 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     Args:
         config_path (FilePath): Path to the config file describing the tokenization setup.
     """
-    config_dict = load_app_config_dict(config_path)
+    config_dict = load_resolved_app_config_dict(config_path)
 
     pack_encoded_data(config_dict=config_dict)
 
@@ -264,7 +264,7 @@ class Main:
     """Main class that orchestrates the training process."""
 
     def __init__(self, config_path: Path) -> None:
-        self.config_dict = load_app_config_dict(config_path)
+        self.config_dict = load_resolved_app_config_dict(config_path)
         self.config_path = config_path
 
         self.registry = Registry(COMPONENTS)

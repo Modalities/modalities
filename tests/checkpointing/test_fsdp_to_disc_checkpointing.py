@@ -13,7 +13,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
-from modalities.__main__ import load_app_config_dict
+from modalities.__main__ import load_resolved_app_config_dict
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDPCheckpointSaving
 from modalities.config.component_factory import ComponentFactory
@@ -58,7 +58,7 @@ class TestFSDPToDiscCheckpointing:
     @pytest.fixture(scope="function")
     def gpt2_model_config_dict(self) -> dict:
         config_file_path = working_dir / "gpt2_config.yaml"
-        config_dict = load_app_config_dict(config_file_path=config_file_path)
+        config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
         return config_dict
 
     @pytest.fixture(scope="function")

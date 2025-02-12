@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 
-from modalities.__main__ import load_app_config_dict
+from modalities.__main__ import load_resolved_app_config_dict
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
@@ -42,7 +42,7 @@ def get_gpt2_model_from_config(gpt2_model_config_dict: dict) -> GPT2LLM:
 
 def _load_gpt2() -> FSDP:
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_optimizer.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
     gpt2_model = get_gpt2_model_from_config(config_dict)
     gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
         gpt2_model,
@@ -56,7 +56,7 @@ def _load_gpt2() -> FSDP:
 
 def _load_coca() -> FSDP:
     config_file_path = _ROOT_DIR / Path("tests/models/coca/coca_config.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_resolved_app_config_dict(config_file_path=config_file_path)
     coca_config = CoCaConfig.model_validate(config_dict)
     coca_model = CoCa(**dict(coca_config))
     coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
