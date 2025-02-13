@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from pathlib import Path
 
@@ -104,7 +105,8 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 entity_type=CheckpointingEntityType.MODEL,
             )
 
-            model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            model_checkpoint_folder_path = model_checkpoint_path.parent
+            model_checkpoint_folder_path.mkdir(parents=True, exist_ok=True)
             torch.save(model_state, model_checkpoint_path)
 
             # save optimizer
@@ -117,6 +119,15 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
             torch.save(optim_state_dict, optimize_checkpoint_path)
+
+            checkpoint_info = {
+                "model_checkpoint_path": str(Path.absolute(model_checkpoint_path)),
+                "optimizer_checkpoint_path": str(Path.absolute(optimize_checkpoint_path)),
+            }
+            last_checkpoint_info_file_path = model_checkpoint_folder_path / "last_checkpoint_info.json"
+            with open(last_checkpoint_info_file_path, "w", encoding="utf-8") as f:
+                json.dump(checkpoint_info, f)
+
         # we need this barrier here, such that all processes exit this function at the same time
         # Since we run throughput measurements in the trainer, the non-checkpointing ranks would already
         # trigger the time measurement in the trainer and would then wait for the checkpointing rank,
