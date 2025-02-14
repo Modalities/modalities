@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Callable, Literal, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -363,13 +363,14 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
-def load_app_config_dict(config_file_path: Path) -> dict:
+def load_app_config_dict(config_file_path: Path, additional_resolver_funs: dict[str, Callable] = None) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
     Modalities-specific variables.
 
     Args:
         config_file_path (Path): YAML config file.
+        additional_resolver_funs (dict[str, Callable], optional): Additional resolver functions. Defaults to None.
 
     Returns:
         dict: Dictionary representation of the config file.
@@ -396,6 +397,10 @@ def load_app_config_dict(config_file_path: Path) -> dict:
         "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
     )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
+
+    if additional_resolver_funs is not None:
+        for resolver_name, resolver_fun in additional_resolver_funs.items():
+            OmegaConf.register_new_resolver(resolver_name, resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
     config_dict = OmegaConf.to_container(cfg, resolve=True)

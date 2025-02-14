@@ -61,6 +61,7 @@ model:
             n_embd: ${model.config.n_embd}
             n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+            base_freq: 10000
     attention_implementation: manual
     activation_type: gelu
     attention_norm:

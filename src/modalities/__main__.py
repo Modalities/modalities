@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 
+import json
 import logging
 import os
 import shutil
 from datetime import datetime
+from functools import partial
 from pathlib import Path
-from typing import Type
+from typing import Callable, Type
 
 import click
 import click_pathlib
+import yaml
+from omegaconf import DictConfig
 from pydantic import BaseModel, FilePath
 
 from modalities.api import (
@@ -48,15 +52,55 @@ def main() -> None:
     "--config_file_path",
     type=click_pathlib.Path(exists=False),
     required=True,
-    help="Path to a file with the YAML config file.",
+    help="Path to the YAML training config file.",
 )
 def CMD_entry_point_run_modalities(config_file_path: Path):
-    """Entrpoint to run the model training.
+    """Entrypoint to run the model training.
 
     Args:
-        config_file_path (Path): Path to the YAML config file.
+        config_file_path (Path): Path to the YAML training config file.
     """
     main_obj = Main(config_file_path)
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        main_obj.run(components)
+
+
+@main.command(name="warmstart")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the YAML warmstart config file.",
+)
+@click.option(
+    "--last_checkpoint_info_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the file containing the model and optimizer checkpoint paths from the last successful checkpoint.",
+)
+def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint_info_file_path: Path):
+    """Entrypoint to run the model warmstart.
+
+    Args:
+        config_file_path (Path): Path to the YAML warmstart config file.
+        last_checkpoint_info_file_path (Path): Path to the file containing the model and
+            optimizer checkpoint paths from the last successful checkpoint.
+    """
+
+    def get_last_checkpoint_resolver_fun(var_name: str, last_checkpoint_info_file_path: Path) -> dict[str, str]:
+        if var_name != "checkpoint_paths":
+            raise ValueError(f"Unknown variable name {var_name}. Should be 'checkpoint_paths'.")
+        with open(last_checkpoint_info_file_path, "r") as f:
+            last_checkpoint_info = json.load(f)
+        return DictConfig(last_checkpoint_info)
+
+    resolver_funs = {
+        "warmstart_env": partial(
+            get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
+        )
+    }
+    main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -263,8 +307,10 @@ def CMD_shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, ba
 class Main:
     """Main class that orchestrates the training process."""
 
-    def __init__(self, config_path: Path) -> None:
-        self.config_dict = load_app_config_dict(config_path)
+    def __init__(self, config_path: Path, additional_resolver_funs: dict[str, Callable] = None) -> None:
+        self.config_dict = load_app_config_dict(
+            config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
+        )
         self.config_path = config_path
 
         self.registry = Registry(COMPONENTS)
@@ -325,6 +371,9 @@ class Main:
             experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
+            resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
+            with open(resolved_config_path, "w", encoding="utf-8") as f:
+                yaml.dump(self.config_dict, f)
 
         evaluation_result_publisher, progress_publisher = self.get_logging_publishers(
             progress_subscriber=components.progress_subscriber,

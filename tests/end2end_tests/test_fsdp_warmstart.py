@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,13 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
+
+
+def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
+    pattern = r"seen_steps_(\d+)-seen_tokens_(\d+)"
+    match = re.search(pattern, filename)
+    return int(match.group(1)), int(match.group(2))
+
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
@@ -135,6 +143,53 @@ class TestWarmstart:
                     loss_scores_0 = TestWarmstart.get_loss_scores(messages_0, "train loss avg")
                     with open(loss_values_experiment_0_path, "w") as f:
                         json.dump(loss_scores_0, f)
+
+                    # make sure that the checkpoints have been written and checkpoint info file has been updated
+                    checkpoint_info_file_path = Path(checkpoint_path) / "0/last_checkpoint_info.json"
+                    assert checkpoint_info_file_path.exists()
+                    with open(checkpoint_info_file_path, "r") as f:
+                        checkpoint_info = json.load(f)
+                    assert checkpoint_info["model_checkpoint_path"] == (
+                        checkpoint_path
+                        + "/0/eid_0-model-seen_steps_12-seen_tokens_6144-target_steps_15-target_tokens_7680.bin"
+                    )
+                    assert checkpoint_info["optimizer_checkpoint_path"] == (
+                        checkpoint_path
+                        + "/0/eid_0-optimizer-seen_steps_12-seen_tokens_6144-target_steps_15-target_tokens_7680.bin"
+                    )
+                    assert Path(checkpoint_info["model_checkpoint_path"]).exists()
+                    assert Path(checkpoint_info["optimizer_checkpoint_path"]).exists()
+
+                    checkpoint_paths = list(Path(checkpoint_path).glob("**/*.bin"))
+                    model_max_seen_steps = -1
+                    model_max_seen_tokens = -1
+                    optimizer_max_seen_steps = -1
+                    optimizer_max_seen_tokens = -1
+                    for checkpoint_path in checkpoint_paths:
+                        seen_steps, seen_tokens = extract_seen_steps_and_tokens(checkpoint_path.name)
+                        if "model" in checkpoint_path.name:
+                            model_max_seen_steps = max(model_max_seen_steps, seen_steps)
+                            model_max_seen_tokens = max(model_max_seen_tokens, seen_tokens)
+                        elif "optimizer" in checkpoint_path.name:
+                            optimizer_max_seen_steps = max(optimizer_max_seen_steps, seen_steps)
+                            optimizer_max_seen_tokens = max(optimizer_max_seen_tokens, seen_tokens)
+                        else:
+                            raise ValueError("Invalid checkpoint path")
+
+                    assert model_max_seen_steps == optimizer_max_seen_steps
+                    assert model_max_seen_tokens == optimizer_max_seen_tokens
+
+                    cp_info_model_seen_steps, cp_info_model_seen_tokens = extract_seen_steps_and_tokens(
+                        checkpoint_info["model_checkpoint_path"]
+                    )
+                    cp_info_optimizer_seen_steps, cp_info_optimizer_seen_tokens = extract_seen_steps_and_tokens(
+                        checkpoint_info["optimizer_checkpoint_path"]
+                    )
+                    assert cp_info_model_seen_steps == cp_info_optimizer_seen_steps
+                    assert cp_info_model_seen_tokens == cp_info_optimizer_seen_tokens
+
+                    assert cp_info_model_seen_steps == model_max_seen_steps
+                    assert cp_info_model_seen_tokens == model_max_seen_tokens
 
                 main_obj_1 = Main(gpt2_warm_start_after_4_steps_config_file_path)
                 main_obj_1.config_dict = gpt2_warm_start_after_4_steps_dict
