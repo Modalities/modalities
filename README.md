@@ -59,7 +59,7 @@ Currently, the flash attention dependency cannot be installed without torch bein
 Until the flash attention developers fix this, we have to run
 
 ```sh
-pip install torch~=2.4.1
+pip install torch==2.6.0
 ```
 beforehand.
 
@@ -75,7 +75,7 @@ pip install -e .
 To install Modalities via pip, run
 
 ```sh
-pip install torch~=2.4.1
+pip install torch==2.6.0
 pip install modalities
 ```
 
@@ -318,3 +318,13 @@ Thanks so much to all of our amazing contributors!
   <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
 </a>
 
+## Citation
+
+    @misc{modalities,
+          title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
+          author={Lübbering, Max and Ali, Mehdi and Stollenwerk, Felix and Fromm, Michael and Weber, Alexander Arno and Rutmann, Richard},
+          year={2024},
+          howpublished={\url{https://github.com/Modalities/modalities}},
+          url="https://github.com/Modalities/modalities",
+    }
+    

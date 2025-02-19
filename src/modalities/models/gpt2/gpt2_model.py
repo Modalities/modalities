@@ -93,7 +93,7 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
         """
         Initializes the RotaryTransform object.
 
@@ -101,11 +101,12 @@ class RotaryTransform(QueryKeyValueTransform):
             n_embd (int): The size of the embedding dimension.
             n_head (int): The number of attention heads.
             seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
+            base_freq (int): Base frequency for RoPE. Defaults to 10000.
         """
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -242,12 +243,14 @@ class AttentionConfig(BaseModel):
                 n_embd (int): Number of embeddings.
                 n_head (int): Number of attention heads.
                 seq_length_dim (int): Dimension of the sequence length.
+                base_freq (int): Base frequency for RoPE.
 
             """
 
             n_embd: Annotated[int, Field(strict=True, ge=0)]
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
+            base_freq: Annotated[int, Field(strict=True, ge=10000)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):

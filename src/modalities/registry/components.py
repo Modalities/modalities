@@ -4,7 +4,7 @@ from typing import Callable, Type
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
-from torch.utils.data import BatchSampler, DistributedSampler
+from torch.utils.data import BatchSampler, DistributedSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.checkpointing.checkpoint_saving_strategies import (
@@ -34,6 +34,7 @@ from modalities.config.config import (
     FSDPCheckpointSavingConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
+    LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
@@ -46,6 +47,7 @@ from modalities.config.config import (
     RichResultSubscriberConfig,
     SaveEveryKStepsCheckpointingStrategyConfig,
     SaveKMostRecentCheckpointsStrategyConfig,
+    SequentialSamplerConfig,
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
@@ -155,6 +157,7 @@ COMPONENTS = [
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
     ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
+    ComponentEntity("scheduler", "linear_lr", torch.optim.lr_scheduler.LinearLR, LinearLRSchedulerConfig),
     ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
     ComponentEntity(
         "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
@@ -180,6 +183,7 @@ COMPONENTS = [
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     ComponentEntity("dataset", "combined", DatasetFactory.get_combined_dataset, CombinedDatasetConfig),
     # samplers
+    ComponentEntity("sampler", "sequential_sampler", SequentialSampler, SequentialSamplerConfig),
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     ComponentEntity(
         "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
