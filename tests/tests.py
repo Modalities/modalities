@@ -122,6 +122,17 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
 
         check_existence_and_clear_getting_started_example_output(run_getting_started_example_directory, date_of_run)
 
+        # warmstart example
+        print("\n=== RUN WARMSTART EXAMPLE ===")
+        run_warmstart_example_directory = _ROOT_DIR / "tutorials/warmstart/scripts"
+        run_warmstart_example_script = _ROOT_DIR / "tutorials/warmstart/scripts/pre_train_and_warmstart.sh"
+        assert isfile(run_warmstart_example_script), f"ERROR! {run_warmstart_example_script} does not exist."
+        command_warmstart_example = (
+            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {devices[0]} {devices[1]}"
+        )
+        print(command_warmstart_example)
+        subprocess.run(command_warmstart_example, shell=True, capture_output=False, text=True)
+
     print("\n=== DONE ===")
 
 
