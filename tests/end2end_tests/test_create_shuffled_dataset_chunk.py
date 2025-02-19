@@ -105,7 +105,7 @@ def test_create_shuffled_dataset_chunk(
     for i in range(len(sorted_combined_chunks)):
         assert all(sorted_combined_chunks[i] == sorted_dataset[i])
 
-    # check that the unsorted chunkds are not equivalent to the original pbin files
+    # check that the unsorted chunks are not equivalent to the original pbin files
     num_documents_equivalent = 0
     for i in range(len(chunks_combined)):
         if len(chunks_combined[i]) == len(tokenized_datasets[i]):

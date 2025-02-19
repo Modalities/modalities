@@ -1,6 +1,7 @@
 import pickle
 from pathlib import Path
 from random import Random
+from typing import Optional
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
@@ -39,7 +40,7 @@ class TokenizedDataShuffler:
 
     @staticmethod
     def shuffle_tokenized_data(
-        input_data_path: Path, output_data_path: Path, batch_size: int, seed: int = None
+        input_data_path: Path, output_data_path: Path, batch_size: int, seed: Optional[int] = None
     ) -> None:
         """Shuffles a tokenized file (.pbin).
         Shuffled data is written to the specified output file.
@@ -51,6 +52,7 @@ class TokenizedDataShuffler:
             input_data_path (Path): Path to the tokenized data (.pbin).
             output_data_path (Path): Path to write the shuffled tokenized data.
             batch_size (int): Number of documents to process per batch.
+            seed (Optional[int], optional): Seed for the random number generator. Defaults to None.
 
         Returns:
             None

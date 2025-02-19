@@ -8,7 +8,7 @@ from modalities.api import FileExistencePolicy, shuffle_tokenized_data
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 
 
-def _calculate_md5(file_path):
+def _calculate_md5(file_path: Path):
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):

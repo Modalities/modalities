@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import numpy as np
 
@@ -47,6 +48,6 @@ class Chunking:
         return chunk
 
     @staticmethod
-    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray], seed: int = None) -> None:
+    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray], seed: Optional[int] = None) -> None:
         rng = np.random.default_rng(seed)  # Create a local random generator
         rng.shuffle(file_chunks)  # Shuffle using the local generator

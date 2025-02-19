@@ -3,6 +3,7 @@
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import tqdm
@@ -70,6 +71,8 @@ def create_raw_data_index(
     Args:
         src_path (Path): The path to the jsonl-file.
         index_path (Path): The path to the index file, that will be created.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the index file already exists.
+            Defaults to FileExistencePolicy.ERROR.
 
     Raises:
         ValueError: If the index file already exists.
@@ -121,7 +124,7 @@ def shuffle_tokenized_data(
     output_data_path: Path,
     batch_size: int,
     file_existence_policy: FileExistencePolicy,
-    seed: int = None,
+    seed: Optional[int] = None,
 ):
     """Shuffles a tokenized file (.pbin) and stores it on disc.
 
@@ -130,6 +133,7 @@ def shuffle_tokenized_data(
         output_data_path (Path): File path to write the shuffled tokenized data.
         batch_size (int): Number of documents to process per batch.
         file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
+        seed (Optional[int]): The seed to use for shuffling.
     """
     if output_data_path.exists():
         if not enforce_file_existence_policy(output_data_path, file_existence_policy):
@@ -146,7 +150,7 @@ def create_shuffled_dataset_chunk(
     chunk_id: int,
     num_chunks: int,
     file_existence_policy: FileExistencePolicy,
-    global_seed: int = None,
+    global_seed: Optional[int] = None,
 ):
     """Creates a shuffled dataset chunk.
     Given a dataset consisting of multiple tokenized pbin files, this function
@@ -159,9 +163,8 @@ def create_shuffled_dataset_chunk(
         output_chunk_file_path (Path): Path to the output chunk which will be stored in pbin format.
         chunk_id (int): The id of the chunk to create.
         num_chunks (int): The total number of chunks to create.
-        vocab_size (int): The size of the vocabulary.
         file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.
-        shuffle (bool, optional): Flag indicating whether we want to shuffle the chunk. Defaults to True.
+        global_seed (Optional[int]): The global seed to use for shuffling.
 
     Raises:
         ValueError: If the chunk has no samples.
@@ -214,6 +217,7 @@ def pack_encoded_data(
 
     Args:
         config_dict (dict): Dictionary containing the configuration for the packed data generation.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
     """
 
     # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,

@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Type
+from typing import Optional, Type
 
 import click
 import click_pathlib
@@ -232,18 +232,19 @@ def CMD_create_shuffled_dataset_chunk(
     chunk_id: int,
     num_chunks: int,
     file_existence_policy: FileExistencePolicy,
-    global_seed: int,
+    global_seed: Optional[int],
 ):
     """Utility to create a dataset chunk from a list of shuffled and tokenized pbin files.
 
     Args:
-        input_file_list_path (Path): Relative file path to the list of files to be chunked.
+        input_file_list_path (Path): Path to file that contains relative paths of
+            pbin files to be chunked (one per line).
         input_data_root_path (Path): Path to the root directory that contains the files to be chunked.
         output_chunk_file_path (Path): File path to the chunked dataset.
         chunk_id (int): The id of the chunk to be created.
         num_chunks (int): Number of chunks in total.
         file_existence_policy (FileExistencePolicy): Policy for handling existing files.
-        global_seed (int): The global seed to use for shuffling.
+        global_seed (Optional[int]): The global seed to use for shuffling.
     """
     file_existence_policy = FileExistencePolicy(file_existence_policy)
 
