@@ -363,7 +363,9 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
-def load_app_config_dict(config_file_path: Path, additional_resolver_funs: dict[str, Callable] = None) -> dict:
+def load_app_config_dict(
+    config_file_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None
+) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
     Modalities-specific variables.

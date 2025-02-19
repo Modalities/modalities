@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Callable, Type
+from typing import Callable, Optional, Type
 
 import click
 import click_pathlib
@@ -50,7 +50,7 @@ def main() -> None:
 @main.command(name="run")
 @click.option(
     "--config_file_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
     help="Path to the YAML training config file.",
 )
@@ -109,7 +109,7 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
 @main.command(name="generate_text")
 @click.option(
     "--config_file_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
     help="Path to a file with the YAML config file.",
 )
@@ -277,7 +277,7 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
 @data.command(name="shuffle_tokenized_data")
 @click.option(
     "--input_data_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
     help="Path to a tokenized file (.pbin).",
 )
@@ -307,7 +307,7 @@ def CMD_shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, ba
 class Main:
     """Main class that orchestrates the training process."""
 
-    def __init__(self, config_path: Path, additional_resolver_funs: dict[str, Callable] = None) -> None:
+    def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
         self.config_dict = load_app_config_dict(
             config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
         )
