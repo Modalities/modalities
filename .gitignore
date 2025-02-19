@@ -162,3 +162,4 @@ noteboks/*
 tests/tmp/*
 *wandb_storage*
 .coverage/*
+*.pbin
