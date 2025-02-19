@@ -8,6 +8,7 @@ from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.running_env.env_utils import MixedPrecisionSettings
+from modalities.utils.logging import get_logger
 
 
 class FSDPCheckpointLoading(CheckpointLoadingIF):
@@ -50,7 +51,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
         Returns:
             nn.Module: The model wrapped with FSDP and sharded according to the sharding strategy.
         """
-
+        get_logger().info(f"Loading model checkpoint from {file_path} on rank {self.global_rank}...")
         # load model
         if self.global_rank == 0:
             # load model on rank 0 into CPU RAM
@@ -67,6 +68,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
             mixed_precision_settings=self.mixed_precision_settings,
             sharding_strategy=self.sharding_strategy,
         )
+        get_logger().info(f"Model checkpoint loaded on rank {self.global_rank}.")
         return fsdp_model
 
     def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
@@ -81,6 +83,7 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
         Returns:
             Optimizer: The optimizer with the loaded checkpoint.
         """
+        get_logger().info(f"Loading optimizer checkpoint from {file_path} on rank {self.global_rank}...")
         # NOTE: model must be FSDP-wrapped model!
         # load optimizer
         full_optimizer_state_dict = None
@@ -93,5 +96,5 @@ class FSDPCheckpointLoading(CheckpointLoadingIF):
             full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
         )
         optimizer.load_state_dict(sharded_optimizer_state_dict)
-
+        get_logger().info(f"Optimizer checkpoint loaded on rank {self.global_rank}.")
         return optimizer
