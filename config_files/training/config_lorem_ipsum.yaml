@@ -242,6 +242,7 @@ model_raw:
             n_embd: ${model_raw.config.n_embd}
             n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
+            base_freq: 10000
     attention_implementation: manual
     activation_type: swiglu
     attention_norm:

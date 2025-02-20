@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from modalities.checkpointing.checkpoint_saving import CheckpointEntityType
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.exceptions import CheckpointingError
 from modalities.training.training_progress import TrainingProgress
+from modalities.utils.logging import get_logger
 
 
 class CheckpointingEntityType(Enum):
@@ -78,6 +80,7 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
         return full_path
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, training_progress: TrainingProgress):
+        get_logger().info("Gathering model and optimizer checkpoint...")
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
@@ -104,11 +107,14 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 entity_type=CheckpointingEntityType.MODEL,
             )
 
-            model_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            model_checkpoint_folder_path = model_checkpoint_path.parent
+            model_checkpoint_folder_path.mkdir(parents=True, exist_ok=True)
+            get_logger().info(f"Saving model checkpoint to {model_checkpoint_path}...")
             torch.save(model_state, model_checkpoint_path)
+            get_logger().info("Model checkpoint saved.")
 
             # save optimizer
-            optimize_checkpoint_path = self._get_checkpointing_path(
+            optimizer_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
                 num_seen_steps=training_progress.num_seen_steps_total,
                 num_seen_tokens=training_progress.num_seen_tokens_total,
@@ -116,7 +122,20 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 num_target_tokens=training_progress.num_target_tokens,
                 entity_type=CheckpointingEntityType.OPTIMIZER,
             )
-            torch.save(optim_state_dict, optimize_checkpoint_path)
+            get_logger().info(f"Saving optimizer checkpoint to {optimizer_checkpoint_path}...")
+            torch.save(optim_state_dict, optimizer_checkpoint_path)
+            get_logger().info("Optimizer checkpoint saved.")
+
+            checkpoint_info = {
+                "model_checkpoint_path": str(Path.absolute(model_checkpoint_path)),
+                "optimizer_checkpoint_path": str(Path.absolute(optimizer_checkpoint_path)),
+            }
+            get_logger().info(f"Saving checkpoint info {checkpoint_info} to {model_checkpoint_folder_path}...")
+            last_checkpoint_info_file_path = model_checkpoint_folder_path / "last_checkpoint_info.json"
+            with open(last_checkpoint_info_file_path, "w", encoding="utf-8") as f:
+                json.dump(checkpoint_info, f)
+            get_logger().info("Checkpoint info saved.")
+
         # we need this barrier here, such that all processes exit this function at the same time
         # Since we run throughput measurements in the trainer, the non-checkpointing ranks would already
         # trigger the time measurement in the trainer and would then wait for the checkpointing rank,
