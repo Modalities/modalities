@@ -48,4 +48,6 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29
 # add some consistency checks
 python check_checkpoint_consistency.py
 
+rm -rf ../data/
+
 echo "Finished warmstart example"
