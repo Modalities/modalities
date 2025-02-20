@@ -113,10 +113,7 @@ def test_tensor(device: str, size: int = 10) -> torch.Tensor:
     return test_tensor
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
 def test_models_before_and_after_conversion_produce_same_output(
     device: str,
     pytorch_model: NNModel,
@@ -141,10 +138,7 @@ def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
     return model
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
 def test_models_before_and_after_conversion_are_equal(
     pytorch_model: NNModel,
     hf_model: NNModel,
