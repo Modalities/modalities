@@ -27,7 +27,7 @@ CUDA_VISIBLE_DEVICES="$1,$2"
 
 echo "> run warmstart example on CUDA_VISIBLE_DEVICES="$CUDA_VISIBLE_DEVICES
 
-# cd to the directory of the script (absolute pathe)
+# cd to the directory of the script (absolute path)
 cd "$(dirname "$0")"
 
 rm -rf ../data/
