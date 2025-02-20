@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from modalities.api import create_shuffled_dataset_chunk
+from modalities.api import FileExistencePolicy, create_shuffled_dataset_chunk
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.preprocessing.tokenization.tokenized_file_writer import TokenizedFileWriter
 
@@ -46,22 +46,24 @@ def pbin_file_path_list(files_num_documents: list[int]) -> list[Path]:
 
 
 @pytest.mark.parametrize(
-    "num_chunks, shuffle, expect_error",
+    "num_chunks, global_seed, expect_error",
     [
-        (900, True, False),
-        (901, True, True),
-        (5000, True, True),
-        (5, False, False),
-        (5, True, False),
-        (1, True, False),
-        (1, False, False),
+        (900, 1, False),
+        (901, 1, True),
+        (5000, 1, True),
+        (5, 1, False),
+        (1, 1, False),
     ],
 )
 def test_create_shuffled_dataset_chunk(
-    pbin_file_path_list: list[Path], files_num_documents: list[int], num_chunks: int, shuffle: bool, expect_error: bool
+    pbin_file_path_list: list[Path],
+    num_chunks: int,
+    global_seed: int,
+    expect_error: bool,
 ):
     def create_chunks(
-        num_chunks: int, pbin_file_path_list: list[Path], vocab_size: int, shuffle: bool
+        num_chunks: int,
+        pbin_file_path_list: list[Path],
     ) -> list[np.ndarray]:
         chunks = []
         parent_dir = pbin_file_path_list[0].parent
@@ -72,21 +74,19 @@ def test_create_shuffled_dataset_chunk(
                 output_chunk_file_path=chunk_file_path,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
-                vocab_size=vocab_size,
-                shuffle=shuffle,
+                file_existence_policy=FileExistencePolicy.ERROR,
+                global_seed=global_seed,
             )
             dataset = PackedMemMapDatasetBase(raw_data_path=chunk_file_path, sample_key="text", load_index=True)
             tokenized_dataset = dataset[:]["text"]
             chunks.append(tokenized_dataset)
         return chunks
 
-    vocab_size = sum(files_num_documents)
-
     if expect_error:
         with pytest.raises(ValueError):
-            create_chunks(num_chunks, pbin_file_path_list, vocab_size, shuffle)
+            create_chunks(num_chunks, pbin_file_path_list)
         return
-    chunks = create_chunks(num_chunks, pbin_file_path_list, vocab_size, shuffle)
+    chunks = create_chunks(num_chunks, pbin_file_path_list)
 
     chunks_combined = []
     for i in range(num_chunks):
@@ -99,8 +99,16 @@ def test_create_shuffled_dataset_chunk(
         tokenized_dataset = dataset[:]["text"]
         tokenized_datasets.extend(tokenized_dataset)
 
-    # check that the chunks are equivalent to the original pbin files
+    # check that the sorted chunks are equivalent to the original pbin files
     sorted_combined_chunks = list(sorted(chunks_combined, key=lambda x: x[0]))
     sorted_dataset = list(sorted(tokenized_datasets, key=lambda x: x[0]))
     for i in range(len(sorted_combined_chunks)):
         assert all(sorted_combined_chunks[i] == sorted_dataset[i])
+
+    # check that the unsorted chunks are not equivalent to the original pbin files
+    num_documents_equivalent = 0
+    for i in range(len(chunks_combined)):
+        if len(chunks_combined[i]) == len(tokenized_datasets[i]):
+            num_documents_equivalent += int(all(chunks_combined[i] == tokenized_datasets[i]))
+
+    assert num_documents_equivalent < len(chunks_combined)

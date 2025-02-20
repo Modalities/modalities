@@ -11,7 +11,7 @@ import sentencepiece as spm
 import tqdm
 from transformers import AutoTokenizer
 
-from modalities.api import create_raw_data_index, pack_encoded_data
+from modalities.api import FileExistencePolicy, create_raw_data_index, pack_encoded_data
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 
 
@@ -43,7 +43,7 @@ def _run_tokenization(
         "tokenizer": {**tokenizer_config},
     }
 
-    pack_encoded_data(config_dict=tokenization_config_dict)
+    pack_encoded_data(config_dict=tokenization_config_dict, file_existence_policy=FileExistencePolicy.ERROR)
 
 
 def _verify_index(src_path: Path, index_path: Path):
