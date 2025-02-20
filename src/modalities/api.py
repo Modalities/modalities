@@ -34,7 +34,7 @@ class FileExistencePolicy(Enum):
 
 
 def enforce_file_existence_policy(file_path: Path, file_existence_policy: FileExistencePolicy) -> bool:
-    """Enforces the file existence policy. Function returns True, if processing should continue. Otherwise False.
+    """Enforces the file existence policy. Function returns True, if processing should be stopped. Otherwise False.
 
     Args:
         file_path (Path): File path to the file to check.
@@ -44,15 +44,15 @@ def enforce_file_existence_policy(file_path: Path, file_existence_policy: FileEx
         ValueError: Raised if the file existence policy is unknown or the policy requires to raise a ValueError.
 
     Returns:
-        bool: True if processing should continue, otherwise False.
+        bool: True if processing should be stopped, otherwise False.
     """
     if file_existence_policy == FileExistencePolicy.SKIP:
         get_logger(name="main").warning(f"File already exists at {str(file_path)}. Skipping ...")
-        return False
+        return True
     elif file_existence_policy == FileExistencePolicy.OVERRIDE:
         get_logger(name="main").warning(f"File already exists at {str(file_path)}. Overriding it.")
         os.remove(file_path)
-        return True
+        return False
     elif file_existence_policy == FileExistencePolicy.ERROR:
         raise ValueError("File already exists. Delete it or specify different output folder.")
     else:
@@ -79,7 +79,8 @@ def create_raw_data_index(
     """
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
-        if not enforce_file_existence_policy(index_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(index_path, file_existence_policy)
+        if stop_process:
             return
 
     get_logger(name="main").info(
