@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import PosixPath
 from typing import Any, Dict, List, Optional
@@ -21,20 +22,20 @@ class HFModelAdapterConfig(PretrainedConfig):
 
     model_type = "modalities"
 
-    def __init__(self, config={}, **kwargs):
+    def __init__(self, config: dict = {}, **kwargs):
         """
         Initializes an HFModelAdapterConfig object.
 
         Args:
-            **kwargs: Additional keyword arguments.
+            config (dict): The modalities configuration dictionary.
+              Providing this is required, however it defaults to {} because of transformers' internal workings.
+            **kwargs: Additional keyword arguments forwarded to PretrainedConfig.
 
         Raises:
             ConfigError: If the config is not passed in HFModelAdapterConfig.
         """
-        if "config" not in kwargs:
-            raise ValueError("Config is not passed in HFModelAdapterConfig.")
         super().__init__(**kwargs)
-        self.config = config
+        self.config = deepcopy(config)
         # self.config is added by the super class via kwargs
         assert self.config is not None, "Config is not passed in HFModelAdapterConfig."
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
