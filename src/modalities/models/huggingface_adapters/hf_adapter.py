@@ -1,17 +1,14 @@
 import json
 from dataclasses import dataclass
 from pathlib import PosixPath
-from typing import Any, Optional, Union, List, Tuple, Dict
+from typing import Any, Dict, List, Optional
 
 import torch
 from class_resolver.utils import logger
-from torch import TensorType
-from transformers import PretrainedConfig, PreTrainedModel, PreTrainedTokenizerBase, PreTrainedTokenizer, \
-    PreTrainedTokenizerFast, AddedToken
-from transformers.tokenization_utils_base import TextInput, PreTokenizedInput, EncodedInput, TruncationStrategy
-from transformers.utils import ModelOutput, PaddingStrategy
+from transformers import AddedToken, PretrainedConfig, PreTrainedModel, PreTrainedTokenizer
+from transformers.tokenization_utils_base import TextInput
+from transformers.utils import ModelOutput
 
-from modalities.exceptions import ConfigError
 from modalities.models.model import NNModel
 from modalities.models.utils import ModelTypeEnum, get_model_from_config, get_tokenizer_from_config
 
@@ -34,11 +31,12 @@ class HFModelAdapterConfig(PretrainedConfig):
         Raises:
             ConfigError: If the config is not passed in HFModelAdapterConfig.
         """
+        if "config" not in kwargs:
+            raise ValueError("Config is not passed in HFModelAdapterConfig.")
         super().__init__(**kwargs)
         self.config = config
         # self.config is added by the super class via kwargs
-        if self.config is None:
-            raise ConfigError("Config is not passed in HFModelAdapterConfig.")
+        assert self.config is not None, "Config is not passed in HFModelAdapterConfig."
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
         self._convert_posixpath_to_str(data_to_be_formatted=self.config)
 
@@ -57,7 +55,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         return json.dumps(json_dict)
 
     def _convert_posixpath_to_str(
-            self, data_to_be_formatted: dict[str, Any] | list[Any] | PosixPath | Any
+        self, data_to_be_formatted: dict[str, Any] | list[Any] | PosixPath | Any
     ) -> dict[str, Any] | list[Any] | PosixPath | Any:
         # Recursively converts any PosixPath objects within a nested data structure to strings.
 
@@ -78,7 +76,7 @@ class HFModelAdapter(PreTrainedModel):
     config_class = HFModelAdapterConfig
 
     def __init__(
-            self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
+        self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
     ):
         """
         Initializes the HFAdapter object.
@@ -98,12 +96,12 @@ class HFModelAdapter(PreTrainedModel):
             self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.MODEL)
 
     def forward(
-            self,
-            input_ids: torch.Tensor,
-            attention_mask: Optional[torch.Tensor] = None,
-            return_dict: Optional[bool] = False,
-            output_attentions: Optional[bool] = False,
-            output_hidden_states: Optional[bool] = False,
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        return_dict: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
     ):
         """
         Forward pass of the HFAdapter module.
@@ -129,7 +127,7 @@ class HFModelAdapter(PreTrainedModel):
             return model_forward_output[self.prediction_key]
 
     def prepare_inputs_for_generation(
-            self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
+        self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
     ) -> dict[str, Any]:
         """
         Prepares the inputs for generation.
@@ -245,22 +243,22 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
-            self,
-            config: HFModelAdapterConfig,
-            # vocab_file,
-            unk_token="<unk>",
-            bos_token="<s>",
-            eos_token="</s>",
-            pad_token=None,
-            sp_model_kwargs: Optional[Dict[str, Any]] = None,
-            add_bos_token=True,
-            add_eos_token=False,
-            clean_up_tokenization_spaces=False,
-            use_default_system_prompt=False,
-            spaces_between_special_tokens=False,
-            legacy=None,
-            add_prefix_space=True,
-            **kwargs,
+        self,
+        config: HFModelAdapterConfig,
+        # vocab_file,
+        unk_token="<unk>",
+        bos_token="<s>",
+        eos_token="</s>",
+        pad_token=None,
+        sp_model_kwargs: Optional[Dict[str, Any]] = None,
+        add_bos_token=True,
+        add_eos_token=False,
+        clean_up_tokenization_spaces=False,
+        use_default_system_prompt=False,
+        spaces_between_special_tokens=False,
+        legacy=None,
+        add_prefix_space=True,
+        **kwargs,
     ):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         bos_token = AddedToken(bos_token, normalized=False, special=True) if isinstance(bos_token, str) else bos_token
@@ -271,11 +269,11 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
         if legacy is None:
             logger.warning_once(
                 f"You are using the default legacy behaviour of the {self.__class__}. This is"
-                " expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you."
-                " If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it"
-                " means, and thoroughly read the reason why this was added as explained in"
-                " https://github.com/huggingface/transformers/pull/24565 - if you loaded a llama tokenizer from a GGUF file"
-                " you can ignore this message"
+                " expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes"
+                " for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you"
+                " understand what it means, and thoroughly read the reason why this was added as explained in"
+                " https://github.com/huggingface/transformers/pull/24565 - if you loaded a llama tokenizer from a"
+                " GGUF file you can ignore this message"
             )
             legacy = True
 
@@ -364,7 +362,7 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
             # 1. Encode string + prefix ex: "<unk> Hey"
         tokens = self.sp_model.tokenizer.encode(self.unk_token + text, out_type=str)
         # 2. Remove self.unk_token from ['<','unk','>', '▁Hey']
-        return tokens[self.unk_token_length:] if len(tokens) >= self.unk_token_length else tokens
+        return tokens[self.unk_token_length :] if len(tokens) >= self.unk_token_length else tokens
 
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""

@@ -1,29 +1,34 @@
 #!/usr/bin/env python
 
+import json
 import logging
 import os
 import shutil
 from datetime import datetime
+from functools import partial
 from pathlib import Path
-from typing import Type
+from typing import Callable, Optional, Type
 
 import click
 import click_pathlib
+import yaml
+from omegaconf import DictConfig
 from pydantic import BaseModel, FilePath
 
 from modalities.api import (
+    FileExistencePolicy,
     convert_pytorch_to_hf_checkpoint,
     create_raw_data_index,
     create_shuffled_dataset_chunk,
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
+    shuffle_tokenized_data,
 )
 from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
-from modalities.dataloader.shuffle_tokenized_data import shuffle_tokenized_data
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
@@ -46,17 +51,57 @@ def main() -> None:
 @main.command(name="run")
 @click.option(
     "--config_file_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
-    help="Path to a file with the YAML config file.",
+    help="Path to the YAML training config file.",
 )
 def CMD_entry_point_run_modalities(config_file_path: Path):
-    """Entrpoint to run the model training.
+    """Entrypoint to run the model training.
 
     Args:
-        config_file_path (Path): Path to the YAML config file.
+        config_file_path (Path): Path to the YAML training config file.
     """
     main_obj = Main(config_file_path)
+    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        main_obj.run(components)
+
+
+@main.command(name="warmstart")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the YAML warmstart config file.",
+)
+@click.option(
+    "--last_checkpoint_info_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the file containing the model and optimizer checkpoint paths from the last successful checkpoint.",
+)
+def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint_info_file_path: Path):
+    """Entrypoint to run the model warmstart.
+
+    Args:
+        config_file_path (Path): Path to the YAML warmstart config file.
+        last_checkpoint_info_file_path (Path): Path to the file containing the model and
+            optimizer checkpoint paths from the last successful checkpoint.
+    """
+
+    def get_last_checkpoint_resolver_fun(var_name: str, last_checkpoint_info_file_path: Path) -> dict[str, str]:
+        if var_name != "checkpoint_paths":
+            raise ValueError(f"Unknown variable name {var_name}. Should be 'checkpoint_paths'.")
+        with open(last_checkpoint_info_file_path, "r") as f:
+            last_checkpoint_info = json.load(f)
+        return DictConfig(last_checkpoint_info)
+
+    resolver_funs = {
+        "warmstart_env": partial(
+            get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
+        )
+    }
+    main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -65,7 +110,7 @@ def CMD_entry_point_run_modalities(config_file_path: Path):
 @main.command(name="generate_text")
 @click.option(
     "--config_file_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
     help="Path to a file with the YAML config file.",
 )
@@ -133,7 +178,13 @@ def data():
     default=None,
     help="output path for index. will use parent directory of src_path if none.",
 )
-def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path, file_existence_policy: FileExistencePolicy):
     """Utility CMD for indexing the content of a large jsonl-file.
     Background is the ability to further process the respective file without loading it,
     while splitting its content line-based. This step is necessary in advance of further processing like tokenization.
@@ -142,16 +193,24 @@ def CMD_entry_point_data_create_raw_index(src_path: Path, index_path: Path):
     Args:
         src_path (Path): The path to the jsonl-file.
         index_path (Path): The path to the index file, that will be created.
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
 
     Raises:
         ValueError: If the index file already exists.
     """
-    create_raw_data_index(src_path=src_path, index_path=index_path)
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+    create_raw_data_index(src_path=src_path, index_path=index_path, file_existence_policy=file_existence_policy)
 
 
 @data.command(name="pack_encoded_data")
 @click.argument("config_path", type=FilePath)
-def CMD_entry_point_pack_encoded_data(config_path: FilePath):
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+def CMD_entry_point_pack_encoded_data(config_path: FilePath, file_existence_policy: FileExistencePolicy):
     """Utility to encode an indexed, large jsonl-file.
     (see also `create_index` for more information)
     Returns .pbin-file, which can be inserted into a training process directly
@@ -159,10 +218,12 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
 
     Args:
         config_path (FilePath): Path to the config file describing the tokenization setup.
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
     """
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
     config_dict = load_app_config_dict(config_path)
 
-    pack_encoded_data(config_dict=config_dict)
+    pack_encoded_data(config_dict=config_dict, file_existence_policy=file_existence_policy)
 
 
 @data.command(name="create_shuffled_dataset_chunk")
@@ -171,6 +232,12 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     type=Path,
     required=True,
     help="Path to the file containing the list of files to be chunked.",
+)
+@click.option(
+    "--input_data_root_path",
+    type=Path,
+    required=True,
+    help="Directory path to the root of the input data.",
 )
 @click.option(
     "--output_chunk_file_path",
@@ -191,24 +258,53 @@ def CMD_entry_point_pack_encoded_data(config_path: FilePath):
     help="The number of chunks to create.",
 )
 @click.option(
-    "--vocab_size",
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+@click.option(
+    "--global_seed",
     type=int,
-    required=True,
-    help="The size of the vocabulary.",
+    default=None,
+    help="The global seed to use for shuffling.",
 )
 def CMD_create_shuffled_dataset_chunk(
-    input_file_list_path: Path, output_chunk_file_path: Path, chunk_id: int, num_chunks: int, vocab_size: int
+    input_file_list_path: Path,
+    input_data_root_path: Path,
+    output_chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    file_existence_policy: FileExistencePolicy,
+    global_seed: Optional[int],
 ):
+    """Utility to create a dataset chunk from a list of shuffled and tokenized pbin files.
+
+    Args:
+        input_file_list_path (Path): Path to file that contains relative paths of
+            pbin files to be chunked (one per line).
+        input_data_root_path (Path): Path to the root directory that contains the files to be chunked.
+        output_chunk_file_path (Path): File path to the chunked dataset.
+        chunk_id (int): The id of the chunk to be created.
+        num_chunks (int): Number of chunks in total.
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
+        global_seed (Optional[int]): The global seed to use for shuffling.
+    """
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+
     with open(input_file_list_path, "r", encoding="utf-8") as f:
         file_path_list = f.readlines()
-    file_path_list = [Path(file_path.strip()) for file_path in file_path_list]
+    file_path_list = [
+        input_data_root_path / Path(file_path.strip()).with_suffix(".pbin") for file_path in file_path_list
+    ]
 
     create_shuffled_dataset_chunk(
         file_path_list=file_path_list,
         output_chunk_file_path=output_chunk_file_path,
         chunk_id=chunk_id,
         num_chunks=num_chunks,
-        vocab_size=vocab_size,
+        file_existence_policy=file_existence_policy,
+        global_seed=global_seed,
     )
 
 
@@ -233,7 +329,7 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
 @data.command(name="shuffle_tokenized_data")
 @click.option(
     "--input_data_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
     help="Path to a tokenized file (.pbin).",
 )
@@ -244,27 +340,52 @@ def CMD_entry_point_merge_packed_data(src_paths: list[Path], target_path: Path):
     help="Path to write the shuffled tokenized data (.pbin).",
 )
 @click.option(
-    "--batch-size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
+    "--batch_size", type=int, default=100, show_default=True, help="Number of documents to process per batch."
 )
-def CMD_shuffle_tokenized_data(input_data_path: Path, output_data_path: Path, batch_size: int) -> None:
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    help="The seed for shuffling the data.",
+)
+def CMD_shuffle_tokenized_data(
+    input_data_path: Path, output_data_path: Path, batch_size: int, file_existence_policy, seed: int
+) -> None:
     """Entrypoint for shuffling tokenized data.
 
     Args:
         input_data_path (Path): The path to the input tokenized data (.pbin).
-        output_data_path (Path): Path to write the shuffled tokenized data (.pbin).
+        output_data_path (Path): File path to write the shuffled tokenized data (.pbin).
         batch_size (int): The size of the batches to shuffle.
-
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
+        seed (int): The seed for shuffling the data.
     Returns:
         None
     """
-    shuffle_tokenized_data(input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size)
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+
+    shuffle_tokenized_data(
+        input_data_path=input_data_path,
+        output_data_path=output_data_path,
+        batch_size=batch_size,
+        file_existence_policy=file_existence_policy,
+        seed=seed,
+    )
 
 
 class Main:
     """Main class that orchestrates the training process."""
 
-    def __init__(self, config_path: Path) -> None:
-        self.config_dict = load_app_config_dict(config_path)
+    def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
+        self.config_dict = load_app_config_dict(
+            config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
+        )
         self.config_path = config_path
 
         self.registry = Registry(COMPONENTS)
@@ -325,6 +446,9 @@ class Main:
             experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
             shutil.copy(self.config_path, experiment_path / self.config_path.name)
+            resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
+            with open(resolved_config_path, "w", encoding="utf-8") as f:
+                yaml.dump(self.config_dict, f)
 
         evaluation_result_publisher, progress_publisher = self.get_logging_publishers(
             progress_subscriber=components.progress_subscriber,

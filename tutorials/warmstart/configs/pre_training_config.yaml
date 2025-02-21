@@ -10,40 +10,24 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ../modalities_in_15_mins/data/preprocessed/fineweb_edu_num_docs_483606.pbin
+    checkpoint_saving_path: ../data/checkpoints
+    train_dataset_path: ../data/mem_map/redpajama_v2_samples_512_train.pbin
   intervals:
-    training_log_interval_in_steps: 5
-    checkpointing_interval_in_steps: 500
-    evaluation_interval_in_steps: 500
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 11   # we want to get exactly one checkpoint
+    evaluation_interval_in_steps: 1000
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
-    local_train_micro_batch_size: 64
+    local_train_micro_batch_size: 8
     sequence_length: 256
   training_target:
-    num_target_tokens:
-      component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
-      config:
-        dataset_path: ${settings.paths.train_dataset_path}
-        sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-    num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+    num_target_tokens: 81920 # num_target_steps * world_size * local_train_micro_batch_size * sequence_length * gradient_accumulation_steps
+    num_target_steps: 20    # we want to run for exactly 20 steps (although we will only get one checkpoint after 11 steps)
   training_progress: 
     global_num_seen_tokens: 0
     num_seen_steps: 0
@@ -168,15 +152,16 @@ model_raw:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
-    attention_implementation: manual
+      - type_hint: RotaryTransform
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head: ${model_raw.config.n_head_q}
+          seq_length_dim: -2
+          base_freq: 100000
+    attention_implementation: pytorch_flash
     activation_type: swiglu
     attention_norm:
       component_key: layer_norm
@@ -240,15 +225,8 @@ gradient_clipper:
 
 progress_subscriber:
   component_key: progress_subscriber
-  variant_key: rich
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    num_seen_steps: ${settings.training_progress.num_seen_steps}
-    num_target_steps: ${settings.training_target.num_target_steps}
-    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
-    eval_dataloaders:
-      instance_key: eval_dataloaders
-      pass_type: BY_REFERENCE
+  variant_key: dummy
+  config: {}
 
 evaluation_subscriber:
   component_key: results_subscriber
@@ -256,7 +234,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: warmstart_tutorial
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: ../data/wandb_storage
     config_file_path: ${settings.config_file_path}
