@@ -1,3 +1,23 @@
+"""
+usage: convert_gpt2.py [-h] [--num_testruns NUM_TESTRUNS] [--device_modalities DEVICE_MODALITIES]
+                       [--device_hf DEVICE_HF] modalities_config output_dir
+
+Convert GPT-2 model checkpoint to Huggingface transformers format.
+
+positional arguments:
+  modalities_config     Path to the modalities config file.
+  output_dir            Directory to save the converted model.
+
+options:
+  -h, --help            show this help message and exit
+  --num_testruns NUM_TESTRUNS
+                        Number of test runs to perform.
+  --device_modalities DEVICE_MODALITIES
+                        Device for the modalities model.
+  --device_hf DEVICE_HF
+                        Device for the Hugging Face model.
+"""
+
 import argparse
 import shutil
 
@@ -14,8 +34,24 @@ from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
 
 def convert_gpt2(
-    modalities_config_path: str, output_dir: str, num_testruns: int, device_modalities: str, device_hf: str
+    modalities_config_path: str,
+    output_dir: str,
+    num_testruns: int = 0,
+    device_modalities: str = "cpu",
+    device_hf: str = "cpu",
 ) -> None:
+    """Takes a modalities gpt2 model and converts it to a Huggingface transformers model.
+       The provided config yaml file should contain the model_raw section with the model configuration.
+       Additionally, the checkpointed_model section should be present and contain the path to the model checkpoint.
+       Optionally, the function can run a number of test runs to compare the converted model with the original one.
+
+    Args:
+        modalities_config_path (str): Path to the modalities config file.
+        output_dir (str): Directory to save the converted model.
+        num_testruns (int, optional): Number of test runs to perform. Defaults to 0.
+        device_modalities (str, optional): Device for the modalities model. Defaults to "cpu".
+        device_hf (str, optional): Device for the Hugging Face model. Defaults to "cpu".
+    """
     modalities_config = load_app_config_dict(modalities_config_path)
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
@@ -37,6 +73,16 @@ def convert_gpt2(
 
 
 def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, GPT2LLM]:
+    """Converts the modalities model to a Huggingface transformers model.
+       Both the loaded modalities model and the converted Huggingface model are returned
+       so that they can be compared.
+
+    Args:
+        modalities_config (dict): Modalities config dictionary.
+
+    Returns:
+        tuple[GPT2ForCausalLM, GPT2LLM]: Converted Hugging Face model and the original modalities model.
+    """
     gpt2_config = convert_model_config(modalities_config)
     hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=torch.bfloat16)
     modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
@@ -45,6 +91,16 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
 
 
 def convert_model_config(modalities_config: dict) -> GPT2Config:
+    """Converts the modalities model configuration to a Huggingface transformers configuration.
+       For this the model_raw section of the modalities config is used.
+       Corresponding entries are mapped to the Huggingface configuration.
+
+    Args:
+        modalities_config (dict): Modalities config dictionary.
+
+    Returns:
+        GPT2Config: Converted Huggingface model configuration.
+    """
     config = modalities_config["model_raw"]["config"]
 
     assert config["poe_type"] == PositionTypes.NOPE
@@ -77,6 +133,14 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
 
 
 def test_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, num_testruns: int, vocab_size: int):
+    """Tests the converted model by inputting a random token sequence and comparing the output logits of both models.
+
+    Args:
+        hf_model (GPT2ForCausalLM): Huggingface transformers model.
+        modalities_model (GPT2LLM): Modalities model.
+        num_testruns (int): Number of test runs to perform.
+        vocab_size (int): Vocabulary size of the model. (Required for generating random input tokens.)
+    """
     for _ in tqdm(range(num_testruns), desc="Testing converted model"):
         input_ids = torch.randint(0, vocab_size, (1, 1024), device=hf_model.device)
         inputs = {modalities_model.sample_key: input_ids.to(modalities_model.transformer.wte.weight.device)}
@@ -90,6 +154,13 @@ def test_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, n
 
 
 def _copy_weights_model(hf_model_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
+    """Copies the weights of the modalities model to the Huggingface transformers model.
+
+    Args:
+        hf_model_model (GPT2ForCausalLM): The uninitialized Huggingface transformers model.
+                                          The weights will be copied here.
+        modalities_model (GPT2LLM): The modalities model from which the weights will be copied.
+    """
     hf_model_model.model.embed_tokens.weight.data.copy_(modalities_model.transformer.wte.weight.data)
     for hf_layer, modalities_layer in zip(hf_model_model.model.layers, modalities_model.transformer.h):
         _copy_weights_attention(hf_layer, modalities_layer)
@@ -126,6 +197,14 @@ def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm, m2: nn.Linear | nn.
 
 
 def _transfer_model_code(output_dir: str):
+    """Copies the required model code to the output directory.
+       This allows the converted model to be used without the modalities package via:
+       >>> from transformers import AutoModelForCausalLM
+       >>> model = AutoModelForCausalLM.from_pretrained("path/to/converted/model", trust_remote_code=True)
+
+    Args:
+        output_dir (str): Directory of the converted model.
+    """
     source_dir = os.path.dirname(__file__)
     modeling_gpt2_path = os.path.join(source_dir, "modeling_gpt2.py")
     configuration_gpt2_path = os.path.join(source_dir, "configuration_gpt2.py")
@@ -147,7 +226,7 @@ if __name__ == "__main__":
     os.environ["WORLD_SIZE"] = "1"
     os.environ["RANK"] = "0"
 
-    parser = argparse.ArgumentParser(description="Convert GPT-2 model checkpoint.")
+    parser = argparse.ArgumentParser(description="Convert GPT-2 model checkpoint to Huggingface transformers format.")
     parser.add_argument("modalities_config", type=str, help="Path to the modalities config file.")
     parser.add_argument("output_dir", type=str, help="Directory to save the converted model.")
     parser.add_argument("--num_testruns", type=int, default=0, help="Number of test runs to perform.")
