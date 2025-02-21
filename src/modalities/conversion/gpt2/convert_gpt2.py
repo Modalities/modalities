@@ -1,5 +1,4 @@
 import argparse
-from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -13,7 +12,7 @@ from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
 
-def convert_model_checkpoint(modalities_config: dict) -> Tuple[GPT2ForCausalLM, GPT2LLM]:
+def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, GPT2LLM]:
     gpt2_config = convert_model_config(modalities_config)
     hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=torch.bfloat16)
     modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
@@ -22,28 +21,32 @@ def convert_model_checkpoint(modalities_config: dict) -> Tuple[GPT2ForCausalLM, 
 
 
 def convert_model_config(modalities_config: dict) -> GPT2Config:
-    assert modalities_config["model_raw"]["config"]["poe_type"] == PositionTypes.NOPE
-    assert modalities_config["model_raw"]["config"]["activation_type"] == "swiglu"
+    config = modalities_config["model_raw"]["config"]
+
+    assert config["poe_type"] == PositionTypes.NOPE
+    assert config["activation_type"] == "swiglu"
 
     return GPT2Config(
-        vocab_size=modalities_config["model_raw"]["config"]["vocab_size"],
-        hidden_size=modalities_config["model_raw"]["config"]["n_embd"],
+        vocab_size=config["vocab_size"],
+        hidden_size=config["n_embd"],
         pad_token_id=None,
-        num_hidden_layers=modalities_config["model_raw"]["config"]["n_layer"],
-        num_key_value_heads=modalities_config["model_raw"]["config"]["n_head_kv"],
-        num_attention_heads=modalities_config["model_raw"]["config"]["n_head_q"],
-        intermediate_size=SwiGLU._get_hidden_dim(ffn_hidden=modalities_config["model_raw"]["config"]["ffn_hidden"]),
-        mlp_bias=modalities_config["model_raw"]["config"]["bias"],
+        num_hidden_layers=config["n_layer"],
+        num_key_value_heads=config["n_head_kv"],
+        num_attention_heads=config["n_head_q"],
+        intermediate_size=SwiGLU._get_hidden_dim(ffn_hidden=config["ffn_hidden"]),
+        mlp_bias=config["bias"],
         hidden_act="silu",
-        layer_norm_eps=modalities_config["model_raw"]["config"]["ffn_norm"]["config"]["eps"],
-        layer_norm_elementwise_affine=modalities_config["model_raw"]["config"]["ffn_norm"]["config"].get(
-            "elementwise_affine", True
+        layer_norm_eps=config["ffn_norm"]["config"]["eps"],
+        layer_norm_elementwise_affine=config["ffn_norm"]["config"].get(
+            "elementwise_affine",
+            True,
+            # TODO:
+            # Temporary solution: double-check that these are the correct default values.
+            # Permanent solution: read default values from where they are defined.
         ),
-        layer_norm_bias=modalities_config["model_raw"]["config"]["ffn_norm"]["config"].get("bias", True),
-        max_position_embeddings=modalities_config["model_raw"]["config"]["sequence_length"],
-        rope_theta=modalities_config["model_raw"]["config"]["attention_config"]["qkv_transforms"][0]["config"][
-            "base_freq"
-        ],
+        layer_norm_bias=config["ffn_norm"]["config"].get("bias", True),  # TODO: see comment above
+        max_position_embeddings=config["sequence_length"],
+        rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation="sdpa",
         output_attentions=False,
     )
@@ -98,6 +101,23 @@ def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm, m2: nn.Linear | nn.
         m1.bias.data.copy_(m2.bias.data)
 
 
+def convert_gpt2(
+    modalities_config_path: str, output_dir: str, num_testruns: int, device_modalities: str, device_hf: str
+) -> None:
+    modalities_config = load_app_config_dict(modalities_config_path)
+    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+
+    if num_testruns > 0:
+        test_converted_model(
+            hf_model.to(device_hf),
+            modalities_model.to(device_modalities),
+            num_testruns,
+            modalities_config["model_raw"]["config"]["vocab_size"],
+        )
+
+    hf_model.save_pretrained(output_dir)
+
+
 if __name__ == "__main__":
     import os
 
@@ -114,15 +134,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    modalities_config = load_app_config_dict(args.modalities_config)
-    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
-
-    if args.num_testruns > 0:
-        test_converted_model(
-            hf_model.to(args.device_hf),
-            modalities_model.to(args.device_modalities),
-            args.num_testruns,
-            modalities_config["model_raw"]["config"]["vocab_size"],
-        )
-
-    hf_model.save_pretrained(args.output_dir)
+    convert_gpt2(
+        args.modalities_config,
+        args.output_dir,
+        args.num_testruns,
+        args.device_modalities,
+        args.device_hf,
+    )
