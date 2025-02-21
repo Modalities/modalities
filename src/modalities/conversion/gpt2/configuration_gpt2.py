@@ -141,7 +141,7 @@ class GPT2Config(PretrainedConfig):
     >>> configuration = model.config
     ```"""
 
-    model_type = "llama"
+    model_type = "modalities-gpt2"
     keys_to_ignore_at_inference = ["past_key_values"]
     # Default tensor parallel plan for base model `GPT2Model`
     base_model_tp_plan = {
