@@ -1,4 +1,5 @@
 import argparse
+import shutil
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,29 @@ from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCa
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block, PositionTypes
 from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
+
+
+def convert_gpt2(
+    modalities_config_path: str, output_dir: str, num_testruns: int, device_modalities: str, device_hf: str
+) -> None:
+    modalities_config = load_app_config_dict(modalities_config_path)
+    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+
+    if num_testruns > 0:
+        test_converted_model(
+            hf_model.to(device_hf),
+            modalities_model.to(device_modalities),
+            num_testruns,
+            modalities_config["model_raw"]["config"]["vocab_size"],
+        )
+
+    hf_model.config.auto_map = {
+        "AutoConfig": "configuration_gpt2.GPT2Config",
+        "AutoModel": "modeling_gpt2.GPT2Model",
+        "AutoModelForCausalLM": "modeling_gpt2.GPT2ForCausalLM",
+    }
+    hf_model.save_pretrained(output_dir)
+    _transfer_model_code(output_dir)
 
 
 def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, GPT2LLM]:
@@ -101,21 +125,19 @@ def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm, m2: nn.Linear | nn.
         m1.bias.data.copy_(m2.bias.data)
 
 
-def convert_gpt2(
-    modalities_config_path: str, output_dir: str, num_testruns: int, device_modalities: str, device_hf: str
-) -> None:
-    modalities_config = load_app_config_dict(modalities_config_path)
-    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+def _transfer_model_code(output_dir: str):
+    source_dir = os.path.dirname(__file__)
+    modeling_gpt2_path = os.path.join(source_dir, "modeling_gpt2.py")
+    configuration_gpt2_path = os.path.join(source_dir, "configuration_gpt2.py")
+    shutil.copy(modeling_gpt2_path, output_dir)
+    shutil.copy(configuration_gpt2_path, output_dir)
 
-    if num_testruns > 0:
-        test_converted_model(
-            hf_model.to(device_hf),
-            modalities_model.to(device_modalities),
-            num_testruns,
-            modalities_config["model_raw"]["config"]["vocab_size"],
-        )
-
-    hf_model.save_pretrained(output_dir)
+    target_modeling_file = os.path.join(output_dir, "modeling_gpt2.py")
+    with open(target_modeling_file, "r") as file:
+        content = file.read()
+    content = content.replace("modalities.conversion.gpt2.configuration_gpt2", ".configuration_gpt2")
+    with open(target_modeling_file, "w") as file:
+        file.write(content)
 
 
 if __name__ == "__main__":
