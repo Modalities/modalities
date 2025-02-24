@@ -1,12 +1,18 @@
 import pickle
 from pathlib import Path
 from random import Random
-from typing import Optional
+from typing import Any, MutableSequence, Optional
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
 
-class TokenizedDataShuffler:
+class DataShuffler:
+    @staticmethod
+    def _shuffle_mutable_sequence_in_place(mutable_sequence: MutableSequence[Any], seed=None) -> None:
+        """Shuffle a mutable sequence in-place."""
+        rng = Random(seed)
+        rng.shuffle(mutable_sequence)
+
     @staticmethod
     def _process_batch(
         batch: list[tuple[int, int]], data: bytes, start_position: int
@@ -73,8 +79,7 @@ class TokenizedDataShuffler:
             index_base = pickle.loads(pkl_encoded_index)
 
         # Step 2: Shuffle the index
-        rng = Random(seed)
-        rng.shuffle(index_base)
+        DataShuffler._shuffle_mutable_sequence_in_place(mutable_sequence=index_base, seed=seed)
 
         # Step 3: Divide the shuffled index into batches
         batches: list[list[tuple[int, int]]] = [
@@ -93,10 +98,20 @@ class TokenizedDataShuffler:
 
             # Process and write each batch sequentially
             for batch in batches:
-                data_segment, new_index = TokenizedDataShuffler._process_batch(batch, data, current_position)
+                data_segment, new_index = DataShuffler._process_batch(batch, data, current_position)
                 f.write(data_segment)
                 final_index.extend(new_index)
                 current_position += len(data_segment)
 
             # Write the final index to the file
             f.write(pickle.dumps(final_index))
+
+    @staticmethod
+    def shuffle_jsonl_data(input_data_path: Path, output_data_path: Path, seed: Optional[int] = None):
+        # read jsonl and store in RAM
+        with input_data_path.open("r") as f:
+            data = f.readlines()
+
+        DataShuffler._shuffle_mutable_sequence_in_place(data, seed)
+        with output_data_path.open("w") as f:
+            f.writelines(data)
