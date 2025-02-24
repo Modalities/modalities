@@ -7,20 +7,27 @@ As a reference, this example has the following folder structure. Folders in <> w
 ```
 └── getting_started
     ├── checkpoints
-    │   └─ <checkpoint_folders>
-    ├── example_config.yaml
+    │   └── <checkpoint_folders>
+    ├── configs
+    │   ├── example_config.yaml
+    │   ├── example_conversion_config_template.yaml
+    │   ├── example_dataset_config_test.yaml
+    │   ├── example_dataset_config_train.yaml
+    │   └── example_text_generation_config.yaml
     ├── data
     │   ├── mem_map
-    │   ├── <preprocessed dataset files>
-    │   └── raw
-    │       ├── redpajama_v2_samples_512_test.jsonl
-    │       └── redpajama_v2_samples_512_train.jsonl
-    ├── getting_started_example.md
+    │   │   └── <preprocessed dataset files>
+    │   ├── raw
+    │   │   ├── redpajama_v2_samples_512_test.jsonl
+    │   │   └── redpajama_v2_samples_512_train.jsonl
+    │   └── <wandb_storage>
+    ├── scripts
+    │   ├── run_checkpoint_conversion.sh
+    │   └── run_getting_started_example.sh
     ├── tokenizer
-    │   ├── tokenizer.json
-    │   └── tokenizer_config.json
-    └── wandb
-        └── <wandb_logs>
+    │   ├── tokenizer_config.json
+    │   └── tokenizer.json
+    └── README.md
 ```
 
 ## 1. Preprocessing
@@ -40,7 +47,7 @@ The two raw dataset splits for training and evaluation can be found in
 and need to be preprocessed into the [MemMap dataset format](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/dataset.py). 
 
 ### Config File
-To do so, we employ the `example_dataset_config_train.yaml` and `example_dataset_config_test.yaml` configuration files, which contain the paths of the input and output files, the path of the tokenizer as well as some configurable parameters:
+To do so, we employ the `configs/example_dataset_config_train.yaml` and `configs/example_dataset_config_test.yaml` configuration files, which contain the paths of the input and output files, the path of the tokenizer as well as some configurable parameters:
 ```yaml
 # example_dataset_config_train.yaml
 
@@ -88,10 +95,10 @@ After having determined the index, we create the packed dataset as described bel
 
 ```sh
 # train split
-modalities data pack_encoded_data example_dataset_config_train.yaml
+modalities data pack_encoded_data configs/example_dataset_config_train.yaml
 
 # test split
-modalities data pack_encoded_data example_dataset_config_test.yaml
+modalities data pack_encoded_data configs/example_dataset_config_test.yaml
 ```
 This will create the following file structure which can we can directly load into the [PackedMemMapdataset](https://github.com/Modalities/modalities/blob/main/src/modalities/dataloader/dataset.py#L65).
 ```
@@ -148,7 +155,7 @@ first and then divides it into chunks of size context-length.
 ### Config File
 In Modalities, we describe the entire training and evaluation setup (i.e., components such as model, trainer, evaluator, dataloder etc.) within a single configuration file. Not only does this increase reproducibility but also allows for having the entire training runs under version control. A full list of all the components already available in modalities an be found [here](../../docs/components/components.md).
 
-The example config file for this experiment can be found in `tutorials/getting_started/example_config.yaml`. 
+The example config file for this experiment can be found in `tutorials/getting_started/configs/example_config.yaml`. 
 
 ### Training
 Having created the dataset and defined the experiment in the configuration file, we can already start the training by running the following command.
@@ -157,7 +164,7 @@ Having created the dataset and defined the experiment in the configuration file,
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --rdzv-endpoint localhost:29505 \
                                               --nnodes 1 \
                                               --nproc_per_node 8 \
-                                              $(which modalities) run --config_file_path example_config.yaml
+                                              $(which modalities) run --config_file_path configs/example_config.yaml
 ```
 
 The command can be broken down into the following parts:
@@ -183,15 +190,15 @@ The command can be broken down into the following parts:
 7. **`run`**:
    - Command argument for the `modalities` executable to initiate the training.
 
-8. **`--config_file_path example_config.yaml`**:
-   - Specifies the path to the configuration file. The file `example_config.yaml` contains the configuration of the components, including dataset and model configurations, training parameters, etc.
+8. **`--config_file_path configs/example_config.yaml`**:
+   - Specifies the path to the configuration file. The file `configs/example_config.yaml` contains the configuration of the components, including dataset and model configurations, training parameters, etc.
 
 
 Already during the training, the checkpoints can be found locally in `checkpoints/` and the loss and metric developments can be inspected online in [Weights&Biases](https://wandb.ai/). 
 
 ### Evaluation
 
-In order to let the model generate text, we need to specify the last training checkpoint under `model_path` in the config file `example_text_generation_config.yaml`:
+In order to let the model generate text, we need to specify the last training checkpoint under `model_path` in the config file `configs/example_text_generation_config.yaml`:
 
 ```
 # example_text_generation_config.yaml
@@ -210,7 +217,7 @@ settings:
 Subsequently, given the checkpoint and tokenizer, we can load the model for text generation as follows:
 
 ```sh
-modalities generate_text --config_file_path example_text_generation_config.yaml 
+modalities generate_text --config_file_path configs/example_text_generation_config.yaml 
 ```
 
 This opens an interactive chatting CMD interface.
