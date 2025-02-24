@@ -17,10 +17,10 @@ from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
-from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
 from modalities.dataloader.preprocessing.tokenization.tokenized_file_writer import TokenizedFileWriter
-from modalities.dataloader.shuffle_tokenized_data import TokenizedDataShuffler
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
+from modalities.preprocessing.create_chunks import Chunking
+from modalities.preprocessing.shuffle_data import DataShuffler
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.utils.logging import get_logger
@@ -137,12 +137,35 @@ def shuffle_tokenized_data(
         seed (Optional[int]): The seed to use for shuffling.
     """
     if output_data_path.exists():
-        if not enforce_file_existence_policy(output_data_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
+        if not stop_process:
             return
 
-    TokenizedDataShuffler.shuffle_tokenized_data(
+    DataShuffler.shuffle_tokenized_data(
         input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size, seed=seed
     )
+
+
+def shuffle_jsonl_data(
+    input_data_path: Path,
+    output_data_path: Path,
+    file_existence_policy: FileExistencePolicy,
+    seed: Optional[int] = None,
+):
+    """Shuffles a JSONL file (.jsonl) and stores it on disc.
+
+    Args:
+        input_data_path (Path): File path to the jsonl data (.jsonl).
+        output_data_path (Path): File path to write the shuffled jsonl data.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
+        seed (Optional[int]): The seed to use for shuffling.
+    """
+    if output_data_path.exists():
+        stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
+        if not stop_process:
+            return
+
+    DataShuffler.shuffle_jsonl_data(input_data_path=input_data_path, output_data_path=output_data_path, seed=seed)
 
 
 def create_shuffled_dataset_chunk(

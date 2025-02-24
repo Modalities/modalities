@@ -23,6 +23,7 @@ from modalities.api import (
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
+    shuffle_jsonl_data,
     shuffle_tokenized_data,
 )
 from modalities.batch import EvaluationResultBatch
@@ -374,6 +375,52 @@ def CMD_shuffle_tokenized_data(
         input_data_path=input_data_path,
         output_data_path=output_data_path,
         batch_size=batch_size,
+        file_existence_policy=file_existence_policy,
+        seed=seed,
+    )
+
+
+@data.command(name="shuffle_jsonl_data")
+@click.option(
+    "--input_data_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a jsonl file (.jsonl).",
+)
+@click.option(
+    "--output_data_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to write the shuffled jsonl data (.jsonl).",
+)
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    help="The seed for shuffling the data.",
+)
+def CMD_shuffle_jsonl_data(input_data_path: Path, output_data_path: Path, file_existence_policy, seed: int) -> None:
+    """Entrypoint for shuffling jsonl data.
+
+    Args:
+        input_data_path (Path): The path to the input jsonl data (.pbin).
+        output_data_path (Path): File path to write the shuffled jsonl data (.pbin).
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
+        seed (int): The seed for shuffling the data.
+    Returns:
+        None
+    """
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+
+    shuffle_jsonl_data(
+        input_data_path=input_data_path,
+        output_data_path=output_data_path,
         file_existence_policy=file_existence_policy,
         seed=seed,
     )
