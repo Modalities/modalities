@@ -19,6 +19,7 @@ options:
 """
 
 import argparse
+import os
 import shutil
 
 import torch
@@ -220,8 +221,6 @@ def _transfer_model_code(output_dir: str):
 
 
 if __name__ == "__main__":
-    import os
-
     os.environ["LOCAL_RANK"] = "0"
     os.environ["WORLD_SIZE"] = "1"
     os.environ["RANK"] = "0"
