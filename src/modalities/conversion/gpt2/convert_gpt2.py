@@ -42,7 +42,7 @@ def convert_gpt2(
     device_hf: str = "cpu",
 ) -> None:
     """Takes a modalities gpt2 model and converts it to a Huggingface transformers model.
-       The provided config yaml file should contain the model_raw section with the model configuration.
+       The provided config yaml file should contain the model_raw or model section with the model configuration.
        Additionally, the checkpointed_model section should be present and contain the path to the model checkpoint.
        Optionally, the function can run a number of test runs to compare the converted model with the original one.
 
@@ -57,11 +57,11 @@ def convert_gpt2(
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
     if num_testruns > 0:
-        test_converted_model(
+        check_converted_model(
             hf_model.to(device_hf),
             modalities_model.to(device_modalities),
             num_testruns,
-            modalities_config["model_raw"]["config"]["vocab_size"],
+            modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"],
         )
 
     hf_model.config.auto_map = {
@@ -93,7 +93,7 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
 
 def convert_model_config(modalities_config: dict) -> GPT2Config:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
-       For this the model_raw section of the modalities config is used.
+       For this the model_raw or model section of the modalities config is used.
        Corresponding entries are mapped to the Huggingface configuration.
 
     Args:
@@ -102,10 +102,21 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     Returns:
         GPT2Config: Converted Huggingface model configuration.
     """
-    config = modalities_config["model_raw"]["config"]
+    config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
 
     assert config["poe_type"] == PositionTypes.NOPE
     assert config["activation_type"] == "swiglu"
+
+    assert config["attention_norm"]["variant_key"] == "layer_norm"
+    assert config["ffn_norm"]["variant_key"] == "layer_norm"
+    assert config["lm_head_norm"]["variant_key"] == "layer_norm"
+
+    if config["attention_implementation"] == "pytorch_flash":
+        attention_impl = "sdpa"
+    elif config["attention_implementation"] == "manual":
+        attention_impl = "eager"
+    else:
+        raise ValueError(f"Unknown or unsupported attention implementation {config['attention_implementation']}.")
 
     return GPT2Config(
         vocab_size=config["vocab_size"],
@@ -115,6 +126,7 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         num_key_value_heads=config["n_head_kv"],
         num_attention_heads=config["n_head_q"],
         intermediate_size=SwiGLU._get_hidden_dim(ffn_hidden=config["ffn_hidden"]),
+        attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
         layer_norm_eps=config["ffn_norm"]["config"]["eps"],
@@ -128,12 +140,12 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         layer_norm_bias=config["ffn_norm"]["config"].get("bias", True),  # TODO: see comment above
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
-        _attn_implementation="sdpa",
+        _attn_implementation=attention_impl,
         output_attentions=False,
     )
 
 
-def test_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, num_testruns: int, vocab_size: int):
+def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, num_testruns: int, vocab_size: int):
     """Tests the converted model by inputting a random token sequence and comparing the output logits of both models.
 
     Args:
