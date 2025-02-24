@@ -109,9 +109,9 @@ class DataShuffler:
     @staticmethod
     def shuffle_jsonl_data(input_data_path: Path, output_data_path: Path, seed: Optional[int] = None):
         # read jsonl and store in RAM
-        with input_data_path.open("r") as f:
+        with input_data_path.open("rb") as f:
             data = f.readlines()
 
         DataShuffler._shuffle_mutable_sequence_in_place(data, seed)
-        with output_data_path.open("w") as f:
+        with output_data_path.open("wb") as f:
             f.writelines(data)

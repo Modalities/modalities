@@ -3,7 +3,7 @@
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import tqdm
@@ -194,7 +194,8 @@ def create_shuffled_dataset_chunk(
         ValueError: If the chunk has no samples.
     """
     if output_chunk_file_path.exists():
-        if not enforce_file_existence_policy(output_chunk_file_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(output_chunk_file_path, file_existence_policy)
+        if stop_process:
             return
 
     samples = []
@@ -230,6 +231,61 @@ def create_shuffled_dataset_chunk(
     get_logger(name="main").info(f"Chunk {chunk_id} was successfully written to {str(output_chunk_file_path)}.")
 
 
+def create_shuffled_jsonl_dataset_chunk(
+    file_path_list: list[Path],
+    output_chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    file_existence_policy: FileExistencePolicy,
+    global_seed: Optional[int] = None,
+):
+    """Creates a shuffled jsonl dataset chunk.
+    Given a dataset consisting of multiple jsonl files, this function
+    creates a shuffled dataset chunk for a given chunk id.
+    From each jsonl file, the respective chunk is extracted, shuffled
+    and written to a new jsonl file.
+
+    Args:
+        file_path_list (list[Path]): List of paths to the input jsonl files.
+        output_chunk_file_path (Path): Path to the output chunk which will be stored in jsonl format.
+        chunk_id (int): The id of the chunk to create.
+        num_chunks (int): The total number of chunks to create.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.
+        global_seed (Optional[int]): The global seed to use for shuffling.
+
+    Raises:
+        ValueError: If the chunk has no samples.
+    """
+    if output_chunk_file_path.exists():
+        stop_process = enforce_file_existence_policy(output_chunk_file_path, file_existence_policy)
+        if stop_process:
+            return
+
+    samples = []
+    for file_path in tqdm.tqdm(file_path_list, desc=f"Loading file chunks of {chunk_id=}"):
+        with open(file_path, "rb") as f:
+            dataset = f.readlines()
+
+        file_samples: list[Any] = Chunking.get_file_chunk(dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id)
+        samples.extend(file_samples)
+
+    if len(samples) == 0:
+        raise ValueError(
+            f"Chunk {chunk_id} has no samples. Please decrease the number of chunks to less than {chunk_id}."
+        )
+
+    # samples are shuffled in place
+    get_logger(name="main").info(f"Shuffling chunk {chunk_id} ...")
+    seed = calculate_hashed_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
+    Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
+
+    get_logger(name="main").info(f"Writing chunk {chunk_id} to {str(output_chunk_file_path)} ...")
+    with open(output_chunk_file_path, "wb") as f:
+        for sample in samples:
+            f.write(sample)
+    get_logger(name="main").info(f"Chunk {chunk_id} was successfully written to {str(output_chunk_file_path)}.")
+
+
 def pack_encoded_data(
     config_dict: dict,
     file_existence_policy: FileExistencePolicy,
@@ -257,7 +313,8 @@ def pack_encoded_data(
     )
 
     if components.settings.dst_path.exists():
-        if not enforce_file_existence_policy(components.settings.dst_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(components.settings.dst_path, file_existence_policy)
+        if stop_process:
             return
 
     generator = PackedDataGenerator(
