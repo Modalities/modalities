@@ -1,7 +1,7 @@
 import pickle
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
-from modalities.dataloader.shuffle_tokenized_data import TokenizedDataShuffler
+from modalities.preprocessing.shuffle_data import DataShuffler
 
 
 def _tokenize(text: str, vocabulary: dict[str, int]) -> list[int]:
@@ -31,7 +31,7 @@ def test_process_batch(tmp_path, encoding_set_up):
     batch = [(0, 1), (1, 4), (5, 10)]
 
     # Call the function
-    new_data, new_index = TokenizedDataShuffler._process_batch(batch=batch, data=in_memory_data, start_position=0)
+    new_data, new_index = DataShuffler._process_batch(batch=batch, data=in_memory_data, start_position=0)
 
     # Validate the result
     expected_data = data
@@ -64,7 +64,7 @@ def test_shuffle_tokenized_data(tmp_path, encoding_set_up):
     for batch_size in [1, 2, 3]:
         # Call shuffle_tokenized_data
         output_path = tmp_path / "input_shuffled.pbin"
-        TokenizedDataShuffler.shuffle_tokenized_data(
+        DataShuffler.shuffle_tokenized_data(
             input_data_path=input_path, output_data_path=output_path, batch_size=batch_size
         )
 

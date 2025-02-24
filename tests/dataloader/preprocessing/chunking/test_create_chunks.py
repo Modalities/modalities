@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from transformers import BatchEncoding
 
-from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
+from modalities.preprocessing.create_chunks import Chunking
 
 
 class MockedPackedMemMapDatasetBase:
@@ -121,10 +121,10 @@ def test__get_chunk_range(num_chunks: int, num_samples: int, expected_chunk_indi
 def test_get_file_chunk(dataset: list[list[int]], num_chunks: int, chunk_id: int, expect_error: bool):
     if expect_error:
         with pytest.raises(ValueError):
-            Chunking.get_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
+            Chunking.get_tokenized_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
         return
     else:
-        chunk = Chunking.get_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
+        chunk = Chunking.get_tokenized_file_chunk(dataset, num_chunks=num_chunks, chunk_id=chunk_id)
 
     chunk_range = Chunking._get_chunk_range(num_chunks=num_chunks, num_samples=len(dataset), chunk_id=chunk_id)
     chunk_recalculated = dataset[chunk_range[0] : chunk_range[1]][dataset.sample_key]

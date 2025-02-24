@@ -3,7 +3,7 @@
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import tqdm
@@ -17,10 +17,10 @@ from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
-from modalities.dataloader.preprocessing.chunking.create_chunks import Chunking
 from modalities.dataloader.preprocessing.tokenization.tokenized_file_writer import TokenizedFileWriter
-from modalities.dataloader.shuffle_tokenized_data import TokenizedDataShuffler
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
+from modalities.preprocessing.create_chunks import Chunking
+from modalities.preprocessing.shuffle_data import DataShuffler
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.utils.logging import get_logger
@@ -137,12 +137,35 @@ def shuffle_tokenized_data(
         seed (Optional[int]): The seed to use for shuffling.
     """
     if output_data_path.exists():
-        if not enforce_file_existence_policy(output_data_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
+        if not stop_process:
             return
 
-    TokenizedDataShuffler.shuffle_tokenized_data(
+    DataShuffler.shuffle_tokenized_data(
         input_data_path=input_data_path, output_data_path=output_data_path, batch_size=batch_size, seed=seed
     )
+
+
+def shuffle_jsonl_data(
+    input_data_path: Path,
+    output_data_path: Path,
+    file_existence_policy: FileExistencePolicy,
+    seed: Optional[int] = None,
+):
+    """Shuffles a JSONL file (.jsonl) and stores it on disc.
+
+    Args:
+        input_data_path (Path): File path to the jsonl data (.jsonl).
+        output_data_path (Path): File path to write the shuffled jsonl data.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
+        seed (Optional[int]): The seed to use for shuffling.
+    """
+    if output_data_path.exists():
+        stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
+        if not stop_process:
+            return
+
+    DataShuffler.shuffle_jsonl_data(input_data_path=input_data_path, output_data_path=output_data_path, seed=seed)
 
 
 def create_shuffled_dataset_chunk(
@@ -171,7 +194,8 @@ def create_shuffled_dataset_chunk(
         ValueError: If the chunk has no samples.
     """
     if output_chunk_file_path.exists():
-        if not enforce_file_existence_policy(output_chunk_file_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(output_chunk_file_path, file_existence_policy)
+        if stop_process:
             return
 
     samples = []
@@ -183,7 +207,7 @@ def create_shuffled_dataset_chunk(
         elif token_size_in_bytes != dataset.token_size_in_bytes:
             raise ValueError("All datasets must have the same token size in bytes.")
 
-        file_samples: list[np.ndarray] = Chunking.get_file_chunk(
+        file_samples: list[np.ndarray] = Chunking.get_tokenized_file_chunk(
             dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
         )
         samples.extend(file_samples)
@@ -204,6 +228,63 @@ def create_shuffled_dataset_chunk(
         tokenized_dataset_file_path=output_chunk_file_path,
         token_size_in_bytes=token_size_in_bytes,
     )
+    get_logger(name="main").info(f"Chunk {chunk_id} was successfully written to {str(output_chunk_file_path)}.")
+
+
+def create_shuffled_jsonl_dataset_chunk(
+    file_path_list: list[Path],
+    output_chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    file_existence_policy: FileExistencePolicy,
+    global_seed: Optional[int] = None,
+):
+    """Creates a shuffled jsonl dataset chunk.
+    Given a dataset consisting of multiple jsonl files, this function
+    creates a shuffled dataset chunk for a given chunk id.
+    From each jsonl file, the respective chunk is extracted, shuffled
+    and written to a new jsonl file.
+
+    Args:
+        file_path_list (list[Path]): List of paths to the input jsonl files.
+        output_chunk_file_path (Path): Path to the output chunk which will be stored in jsonl format.
+        chunk_id (int): The id of the chunk to create.
+        num_chunks (int): The total number of chunks to create.
+        file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.
+        global_seed (Optional[int]): The global seed to use for shuffling.
+
+    Raises:
+        ValueError: If the chunk has no samples.
+    """
+    if output_chunk_file_path.exists():
+        stop_process = enforce_file_existence_policy(output_chunk_file_path, file_existence_policy)
+        if stop_process:
+            return
+
+    samples = []
+    for file_path in tqdm.tqdm(file_path_list, desc=f"Loading file chunks of {chunk_id=}"):
+        with open(file_path, "rb") as f:
+            dataset = f.readlines()
+
+        file_samples: list[Any] = Chunking.get_jsonl_file_chunk(
+            dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
+        )
+        samples.extend(file_samples)
+
+    if len(samples) == 0:
+        raise ValueError(
+            f"Chunk {chunk_id} has no samples. Please decrease the number of chunks to less than {chunk_id}."
+        )
+
+    # samples are shuffled in place
+    get_logger(name="main").info(f"Shuffling chunk {chunk_id} ...")
+    seed = calculate_hashed_seed(input_data=[str(global_seed), str(chunk_id)]) if global_seed is not None else None
+    Chunking.shuffle_file_chunks_in_place(file_chunks=samples, seed=seed)
+
+    get_logger(name="main").info(f"Writing chunk {chunk_id} to {str(output_chunk_file_path)} ...")
+    with open(output_chunk_file_path, "wb") as f:
+        for sample in samples:
+            f.write(sample)
     get_logger(name="main").info(f"Chunk {chunk_id} was successfully written to {str(output_chunk_file_path)}.")
 
 
@@ -234,7 +315,8 @@ def pack_encoded_data(
     )
 
     if components.settings.dst_path.exists():
-        if not enforce_file_existence_policy(components.settings.dst_path, file_existence_policy):
+        stop_process = enforce_file_existence_policy(components.settings.dst_path, file_existence_policy)
+        if stop_process:
             return
 
     generator = PackedDataGenerator(

@@ -51,7 +51,7 @@ class PackedDataGenerator:
             processing_batch_size (int): Size of the batches that the workers process.
             raw_samples_queue_size (int): Maximum size of the raw samples queue.
             processed_samples_queue_size (int): Maximum size of the processed samples queue.
-            index_path (Optional[FilePath], optional): Path to an index file,
+            index_path (Optional[FilePath]): Path to an index file,
                 which indicates the start character position
                 and length of samples given in `src_path`. If not defined, an index file next to `src_path` is picked,
                 by replacing its suffix with ".idx". Defaults to None.
