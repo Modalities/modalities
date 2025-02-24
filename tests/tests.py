@@ -140,6 +140,14 @@ def replace_checkpoint_in_conversion_config(
     return conversion_config
 
 
+def subprocess_run(command: str) -> None:
+    print(command)
+    try:
+        subprocess.run(command, shell=True, capture_output=False, check=True, text=True)
+    except subprocess.CalledProcessError:
+        raise Exception("SUBPROCESS RUN FAILED.")
+
+
 def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: str = "0,1"):
     """
     Run tests on cpu, single gpu and multiple gpus
@@ -179,8 +187,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         command_unit_tests = (
             f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} python -m pytest"
         )
-        print(command_unit_tests)
-        subprocess.run(command_unit_tests, shell=True, capture_output=False, text=True)
+        subprocess_run(command_unit_tests)
 
     # run multi-gpu tests
     if multi_gpu:
@@ -192,8 +199,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         command_end_to_end_tests = (
             f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]} --no-cov"
         )
-        print(command_end_to_end_tests)
-        subprocess.run(command_end_to_end_tests, shell=True, capture_output=False, text=True)
+        subprocess_run(command_end_to_end_tests)
 
         # getting started example
         print("\n=== RUN GETTING STARTED EXAMPLE ===")
@@ -206,9 +212,8 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         ), f"ERROR! {run_getting_started_example_script} does not exist."
         command_getting_started_example = f"cd {run_getting_started_example_directory}; "
         command_getting_started_example += f"bash scripts/run_getting_started_example.sh {devices[0]} {devices[1]}"
-        print(command_getting_started_example)
         date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-        subprocess.run(command_getting_started_example, shell=True, capture_output=False, text=True)
+        subprocess_run(command_getting_started_example)
 
         # checkpoint conversion (based on getting started example)
         print("\n=== RUN CHECKPOINT CONVERSION (BASED ON GETTING STARTED EXAMPLE) ===")
@@ -220,12 +225,11 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         run_conversion_script = _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_checkpoint_conversion.sh"
         assert isfile(run_conversion_script), f"ERROR! {run_conversion_script} does not exist."
         command_conversion = f"cd {run_getting_started_example_directory}; "
-        command_conversion += f"sh run_checkpoint_conversion.sh {conversion_config_path} "
+        command_conversion += f"sh scripts/run_checkpoint_conversion.sh {conversion_config_path} "
         command_conversion += (
             f"{run_getting_started_example_directory}/checkpoints/{modalities_checkpoint.split('/')[-1]}"
         )
-        print(command_conversion)
-        subprocess.run(command_conversion, shell=True, capture_output=False, text=True)
+        subprocess_run(command_conversion)
 
         check_existence_and_clear_getting_started_example_output(run_getting_started_example_directory, date_of_run)
 
@@ -237,8 +241,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         command_warmstart_example = (
             f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {devices[0]} {devices[1]}"
         )
-        print(command_warmstart_example)
-        subprocess.run(command_warmstart_example, shell=True, capture_output=False, text=True)
+        subprocess_run(command_warmstart_example)
 
     print("\n=== DONE ===")
 
