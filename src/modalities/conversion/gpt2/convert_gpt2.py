@@ -143,7 +143,7 @@ def test_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, n
         vocab_size (int): Vocabulary size of the model. (Required for generating random input tokens.)
     """
     for _ in tqdm(range(num_testruns), desc="Testing converted model"):
-        input_ids = torch.randint(0, vocab_size, (1, 1024), device=hf_model.device)
+        input_ids = torch.randint(0, vocab_size, (1, modalities_model.sequence_length), device=hf_model.device)
         inputs = {modalities_model.sample_key: input_ids.to(modalities_model.transformer.wte.weight.device)}
 
         with torch.no_grad():
