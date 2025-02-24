@@ -207,7 +207,7 @@ def create_shuffled_dataset_chunk(
         elif token_size_in_bytes != dataset.token_size_in_bytes:
             raise ValueError("All datasets must have the same token size in bytes.")
 
-        file_samples: list[np.ndarray] = Chunking.get_file_chunk(
+        file_samples: list[np.ndarray] = Chunking.get_tokenized_file_chunk(
             dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
         )
         samples.extend(file_samples)
@@ -266,7 +266,9 @@ def create_shuffled_jsonl_dataset_chunk(
         with open(file_path, "rb") as f:
             dataset = f.readlines()
 
-        file_samples: list[Any] = Chunking.get_file_chunk(dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id)
+        file_samples: list[Any] = Chunking.get_jsonl_file_chunk(
+            dataset=dataset, num_chunks=num_chunks, chunk_id=chunk_id
+        )
         samples.extend(file_samples)
 
     if len(samples) == 0:
