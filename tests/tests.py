@@ -72,7 +72,7 @@ def check_existence_and_clear_getting_started_example_output(
             print(f"Error: {e.filename} - {e.strerror}.")
 
     # config converted
-    config_converted = join(run_getting_started_example_directory, "example_conversion_config.yaml")
+    config_converted = join(run_getting_started_example_directory, "configs", "example_conversion_config.yaml")
     assert isfile(config_converted), f"ERROR! {config_converted} does not exist"
     try:
         os.remove(config_converted)
@@ -112,13 +112,15 @@ def replace_checkpoint_in_conversion_config(
     run_getting_started_example_directory: str, modalities_checkpoint: str
 ) -> str:
     # read example config
-    example_config = join(run_getting_started_example_directory, "example_config.yaml")
+    example_config = join(run_getting_started_example_directory, "configs", "example_config.yaml")
     assert isfile(example_config), f"ERROR! could not find file at {example_config}"
     with open(example_config, "r") as f:
         lines = f.readlines()
 
     # read conversion config template
-    conversion_config_template = join(run_getting_started_example_directory, "example_conversion_config_template.yaml")
+    conversion_config_template = join(
+        run_getting_started_example_directory, "configs", "example_conversion_config_template.yaml"
+    )
     assert isfile(conversion_config_template), f"ERROR! could not find file at {conversion_config_template}"
     with open(conversion_config_template, "r") as f:
         lines_additional = f.readlines()
@@ -131,7 +133,7 @@ def replace_checkpoint_in_conversion_config(
     lines[-1] = f"{last_line_start} {modalities_checkpoint}"
 
     # write conversion config
-    conversion_config = join(run_getting_started_example_directory, "example_conversion_config.yaml")
+    conversion_config = join(run_getting_started_example_directory, "configs", "example_conversion_config.yaml")
     with open(conversion_config, "w") as f:
         for line in lines:
             f.write(line)
@@ -197,14 +199,13 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         print("\n=== RUN GETTING STARTED EXAMPLE ===")
         run_getting_started_example_directory = _ROOT_DIR / "tutorials" / "getting_started"
         run_getting_started_example_script = (
-            _ROOT_DIR / "tutorials" / "getting_started" / "run_getting_started_example.sh"
+            _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_getting_started_example.sh"
         )
         assert isfile(
             run_getting_started_example_script
         ), f"ERROR! {run_getting_started_example_script} does not exist."
-        command_getting_started_example = (
-            f"cd {run_getting_started_example_directory}; bash run_getting_started_example.sh {devices[0]} {devices[1]}"
-        )
+        command_getting_started_example = f"cd {run_getting_started_example_directory}; "
+        command_getting_started_example += f"bash scripts/run_getting_started_example.sh {devices[0]} {devices[1]}"
         print(command_getting_started_example)
         date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
         subprocess.run(command_getting_started_example, shell=True, capture_output=False, text=True)
@@ -216,7 +217,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
             run_getting_started_example_directory, modalities_checkpoint
         )
 
-        run_conversion_script = _ROOT_DIR / "tutorials" / "getting_started" / "run_checkpoint_conversion.sh"
+        run_conversion_script = _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_checkpoint_conversion.sh"
         assert isfile(run_conversion_script), f"ERROR! {run_conversion_script} does not exist."
         command_conversion = f"cd {run_getting_started_example_directory}; "
         command_conversion += f"sh run_checkpoint_conversion.sh {conversion_config_path} "
