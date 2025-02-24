@@ -30,6 +30,15 @@ def check_existence_and_clear_getting_started_example_output(
         except OSError as e:
             print(f"Error: {e.filename} - {e.strerror}.")
 
+    # wandb directory
+    output_directory_wandb = join(run_getting_started_example_directory, "data", "wandb_storage")
+    assert isdir(output_directory_wandb), f"ERROR! {output_directory_wandb} does not exist"
+    try:
+        shutil.rmtree(output_directory_wandb)
+        print(f"> removed {output_directory_wandb}")
+    except OSError as e:
+        print(f"Error: {e.filename} - {e.strerror}.")
+
     # checkpoint
     output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
     checkpoints = [elem for elem in os.listdir(output_directory_checkpoints) if elem.startswith("20")]
