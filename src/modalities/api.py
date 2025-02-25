@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import itertools
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import tqdm
@@ -166,6 +167,39 @@ def shuffle_jsonl_data(
             return
 
     DataShuffler.shuffle_jsonl_data(input_data_path=input_data_path, output_data_path=output_data_path, seed=seed)
+
+
+def create_filtered_tokenized_dataset(
+    input_data_path: Path,
+    filter_routine: Callable[[int], bool],
+    output_data_path: Path,
+    file_existence_policy: FileExistencePolicy,
+):
+    if output_data_path.exists():
+        stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
+        if stop_process:
+            return
+
+    sample_key = "text"
+
+    dataset = PackedMemMapDatasetBase(raw_data_path=input_data_path, sample_key=sample_key, load_index=True)
+
+    # Both generators below run lazily.
+    filter_generator = (filter_routine(i) for i in range(len(dataset)))
+    # We lazily extract the samples, as the TokenizedFileWriter.write_tokenized_dataset
+    # expects an iterator of numpy arrays.
+    samples_extrator = (dataset[i][sample_key] for i in range(len(dataset)))
+    # Automatically skips samples for which the filter_routine returns False.
+    # Also evaluates lazily.
+    dataset_filtered = itertools.compress(samples_extrator, filter_generator)
+
+    get_logger(name="main").info(f"Writing filtered dataset to {str(output_data_path)} ...")
+    TokenizedFileWriter.write_tokenized_dataset(
+        tokenized_dataset=dataset_filtered,
+        tokenized_dataset_file_path=output_data_path,
+        token_size_in_bytes=dataset.token_size_in_bytes,
+    )
+    get_logger(name="main").info(f"Filtered dataset was successfully written to {str(output_data_path)}.")
 
 
 def create_shuffled_dataset_chunk(
