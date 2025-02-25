@@ -27,6 +27,26 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
     return hf_model, modalities_model
 
 
+def _check_conversion_criteria(model_config: dict) -> None:
+    """Checks that the modalities config fulfills criteria necessary for conversion
+
+    Args:
+        model_config (dict): model or model_raw part of the Modalities config dictionary.
+
+    Returns:
+        None
+    """
+    assert model_config["poe_type"] == PositionTypes.NOPE
+    assert model_config["bias"] is False
+    assert model_config["activation_type"] == "swiglu"
+    assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
+
+    for norm in ["attention_norm", "ffn_norm", "lm_head_norm"]:
+        assert model_config[norm]["variant_key"] == "layer_norm"
+        assert model_config[norm]["config"].get("elementwise_affine", True) is True  # True = default setting
+        assert model_config[norm]["config"].get("bias", True) is True  # True = default setting
+
+
 def convert_model_config(modalities_config: dict) -> GPT2Config:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
        For this the model_raw or model section of the modalities config is used.
@@ -40,12 +60,7 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     """
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
 
-    assert config["poe_type"] == PositionTypes.NOPE
-    assert config["activation_type"] == "swiglu"
-
-    assert config["attention_norm"]["variant_key"] == "layer_norm"
-    assert config["ffn_norm"]["variant_key"] == "layer_norm"
-    assert config["lm_head_norm"]["variant_key"] == "layer_norm"
+    _check_conversion_criteria(config)
 
     if config["attention_implementation"] == "pytorch_flash":
         attention_impl = "sdpa"
@@ -69,11 +84,8 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         layer_norm_elementwise_affine=config["ffn_norm"]["config"].get(
             "elementwise_affine",
             True,
-            # TODO:
-            # Temporary solution: double-check that these are the correct default values.
-            # Permanent solution: read default values from where they are defined.
         ),
-        layer_norm_bias=config["ffn_norm"]["config"].get("bias", True),  # TODO: see comment above
+        layer_norm_bias=config["ffn_norm"]["config"].get("bias", True),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation=attention_impl,
