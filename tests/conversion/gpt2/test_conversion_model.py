@@ -2,7 +2,26 @@ import pytest
 import torch
 import torch.nn as nn
 
-from modalities.conversion.gpt2.conversion_model import _copy_weights_base_modules
+from modalities.config.config import load_app_config_dict
+from modalities.conversion.gpt2.conversion_model import (
+    _copy_weights_base_modules,
+    check_converted_model,
+    convert_model_checkpoint,
+)
+from tests.conversion.gpt2.helper import check_same_weight_base_modules, check_same_weight_model
+
+
+def test_convert_model_checkpoint_does_not_change_weights(gpt2_config_path: str):
+    modalities_config = load_app_config_dict(gpt2_config_path)
+    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+    check_same_weight_model(hf_model, modalities_model)
+
+
+def test_convert_model_checkpoint_produces_same_logits_as_original(gpt2_config_path: str):
+    modalities_config = load_app_config_dict(gpt2_config_path)
+    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+    vocab_size = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
+    check_converted_model(hf_model, modalities_model, num_testruns=1, vocab_size=vocab_size)
 
 
 def test_copying_base_modules_weights_yields_identical_modules():
@@ -13,8 +32,7 @@ def test_copying_base_modules_weights_yields_identical_modules():
 
     _copy_weights_base_modules(m1, m2)
 
-    assert torch.equal(m1.weight.data, m2.weight.data)
-    assert torch.equal(m1.bias.data, m2.bias.data)
+    check_same_weight_base_modules(m1, m2)
 
 
 def test_copying_base_modules_works_when_bias_is_false():
@@ -24,8 +42,7 @@ def test_copying_base_modules_works_when_bias_is_false():
 
     _copy_weights_base_modules(m1, m2)
 
-    assert torch.equal(m1.weight.data, m2.weight.data)
-    assert m1.bias == m2.bias and m2.bias is None
+    check_same_weight_base_modules(m1, m2)
 
 
 def test_copying_base_modules_fails_if_bias_settings_mismatch():
