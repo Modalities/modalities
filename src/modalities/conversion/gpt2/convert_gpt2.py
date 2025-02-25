@@ -37,7 +37,6 @@ def convert_gpt2(
        The provided config yaml file should contain the model_raw or model section with the model configuration.
        Additionally, the checkpointed_model section should be present and contain the path to the model checkpoint.
        Optionally, the function can run a number of test runs to compare the converted model with the original one.
-       If a tokenizer is specified in the config, it will be converted as well.
 
     Args:
         modalities_config_path (str): Path to the modalities config file.
