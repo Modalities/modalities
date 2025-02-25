@@ -1,36 +1,65 @@
+import os
+import shutil
 from pathlib import Path
 
+import pytest
 import torch
 import torch.nn as nn
-from transformers import AutoModelForCausalLM
 
 from modalities.config.config import load_app_config_dict
-from modalities.conversion.gpt2.conversion_model import check_converted_model
-from modalities.conversion.gpt2.convert_gpt2 import convert_gpt2
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
+from tests.conftest import _ROOT_DIR
 
 
-def test_converting_gpt2_does_not_change_weights(tmp_path: Path, gpt2_config_path: str):
-    output_dir = tmp_path / "output"
-    convert_gpt2(gpt2_config_path, output_dir)
-    modalities_config = load_app_config_dict(gpt2_config_path)
-    original_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
-    converted_model = AutoModelForCausalLM.from_pretrained(output_dir, local_files_only=True, trust_remote_code=True)
-    check_same_weight_model(converted_model, original_model)
+@pytest.fixture()
+def gpt2_config_path(tmp_path: Path, initialized_model: GPT2LLM, config_file_path: str) -> str:
+    new_config_filename = tmp_path / "gpt2_config_test.yaml"
+    model_path = tmp_path / "model.pth"
+    shutil.copy(config_file_path, new_config_filename)
+    torch.save(initialized_model.state_dict(), model_path)
+    with open(new_config_filename, "r") as file:
+        content = file.read()
+    content = content.replace("checkpoint_path: null", f"checkpoint_path: {model_path}")
+    with open(new_config_filename, "w") as file:
+        file.write(content)
+    return str(new_config_filename)
 
 
-def test_converting_gpt2_does_not_change_outputs(tmp_path: Path, gpt2_config_path: str):
-    output_dir = tmp_path / "output"
-    convert_gpt2(gpt2_config_path, output_dir)
-    modalities_config = load_app_config_dict(gpt2_config_path)
-    original_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
-    converted_model = AutoModelForCausalLM.from_pretrained(
-        output_dir, local_files_only=True, trust_remote_code=True
-    ).to(dtype=torch.bfloat16)
-    vocab_size = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
-    check_converted_model(converted_model, original_model, 1, vocab_size)
+@pytest.fixture()
+def initialized_model(set_env, config_dict: dict) -> GPT2LLM:
+    model = get_model_from_config(config=config_dict, model_type=ModelTypeEnum.MODEL)
+    assert isinstance(model, GPT2LLM)
+    return model
+
+
+@pytest.fixture()
+def set_env():
+    os.environ["LOCAL_RANK"] = "0"
+    os.environ["RANK"] = "0"
+    os.environ["WORLD_SIZE"] = "1"
+
+
+@pytest.fixture()
+def config_dict(config_file_path: Path) -> dict:
+    return load_app_config_dict(config_file_path=config_file_path)
+
+
+@pytest.fixture()
+def config_file_path(config_file_name: str) -> Path:
+    config_file_path = _ROOT_DIR / Path("tests/conversion/test_configs/" + config_file_name)
+    return config_file_path
+
+
+@pytest.fixture(params=["gpt2_config_test.yaml"])
+def config_file_name(request) -> str:
+    return request.param
+
+
+@pytest.fixture
+def device() -> str:
+    return "cpu"
 
 
 def check_same_weight_model(converted_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
