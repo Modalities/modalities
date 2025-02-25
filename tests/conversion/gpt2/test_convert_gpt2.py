@@ -34,7 +34,9 @@ def test_converting_gpt2_does_not_change_outputs(tmp_path: Path, gpt2_config_pat
     convert_gpt2(gpt2_config_path, output_dir)
     modalities_config = load_app_config_dict(gpt2_config_path)
     original_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
-    converted_model = AutoModelForCausalLM.from_pretrained(output_dir, local_files_only=True, trust_remote_code=True)
+    converted_model = AutoModelForCausalLM.from_pretrained(
+        output_dir, local_files_only=True, trust_remote_code=True
+    ).to(dtype=torch.bfloat16)
     vocab_size = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
     check_converted_model(converted_model, original_model, 1, vocab_size)
 
