@@ -24,6 +24,7 @@ import os
 from modalities.config.config import load_app_config_dict
 from modalities.conversion.gpt2.conversion_code import transfer_model_code
 from modalities.conversion.gpt2.conversion_model import check_converted_model, convert_model_checkpoint
+from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
 
 
 def convert_gpt2(
@@ -57,6 +58,12 @@ def convert_gpt2(
             modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"],
         )
 
+    if "tokenizer" in modalities_config:
+        tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
+        bos_token_id, eos_token_id, pad_token_id = convert_tokenizer(tokenizer_model, output_dir)
+        hf_model.config.bos_token_id = bos_token_id
+        hf_model.config.eos_token_id = eos_token_id
+        hf_model.config.pad_token_id = pad_token_id
     hf_model.config.auto_map = {
         "AutoConfig": "configuration_gpt2.GPT2Config",
         "AutoModel": "modeling_gpt2.GPT2Model",
