@@ -488,14 +488,16 @@ def CMD_shuffle_tokenized_data(
     default=None,
     help="The seed for shuffling the data.",
 )
-def CMD_shuffle_jsonl_data(input_data_path: Path, output_data_path: Path, file_existence_policy, seed: int) -> None:
+def CMD_shuffle_jsonl_data(
+    input_data_path: Path, output_data_path: Path, file_existence_policy, seed: Optional[int]
+) -> None:
     """Entrypoint for shuffling jsonl data.
 
     Args:
-        input_data_path (Path): The path to the input jsonl data (.pbin).
-        output_data_path (Path): File path to write the shuffled jsonl data (.pbin).
+        input_data_path (Path): The path to the input jsonl data (.jsonl).
+        output_data_path (Path): File path to write the shuffled jsonl data (.jsonl).
         file_existence_policy (FileExistencePolicy): Policy for handling existing files.
-        seed (int): The seed for shuffling the data.
+        seed (Optional[int]): The seed for shuffling the data. Default is None.
     Returns:
         None
     """

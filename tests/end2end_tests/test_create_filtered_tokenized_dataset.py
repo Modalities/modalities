@@ -12,25 +12,25 @@ from modalities.dataloader.dataset import PackedMemMapDatasetBase
     "input_data_path, file_existence_policy, filter_routine, expected_exception",
     [
         (
-            Path("/raid/s3/opengptx/max_lue/repositories/modalities/tests/end2end_tests/lorem_ipsum.pbin"),
+            Path("tests/end2end_tests/lorem_ipsum.pbin"),
             FileExistencePolicy.ERROR,
             lambda x: True,  # take every sample
             False,
         ),
         (
-            Path("/raid/s3/opengptx/max_lue/repositories/modalities/tests/end2end_tests/lorem_ipsum.pbin"),
+            Path("tests/end2end_tests/lorem_ipsum.pbin"),
             FileExistencePolicy.ERROR,
             lambda x: False,  # take no sample
             True,
         ),
         (
-            Path("/raid/s3/opengptx/max_lue/repositories/modalities/tests/end2end_tests/lorem_ipsum.pbin"),
+            Path("tests/end2end_tests/lorem_ipsum.pbin"),
             FileExistencePolicy.ERROR,
             lambda x: x % 2 == 0,  # take every second sample
             False,
         ),
         (
-            Path("/raid/s3/opengptx/max_lue/repositories/modalities/tests/end2end_tests/lorem_ipsum.pbin"),
+            Path("tests/end2end_tests/lorem_ipsum.pbin"),
             FileExistencePolicy.ERROR,
             lambda x: x == 2,  # take only the third sample
             False,

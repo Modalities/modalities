@@ -78,6 +78,8 @@ def create_raw_data_index(
     Raises:
         ValueError: If the index file already exists.
     """
+    if src_path == index_path:
+        raise ValueError("Input and output index paths must be different.")
     index_path = LargeFileLinesReader.default_index_path(src_path, index_path)
     if index_path.exists():
         stop_process = enforce_file_existence_policy(index_path, file_existence_policy)
@@ -137,9 +139,11 @@ def shuffle_tokenized_data(
         file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
         seed (Optional[int]): The seed to use for shuffling.
     """
+    if input_data_path == output_data_path:
+        raise ValueError("Input and output file paths must be different.")
     if output_data_path.exists():
         stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
-        if not stop_process:
+        if stop_process:
             return
 
     DataShuffler.shuffle_tokenized_data(
@@ -161,9 +165,11 @@ def shuffle_jsonl_data(
         file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.
         seed (Optional[int]): The seed to use for shuffling.
     """
+    if input_data_path == output_data_path:
+        raise ValueError("Input and output file paths must be different.")
     if output_data_path.exists():
         stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
-        if not stop_process:
+        if stop_process:
             return
 
     DataShuffler.shuffle_jsonl_data(input_data_path=input_data_path, output_data_path=output_data_path, seed=seed)
@@ -175,6 +181,8 @@ def create_filtered_tokenized_dataset(
     output_data_path: Path,
     file_existence_policy: FileExistencePolicy,
 ):
+    if input_data_path == output_data_path:
+        raise ValueError("Input and output file paths must be different.")
     if output_data_path.exists():
         stop_process = enforce_file_existence_policy(output_data_path, file_existence_policy)
         if stop_process:
@@ -235,6 +243,8 @@ def create_shuffled_dataset_chunk(
     samples = []
     token_size_in_bytes = None
     for file_path in tqdm.tqdm(file_path_list, desc=f"Loading file chunks of {chunk_id=}"):
+        if file_path == output_chunk_file_path:
+            raise ValueError("Input and output chunk file paths must be different.")
         dataset = PackedMemMapDatasetBase(raw_data_path=file_path, sample_key="text", load_index=True)
         if token_size_in_bytes is None:
             token_size_in_bytes = dataset.token_size_in_bytes
@@ -297,6 +307,8 @@ def create_shuffled_jsonl_dataset_chunk(
 
     samples = []
     for file_path in tqdm.tqdm(file_path_list, desc=f"Loading file chunks of {chunk_id=}"):
+        if file_path == output_chunk_file_path:
+            raise ValueError("Input and output chunk file paths must be different.")
         with open(file_path, "rb") as f:
             dataset = f.readlines()
 

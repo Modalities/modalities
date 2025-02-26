@@ -1,4 +1,3 @@
-import copy
 import json
 import tempfile
 from pathlib import Path
@@ -46,7 +45,6 @@ def test_shuffle_jsonl_data(
     file_existence_policy: FileExistencePolicy,
     seed: int,
 ):
-    data_rows_copy = copy.deepcopy(data_rows)
     output_data_path = output_data_folder_path / "output.jsonl"
     shuffle_jsonl_data(
         input_data_path=input_data_path,
@@ -62,5 +60,5 @@ def test_shuffle_jsonl_data(
     # Check that the shuffled data contains the same rows as the input data
     assert len(data_rows) > 0
     assert len(data_rows) == len(rows_dict_shuffled)
-    assert any([row != row_shuffled for row, row_shuffled in zip(data_rows_copy, rows_dict_shuffled)])
+    assert any([row != row_shuffled for row, row_shuffled in zip(data_rows, rows_dict_shuffled)])
     assert set([json.dumps(d) for d in data_rows]) == set([json.dumps(d) for d in rows_dict_shuffled])
