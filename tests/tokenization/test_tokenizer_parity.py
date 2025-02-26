@@ -2,13 +2,14 @@ from pathlib import Path
 
 import pytest
 import sentencepiece as spm
+from transformers import PreTrainedTokenizerFast
 
 from modalities.config.config import load_app_config_dict
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapterConfig, HFTokenizerAdapter
 
 
 # Tokenize using SentencePiece
-def tokenize_with_sp(sp_tokenizer, text):
+def tokenize_with_sp(sp_tokenizer, text: str):
     tokens = sp_tokenizer.encode(text, out_type=str)
     token_ids = sp_tokenizer.encode(text, out_type=int)
     decoded_text = sp_tokenizer.decode(token_ids)
@@ -45,7 +46,7 @@ def sp_tokenizer_path():
 
 # Fixtures for tokenizers
 @pytest.fixture
-def sp_tokenizer(sp_tokenizer_path):
+def sp_tokenizer(sp_tokenizer_path: str):
     tokenizer = load_sp_tokenizer(sp_tokenizer_path)
     return tokenizer
 
@@ -56,8 +57,7 @@ def hf_tokenizer_path():
 
 
 @pytest.fixture
-def hf_tokenizer(hf_tokenizer_path):
-    from transformers import PreTrainedTokenizerFast
+def hf_tokenizer(hf_tokenizer_path: str):
     tokenizer = PreTrainedTokenizerFast.from_pretrained(hf_tokenizer_path)
     return tokenizer
 
@@ -73,11 +73,10 @@ def config_dict(config_file_path: Path) -> dict:
 
 
 @pytest.fixture
-def wrapper_tokenizer(config_dict):
+def wrapper_tokenizer(config_dict: dict):
     config_adapter = HFModelAdapterConfig(config=config_dict)
     tokenizer = HFTokenizerAdapter(config=config_adapter)
     return tokenizer
-
 
 
 # Parametrized test function
@@ -93,7 +92,8 @@ def wrapper_tokenizer(config_dict):
     "Random string: ajsdkfhwjeio2340298hfsdjkf@@@!!!***.",
     "Numbers: 1234567890, 1,000,000, and 3.14159 are common in text as well.",
 ])
-def test_tokenizations(sp_tokenizer, hf_tokenizer, wrapper_tokenizer, text):
+def test_tokenizations(sp_tokenizer: spm.SentencePieceProcessor, hf_tokenizer: PreTrainedTokenizerFast,
+                       wrapper_tokenizer: HFTokenizerAdapter, text: str):
     # Tokenize using all tokenizers
     sp_data = tokenize_with_sp(sp_tokenizer, text)
     hf_data = tokenize_with_hf(hf_tokenizer, text)
