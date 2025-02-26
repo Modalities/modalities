@@ -93,7 +93,11 @@ def prediction_key() -> str:
 
 @pytest.fixture()
 def hf_model_from_checkpoint(
-    checkpoint_conversion: CheckpointConversion, pytorch_model: NNModel, device: str, prediction_key: str
+    checkpoint_conversion: CheckpointConversion,
+    pytorch_model: NNModel,
+    device: str,
+    prediction_key: str,
+    hf_model: NNModel,
 ) -> NNModel:
     AutoConfig.register(model_type="modalities", config=HFModelAdapterConfig)
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
@@ -147,3 +151,24 @@ def test_models_before_and_after_conversion_are_equal(
     for p1, p2, p3 in zip(hf_model.parameters(), pytorch_model.parameters(), hf_model_from_checkpoint.parameters()):
         assert torch.equal(p1, p2)
         assert torch.equal(p1, p3)
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
+def test_hf_model_can_generate(hf_model: AutoModelForCausalLM):
+    assert hf_model.can_generate()
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
+def test_hf_model_from_checkpoint_can_generate(hf_model_from_checkpoint: AutoModelForCausalLM):
+    assert hf_model_from_checkpoint.can_generate()
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
+def test_hf_model_and_hf_model_from_checkpoint_generate_same(
+    hf_model: AutoModelForCausalLM,
+    hf_model_from_checkpoint: AutoModelForCausalLM,
+    test_tensor: torch.Tensor,
+):
+    res = hf_model.generate(test_tensor, max_length=20)
+    res_from_checkpoint = hf_model_from_checkpoint.generate(test_tensor, max_length=20)
+    assert (res == res_from_checkpoint).all()
