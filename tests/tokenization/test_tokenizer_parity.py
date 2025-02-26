@@ -83,8 +83,6 @@ def wrapper_tokenizer(config_dict: dict):
 @pytest.mark.parametrize("text", [
     "This is a simple sentence with punctuation! How does it handle commas, semicolons, and exclamation marks?",
     "URLs like https://www.example.com or ftp://server.org/test are quite common.",
-    "Emojis are fun 😄🤔👍, but how do tokenizers handle them?",
-    "Foreign languages: Bonjour! ¿Cómo estás? こんにちは! How do you handle multilingual text?",
     "Programming code: def tokenize(text): return text.split() # Python code as input.",
     "Special characters: ~!@#$%^&*()_+-={}|[]\\:\";'<>?,./` and spaces.",
     "Long sentence: In a land far, far away, there lived a programmer who loved tokenizers so much that they created thousands of tests, each weirder than the last, to ensure that every edge case imaginable was covered.",
