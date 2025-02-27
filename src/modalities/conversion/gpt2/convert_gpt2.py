@@ -60,7 +60,7 @@ def convert_gpt2(
 
     if "tokenizer" in modalities_config:
         tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
-        bos_token_id, eos_token_id, pad_token_id = convert_tokenizer(tokenizer_model, output_dir)
+        bos_token_id, eos_token_id, pad_token_id, _ = convert_tokenizer(tokenizer_model, output_dir)
         hf_model.config.bos_token_id = bos_token_id
         hf_model.config.eos_token_id = eos_token_id
         hf_model.config.pad_token_id = pad_token_id
