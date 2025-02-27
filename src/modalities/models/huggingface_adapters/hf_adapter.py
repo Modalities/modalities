@@ -56,7 +56,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         return json.dumps(json_dict)
 
     def _convert_posixpath_to_str(
-        self, data_to_be_formatted: dict[str, Any] | list[Any] | PosixPath | Any
+            self, data_to_be_formatted: dict[str, Any] | list[Any] | PosixPath | Any
     ) -> dict[str, Any] | list[Any] | PosixPath | Any:
         # Recursively converts any PosixPath objects within a nested data structure to strings.
 
@@ -77,7 +77,7 @@ class HFModelAdapter(PreTrainedModel):
     config_class = HFModelAdapterConfig
 
     def __init__(
-        self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
+            self, config: HFModelAdapterConfig, prediction_key: str, load_checkpoint: bool = False, *inputs, **kwargs
     ):
         """
         Initializes the HFAdapter object.
@@ -97,12 +97,12 @@ class HFModelAdapter(PreTrainedModel):
             self.model: NNModel = get_model_from_config(config.config, model_type=ModelTypeEnum.MODEL)
 
     def forward(
-        self,
-        input_ids: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        return_dict: Optional[bool] = False,
-        output_attentions: Optional[bool] = False,
-        output_hidden_states: Optional[bool] = False,
+            self,
+            input_ids: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            return_dict: Optional[bool] = False,
+            output_attentions: Optional[bool] = False,
+            output_hidden_states: Optional[bool] = False,
     ):
         """
         Forward pass of the HFAdapter module.
@@ -128,7 +128,7 @@ class HFModelAdapter(PreTrainedModel):
             return model_forward_output[self.prediction_key]
 
     def prepare_inputs_for_generation(
-        self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
+            self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor = None, **kwargs
     ) -> dict[str, Any]:
         """
         Prepares the inputs for generation.
@@ -165,6 +165,29 @@ class ModalitiesModelOutput(ModelOutput):
     logits: Optional[torch.FloatTensor] = None
     hidden_states: Optional[tuple[torch.FloatTensor]] = None
     attentions: Optional[tuple[torch.FloatTensor]] = None
+
+
+# This below code was copied and modified from the Llama2 implementation of the Hugging Face Transformers library.
+# The original code can be found at:
+#   https://github.com/huggingface/transformers/blob/4dbf17c17f5834eb68f296457acc605a8c533b5a/src/transformers/models/llama/tokenization_llama.py
+
+#
+# This code is based on EleutherAI's GPT-NeoX library and the GPT-NeoX
+# and OPT implementations in this library. It has been modified from its
+# original forms to accommodate minor architectural differences compared
+# to GPT-NeoX and OPT used by the Meta AI team that trained the model.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 class HFTokenizerAdapter(PreTrainedTokenizer):
@@ -244,22 +267,22 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
-        self,
-        config: HFModelAdapterConfig,
-        # vocab_file,
-        unk_token="<unk>",
-        bos_token="<s>",
-        eos_token="</s>",
-        pad_token=None,
-        sp_model_kwargs: Optional[Dict[str, Any]] = None,
-        add_bos_token=True,
-        add_eos_token=False,
-        clean_up_tokenization_spaces=False,
-        use_default_system_prompt=False,
-        spaces_between_special_tokens=False,
-        legacy=None,
-        add_prefix_space=True,
-        **kwargs,
+            self,
+            config: HFModelAdapterConfig,
+            # vocab_file,
+            unk_token="<unk>",
+            bos_token="<s>",
+            eos_token="</s>",
+            pad_token=None,
+            sp_model_kwargs: Optional[Dict[str, Any]] = None,
+            add_bos_token=True,
+            add_eos_token=False,
+            clean_up_tokenization_spaces=False,
+            use_default_system_prompt=False,
+            spaces_between_special_tokens=False,
+            legacy=None,
+            add_prefix_space=True,
+            **kwargs,
     ):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         bos_token = AddedToken(bos_token, normalized=False, special=True) if isinstance(bos_token, str) else bos_token
@@ -363,7 +386,7 @@ class HFTokenizerAdapter(PreTrainedTokenizer):
             # 1. Encode string + prefix ex: "<unk> Hey"
         tokens = self.sp_model.tokenizer.encode(self.unk_token + text, out_type=str)
         # 2. Remove self.unk_token from ['<','unk','>', '▁Hey']
-        return tokens[self.unk_token_length :] if len(tokens) >= self.unk_token_length else tokens
+        return tokens[self.unk_token_length:] if len(tokens) >= self.unk_token_length else tokens
 
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
