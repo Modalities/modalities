@@ -129,7 +129,7 @@ def test_create_shuffled_jsonl_dataset_chunk(
 ):
     # This test verifies the correctness of the chunking and shuffling implmeented in the
     # create_shuffled_jsonl_dataset_chunk API function. The function takes the input file list,
-    # reads the data from the files, creates a chunk, shuffles thechunk and writes the shuffled
+    # reads the data from the files, creates a chunk, shuffles the chunk and writes the shuffled
     # chunk to a new JSONL file. The correctness of the chunking and shuffling is verified by
     # comparing the output chunk to the expected data.
 
