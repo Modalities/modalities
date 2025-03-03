@@ -1,6 +1,5 @@
 import logging
 import math
-from copy import deepcopy
 from enum import Enum
 from typing import Annotated
 
@@ -8,8 +7,9 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator, validator
 
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
@@ -23,6 +23,24 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+class LayerNorms(LookupEnum):
+    """
+    Enum lookup class for LayerNorms.
+
+    Attributes:
+        RMSNorm: RMSLayerNorm class.
+        LayerNorm: nn.LayerNorm class.
+    """
+
+    rms_norm = RMSLayerNorm
+    layer_norm = nn.LayerNorm
+
+
+class LayerNormWrapperConfig(BaseModel):
+    norm_type: LayerNorms
+    config: LayerNormConfig | RMSLayerNormConfig
 
 
 class PositionTypes(str, Enum):
@@ -279,6 +297,7 @@ class GPT2LLMConfig(BaseModel):
     Args:
         sample_key (str): The key for the samples.
         prediction_key (str): The key for the predictions.
+        use_meta_device (bool): Whether to use meta device.
         poe_type (PositionTypes): The type of position encoding.
         sequence_length (int): The length of the sequence.
         vocab_size (int): The size of the vocabulary.
@@ -292,13 +311,14 @@ class GPT2LLMConfig(BaseModel):
         attention_config (AttentionConfig): The attention configuration.
         attention_implementation (AttentionImplementation): The attention implementation.
         activation_type (ActivationType): The activation type.
-        attention_norm (PydanticPytorchModuleType): The normalization type for attention.
-        ffn_norm (PydanticPytorchModuleType): The normalization type for feed-forward network.
-        lm_head_norm (PydanticPytorchModuleType): The normalization type for the language model head.
+        attention_norm_config (LayerNormWrapperConfig): Config for normalization of the  for attention.
+        ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
+        lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
     """
 
     sample_key: str
     prediction_key: str
+    use_meta_device: bool
     poe_type: PositionTypes
     sequence_length: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
@@ -314,9 +334,9 @@ class GPT2LLMConfig(BaseModel):
     attention_config: AttentionConfig
     attention_implementation: AttentionImplementation
     activation_type: ActivationType
-    attention_norm: PydanticPytorchModuleType
-    ffn_norm: PydanticPytorchModuleType
-    lm_head_norm: PydanticPytorchModuleType
+    attention_norm_config: LayerNormWrapperConfig
+    ffn_norm_config: LayerNormWrapperConfig
+    lm_head_norm_config: LayerNormWrapperConfig
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -749,9 +769,9 @@ class GPT2LLM(NNModel):
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
         attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
+        attention_norm_config: LayerNormWrapperConfig,
+        ffn_norm_config: LayerNormWrapperConfig,
+        lm_head_norm_config: LayerNormWrapperConfig,
         seed: int = None,
     ):
         """
@@ -773,14 +793,14 @@ class GPT2LLM(NNModel):
             activation_type (ActivationType): The activation type.
             attention_implementation (AttentionImplementation): The attention implementation.
             attention_config (AttentionConfig): The attention configuration.
-            attention_norm (nn.Module): The attention normalization module.
-            ffn_norm (nn.Module): The feed-forward network normalization module.
-            lm_head_norm (nn.Module): The language model head normalization module.
+            attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
+            ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
+            lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp"],
-            "embedding": [".wte", ".wpe"],
+            "embedding": [".wte", ".wpe", "lm_head.weight"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
@@ -827,21 +847,25 @@ class GPT2LLM(NNModel):
                             attention_config=attention_config,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
-                            attention_norm=deepcopy(attention_norm),
-                            ffn_norm=deepcopy(ffn_norm),
+                            # deepcopy did not work here! The weights were then automatically
+                            # moved to a cuda device even when the deepcopied weights were on
+                            # a meta device!
+                            attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
+                            ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
                         )
                         for _ in range(n_layer)
                     ]
                 ),
-                lm_head_norm=lm_head_norm,
+                lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
+                lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
-        self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
+        # self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+        # self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
@@ -875,7 +899,7 @@ class GPT2LLM(NNModel):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.lm_head_norm(x)
-        logits = self.lm_head(x)
+        logits = self.transformer.lm_head(x)
         return {self.prediction_key: logits}
 
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:

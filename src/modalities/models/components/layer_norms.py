@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field
 
-from modalities.config.lookup_enum import LookupEnum
-
 
 class RMSLayerNorm(nn.Module):
     """RMS normalization class."""
@@ -57,18 +55,10 @@ class RMSLayerNorm(nn.Module):
         else:
             return output * self.weight + self.bias
 
-
-class LayerNorms(LookupEnum):
-    """
-    Enum lookup class for LayerNorms.
-
-    Attributes:
-        RMSNorm: RMSLayerNorm class.
-        LayerNorm: nn.LayerNorm class.
-    """
-
-    RMSNorm = RMSLayerNorm
-    LayerNorm = nn.LayerNorm
+    def reset_parameters(self):
+        # inpired by torch titan RMS Norm implementation:
+        # https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/models/norms.py#L113C1-L114C57
+        torch.nn.init.ones_(self.weight)
 
 
 class LayerNormConfig(BaseModel):

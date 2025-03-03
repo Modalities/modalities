@@ -14,9 +14,9 @@ class DeviceMeshConfig(BaseModel):
     device_type: str = "cuda"
     data_parallel_replicate_degree: Annotated[int, Field(strict=True, ge=-1)]
     data_parallel_shard_degree: Annotated[int, Field(strict=True, ge=-1)]
-    tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)]
-    pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)]
-    context_parallel_degree: Annotated[int, Field(strict=True, gt=0)]
+    tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
+    pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
+    context_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     enable_loss_parallel: Optional[bool] = False
     world_size: Annotated[int, Field(strict=True, gt=0)]
 
@@ -34,7 +34,7 @@ class DeviceMeshConfig(BaseModel):
             self.data_parallel_replicate_degree,
             self.context_parallel_degree,
             self.tensor_parallel_degree,
-            self.pipeline_parallel_degreep,
+            self.pipeline_parallel_degree,
         ):
             if d < 1:
                 raise ConfigError("Parallelism degree must be >= 1, except for data_parallel_shard_degree")
@@ -102,6 +102,7 @@ def get_device_mesh(
             ParallelismDegrees.PP.value,
             ParallelismDegrees.DP_REPLICATE.value,
             ParallelismDegrees.DP_SHARD.value,
+            ParallelismDegrees.CP.value,
             ParallelismDegrees.TP.value,
         ],
         strict=True,
