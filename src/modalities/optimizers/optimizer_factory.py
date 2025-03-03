@@ -72,7 +72,9 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: list[str]) -> None:
+def _assert_existence_of_weight_decay_groups_excluded(
+    model: nn.Module, weight_decay_groups_excluded: list[str]
+) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -81,7 +83,12 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
         weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
         if group not in weight_decay_groups.keys():
@@ -92,12 +99,17 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
 
 
 def _create_optimizer_groups(
-    model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]
+    model: nn.Module, weight_decay: float, weight_decay_groups_excluded: list[str]
 ) -> tuple[OptimizerGroups, list[str]]:
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
 
@@ -160,7 +172,7 @@ def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimize
     print_rank_0(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
 
 
-def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: OptimizerGroups) -> None:
+def _assert_completeness_of_optimizer_groups(model: nn.Module, optimizer_groups: OptimizerGroups) -> None:
     """
     checks that the number of parameters in the optimizer groups
     sum up to the total number of model parameters as expected
