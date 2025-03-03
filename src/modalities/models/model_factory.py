@@ -1,3 +1,4 @@
+import itertools
 from pathlib import Path
 
 import torch
@@ -10,6 +11,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.exceptions import ModelStateError
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
@@ -144,9 +146,10 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+    def get_weight_initalized_fdsp2_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
         """
         Initializes the given model with weights using the provided model initializer.
+        The model can be on a meta device.
 
         Args:
             model (nn.Module): The model to be initialized with weights.
@@ -155,6 +158,36 @@ class ModelFactory:
         Returns:
             nn.Module: The initialized model.
         """
+
+        def reset_parameters_if_function_exists(module: nn.Module):
+            # Recursively apply to all submodules
+            for submodule in module.children():
+                reset_parameters_if_function_exists(submodule)
+
+            # Check if the module has the `reset_parameters` method
+            if hasattr(module, "reset_parameters") and callable(getattr(module, "reset_parameters")):
+                module.reset_parameters()
+
+        # initialize the weights if they are on a meta device
+        def is_model_on_meta_device(model: nn.Module) -> bool:
+            meta_counter = 0
+            param_counter = 0
+            for tensor in itertools.chain(model.parameters(), model.buffers()):
+                if tensor.device == torch.device("meta"):
+                    meta_counter += 1
+                param_counter += 1
+
+            if meta_counter > 0 and meta_counter < param_counter:
+                raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
+            return meta_counter > 0
+
+        if is_model_on_meta_device(model=model):
+            # Allocate buffers and sharded parameters on GPU
+            model = model.to_empty(device="cuda")
+
+        # call reset_parameters on all nn.Modules that implement this function
+        # (normally all norms)
+        reset_parameters_if_function_exists(module=model)
         model_initializer.initialize_in_place(model)
         return model
 
