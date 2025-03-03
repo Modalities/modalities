@@ -36,7 +36,7 @@ class PretrainedGPTModel(PreTrainedModel):
 
         """
         model_input = {"input_ids": tensor}
-        model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
+        model_forward_output: dict[str, torch.Tensor] = self.model(model_input)
         return model_forward_output[self.config.config.prediction_key]
 
 
