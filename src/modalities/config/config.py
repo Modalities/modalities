@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
@@ -222,6 +223,11 @@ class CheckpointedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
 
 
+@deprecated(
+    "With version 0.4, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) "
+    "and FSDP2WrappedModelConfig instead.",
+    category=FutureWarning,
+)
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     sync_module_states: bool
@@ -267,6 +273,11 @@ class FSDP2WrappedModelConfig(BaseModel):
         if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
             raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
         return self
+
+
+class CompiledModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
 
 
 class WeightInitializedModelConfig(BaseModel):
