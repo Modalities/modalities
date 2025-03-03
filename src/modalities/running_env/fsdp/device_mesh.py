@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -69,6 +70,14 @@ class DeviceMeshConfig(BaseModel):
         return self
 
 
+class ParallelismDegrees(Enum):
+    DP_REPLICATE = "dp_replicate"
+    DP_SHARD = "dp_shard"
+    CP = "cp"
+    TP = "tp"
+    PP = "pp"
+
+
 def get_device_mesh(
     device_type: str,
     data_parallel_replicate_degree: int,
@@ -89,7 +98,12 @@ def get_device_mesh(
             context_parallel_degree,
             tensor_parallel_degree,
         ],
-        ["pp", "dp_replicate", "dp_shard", "cp", "tp"],
+        [
+            ParallelismDegrees.PP.value,
+            ParallelismDegrees.DP_REPLICATE.value,
+            ParallelismDegrees.DP_SHARD.value,
+            ParallelismDegrees.TP.value,
+        ],
         strict=True,
     ):
         if dim > 1:
