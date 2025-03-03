@@ -3,6 +3,7 @@ import os
 import torch
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
+from pydantic import BaseModel
 
 # TODO find a solution for github actions
 # to install this as a dependency
@@ -75,3 +76,14 @@ class MixedPrecisionSettings(LookupEnum):
     FP_32 = fpThirtytwo
     MIXED_PRECISION_MEGATRON = megatron_strategy
     NO_MIXED_PRECISION = no_mixed_precision
+
+
+class PyTorchDtypes(LookupEnum):
+    FP_16 = torch.float16
+    FP_32 = torch.float32
+    BF_16 = torch.bfloat16
+
+
+class FSDP2MixedPrecisionSettings(BaseModel):
+    param_dtype: PyTorchDtypes
+    reduce_dtype: PyTorchDtypes

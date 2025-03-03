@@ -17,6 +17,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticDeviceMeshIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
@@ -27,7 +28,13 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
-from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
+from modalities.running_env.env_utils import (
+    FSDP2MixedPrecisionSettings,
+    MixedPrecisionSettings,
+    PyTorchDtypes,
+    has_bfloat_support,
+)
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.util import get_experiment_id_of_run, parse_enum_by_name
 
 
@@ -237,6 +244,29 @@ class FSDPWrappedModelConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class FSDP2WrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
+    reshard_after_forward: bool = True
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_mixed_precision_settings(self):
+        if not has_bfloat_support() and (
+            self.mixed_precision_settings.reduce_dtype == PyTorchDtypes.BF_16
+            or self.mixed_precision_settings.param_dtype == PyTorchDtypes.BF_16
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return self
+
+    @model_validator(mode="after")
+    def validate_dp_mesh_existence(self):
+        if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
+        return self
 
 
 class WeightInitializedModelConfig(BaseModel):

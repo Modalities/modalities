@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -65,3 +66,4 @@ PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(tor
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
 PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThirdPartyTypeIF(ModelInitializationIF)]
+PydanticDeviceMeshIFType = Annotated[DeviceMesh, PydanticThirdPartyTypeIF(DeviceMesh)]
