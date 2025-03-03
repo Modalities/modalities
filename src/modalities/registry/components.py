@@ -30,6 +30,7 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    FSDP2WrappedModelConfig,
     FSDPCheckpointLoadingConfig,
     FSDPCheckpointSavingConfig,
     FSDPWrappedModelConfig,
@@ -75,6 +76,7 @@ from modalities.nn.model_initialization.composed_initialization import (
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
@@ -128,6 +130,7 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
         "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
     ),
@@ -138,6 +141,8 @@ COMPONENTS = [
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # Device mesh
+    ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
