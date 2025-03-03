@@ -12,8 +12,17 @@ from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
 from modalities.exceptions import ModelStateError
+from modalities.models.gpt2.gpt2_model import (
+    GPT2LLM,
+    AttentionConfig,
+    AttentionImplementation,
+    LayerNormWrapperConfig,
+    PositionTypes,
+)
+from modalities.models.model import ActivationType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
@@ -126,7 +135,7 @@ class ModelFactory:
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
 
-        fsdp_config = {"mesh": device_mesh["dp"], "mp_policy": mp_policy}
+        fsdp_config = {"mesh": device_mesh[ParallelismDegrees.DP_SHARD.value], "mp_policy": mp_policy}
 
         modules = list(model.modules())
         # we first shard all the blocks
@@ -146,7 +155,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_weight_initalized_fdsp2_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
         """
         Initializes the given model with weights using the provided model initializer.
         The model can be on a meta device.
@@ -172,7 +181,7 @@ class ModelFactory:
         def is_model_on_meta_device(model: nn.Module) -> bool:
             meta_counter = 0
             param_counter = 0
-            for tensor in itertools.chain(model.parameters(), model.buffers()):
+            for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
                 if tensor.device == torch.device("meta"):
                     meta_counter += 1
                 param_counter += 1
@@ -216,4 +225,58 @@ class ModelFactory:
                     "Activation checkpointing can only be applied to FSDP-wrapped models! "
                     f"Current model type: {type(model)}"
                 )
+        return model
+
+
+class GPT2ModelFactory:
+    @staticmethod
+    def get_gpt2_model(
+        use_meta_device: bool,
+        sample_key: str,
+        prediction_key: str,
+        poe_type: PositionTypes,
+        sequence_length: int,
+        vocab_size: int,
+        n_layer: int,
+        n_head_q: int,
+        n_head_kv: int,
+        n_embd: int,
+        ffn_hidden: int,
+        dropout: float,
+        bias: bool,
+        activation_type: ActivationType,
+        attention_implementation: AttentionImplementation,
+        attention_config: AttentionConfig,
+        attention_norm_config: LayerNormWrapperConfig,
+        ffn_norm_config: LayerNormWrapperConfig,
+        lm_head_norm_config: LayerNormWrapperConfig,
+        seed: int = None,
+    ) -> GPT2LLM:
+        config = dict(
+            sample_key=sample_key,
+            prediction_key=prediction_key,
+            poe_type=poe_type,
+            sequence_length=sequence_length,
+            vocab_size=vocab_size,
+            n_layer=n_layer,
+            n_head_q=n_head_q,
+            n_head_kv=n_head_kv,
+            n_embd=n_embd,
+            ffn_hidden=ffn_hidden,
+            dropout=dropout,
+            bias=bias,
+            activation_type=activation_type,
+            attention_implementation=attention_implementation,
+            attention_config=attention_config,
+            attention_norm_config=attention_norm_config,
+            ffn_norm_config=ffn_norm_config,
+            lm_head_norm_config=lm_head_norm_config,
+            seed=seed,
+        )
+
+        if use_meta_device:
+            with torch.device("meta"):
+                model = GPT2LLM(**config)
+        else:
+            model = GPT2LLM(**config)
         return model
