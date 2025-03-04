@@ -15,6 +15,16 @@ from modalities.exceptions import CheckpointingError
 from modalities.training.training_progress import TrainingProgress
 from modalities.utils.logging import get_logger
 
+import torch.distributed.checkpoint as dcp
+from modalities.checkpointing.fsdp.app_state import AppState
+
+import os
+from typing import Union
+from torch.distributed.checkpoint import FileSystemReader
+from torch.distributed.checkpoint.default_planner import _EmptyStateDictLoadPlanner
+from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
+
+
 
 class CheckpointingEntityType(Enum):
     """
@@ -23,10 +33,13 @@ class CheckpointingEntityType(Enum):
     Attributes:
         MODEL (str): Represents the model entity.
         OPTIMIZER (str): Represents the optimizer entity.
+        DISTRIBUTED (str): Represents the distributed checkpoint (dcp) 
+                           entity that comprises both model and optimizer.
     """
 
     MODEL = "model"
     OPTIMIZER = "optimizer"
+    DISTRIBUTED = "distributed"
 
 
 class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
@@ -61,77 +74,114 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
     def _get_checkpointing_path(
         self,
         experiment_id: str,
-        num_seen_steps: int,
-        num_seen_tokens: int,
-        num_target_steps: int,
-        num_target_tokens: int,
         entity_type: CheckpointingEntityType,
+        num_seen_steps: int = None,
+        num_seen_tokens: int = None,
+        num_target_steps: int = None,
+        num_target_tokens: int = None,
     ) -> Path:
-        entity_file_name = self.CHECKPOINT_STRUCTURE.format(
-            experiment_id=experiment_id,
-            entity=entity_type.value,
-            num_seen_steps=str(num_seen_steps),
-            num_seen_tokens=str(num_seen_tokens),
-            num_target_steps=str(num_target_steps),
-            num_target_tokens=str(num_target_tokens),
-        )
+        if entity_type == CheckpointingEntityType.DISTRIBUTED:
+            full_path = Path(self.checkpoint_path, experiment_id, 'distributed_checkpoint')
+        else:
+            entity_file_name = self.CHECKPOINT_STRUCTURE.format(
+                experiment_id=experiment_id,
+                entity=entity_type.value,
+                num_seen_steps=str(num_seen_steps),
+                num_seen_tokens=str(num_seen_tokens),
+                num_target_steps=str(num_target_steps),
+                num_target_tokens=str(num_target_tokens),
+            )
 
-        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
+            full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
+
+    @classmethod
+    def _dcp_to_torch_save(cls, key: str, dcp_checkpoint_dir: Union[str, os.PathLike], torch_save_path: Union[str, os.PathLike]):
+        """
+        This function is almost the same as dcp_to_torch_save
+        https://github.com/pytorch/pytorch/blob/v2.6.0/torch/distributed/checkpoint/format_utils.py#L196
+
+        The distributed checkpoint contains both the model and the optimizer. 
+        Instead of converting both together like the original function, 
+        only the part specified by the input argument key = 'model' or 'optim' 
+        is converted to a self-contained checkpoint.
+
+        Args:
+            key: 'model' or 'optim'
+            dcp_checkpoint_dir: directory that contains the distributed checkpoint files (__<rank>_0.distcp)
+            torch_save_path: path for the converted, self-contained checkpoint
+        """
+        sd: STATE_DICT_TYPE = {}
+        _load_state_dict(
+            sd,
+            storage_reader=FileSystemReader(dcp_checkpoint_dir),
+            planner=_EmptyStateDictLoadPlanner(),
+            no_dist=True,
+        )
+        torch.save(sd["app"][key], torch_save_path)
 
     def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, training_progress: TrainingProgress):
         get_logger().info("Gathering model and optimizer checkpoint...")
-        # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
-        model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        with FSDP.state_dict_type(
-            module=model,
-            state_dict_type=StateDictType.FULL_STATE_DICT,
-            state_dict_config=model_save_policy,
-            optim_state_dict_config=optim_save_policy,
-        ):
-            model_state = model.state_dict()
-            optimizer_state = optimizer.state_dict()  # this gets the optimizer state dict object for each rank
-            optim_state_dict = FSDP.optim_state_dict(
-                model=model, optim=optimizer, optim_state_dict=optimizer_state
-            )  # all the state dicts of the different ranks are synchronized
+
+        # Note: the experiment_id is created independently on each rank using a timestamp,
+        #       which means that they are not necessarily the same.
+        #       The following broadcast ensures that all ranks have the very same experiment_id,
+        #       which is needed for distributed checkpointing (DCP).
+        # TODO: this does not work, problem still needs to be solved.
+        experiment_id = self.experiment_id
+        to_broadcast = [experiment_id]
+        dist.broadcast_object_list(to_broadcast, src=0)
+        self.experiment_id = experiment_id
+
+        # save distributed checkpoint (DCP)
+        distributed_checkpoint_path = self._get_checkpointing_path(
+            experiment_id=self.experiment_id,
+            entity_type=CheckpointingEntityType.DISTRIBUTED,
+        )
+
+        distributed_checkpoint_path.mkdir(parents=True, exist_ok=True)
+        get_logger().info(f"Saving distributed model checkpoint to {distributed_checkpoint_path}...")
+        state_dict = { "app": AppState(model, optimizer) }
+        dcp.save(state_dict, checkpoint_id=distributed_checkpoint_path)
+        get_logger().info("Distributed checkpoint saved.")
 
         if self.global_rank == 0:
             # save model
             model_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
+                entity_type=CheckpointingEntityType.MODEL,
                 num_seen_steps=training_progress.num_seen_steps_total,
                 num_seen_tokens=training_progress.num_seen_tokens_total,
                 num_target_steps=training_progress.num_target_steps,
                 num_target_tokens=training_progress.num_target_tokens,
-                entity_type=CheckpointingEntityType.MODEL,
             )
+            checkpoint_folder_path = model_checkpoint_path.parent
 
-            model_checkpoint_folder_path = model_checkpoint_path.parent
-            model_checkpoint_folder_path.mkdir(parents=True, exist_ok=True)
-            get_logger().info(f"Saving model checkpoint to {model_checkpoint_path}...")
-            torch.save(model_state, model_checkpoint_path)
+            get_logger().info(f"Saving self-contained model checkpoint to {model_checkpoint_path}...")
+            self._dcp_to_torch_save('model', distributed_checkpoint_path, model_checkpoint_path)
             get_logger().info("Model checkpoint saved.")
+
 
             # save optimizer
             optimizer_checkpoint_path = self._get_checkpointing_path(
                 experiment_id=self.experiment_id,
+                entity_type=CheckpointingEntityType.OPTIMIZER,
                 num_seen_steps=training_progress.num_seen_steps_total,
                 num_seen_tokens=training_progress.num_seen_tokens_total,
                 num_target_steps=training_progress.num_target_steps,
                 num_target_tokens=training_progress.num_target_tokens,
-                entity_type=CheckpointingEntityType.OPTIMIZER,
             )
-            get_logger().info(f"Saving optimizer checkpoint to {optimizer_checkpoint_path}...")
-            torch.save(optim_state_dict, optimizer_checkpoint_path)
+            get_logger().info(f"Saving self-contained optimizer checkpoint to {optimizer_checkpoint_path}...")
+            self._dcp_to_torch_save('optim', distributed_checkpoint_path, optimizer_checkpoint_path)
             get_logger().info("Optimizer checkpoint saved.")
 
+            # save checkpoint info
             checkpoint_info = {
                 "model_checkpoint_path": str(Path.absolute(model_checkpoint_path)),
                 "optimizer_checkpoint_path": str(Path.absolute(optimizer_checkpoint_path)),
             }
-            get_logger().info(f"Saving checkpoint info {checkpoint_info} to {model_checkpoint_folder_path}...")
-            last_checkpoint_info_file_path = model_checkpoint_folder_path / "last_checkpoint_info.json"
+            get_logger().info(f"Saving checkpoint info {checkpoint_info} to {checkpoint_folder_path}...")
+            last_checkpoint_info_file_path = checkpoint_folder_path / "last_checkpoint_info.json"
             with open(last_checkpoint_info_file_path, "w", encoding="utf-8") as f:
                 json.dump(checkpoint_info, f)
             get_logger().info("Checkpoint info saved.")
@@ -152,7 +202,8 @@ class FSDPCheckpointSaving(CheckpointSavingExecutionABC):
                 num_target_steps=training_progress.num_target_steps,
                 num_target_tokens=training_progress.num_target_tokens,
             )
-            for entity_type in CheckpointEntityType
+            # TODO: Why the imported CheckpointEntityType instead of CheckpointingEntityType from this module? Can they be merged?
+            for entity_type in CheckpointEntityType  
         ]
 
     def _delete_checkpoint(self, training_progress: TrainingProgress):
