@@ -131,8 +131,8 @@ def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
     """Copies the weights of the modalities model to the Huggingface transformers model.
 
     Args:
-        hf_model_model (GPT2ForCausalLM): The uninitialized Huggingface transformers model.
-                                          The weights will be copied here.
+        hf_model (GPT2ForCausalLM): The uninitialized Huggingface transformers model.
+                                    The weights will be copied here.
         modalities_model (GPT2LLM): The modalities model from which the weights will be copied.
     """
     hf_model.model.embed_tokens.weight.data.copy_(modalities_model.transformer.wte.weight.data)
