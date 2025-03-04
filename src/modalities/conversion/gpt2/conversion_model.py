@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
+from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block, PositionTypes
 from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
@@ -27,26 +28,6 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
     return hf_model, modalities_model
 
 
-def _check_conversion_criteria(model_config: dict) -> None:
-    """Checks that the modalities config fulfills criteria necessary for conversion
-
-    Args:
-        model_config (dict): model or model_raw part of the Modalities config dictionary.
-
-    Returns:
-        None
-    """
-    assert model_config["poe_type"] == PositionTypes.NOPE
-    assert model_config["bias"] is False
-    assert model_config["activation_type"] == "swiglu"
-    assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
-
-    for norm in ["attention_norm", "ffn_norm", "lm_head_norm"]:
-        assert model_config[norm]["variant_key"] == "layer_norm"
-        assert model_config[norm]["config"].get("elementwise_affine", True) is True  # True = default setting
-        assert model_config[norm]["config"].get("bias", True) is True  # True = default setting
-
-
 def convert_model_config(modalities_config: dict) -> GPT2Config:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
        For this the model_raw or model section of the modalities config is used.
@@ -59,15 +40,7 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         GPT2Config: Converted Huggingface model configuration.
     """
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
-
     _check_conversion_criteria(config)
-
-    if config["attention_implementation"] == "pytorch_flash":
-        attention_impl = "sdpa"
-    elif config["attention_implementation"] == "manual":
-        attention_impl = "eager"
-    else:
-        raise ValueError(f"Unknown or unsupported attention implementation {config['attention_implementation']}.")
 
     return GPT2Config(
         vocab_size=config["vocab_size"],
@@ -80,15 +53,12 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
-        layer_norm_eps=config["ffn_norm"]["config"]["eps"],
-        layer_norm_elementwise_affine=config["ffn_norm"]["config"].get(
-            "elementwise_affine",
-            True,
-        ),
-        layer_norm_bias=config["ffn_norm"]["config"].get("bias", True),
+        layer_norm_eps=_get_layer_norm_value(config["ffn_norm"]["config"], "eps"),
+        layer_norm_elementwise_affine=_get_layer_norm_value(config["ffn_norm"]["config"], "elementwise_affine"),
+        layer_norm_bias=_get_layer_norm_value(config["ffn_norm"]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
-        _attn_implementation=attention_impl,
+        _attn_implementation=_map_attention_type(config),
         output_attentions=False,
     )
 
@@ -114,7 +84,50 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
         assert torch.equal(llama_logits, modalities_logits)
 
 
-def _copy_weights_model(hf_model_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
+def _check_conversion_criteria(model_config: dict) -> None:
+    """Checks that the modalities config fulfills criteria necessary for conversion
+
+    Args:
+        model_config (dict): model or model_raw part of the Modalities config dictionary.
+
+    Returns:
+        None
+    """
+    assert model_config["poe_type"] == PositionTypes.NOPE
+    assert model_config["activation_type"] == "swiglu"
+    assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
+
+    norms = ["attention_norm", "ffn_norm", "lm_head_norm"]
+    for norm in norms:
+        assert model_config[norm]["variant_key"] == "layer_norm"
+
+    assert (
+        len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
+    ), "All norms must have the same bias setting."
+    assert (
+        len(set(_get_layer_norm_value(model_config[norm]["config"], "elementwise_affine") for norm in norms)) == 1
+    ), "All norms must have the same elementwise_affine setting."
+    assert (
+        len(set(_get_layer_norm_value(model_config[norm]["config"], "eps") for norm in norms)) == 1
+    ), "All norms must have the same eps setting."
+
+
+def _get_layer_norm_value(config: dict, field: str) -> bool | float | int:
+    default = LayerNormConfig.model_fields[field].default
+    return config.get(field, default)
+
+
+def _map_attention_type(config):
+    if config["attention_implementation"] == "pytorch_flash":
+        attention_impl = "sdpa"
+    elif config["attention_implementation"] == "manual":
+        attention_impl = "eager"
+    else:
+        raise ValueError(f"Unknown or unsupported attention implementation {config['attention_implementation']}.")
+    return attention_impl
+
+
+def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
     """Copies the weights of the modalities model to the Huggingface transformers model.
 
     Args:
@@ -122,13 +135,13 @@ def _copy_weights_model(hf_model_model: GPT2ForCausalLM, modalities_model: GPT2L
                                           The weights will be copied here.
         modalities_model (GPT2LLM): The modalities model from which the weights will be copied.
     """
-    hf_model_model.model.embed_tokens.weight.data.copy_(modalities_model.transformer.wte.weight.data)
-    for hf_layer, modalities_layer in zip(hf_model_model.model.layers, modalities_model.transformer.h):
+    hf_model.model.embed_tokens.weight.data.copy_(modalities_model.transformer.wte.weight.data)
+    for hf_layer, modalities_layer in zip(hf_model.model.layers, modalities_model.transformer.h):
         _copy_weights_attention(hf_layer, modalities_layer)
         _copy_weights_mlp(hf_layer, modalities_layer)
         _copy_weights_layer_norms(hf_layer, modalities_layer)
-    _copy_weights_base_modules(hf_model_model.lm_head, modalities_model.lm_head)
-    _copy_weights_base_modules(hf_model_model.model.norm, modalities_model.transformer.lm_head_norm)
+    _copy_weights_base_modules(hf_model.lm_head, modalities_model.lm_head)
+    _copy_weights_base_modules(hf_model.model.norm, modalities_model.transformer.lm_head_norm)
 
 
 def _copy_weights_attention(hf_layer: GPT2DecoderLayer, modalities_layer: GPT2Block):

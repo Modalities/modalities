@@ -28,4 +28,6 @@ def test_converting_gpt2_does_not_change_outputs(tmp_path: Path, gpt2_config_pat
         output_dir, local_files_only=True, trust_remote_code=True
     ).to(dtype=torch.bfloat16)
     vocab_size = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
-    check_converted_model(converted_model, original_model, 1, vocab_size)
+    check_converted_model(
+        hf_model=converted_model, modalities_model=original_model, num_testruns=1, vocab_size=vocab_size
+    )

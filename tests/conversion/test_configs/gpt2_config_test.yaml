@@ -4,14 +4,14 @@ model:
   config:
     sample_key: input_ids
     poe_type: NOPE
-    sequence_length: 256
+    sequence_length: 128
     prediction_key: logits
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 4
-    n_head_q: 12
-    n_head_kv: 12
-    ffn_hidden: 1024
-    n_embd: 768
+    n_layer: 3
+    n_head_q: 4
+    n_head_kv: 4
+    ffn_hidden: 512
+    n_embd: 256
     dropout: 0.0
     bias: false # True: bias in Linears, like GPT-2. False: a bit better and faster
     attention_config:
@@ -37,7 +37,7 @@ model:
       config:
         normalized_shape: ${model.config.n_embd}
         eps: 1e-5
-        bias: false
+        bias: true
     lm_head_norm:
       component_key: layer_norm
       variant_key: layer_norm
