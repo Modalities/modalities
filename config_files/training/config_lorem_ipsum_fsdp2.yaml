@@ -11,7 +11,7 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ./data/lorem_ipsum.pbin
+    train_dataset_path: ./data/lorem_ipsum_long.pbin
   intervals:
     training_log_interval_in_steps: 2
     checkpointing_interval_in_steps: 2
@@ -98,37 +98,6 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-val_dataloader:
-  component_key: data_loader
-  variant_key: default
-  config:
-    num_workers: 2
-    pin_memory: true
-    dataloader_tag: val
-    dataset:
-      instance_key: train_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
-      variant_key: default
-      config:
-        batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
-          config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            drop_last: true
-            dataset:
-              instance_key: train_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
-
 test_dataloader:
   component_key: data_loader
   variant_key: default
@@ -161,8 +130,6 @@ test_dataloader:
       pass_type: BY_REFERENCE
 
 eval_dataloaders:
-  - instance_key: val_dataloader
-    pass_type: BY_REFERENCE
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE
 
@@ -196,7 +163,7 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 2
-    data_parallel_shard_degree: 4
+    data_parallel_shard_degree: 2
     world_size: ${settings.cuda_env.world_size}
 
 

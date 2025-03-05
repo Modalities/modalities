@@ -59,13 +59,41 @@ def get_callback_interval_in_batches_per_rank(
     return num_local_train_micro_batches_ret
 
 
-def get_experiment_id_of_run(config_file_path: Path, hash_length: Optional[int] = 8) -> str:
-    """create experiment ID including the date and time for file save uniqueness
-    example: 2022-05-07__14-31-22_fdh1xaj2'
-    """
-    hash = hashlib.sha256(str(config_file_path).encode()).hexdigest()[:hash_length]
-    date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-    experiment_id = f"{date_of_run}_{hash}"
+def get_experiment_id_of_run(
+    config_file_path: Path, hash_length: Optional[int] = 8, max_experment_id_byte_length: Optional[int] = 1024
+) -> str:
+    def get_experiment_id_from_config(config_file_path: Path, hash_length: Optional[int] = 8) -> str:
+        """Create experiment ID including the date and time for file save uniqueness
+        example: 2022-05-07__14-31-22_fdh1xaj2'
+        """
+        hash = hashlib.sha256(str(config_file_path).encode()).hexdigest()[:hash_length]
+        date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
+        experiment_id = f"{date_of_run}_{hash}"
+        return experiment_id
+
+    rank = dist.get_rank()
+    if rank == 0:
+        # Generate a unique folder name
+        experimenet_id = get_experiment_id_from_config(config_file_path, hash_length)
+        experimenet_id_bytes = experimenet_id.encode("utf-8")
+        if len(experimenet_id_bytes) > max_experment_id_byte_length:
+            raise ValueError(
+                f"Experiment ID is too long: {len(experimenet_id_bytes)} bytes, "
+                f"max length is {max_experment_id_byte_length} bytes"
+            )
+        print(f"Rank 0 generated experiment_id: {experimenet_id}")
+    else:
+        experimenet_id_bytes = bytearray(max_experment_id_byte_length)  # Preallocate buffer for receiving
+
+    # Ensure all ranks have the same folder name
+    experment_id_tensor = torch.tensor(
+        list(experimenet_id_bytes) + [0] * (max_experment_id_byte_length - len(experimenet_id_bytes)), dtype=torch.uint8
+    ).cuda()
+    dist.broadcast(experment_id_tensor, src=0)
+
+    # Decode on all ranks
+    experiment_id = experment_id_tensor.cpu().numpy().tobytes().decode("utf-8").rstrip("\x00")
+    print(f"Rank {rank} received experiment_id: {experiment_id}")
     return experiment_id
 
 

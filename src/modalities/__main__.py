@@ -61,8 +61,8 @@ def CMD_entry_point_run_modalities(config_file_path: Path):
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
-    main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -101,8 +101,8 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
