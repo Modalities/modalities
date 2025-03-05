@@ -12,7 +12,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveKMostRecentCheckpointsStrategy,
 )
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
-from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
     ActivationCheckpointedModelConfig,
@@ -26,6 +26,7 @@ from modalities.config.config import (
     CombinedDatasetConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    DCPCheckpointSavingConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -216,7 +217,8 @@ COMPONENTS = [
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
     # checkpoint saving execution
-    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "fsdp1", FSDP1CheckpointSaving, FSDPCheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "dcp", DCPCheckpointSaving, DCPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),

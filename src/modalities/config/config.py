@@ -122,6 +122,12 @@ class FSDPCheckpointSavingConfig(BaseModel):
     experiment_id: str
 
 
+class DCPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+
+
 class CheckpointSavingConfig(BaseModel):
     checkpoint_saving_strategy: PydanticCheckpointSavingStrategyIFType
     checkpoint_saving_execution: PydanticCheckpointSavingExecutionIFType
