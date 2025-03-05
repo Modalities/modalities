@@ -117,7 +117,7 @@ def _get_layer_norm_value(config: dict, field: str) -> bool | float | int:
     return config.get(field, default)
 
 
-def _map_attention_type(config):
+def _map_attention_type(config: dict):
     if config["attention_implementation"] == "pytorch_flash":
         attention_impl = "sdpa"
     elif config["attention_implementation"] == "manual":
