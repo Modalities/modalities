@@ -11,8 +11,9 @@ from modalities.models.utils import ModelTypeEnum, get_model_from_config
 from tests.conftest import _ROOT_DIR
 
 
-@pytest.fixture()
-def gpt2_config_path(tmp_path: Path, initialized_model: GPT2LLM, config_file_path: str) -> str:
+@pytest.fixture
+def gpt2_config_path(tmpdir_factory: pytest.TempdirFactory, initialized_model: GPT2LLM, config_file_path: str) -> str:
+    tmp_path = tmpdir_factory.mktemp("gpt2_model")
     new_config_filename = tmp_path / "gpt2_config_test.yaml"
     model_path = tmp_path / "model.pth"
     shutil.copy(config_file_path, new_config_filename)

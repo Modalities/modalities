@@ -11,6 +11,12 @@ from modalities.conversion.gpt2.conversion_model import (
 from tests.conversion.gpt2.helper import check_same_weight_base_modules, check_same_weight_model
 
 
+def test_convert_model_can_generate(gpt2_config_path: str):
+    modalities_config = load_app_config_dict(gpt2_config_path)
+    hf_model, _ = convert_model_checkpoint(modalities_config)
+    assert hf_model.can_generate()
+
+
 def test_convert_model_checkpoint_does_not_change_weights(gpt2_config_path: str):
     modalities_config = load_app_config_dict(gpt2_config_path)
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
