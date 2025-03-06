@@ -4,8 +4,18 @@ from pathlib import Path
 import torch.nn as nn
 from torch.optim import Optimizer
 
+from modalities.checkpointing.fsdp.app_state import AppState
 
-class CheckpointLoadingIF(ABC):
+
+class DistributedCheckpointLoadingIF(ABC):
+    """Distributed checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
+
+    @abstractmethod
+    def load_checkpoint_(self, app_state: AppState, checkpoint_directory_path: Path) -> AppState:
+        raise NotImplementedError
+
+
+class LocalCheckpointLoadingIF(ABC):
     """Checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
 
     @abstractmethod
