@@ -11,6 +11,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
+from modalities.checkpointing.fsdp.app_state import AppState
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
@@ -18,6 +19,7 @@ from modalities.config.config import (
     ActivationCheckpointedModelConfig,
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
+    AppStateConfig,
     BatchSamplerConfig,
     CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
@@ -159,6 +161,8 @@ COMPONENTS = [
     ComponentEntity(
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
     ),
+    # App state
+    ComponentEntity("app_state", "default", AppState, AppStateConfig),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),

@@ -300,6 +300,11 @@ class ActivationCheckpointedModelConfig(BaseModel):
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
+class AppStateConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    optimizer: PydanticOptimizerIFType
+
+
 class PreTrainedHFTokenizerConfig(BaseModel):
     pretrained_model_name_or_path: str
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
