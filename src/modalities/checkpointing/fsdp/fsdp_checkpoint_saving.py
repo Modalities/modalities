@@ -244,10 +244,10 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
 
         if self.global_rank == 0:
             # save checkpoint info
-            checkpoint_folder_path = distributed_checkpoint_path.parent
-            checkpoint_info = {"checkpoint_folder_path": str(Path.absolute(checkpoint_folder_path))}
-            get_logger().info(f"Saving checkpoint info {checkpoint_info} to {checkpoint_folder_path}...")
-            last_checkpoint_info_file_path = checkpoint_folder_path / "last_checkpoint_info.json"
+            checkpoint_info = {"checkpoint_folder_path": str(Path.absolute(distributed_checkpoint_path))}
+            experiment_folder_path = distributed_checkpoint_path.parent
+            get_logger().info(f"Saving checkpoint info {checkpoint_info} to {experiment_folder_path}...")
+            last_checkpoint_info_file_path = experiment_folder_path / "last_checkpoint_info.json"
             with open(last_checkpoint_info_file_path, "w", encoding="utf-8") as f:
                 json.dump(checkpoint_info, f)
             get_logger().info("Checkpoint info saved.")
