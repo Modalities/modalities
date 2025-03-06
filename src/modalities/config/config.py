@@ -36,7 +36,7 @@ from modalities.running_env.env_utils import (
     has_bfloat_support,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
-from modalities.util import get_experiment_id_of_run, parse_enum_by_name
+from modalities.util import parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -411,7 +411,7 @@ class RichResultSubscriberConfig(BaseModel):
 
 
 def load_app_config_dict(
-    config_file_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None
+    config_file_path: Path, experiment_id: str, additional_resolver_funs: Optional[dict[str, Callable]] = None
 ) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
@@ -429,11 +429,9 @@ def load_app_config_dict(
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
-        if var_name == "experiment_id":
-            return get_experiment_id_of_run(config_file_path=config_file_path)
-        elif var_name == "config_file_path":
-            return config_file_path
+    def modalities_env_resolver_fun(var_name: str, kwargs: Path | str) -> str | Path:
+        if var_name in kwargs:
+            return kwargs[var_name]
         else:
             raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
@@ -442,8 +440,9 @@ def load_app_config_dict(
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
+    modalities_env_kwargs = {"experiment_id": experiment_id, "config_file_path": config_file_path}
     OmegaConf.register_new_resolver(
-        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+        "modalities_env", partial(modalities_env_resolver_fun, kwargs=modalities_env_kwargs), replace=True
     )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 

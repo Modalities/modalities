@@ -40,7 +40,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
+from modalities.util import get_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 
 
 @click.group()
@@ -383,8 +383,9 @@ class Main:
     """Main class that orchestrates the training process."""
 
     def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
+        experiment_id = get_experiment_id_of_run(config_path)
         self.config_dict = load_app_config_dict(
-            config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
+            config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
         )
         self.config_path = config_path
 
