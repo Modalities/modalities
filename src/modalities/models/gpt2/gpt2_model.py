@@ -1,7 +1,7 @@
 import logging
 import math
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Optional
 
 import torch
 import torch.nn as nn
@@ -297,7 +297,7 @@ class GPT2LLMConfig(BaseModel):
     Args:
         sample_key (str): The key for the samples.
         prediction_key (str): The key for the predictions.
-        use_meta_device (bool): Whether to use meta device.
+        use_meta_device (bool, optional): Whether to use meta device. Defaults to False.
         poe_type (PositionTypes): The type of position encoding.
         sequence_length (int): The length of the sequence.
         vocab_size (int): The size of the vocabulary.
@@ -318,7 +318,7 @@ class GPT2LLMConfig(BaseModel):
 
     sample_key: str
     prediction_key: str
-    use_meta_device: bool
+    use_meta_device: Optional[bool] = False
     poe_type: PositionTypes
     sequence_length: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
