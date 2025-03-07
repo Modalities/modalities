@@ -13,12 +13,14 @@ from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointLoadingIFType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
+    PydanticDistributedCheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
@@ -114,6 +116,10 @@ class FSDPCheckpointLoadingConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
+
+
+class DCPCheckpointLoadingConfig(BaseModel):
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class FSDPCheckpointSavingConfig(BaseModel):
@@ -223,10 +229,22 @@ class CheckpointedOptimizerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
 
+class DCPCheckpointedOptimizerConfig(BaseModel):
+    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
+    checkpoint_path: Path
+    app_state: PydanticAppStateType
+
+
 class CheckpointedModelConfig(BaseModel):
     checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
+
+
+class DCPCheckpointedModelConfig(BaseModel):
+    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
+    checkpoint_path: Path
+    app_state: PydanticAppStateType
 
 
 @deprecated(
@@ -416,7 +434,9 @@ class RichResultSubscriberConfig(BaseModel):
 
 
 def load_app_config_dict(
-    config_file_path: Path, experiment_id: str, additional_resolver_funs: Optional[dict[str, Callable]] = None
+    config_file_path: Path,
+    experiment_id: Optional[str] = None,
+    additional_resolver_funs: Optional[dict[str, Callable]] = None,
 ) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
@@ -445,7 +465,9 @@ def load_app_config_dict(
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    modalities_env_kwargs = {"experiment_id": experiment_id, "config_file_path": config_file_path}
+    modalities_env_kwargs = {"config_file_path": config_file_path}
+    if experiment_id is not None:
+        modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(
         "modalities_env", partial(modalities_env_resolver_fun, kwargs=modalities_env_kwargs), replace=True
     )

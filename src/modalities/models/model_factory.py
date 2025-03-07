@@ -1,5 +1,6 @@
 import itertools
 from pathlib import Path
+from typing import Optional
 
 import torch
 import torch.distributed as dist
@@ -10,7 +11,8 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
+from modalities.checkpointing.fsdp.app_state import AppState
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -33,7 +35,7 @@ class ModelFactory:
 
     @staticmethod
     def get_checkpointed_model(
-        checkpoint_loading: CheckpointLoadingIF,
+        checkpoint_loading: LocalCheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
     ) -> nn.Module:
@@ -54,6 +56,30 @@ class ModelFactory:
             model=model,
         )
         return wrapped_model
+
+    @staticmethod
+    def get_dcp_checkpointed_model(
+        checkpoint_loading: DistributedCheckpointLoadingIF, checkpoint_path: Path, app_state: AppState
+    ) -> nn.Module:
+        """
+        Loads model from distributed checkpoint.
+
+        Args:
+            checkpoint_loading (DistributedCheckpointLoadingIF): The checkpoint loading approach used to
+                load the distributed model checkpoint.
+            checkpoint_path (Path): The path to the checkpoint file.
+            app_state (AppState): The application state object containing the model and optimizer.
+                NOTE: The model must be already FSDP-wrapped.
+        Returns:
+            nn.Module: The loaded model.
+
+        """
+        if not app_state.is_loaded:
+            checkpoint_loading.load_checkpoint_(
+                checkpoint_directory_path=checkpoint_path,
+                app_state=app_state,
+            )
+        return app_state.model
 
     @deprecated(
         "With version 0.4, we upgraded FSDP to FSDP 2.0. "
@@ -231,7 +257,6 @@ class ModelFactory:
 class GPT2ModelFactory:
     @staticmethod
     def get_gpt2_model(
-        use_meta_device: bool,
         sample_key: str,
         prediction_key: str,
         poe_type: PositionTypes,
@@ -250,6 +275,7 @@ class GPT2ModelFactory:
         attention_norm_config: LayerNormWrapperConfig,
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
+        use_meta_device: Optional[bool] = False,
         seed: int = None,
     ) -> GPT2LLM:
         config = dict(

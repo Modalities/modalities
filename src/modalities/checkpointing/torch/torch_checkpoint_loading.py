@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import LocalCheckpointLoadingIF
 from modalities.config.config import PrecisionEnum
 from modalities.util import get_local_number_of_trainable_parameters
 
 
-class TorchCheckpointLoading(CheckpointLoadingIF):
+class TorchCheckpointLoading(LocalCheckpointLoadingIF):
     """Class to load PyTorch model and optimizer checkpoints."""
 
     def __init__(self, device: torch.device, precision: Optional[PrecisionEnum] = None):

@@ -12,7 +12,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveKMostRecentCheckpointsStrategy,
 )
 from modalities.checkpointing.fsdp.app_state import AppState
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointLoading, FSDPCheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
@@ -28,6 +28,9 @@ from modalities.config.config import (
     CombinedDatasetConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    DCPCheckpointedModelConfig,
+    DCPCheckpointedOptimizerConfig,
+    DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
@@ -132,6 +135,7 @@ COMPONENTS = [
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
+    ComponentEntity("model", "dcp_checkpointed", ModelFactory.get_dcp_checkpointed_model, DCPCheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
@@ -160,6 +164,9 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+    ),
+    ComponentEntity(
+        "optimizer", "dcp_checkpointed", OptimizerFactory.get_dcp_checkpointed_optimizer, DCPCheckpointedOptimizerConfig
     ),
     # App state
     ComponentEntity("app_state", "default", AppState, AppStateConfig),
@@ -225,6 +232,7 @@ COMPONENTS = [
     ComponentEntity("checkpoint_saving_execution", "dcp", DCPCheckpointSaving, DCPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(

@@ -81,6 +81,9 @@ class TrainingComponentsInstantiationModel(BaseModel):
             model_checkpoint_path: Path
             optimizer_checkpoint_path: Path
 
+        class DCPWarmstartCheckpointPaths(BaseModel):
+            checkpoint_folder_path: Path
+
         experiment_id: str
         config_file_path: FilePath
         referencing_keys: dict[str, str]
@@ -91,7 +94,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         step_profile: StepProfile
         training_target: TrainingTarget
         training_progress: TrainingProgress
-        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths] = None
+        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
