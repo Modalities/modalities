@@ -9,14 +9,18 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointLoadingIFType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
+    PydanticDeviceMeshIFType,
+    PydanticDistributedCheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticModelInitializationIFType,
@@ -27,8 +31,14 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
-from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import get_experiment_id_of_run, parse_enum_by_name
+from modalities.running_env.env_utils import (
+    FSDP2MixedPrecisionSettings,
+    MixedPrecisionSettings,
+    PyTorchDtypes,
+    has_bfloat_support,
+)
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.util import parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -108,7 +118,17 @@ class FSDPCheckpointLoadingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class DCPCheckpointLoadingConfig(BaseModel):
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+
+
 class FSDPCheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+
+
+class DCPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
@@ -209,12 +229,29 @@ class CheckpointedOptimizerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
 
+class DCPCheckpointedOptimizerConfig(BaseModel):
+    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
+    checkpoint_path: Path
+    app_state: PydanticAppStateType
+
+
 class CheckpointedModelConfig(BaseModel):
     checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
 
+class DCPCheckpointedModelConfig(BaseModel):
+    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
+    checkpoint_path: Path
+    app_state: PydanticAppStateType
+
+
+@deprecated(
+    "With version 0.4, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) "
+    "and FSDP2WrappedModelConfig instead.",
+    category=FutureWarning,
+)
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     sync_module_states: bool
@@ -239,6 +276,34 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class FSDP2WrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
+    reshard_after_forward: bool = True
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_mixed_precision_settings(self):
+        if not has_bfloat_support() and (
+            self.mixed_precision_settings.reduce_dtype == PyTorchDtypes.BF_16
+            or self.mixed_precision_settings.param_dtype == PyTorchDtypes.BF_16
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return self
+
+    @model_validator(mode="after")
+    def validate_dp_mesh_existence(self):
+        if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
+        return self
+
+
+class CompiledModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
+
+
 class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     model_initializer: PydanticModelInitializationIFType
@@ -251,6 +316,11 @@ class WeightInitializedModelConfig(BaseModel):
 class ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDPModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class AppStateConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    optimizer: PydanticOptimizerIFType
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
@@ -364,7 +434,9 @@ class RichResultSubscriberConfig(BaseModel):
 
 
 def load_app_config_dict(
-    config_file_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None
+    config_file_path: Path,
+    experiment_id: Optional[str] = None,
+    additional_resolver_funs: Optional[dict[str, Callable]] = None,
 ) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
@@ -382,11 +454,9 @@ def load_app_config_dict(
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
-        if var_name == "experiment_id":
-            return get_experiment_id_of_run(config_file_path=config_file_path)
-        elif var_name == "config_file_path":
-            return config_file_path
+    def modalities_env_resolver_fun(var_name: str, kwargs: Path | str) -> str | Path:
+        if var_name in kwargs:
+            return kwargs[var_name]
         else:
             raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
@@ -395,8 +465,11 @@ def load_app_config_dict(
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
+    modalities_env_kwargs = {"config_file_path": config_file_path}
+    if experiment_id is not None:
+        modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(
-        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+        "modalities_env", partial(modalities_env_resolver_fun, kwargs=modalities_env_kwargs), replace=True
     )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 

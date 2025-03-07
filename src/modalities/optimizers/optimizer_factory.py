@@ -5,7 +5,8 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Adam, AdamW, Optimizer
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
+from modalities.checkpointing.fsdp.app_state import AppState
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
@@ -40,12 +41,39 @@ class OptimizerFactory:
 
     @staticmethod
     def get_checkpointed_optimizer(
-        checkpoint_loading: CheckpointLoadingIF, checkpoint_path: Path, wrapped_model: nn.Module, optimizer: Optimizer
+        checkpoint_loading: LocalCheckpointLoadingIF,
+        checkpoint_path: Path,
+        wrapped_model: nn.Module,
+        optimizer: Optimizer,
     ) -> Optimizer:
         wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint(
             file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
         )
         return wrapped_optimizer
+
+    @staticmethod
+    def get_dcp_checkpointed_optimizer(
+        checkpoint_loading: DistributedCheckpointLoadingIF, checkpoint_path: Path, app_state: AppState
+    ) -> nn.Module:
+        """
+        Loads optimizer from distributed checkpoint.
+
+        Args:
+            checkpoint_loading (DistributedCheckpointLoadingIF): The checkpoint loading approach used to
+                load the distributed optimizer checkpoint.
+            checkpoint_path (Path): The path to the checkpoint folder.
+            app_state (AppState): The application state object containing the model and optimizer.
+                NOTE: The model must be already FSDP-wrapped.
+        Returns:
+            nn.Module: The loaded model.
+
+        """
+        if not app_state.is_loaded:
+            checkpoint_loading.load_checkpoint_(
+                checkpoint_directory_path=checkpoint_path,
+                app_state=app_state,
+            )
+        return app_state.optimizer
 
 
 def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]) -> OptimizerGroups:
@@ -72,7 +100,9 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_groups_excluded: list[str]) -> None:
+def _assert_existence_of_weight_decay_groups_excluded(
+    model: nn.Module, weight_decay_groups_excluded: list[str]
+) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -81,7 +111,12 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
         weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
         if group not in weight_decay_groups.keys():
@@ -92,12 +127,17 @@ def _assert_existence_of_weight_decay_groups_excluded(model: FSDP, weight_decay_
 
 
 def _create_optimizer_groups(
-    model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]
+    model: nn.Module, weight_decay: float, weight_decay_groups_excluded: list[str]
 ) -> tuple[OptimizerGroups, list[str]]:
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
-    nn_model: NNModel = model.module
+    # FSDP 1
+    if hasattr(model, "module"):
+        nn_model: NNModel = model.module
+    # FSDP 2
+    else:
+        nn_model = model
     weight_decay_groups = nn_model.weight_decay_groups
     params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
 
@@ -160,7 +200,7 @@ def _print_optimizer_groups_overview(optimizer_groups: OptimizerGroups, optimize
     print_rank_0(f"=> all ({num_modules_all} modules with {num_params_all:,} parameters)")
 
 
-def _assert_completeness_of_optimizer_groups(model: FSDP, optimizer_groups: OptimizerGroups) -> None:
+def _assert_completeness_of_optimizer_groups(model: nn.Module, optimizer_groups: OptimizerGroups) -> None:
     """
     checks that the number of parameters in the optimizer groups
     sum up to the total number of model parameters as expected

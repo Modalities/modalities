@@ -4,15 +4,17 @@ import torch
 import torch.nn as nn
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
 from torch.utils.data.dataset import Dataset
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
+from modalities.checkpointing.fsdp.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
@@ -43,7 +45,13 @@ class PydanticThirdPartyTypeIF:
 
 
 PydanticCheckpointSavingIFType = Annotated[CheckpointSaving, PydanticThirdPartyTypeIF(CheckpointSaving)]
-PydanticCheckpointLoadingIFType = Annotated[CheckpointLoadingIF, PydanticThirdPartyTypeIF(CheckpointLoadingIF)]
+PydanticCheckpointLoadingIFType = Annotated[
+    LocalCheckpointLoadingIF, PydanticThirdPartyTypeIF(LocalCheckpointLoadingIF)
+]
+PydanticDistributedCheckpointLoadingIFType = Annotated[
+    DistributedCheckpointLoadingIF, PydanticThirdPartyTypeIF(DistributedCheckpointLoadingIF)
+]
+
 PydanticCheckpointSavingStrategyIFType = Annotated[
     CheckpointSavingStrategyIF, PydanticThirdPartyTypeIF(CheckpointSavingStrategyIF)
 ]
@@ -65,3 +73,5 @@ PydanticPytorchDeviceType = Annotated[torch.device, PydanticThirdPartyTypeIF(tor
 PydanticTextInferenceComponentType = Annotated[TextInferenceComponent, PydanticThirdPartyTypeIF(TextInferenceComponent)]
 PydanticGradientClipperIFType = Annotated[GradientClipperIF, PydanticThirdPartyTypeIF(GradientClipperIF)]
 PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThirdPartyTypeIF(ModelInitializationIF)]
+PydanticDeviceMeshIFType = Annotated[DeviceMesh, PydanticThirdPartyTypeIF(DeviceMesh)]
+PydanticAppStateType = Annotated[AppState, PydanticThirdPartyTypeIF(AppState)]

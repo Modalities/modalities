@@ -42,7 +42,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
+from modalities.util import get_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 
 
 @click.group()
@@ -63,8 +63,8 @@ def CMD_entry_point_run_modalities(config_file_path: Path):
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
-    main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -103,8 +103,8 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -515,8 +515,9 @@ class Main:
     """Main class that orchestrates the training process."""
 
     def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
+        experiment_id = get_experiment_id_of_run(config_path)
         self.config_dict = load_app_config_dict(
-            config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
+            config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
         )
         self.config_path = config_path
 

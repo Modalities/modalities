@@ -1,5 +1,3 @@
-from enum import Enum
-
 import torch.nn as nn
 from torch.optim import Optimizer
 
@@ -7,18 +5,6 @@ from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.training.training_progress import TrainingProgress
-
-
-class CheckpointEntityType(Enum):
-    """
-    Enum class representing the types of entities that can be saved in a checkpoint.
-    Attributes:
-        MODEL (str): Represents the model entity.
-        OPTIMIZER (str): Represents the optimizer entity.
-    """
-
-    MODEL = "model"
-    OPTIMIZER = "optimizer"
 
 
 class CheckpointSaving:
