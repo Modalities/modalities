@@ -16,7 +16,7 @@ class HFModelAdapterConfig(PretrainedConfig):
 
     model_type = "modalities"
 
-    def __init__(self, **kwargs):
+    def __init__(self, config={}, **kwargs):
         """
         Initializes an HFModelAdapterConfig object.
 
@@ -29,6 +29,7 @@ class HFModelAdapterConfig(PretrainedConfig):
         if "config" not in kwargs:
             raise ValueError("Config is not passed in HFModelAdapterConfig.")
         super().__init__(**kwargs)
+        self.config = config
         # self.config is added by the super class via kwargs
         assert self.config is not None, "Config is not passed in HFModelAdapterConfig."
         # since the config will be saved to json and json can't handle posixpaths, we need to convert them to strings
@@ -115,7 +116,7 @@ class HFModelAdapter(PreTrainedModel):
             raise NotImplementedError
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
-        if return_dict:
+        if not return_dict:
             return ModalitiesModelOutput(**model_forward_output)
         else:
             return model_forward_output[self.prediction_key]
