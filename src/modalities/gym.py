@@ -7,6 +7,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
@@ -89,6 +90,7 @@ class Gym:
         self,
         model: nn.Module,
         optimizer: Optimizer,
+        lr_scheduler: LRScheduler,
         training_progress: TrainingProgress,
         checkpoint_saving: CheckpointSaving,
         checkpointing_interval_in_steps: int,
@@ -97,11 +99,15 @@ class Gym:
             training_progress.num_seen_steps_total % checkpointing_interval_in_steps == 0
             and training_progress.num_seen_steps_total > 0
         ):
+            app_state = AppState(
+                model=model,
+                optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
+            )
             checkpoint_saving.save_checkpoint(
                 training_progress=training_progress,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
-                model=model,
-                optimizer=optimizer,
+                app_state=app_state,
                 early_stoppping_criterion_fulfilled=False,  # TODO: implement early stopping
             )
 
