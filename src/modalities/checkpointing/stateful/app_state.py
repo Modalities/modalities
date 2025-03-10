@@ -74,13 +74,12 @@ class AppState(Stateful):
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
 
-        ModelStateRetriever.load_state_dict_(model=self._model, state_dict=state_dict[StatefulComponents.MODEL.value])
+        ModelStateRetriever.load_state_dict_(app_state=self, state_dict=state_dict[StatefulComponents.MODEL.value])
         OptimizerStateRetriever.load_state_dict_(
-            model=self._model,
-            optimizer=self._optimizer,
+            app_state=self,
             state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
         )
         LRSchedulerStateRetriever.load_state_dict_(
-            lr_scheduler=self._lr_scheduler, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
+            app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
         )
         self._is_loaded = True

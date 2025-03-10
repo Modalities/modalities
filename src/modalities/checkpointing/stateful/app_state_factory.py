@@ -16,12 +16,12 @@ class AppStateFactory:
     def get_dcp_checkpointed_app_state(
         self,
         app_state: AppState,
-        checkpoint_path: Path,
+        checkpoint_directory_path: Path,
     ) -> AppState:
         if app_state.is_loaded:
             raise RuntimeError(
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
 
-        DCPCheckpointLoading.load_checkpoint_(app_state=app_state, checkpoint_directory_path=checkpoint_path)
+        DCPCheckpointLoading.load_checkpoint_(app_state=app_state, checkpoint_directory_path=checkpoint_directory_path)
         return app_state
