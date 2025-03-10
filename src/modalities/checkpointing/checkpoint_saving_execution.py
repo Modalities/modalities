@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 
-import torch.nn as nn
-from torch.optim import Optimizer
-
 from modalities.checkpointing.checkpoint_saving_instruction import CheckpointingInstruction
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.training.training_progress import TrainingProgress
 
 
@@ -11,7 +9,7 @@ class CheckpointSavingExecutionABC(ABC):
     """Abstract class for saving PyTorch model and optimizer checkpoints."""
 
     @abstractmethod
-    def _save_checkpoint(self, model: nn.Module, optimizer: Optimizer, training_progress: TrainingProgress):
+    def _save_checkpoint(self, app_state: AppState, training_progress: TrainingProgress):
         """
         Saves the checkpoint of the model and optimizer.
 
@@ -42,8 +40,7 @@ class CheckpointSavingExecutionABC(ABC):
         self,
         checkpointing_instruction: CheckpointingInstruction,
         training_progress: TrainingProgress,
-        model: nn.Module,
-        optimizer: Optimizer,
+        app_state: AppState,
     ):
         """
         Runs the checkpoint instruction.
@@ -51,11 +48,10 @@ class CheckpointSavingExecutionABC(ABC):
         Args:
             checkpointing_instruction (CheckpointingInstruction): The checkpointing instruction.
             training_progress (TrainingProgress): The training progress.
-            model (nn.Module): The model.
-            optimizer (Optimizer): The optimizer.
+            app_state (AppState): The application state to be checkpointed.
         """
         if checkpointing_instruction.save_current:
-            self._save_checkpoint(model=model, optimizer=optimizer, training_progress=training_progress)
+            self._save_checkpoint(app_state=app_state, training_progress=training_progress)
 
         for training_progress_to_delete in checkpointing_instruction.checkpoints_to_delete:
             self._delete_checkpoint(training_progress=training_progress_to_delete)
