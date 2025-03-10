@@ -12,7 +12,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
-from modalities.checkpointing.fsdp.app_state import AppState
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -51,7 +51,7 @@ class ModelFactory:
             nn.Module: The loaded wrapped model.
 
         """
-        wrapped_model = checkpoint_loading.load_model_checkpoint(
+        wrapped_model = checkpoint_loading.load_model_checkpoint_(
             file_path=checkpoint_path,
             model=model,
         )
