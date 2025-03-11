@@ -441,7 +441,6 @@ class Main:
         Args:
             components (TrainingComponentsInstantiationModel): The components needed for the training process.
         """
-        print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
             experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
@@ -491,9 +490,8 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        wrapped_model = components.wrapped_model
-        num_params = get_total_number_of_trainable_parameters(wrapped_model)
-        components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model)
+        components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
         print_rank_0(f"Model initialized at {datetime.now()}.")
@@ -514,9 +512,7 @@ class Main:
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
             checkpoint_saving=components.checkpoint_saving,
-            model=wrapped_model,
-            optimizer=components.optimizer,
-            scheduler=components.scheduler,
+            app_state=components.app_state,
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,

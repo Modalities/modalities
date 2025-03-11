@@ -14,8 +14,7 @@ class CheckpointSavingExecutionABC(ABC):
         Saves the checkpoint of the model and optimizer.
 
         Args:
-            model (nn.Module): The model to be saved.
-            optimizer (Optimizer): The optimizer to be saved.
+            app_state (AppState): The application state to be checkpointed.
             training_progress (TrainingProgress): The training progress.
 
         Raises:

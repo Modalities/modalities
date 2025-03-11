@@ -3,12 +3,12 @@ from typing import Callable, Optional
 
 import torch
 import torch.distributed as dist
-import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
@@ -131,10 +131,8 @@ class Trainer:
 
     def train(
         self,
-        model: nn.Module,
+        app_state: AppState,
         train_loader: LLMDataLoader,
-        optimizer: Optimizer,
-        scheduler: LRScheduler,
         loss_fun: Loss,
         training_log_interval_in_steps: int,
         evaluation_callback: Callable[[TrainingProgress], None],
@@ -144,10 +142,8 @@ class Trainer:
         Trains the model.
 
         Args:
-            model (nn.Module): The model to be trained.
+            app_state (AppState): The application state containing the model, optimizer and lr scheduler.
             train_loader (LLMDataLoader): The data loader containing the training data.
-            optimizer (Optimizer): The optimizer used for gradient updates.
-            scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
             training_log_interval_in_steps (int): The interval at which training progress is logged.
             evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.
@@ -156,7 +152,11 @@ class Trainer:
         Returns:
             None
         """
+        model = app_state.model
+        optimizer = app_state.optimizer
+        lr_scheduler = app_state.lr_scheduler
         model.train()
+
         cumulated_losses = self._reset_tracked_losses()
 
         # throughput & MFU
@@ -200,7 +200,7 @@ class Trainer:
                 batch=batch,
                 model=model,
                 optimizer=optimizer,
-                scheduler=scheduler,
+                scheduler=lr_scheduler,
                 loss_fun=loss_fun,
                 micro_batch_id=micro_batch_id,
             )
@@ -280,7 +280,7 @@ class Trainer:
                     throughput_metrics={
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
                         "train mfu": ResultItem(mfu, 2),
-                        "lr mean": ResultItem(torch.tensor(scheduler.get_last_lr()).mean()),
+                        "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,

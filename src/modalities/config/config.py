@@ -23,6 +23,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticDistributedCheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
@@ -318,9 +319,15 @@ class ActivationCheckpointedModelConfig(BaseModel):
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
-class AppStateConfig(BaseModel):
+class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
+    lr_scheduler: PydanticLRSchedulerIFType
+
+
+class DCPAppStateConfig(BaseModel):
+    app_state: PydanticAppStateType
+    checkpoint_dir_path: Path
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
