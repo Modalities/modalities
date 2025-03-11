@@ -195,7 +195,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: fsdp1
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -257,23 +257,20 @@ model_raw:
       qkv_transforms: []
     attention_implementation: manual
     activation_type: gelu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
