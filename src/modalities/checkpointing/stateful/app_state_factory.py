@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import torch.distributed as dist
 import torch.nn as nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -23,6 +24,6 @@ class AppStateFactory:
             raise RuntimeError(
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
-
-        DCPCheckpointLoading.load_checkpoint_(app_state=app_state, checkpoint_dir_path=checkpoint_dir_path)
+        cp_loading = DCPCheckpointLoading(global_rank=dist.get_rank())
+        cp_loading.load_checkpoint_(app_state=app_state, checkpoint_dir_path=checkpoint_dir_path)
         return app_state

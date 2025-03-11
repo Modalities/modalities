@@ -1,5 +1,5 @@
+import copy
 from abc import ABC, abstractmethod
-from copy import copy
 from enum import Enum
 from typing import Any
 

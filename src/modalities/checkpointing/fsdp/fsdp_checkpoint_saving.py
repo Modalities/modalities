@@ -239,7 +239,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
 
         distributed_checkpoint_path.mkdir(parents=True, exist_ok=True)
         get_logger().info(f"Saving distributed model checkpoint to {distributed_checkpoint_path}...")
-        state_dict = app_state.state_dict()
+        state_dict = {"app": app_state}
         dcp.save(state_dict, checkpoint_id=distributed_checkpoint_path)
         get_logger().info("Distributed checkpoint saved.")
 

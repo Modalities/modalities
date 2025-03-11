@@ -12,10 +12,11 @@ settings:
   paths:
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: ./data/lorem_ipsum_long.pbin
+    test_dataset_path: ./data/lorem_ipsum.pbin
   intervals:
-    training_log_interval_in_steps: 2
-    checkpointing_interval_in_steps: 2
-    evaluation_interval_in_steps: 2
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 32
+    evaluation_interval_in_steps: 32
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
@@ -98,6 +99,14 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
+test_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.test_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+
 test_dataloader:
   component_key: data_loader
   variant_key: default
@@ -106,7 +115,7 @@ test_dataloader:
     pin_memory: true
     dataloader_tag: test
     dataset:
-      instance_key: train_dataset
+      instance_key: test_dataset
       pass_type: BY_REFERENCE
     batch_sampler:
       component_key: batch_sampler
@@ -123,7 +132,7 @@ test_dataloader:
             shuffle: false
             drop_last: true
             dataset:
-              instance_key: train_dataset
+              instance_key: test_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
@@ -162,10 +171,23 @@ device_mesh:
   variant_key: default
   config:
     device_type: cuda
-    data_parallel_replicate_degree: 2
-    data_parallel_shard_degree: 2
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 4
     world_size: ${settings.cuda_env.world_size}
 
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: scheduler
+      pass_type: BY_REFERENCE
 
 wrapped_model: 
   component_key: model
@@ -297,8 +319,8 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: modalities_lorem_ipsum
-    mode: OFFLINE
+    project: modalities_dcp_tests
+    mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
