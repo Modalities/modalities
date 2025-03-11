@@ -12,7 +12,6 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import LocalCheckpointLoadingIF
-from modalities.checkpointing.stateful.app_state import AppState
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -56,22 +55,6 @@ class ModelFactory:
             model=model,
         )
         return wrapped_model
-
-    @staticmethod
-    def get_dcp_checkpointed_model(app_state: AppState) -> nn.Module:
-        """
-        Loads model from distributed checkpoint.
-
-        Args:
-            checkpoint_loading (DistributedCheckpointLoadingIF): The checkpoint loading approach used to
-                load the distributed model checkpoint.
-        Returns:
-            nn.Module: The loaded model.
-
-        """
-        if not app_state.is_loaded:
-            raise RuntimeError("AppState must be loaded beforehand!")
-        return app_state.model
 
     @deprecated(
         "With version 0.4, we upgraded FSDP to FSDP 2.0. "

@@ -20,7 +20,6 @@ from modalities.config.pydanctic_if_types import (
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
-    PydanticDistributedCheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticLRSchedulerIFType,
@@ -230,22 +229,10 @@ class CheckpointedOptimizerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
 
-class DCPCheckpointedOptimizerConfig(BaseModel):
-    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
-    checkpoint_path: Path
-    app_state: PydanticAppStateType
-
-
 class CheckpointedModelConfig(BaseModel):
     checkpoint_loading: PydanticCheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
-
-
-class DCPCheckpointedModelConfig(BaseModel):
-    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
-    checkpoint_path: Path
-    app_state: PydanticAppStateType
 
 
 @deprecated(

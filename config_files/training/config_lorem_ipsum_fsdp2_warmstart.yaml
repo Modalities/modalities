@@ -313,14 +313,6 @@ scheduler:
     anneal_strategy: cos
     # last_epoch: -1 # ${settings.training_progress.last_step}
 
-# scheduler:
-#   component_key: scheduler
-#   variant_key: dummy_lr
-#   config:
-#     optimizer:
-#       instance_key: optimizer
-#       pass_type: BY_REFERENCE
-
 
 optimizer:  
   component_key: optimizer

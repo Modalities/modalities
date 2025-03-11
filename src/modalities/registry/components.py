@@ -28,8 +28,6 @@ from modalities.config.config import (
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DCPAppStateConfig,
-    DCPCheckpointedModelConfig,
-    DCPCheckpointedOptimizerConfig,
     DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
     DistributedSamplerConfig,
@@ -136,7 +134,6 @@ COMPONENTS = [
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
     ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
-    ComponentEntity("model", "dcp_checkpointed", ModelFactory.get_dcp_checkpointed_model, DCPCheckpointedModelConfig),
     ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp_2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
@@ -165,9 +162,6 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
         "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
-    ),
-    ComponentEntity(
-        "optimizer", "dcp_checkpointed", OptimizerFactory.get_dcp_checkpointed_optimizer, DCPCheckpointedOptimizerConfig
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),

@@ -186,7 +186,7 @@ app_state:
       instance_key: optimizer
       pass_type: BY_REFERENCE
     lr_scheduler:
-      instance_key: scheduler
+      instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
 wrapped_model: 
@@ -264,7 +264,7 @@ model_raw:
         normalized_shape: ${model_raw.config.n_embd}
         eps: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
