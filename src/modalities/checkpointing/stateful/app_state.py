@@ -1,7 +1,7 @@
 import copy
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 import torch.nn as nn
 from torch.distributed.checkpoint.state_dict import (
@@ -34,7 +34,7 @@ class AppState(Stateful):
     and optimizer.
     """
 
-    def __init__(self, model: nn.Module, optimizer: Optimizer, lr_scheduler: LRScheduler):
+    def __init__(self, model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None):
         self._model = model
         self._optimizer = optimizer
         self._lr_scheduler = lr_scheduler
@@ -60,15 +60,15 @@ class AppState(Stateful):
         # this line automatically manages FSDP FQN's, as well as sets the default
         # state dict type to FSDP.SHARDED_STATE_DICT
         # model_state_dict, optimizer_state_dict = get_state_dict(self._model, self._optimizer)
-        return {
+        sd = {
             StatefulComponents.MODEL.value: ModelStateRetriever.get_state_dict(app_state=self),
             StatefulComponents.OPTIMIZER.value: OptimizerStateRetriever.get_state_dict(
                 app_state=self,
             ),
-            StatefulComponents.LR_SCHEDULER.value: LRSchedulerStateRetriever.get_state_dict(
-                app_state=self,
-            ),
         }
+        if self._lr_scheduler is not None:
+            sd[StatefulComponents.LR_SCHEDULER.value] = LRSchedulerStateRetriever.get_state_dict(app_state=self)
+        return sd
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         # sets our state dicts on the model, optimizer and lr scheduler.
@@ -82,9 +82,10 @@ class AppState(Stateful):
             app_state=self,
             state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
         )
-        LRSchedulerStateRetriever.load_state_dict_(
-            app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
-        )
+        if self._lr_scheduler is not None:
+            LRSchedulerStateRetriever.load_state_dict_(
+                app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
+            )
         self._is_loaded = True
 
 
