@@ -29,7 +29,7 @@ class TorchCheckpointLoading(LocalCheckpointLoadingIF):
         self.device = device
         self.precision = precision
 
-    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads a model checkpoint from the specified file path.
 
@@ -65,7 +65,7 @@ class TorchCheckpointLoading(LocalCheckpointLoadingIF):
         )
         return model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
         """
         Load the optimizer checkpoint from the specified file path.
 

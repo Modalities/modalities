@@ -22,7 +22,7 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 256
@@ -45,11 +45,30 @@ settings:
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
-    global_num_seen_tokens: 0
-    num_seen_steps: 0
-    num_seen_samples: 0
-    last_step: -1
+  training_progress:
+    global_num_seen_tokens:   # used below
+      component_key: number_conversion
+      variant_key: global_num_seen_tokens_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
+    num_seen_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_seen_steps_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
+    num_seen_samples:
+      component_key: number_conversion
+      variant_key: num_samples_from_num_tokens
+      config:
+        num_tokens: ${settings.training_progress.global_num_seen_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+    last_step:  # for the scheduler
+      component_key: number_conversion
+      variant_key: last_step_from_checkpoint_path
+      config:
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
+  warmstart_checkpoint_paths: # ${warmstart_env:checkpoint_paths}
+    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-11__11-44-33_7f5d89b7/eid_2025-03-11__11-44-33_7f5d89b7-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
 
 collate_fn:
   component_key: collate_fn
@@ -142,6 +161,12 @@ eval_dataloaders:
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE
 
+checkpoint_loading:
+  component_key: checkpoint_loading
+  variant_key: dcp
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+
 checkpoint_saving:
   component_key: checkpoint_saving
   variant_key: default
@@ -177,19 +202,28 @@ device_mesh:
 
 app_state:
   component_key: app_state
+  variant_key: dcp
+  config:
+    app_state:
+      instance_key: app_state_raw
+      pass_type: BY_REFERENCE
+    checkpoint_dir_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
+
+app_state_raw:
+  component_key: app_state
   variant_key: raw
   config:
-    model: 
+    model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
     lr_scheduler:
-      instance_key: lr_scheduler
+      instance_key: scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model: 
+wrapped_model:
   component_key: model
   variant_key: model_initialized
   config:
@@ -264,12 +298,12 @@ model_raw:
         normalized_shape: ${model_raw.config.n_embd}
         eps: 1e-5
 
-lr_scheduler:
+scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
     optimizer:
-      instance_key: optimizer
+      instance_key: optimizer # TODO check if we don't need the DCPed optimizer here
       pass_type: BY_REFERENCE
     max_lr: 6e-4
     div_factor: 10
@@ -277,9 +311,10 @@ lr_scheduler:
     total_steps: ${settings.training_target.num_target_steps}
     pct_start: 0.01
     anneal_strategy: cos
-    last_epoch: ${settings.training_progress.last_step}
+    # last_epoch: -1 # ${settings.training_progress.last_step}
 
-optimizer:
+
+optimizer:  
   component_key: optimizer
   variant_key: adam_w
   config:
