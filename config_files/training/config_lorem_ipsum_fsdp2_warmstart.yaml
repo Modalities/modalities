@@ -242,7 +242,7 @@ wrapped_model:
 
 fsdp_model:
   component_key: model
-  variant_key: fsdp_2_wrapped
+  variant_key: fsdp2_wrapped
   config:
     model:
       instance_key: model_raw

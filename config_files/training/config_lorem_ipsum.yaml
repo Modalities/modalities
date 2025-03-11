@@ -177,7 +177,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: fsdp1
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -190,9 +190,23 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
 wrapped_model:
   component_key: model
-  variant_key: fsdp_wrapped
+  variant_key: fsdp1_wrapped
   config:
     model:
       instance_key: model
@@ -245,29 +259,26 @@ model_raw:
             base_freq: 10000
     attention_implementation: manual
     activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:

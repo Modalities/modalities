@@ -33,6 +33,19 @@ class ModelFactory:
     """Model factory class to create models."""
 
     @staticmethod
+    def _is_model_on_meta_device(model: nn.Module) -> bool:
+        meta_counter = 0
+        param_counter = 0
+        for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
+            if tensor.device == torch.device("meta"):
+                meta_counter += 1
+            param_counter += 1
+
+        if meta_counter > 0 and meta_counter < param_counter:
+            raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
+        return meta_counter > 0
+
+    @staticmethod
     def get_checkpointed_model(
         checkpoint_loading: LocalCheckpointLoadingIF,
         checkpoint_path: Path,
@@ -86,6 +99,9 @@ class ModelFactory:
             'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
             Different auto wrap policies may be supported in the future.
         """
+        if ModelFactory._is_model_on_meta_device(model=model):
+            raise ModelStateError("Meta device initialization is not supported for FSDP1. Use FSDP2 instead.")
+
         print(
             f"Unsharded number of parameters on rank {dist.get_rank()}: "
             f"{get_local_number_of_trainable_parameters(model)}"
@@ -179,19 +195,7 @@ class ModelFactory:
                 module.reset_parameters()
 
         # initialize the weights if they are on a meta device
-        def is_model_on_meta_device(model: nn.Module) -> bool:
-            meta_counter = 0
-            param_counter = 0
-            for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
-                if tensor.device == torch.device("meta"):
-                    meta_counter += 1
-                param_counter += 1
-
-            if meta_counter > 0 and meta_counter < param_counter:
-                raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
-            return meta_counter > 0
-
-        if is_model_on_meta_device(model=model):
+        if ModelFactory._is_model_on_meta_device(model=model):
             # Allocate buffers and sharded parameters on GPU
             model = model.to_empty(device="cuda")
 
