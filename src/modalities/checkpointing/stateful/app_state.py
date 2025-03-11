@@ -1,16 +1,19 @@
+from abc import ABC, abstractmethod
+from copy import copy
 from enum import Enum
 from typing import Any
 
 import torch.nn as nn
+from torch.distributed.checkpoint.state_dict import (
+    StateDictOptions,
+    get_model_state_dict,
+    get_optimizer_state_dict,
+    set_model_state_dict,
+    set_optimizer_state_dict,
+)
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-
-from modalities.checkpointing.stateful.state_retriever import (
-    LRSchedulerStateRetriever,
-    ModelStateRetriever,
-    OptimizerStateRetriever,
-)
 
 
 class StatefulComponents(Enum):
@@ -58,12 +61,12 @@ class AppState(Stateful):
         # state dict type to FSDP.SHARDED_STATE_DICT
         # model_state_dict, optimizer_state_dict = get_state_dict(self._model, self._optimizer)
         return {
-            StatefulComponents.MODEL.value: ModelStateRetriever.get_state_dict(model=self._model),
+            StatefulComponents.MODEL.value: ModelStateRetriever.get_state_dict(app_state=self),
             StatefulComponents.OPTIMIZER.value: OptimizerStateRetriever.get_state_dict(
-                model=self._model, optimizer=self._optimizer
+                app_state=self,
             ),
             StatefulComponents.LR_SCHEDULER.value: LRSchedulerStateRetriever.get_state_dict(
-                lr_scheduler=self._lr_scheduler
+                app_state=self,
             ),
         }
 
@@ -83,3 +86,62 @@ class AppState(Stateful):
             app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
         )
         self._is_loaded = True
+
+
+class StateRetrieverIF(ABC):
+    @staticmethod
+    @abstractmethod
+    def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class ModelStateRetriever(StateRetrieverIF):
+    @staticmethod
+    def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        return get_model_state_dict(model=app_state.model)
+
+    @staticmethod
+    def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        set_model_state_dict(model=app_state.model, model_state_dict=state_dict, options=StateDictOptions(strict=False))
+
+
+class OptimizerStateRetriever(StateRetrieverIF):
+    @staticmethod
+    def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        sd = get_optimizer_state_dict(
+            model=app_state.model,
+            optimizers=app_state.optimizer,
+            options=StateDictOptions(flatten_optimizer_state_dict=True),
+        )
+        return sd
+
+    @staticmethod
+    def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        set_optimizer_state_dict(
+            model=app_state.model,
+            optimizers=app_state.optimizer,
+            optim_state_dict=state_dict,
+            options=StateDictOptions(flatten_optimizer_state_dict=True),
+        )
+
+
+class LRSchedulerStateRetriever(StateRetrieverIF):
+    @staticmethod
+    def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        return app_state.lr_scheduler.state_dict()
+
+    @staticmethod
+    def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        # NOTE from torchtitan:
+        # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/optimizer.py#L363
+        # The key value we're concerned
+        # within ``LRScheduler.state_dict()`` is ``last_epoch``, which is an integer
+        # that is immutable. As long as ``steps`` and ``warmup_steps``
+        # in ``job_config`` remain unchanged when resuming from a checkpoint, this
+        # approach is safe. We call ``copy()`` here to ensure extra safety.
+        app_state.lr_scheduler.load_state_dict(copy.deepcopy(state_dict))
