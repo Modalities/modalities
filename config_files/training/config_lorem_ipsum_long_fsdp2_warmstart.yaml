@@ -68,7 +68,7 @@ settings:
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
   warmstart_checkpoint_paths: # ${warmstart_env:checkpoint_paths}
-    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-11__11-44-33_7f5d89b7/eid_2025-03-11__11-44-33_7f5d89b7-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
+    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-12__16-15-10_970fedec_fsdp2_lorem_ipsum_long/eid_2025-03-12__16-15-10_970fedec-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
 
 collate_fn:
   component_key: collate_fn
@@ -204,7 +204,7 @@ app_state:
   component_key: app_state
   variant_key: dcp
   config:
-    app_state:
+    raw_app_state:
       instance_key: app_state_raw
       pass_type: BY_REFERENCE
     checkpoint_dir_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
@@ -220,7 +220,7 @@ app_state_raw:
       instance_key: optimizer
       pass_type: BY_REFERENCE
     lr_scheduler:
-      instance_key: scheduler
+      instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
 wrapped_model:
@@ -298,12 +298,12 @@ model_raw:
         normalized_shape: ${model_raw.config.n_embd}
         eps: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
     optimizer:
-      instance_key: optimizer # TODO check if we don't need the DCPed optimizer here
+      instance_key: optimizer
       pass_type: BY_REFERENCE
     max_lr: 6e-4
     div_factor: 10
@@ -314,7 +314,7 @@ scheduler:
     # last_epoch: -1 # ${settings.training_progress.last_step}
 
 
-optimizer:  
+optimizer:
   component_key: optimizer
   variant_key: adam_w
   config:
