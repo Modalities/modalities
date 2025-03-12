@@ -168,7 +168,7 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_meta_device: true
+    use_meta_device: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -210,7 +210,7 @@ model_raw:
         bias: true
         epsilon: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
@@ -240,7 +240,7 @@ optimizer:
       pass_type: BY_REFERENCE
     checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
 
-optimizer_original:  
+optimizer_original:
   component_key: optimizer
   variant_key: adam_w
   config:
