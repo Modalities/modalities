@@ -2,16 +2,18 @@ from pathlib import Path
 
 import torch
 import torch.distributed.checkpoint as dcp
+import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
+from torch.optim import Optimizer
 
-from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, FSDP1CheckpointLoadingIF
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.utils.logging import get_logger
 
 
-class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
+class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
     """FSDP checkpoint loading class."""
 
     def __init__(
@@ -38,7 +40,7 @@ class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
 
-    def load_model_checkpoint_(self, app_state: AppState, file_path: Path):
+    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads the checkpoint as full state dict into the model on rank 0.
         After loading the model to CPU RAM, the model is wrapped with FSDP and sharded
@@ -56,28 +58,28 @@ class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
         if self.global_rank == 0:
             # load model on rank 0 into CPU RAM
             model_state = torch.load(file_path)
-            app_state.model.load_state_dict(model_state)
+            model.load_state_dict(model_state)
 
         # TODO nasty workaround to prevent circular imports
         from modalities.models.model_factory import ModelFactory
 
         fsdp_model = ModelFactory.get_fsdp_wrapped_model(
-            model=app_state.model,
+            model=model,
             sync_module_states=True,
             block_names=self.block_names,
             mixed_precision_settings=self.mixed_precision_settings,
             sharding_strategy=self.sharding_strategy,
         )
-        app_state.model = fsdp_model
         get_logger().info(f"Model checkpoint loaded on rank {self.global_rank}.")
+        return fsdp_model
 
-    def load_optimizer_checkpoint_(self, app_state: AppState, file_path: Path):
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
         """
-        Loads the checkpoint as full state dict into the optimizer (in-place) on rank 0
-        and shards it subsequently.
+        Loads the checkpoint as full state dict into the optimizer on rank 0
 
         Args:
-            app_state (AppState): The application state with the model and optimizer.
+            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            model (FSDP): The FSDP-wrapped model.
             file_path (Path): The path to the checkpoint file.
 
         Returns:
@@ -93,10 +95,11 @@ class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
 
         # distribute the optimizer state dict from rank 0 to all the other ranks
         sharded_optimizer_state_dict = FSDP.scatter_full_optim_state_dict(
-            full_optim_state_dict=full_optimizer_state_dict, model=app_state.model, group=None
+            full_optim_state_dict=full_optimizer_state_dict, model=model, group=None
         )
-        app_state.optimizer.load_state_dict(sharded_optimizer_state_dict)
+        optimizer.load_state_dict(sharded_optimizer_state_dict)
         get_logger().info(f"Optimizer checkpoint loaded on rank {self.global_rank}.")
+        return optimizer
 
 
 class DCPCheckpointLoading(DistributedCheckpointLoadingIF):

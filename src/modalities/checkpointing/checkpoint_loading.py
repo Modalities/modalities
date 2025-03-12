@@ -15,7 +15,7 @@ class DistributedCheckpointLoadingIF(ABC):
         raise NotImplementedError
 
 
-class LocalCheckpointLoadingIF(ABC):
+class FSDP1CheckpointLoadingIF(ABC):
     """Checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
 
     @abstractmethod

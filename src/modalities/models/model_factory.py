@@ -11,7 +11,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
-from modalities.checkpointing.checkpoint_loading import LocalCheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -47,7 +47,7 @@ class ModelFactory:
 
     @staticmethod
     def get_checkpointed_model(
-        checkpoint_loading: LocalCheckpointLoadingIF,
+        checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
     ) -> nn.Module:

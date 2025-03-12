@@ -14,12 +14,12 @@ from typing_extensions import deprecated
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
     PydanticAppStateType,
-    PydanticCheckpointLoadingIFType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
+    PydanticFSDP1CheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticLRSchedulerIFType,
@@ -95,7 +95,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
         return parse_torch_device(device)
 
 
-class FSDPCheckpointLoadingConfig(BaseModel):
+class FSDP1CheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     block_names: list[str]
     mixed_precision_settings: MixedPrecisionSettings
@@ -122,7 +122,7 @@ class DCPCheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
-class FSDPCheckpointSavingConfig(BaseModel):
+class FSDP1CheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
@@ -223,14 +223,14 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
 class CheckpointedModelConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
@@ -309,11 +309,11 @@ class ActivationCheckpointedModelConfig(BaseModel):
 class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
-    lr_scheduler: PydanticLRSchedulerIFType
+    lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
 
 
 class DCPAppStateConfig(BaseModel):
-    app_state: PydanticAppStateType
+    raw_app_state: PydanticAppStateType
     checkpoint_dir_path: Path
 
 

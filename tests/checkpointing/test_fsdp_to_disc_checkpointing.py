@@ -14,7 +14,7 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDP1CheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDP1CheckpointSaving
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
@@ -209,7 +209,7 @@ class TestFSDPToDiscCheckpointing:
             global_rank=dist.get_rank(),
         )
 
-        checkpoint_loading = FSDPCheckpointLoading(
+        checkpoint_loading = FSDP1CheckpointLoading(
             global_rank=dist.get_rank(),
             block_names=["GPT2Block"],
             mixed_precision_settings=MixedPrecisionSettings.FP_16,

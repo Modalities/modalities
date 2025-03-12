@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Adam, AdamW, Optimizer
 
-from modalities.checkpointing.checkpoint_loading import LocalCheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
@@ -40,7 +40,7 @@ class OptimizerFactory:
 
     @staticmethod
     def get_checkpointed_optimizer(
-        checkpoint_loading: LocalCheckpointLoadingIF,
+        checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         wrapped_model: nn.Module,
         optimizer: Optimizer,
