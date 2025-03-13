@@ -7,7 +7,8 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
 from torch.distributed.device_mesh import DeviceMesh
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FSDPModule as FSDP2
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP  # TODO: rename to FSDP1
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
@@ -133,7 +134,7 @@ class ModelFactory:
         device_mesh: DeviceMesh,
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
-    ) -> nn.Module:
+    ) -> FSDP2:
         """
         Based on https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/parallelisms/parallelize_llama.py#L459
         and https://github.com/pytorch/torchtitan/blob/43584e0a4e72645e25cccd05d86f9632587a8beb/docs/fsdp.md

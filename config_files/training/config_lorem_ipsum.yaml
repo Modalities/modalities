@@ -260,25 +260,21 @@ model_raw:
     attention_implementation: manual
     activation_type: swiglu
     attention_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
     ffn_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
     lm_head_norm_config:
-      norm_type: rms_norm
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-
-lr_scheduler:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
