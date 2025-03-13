@@ -2,10 +2,13 @@ import warnings
 from typing import Optional
 
 import torch
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FSDPModule as FSDP2
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.types import Number
 
 from modalities.util import get_total_number_of_trainable_parameters
+
+FSDP = FSDP1 | FSDP2  # TODO: Move this to a central place & import
 
 # A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/
 # H100: https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/
@@ -39,7 +42,7 @@ def _get_theoretical_gpu_peak_performance_single(precision: torch.dtype, gpu_typ
 
 def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Optional[Number]:
     """
-    Calculates the accummulated theoretical peak performance based on all GPUs, i.e.,
+    Calculates the accumulated theoretical peak performance based on all GPUs, i.e.,
       #GPU=world_size, in units FLOPs / s for given gpu type.
 
     Args:
@@ -47,20 +50,20 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
         world_size (int): The number of GPUs used in parallel.
 
     Returns:
-        (Number, optional): The accummulated theoretical peak performance of all GPUs,
+        (Number, optional): The accumulated theoretical peak performance of all GPUs,
           or None if it cannot be calculated.
     """
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-        if hasattr(model, "mixed_precision"):
-            # FSDP1
+        if isinstance(model, FSDP1):
             precision = model.mixed_precision.param_dtype
             if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
                 warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
                 return None
-        else:
-            # FSDP2
+        elif isinstance(model, FSDP2):
             warnings.warn("MFU is computed based on the assumption that bf16 precision is used.")
             precision = torch.bfloat16
+        else:
+            raise TypeError(f"Model should be of type FSDP, but is {type(model)} instead.")
 
         device_name = torch.cuda.get_device_name()
         if device_name.startswith("NVIDIA A100"):
@@ -103,12 +106,12 @@ def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optiona
     ):  # NOTE: This is a workaround to make cpu-only tests work
         N = get_total_number_of_trainable_parameters(model)
 
-        if hasattr(model, "module"):
-            # FSDP1
+        if isinstance(model, FSDP1):
             model_module = model.module
-        else:
-            # FSDP2
+        elif isinstance(model, FSDP2):
             model_module = model
+        else:
+            raise TypeError(f"Model should be of type FSDP, but is {type(model)} instead.")
 
         try:
             L = model_module.n_layer
