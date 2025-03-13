@@ -1,7 +1,8 @@
 from typing import Iterable, Optional
 
 import torch
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FSDPModule as FSDP2
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.tensor import DTensor
 
 from modalities.config.lookup_enum import LookupEnum
@@ -23,15 +24,18 @@ class GradientClippingMode(LookupEnum):
     MAX_NORM = "inf"
 
 
-class FSDPGradientClipper(GradientClipperIF):
-    """The FSDPGradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP."""
+class FSDP1GradientClipper(GradientClipperIF):
+    """The FSDP1GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP.
+    Follows the documeentation from
+    https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.clip_grad_norm_
+    """
 
-    def __init__(self, wrapped_model: FSDP, max_norm: float, norm_type=GradientClippingMode) -> None:
+    def __init__(self, wrapped_model: FSDP1, max_norm: float, norm_type=GradientClippingMode) -> None:
         """
-        Initialize the FSDPGradientClipper object.
+        Initialize the FSDP1GradientClipper object.
 
         Args:
-            wrapped_model (FSDP): The wrapped model.
+            wrapped_model (FSDP1): The wrapped model.
             max_norm (float): The maximum norm value for gradient clipping.
             norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
 
@@ -49,16 +53,76 @@ class FSDPGradientClipper(GradientClipperIF):
         Returns:
             torch.Tensor: The gradient norm after clipping.
         """
-        gradient_norm_score = FSDPGradientClipper.clip_grad_norm_(
+        gradient_norm_score = self.wrapped_model.clip_grad_norm_(max_norm=self.max_norm, norm_type=self.norm_type.value)
+        return gradient_norm_score
+
+
+class FSDP1LoggingOnlyGradientClipper(GradientClipperIF):
+    """The FSDP1LoggingOnlyGradientClipper class that is responsible for logging the gradient
+    norms without actually clipping the gradients."""
+
+    def __init__(self, wrapped_model: FSDP1, norm_type=GradientClippingMode) -> None:
+        """
+        Initialize the FSDP1LoggingOnlyGradientClipper.
+
+        Args:
+            wrapped_model (FSDP1): The wrapped FSDP1 model.
+            norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
+
+        Returns:
+            None
+        """
+        self.wrapped_model = wrapped_model
+        self.norm_type = norm_type
+
+    @torch.no_grad()
+    def clip_gradients(self) -> torch.Tensor:
+        """
+        Returns the gradient norm, but does not apply clipping since max_norm is set to inifinity.
+
+        Returns:
+            torch.Tensor: The gradient norms.
+        """
+        gradient_norm_score = self.wrapped_model.clip_grad_norm_(max_norm=torch.inf, norm_type=self.norm_type.value)
+        return gradient_norm_score
+
+
+class FSDP2GradientClipper(GradientClipperIF):
+    """The FSDP2GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP."""
+
+    def __init__(self, wrapped_model: FSDP2, max_norm: float, norm_type=GradientClippingMode) -> None:
+        """
+        Initialize the FSDP2GradientClipper object.
+
+        Args:
+            wrapped_model (FSDP2): The wrapped model.
+            max_norm (float): The maximum norm value for gradient clipping.
+            norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
+
+        Returns:
+            None
+        """
+        self.wrapped_model = wrapped_model
+        self.max_norm = max_norm
+        self.norm_type = norm_type
+
+    @torch.no_grad()
+    def clip_gradients(self) -> torch.Tensor:
+        """
+        Clips the gradients of the wrapped model using the specified maximum norm and norm type.
+
+        Returns:
+            torch.Tensor: The gradient norm after clipping.
+        """
+        gradient_norm_score = FSDP2GradientClipper.clip_grad_norm_(
             parameters=self.wrapped_model.parameters(),
             max_norm=self.max_norm,
             norm_type=self.norm_type.value,
-            error_if_nonfinite=False,
+            error_if_nonfinite=True,
             foreach=True,
         )
         return gradient_norm_score
 
-    @torch.no_grad()
     @staticmethod
     def clip_grad_norm_(
         parameters: torch.Tensor | Iterable[torch.Tensor],
@@ -110,16 +174,16 @@ class FSDPGradientClipper(GradientClipperIF):
         return total_norm
 
 
-class FSDPLoggingOnlyGradientClipper(GradientClipperIF):
-    """The FSDPLoggingOnlyGradientClipper class that is responsible for logging the gradient
+class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
+    """The FSDP2LoggingOnlyGradientClipper class that is responsible for logging the gradient
     norms without actually clipping the gradients."""
 
-    def __init__(self, wrapped_model: FSDP, norm_type=GradientClippingMode) -> None:
+    def __init__(self, wrapped_model: FSDP2, norm_type=GradientClippingMode) -> None:
         """
-        Initialize the FSDPLoggingOnlyGradientClipper.
+        Initialize the FSDP2LoggingOnlyGradientClipper.
 
         Args:
-            wrapped_model (FSDP): The wrapped FSDP model.
+            wrapped_model (FSDP2): The wrapped FSDP2 model.
             norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
 
         Returns:

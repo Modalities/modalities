@@ -85,8 +85,10 @@ from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
-    FSDPGradientClipper,
-    FSDPLoggingOnlyGradientClipper,
+    FSDP1GradientClipper,
+    FSDP1LoggingOnlyGradientClipper,
+    FSDP2GradientClipper,
+    FSDP2LoggingOnlyGradientClipper,
 )
 from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     DummyGradientClipperConfig,
@@ -260,9 +262,13 @@ COMPONENTS = [
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
     # gradient clippers
-    ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDPGradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+        "gradient_clipper", "fsdp1_logging_only", FSDP1LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+    ),
+    ComponentEntity("gradient_clipper", "fsdp2", FSDP2GradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity(
+        "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
     # Number conversion

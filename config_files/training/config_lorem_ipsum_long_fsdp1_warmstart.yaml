@@ -299,7 +299,7 @@ optimizer:
   variant_key: checkpointed
   config:
     optimizer:
-      instance_key: optimizer_original
+      instance_key: optimizer_initial
       pass_type: BY_REFERENCE
     wrapped_model:
       instance_key: wrapped_model
@@ -309,7 +309,7 @@ optimizer:
       pass_type: BY_REFERENCE
     checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
 
-optimizer_original:
+optimizer_initial:
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -324,7 +324,7 @@ optimizer_original:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp1
   config:
     wrapped_model:
       instance_key: wrapped_model
