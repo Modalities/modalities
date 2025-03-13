@@ -279,7 +279,7 @@ class Trainer:
                     # TODO: hardcoded metric key
                     throughput_metrics={
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
-                        "train mfu": ResultItem(mfu, 2),
+                        "train mfu (16-bit)": ResultItem(mfu, 2),
                         "lr mean": ResultItem(torch.tensor(scheduler.get_last_lr()).mean()),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
