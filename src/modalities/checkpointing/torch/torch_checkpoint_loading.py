@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 
-from modalities.checkpointing.checkpoint_loading import LocalCheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.config.config import PrecisionEnum
 from modalities.util import get_local_number_of_trainable_parameters
 
 
-class TorchCheckpointLoading(LocalCheckpointLoadingIF):
+class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
     """Class to load PyTorch model and optimizer checkpoints."""
 
     def __init__(self, device: torch.device, precision: Optional[PrecisionEnum] = None):
@@ -29,7 +29,7 @@ class TorchCheckpointLoading(LocalCheckpointLoadingIF):
         self.device = device
         self.precision = precision
 
-    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads a model checkpoint from the specified file path.
 
@@ -65,7 +65,7 @@ class TorchCheckpointLoading(LocalCheckpointLoadingIF):
         )
         return model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
         """
         Load the optimizer checkpoint from the specified file path.
 

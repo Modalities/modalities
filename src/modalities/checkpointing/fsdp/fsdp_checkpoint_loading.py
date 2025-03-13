@@ -7,13 +7,13 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from torch.optim import Optimizer
 
-from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
-from modalities.checkpointing.fsdp.app_state import AppState
+from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, FSDP1CheckpointLoadingIF
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.utils.logging import get_logger
 
 
-class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
+class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
     """FSDP checkpoint loading class."""
 
     def __init__(
@@ -40,7 +40,7 @@ class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
 
-    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
+    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads the checkpoint as full state dict into the model on rank 0.
         After loading the model to CPU RAM, the model is wrapped with FSDP and sharded
@@ -73,7 +73,7 @@ class FSDPCheckpointLoading(LocalCheckpointLoadingIF):
         get_logger().info(f"Model checkpoint loaded on rank {self.global_rank}.")
         return fsdp_model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
         """
         Loads the checkpoint as full state dict into the optimizer on rank 0
 
@@ -117,7 +117,7 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
         """
         self._global_rank = global_rank
 
-    def load_checkpoint_(self, app_state: AppState, checkpoint_directory_path: Path):
+    def load_checkpoint_(self, app_state: AppState, checkpoint_dir_path: Path):
         """Loads the distributed checkpoint from the specified directory path.
         NOTE: The model in the app_state must be already FSDP-wrapped.
 
@@ -127,9 +127,8 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
         """
 
         get_logger().info(f"Loading distributed checkpoint on rank {self._global_rank}.")
-        state_dict = {"app": app_state}
         dcp.load(
-            state_dict=state_dict,
-            checkpoint_id=checkpoint_directory_path,
+            state_dict={"app": app_state},
+            checkpoint_id=checkpoint_dir_path,
         )
         get_logger().info(f"Distributed checkpoint loaded on rank {self._global_rank}.")

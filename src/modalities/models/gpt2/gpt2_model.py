@@ -1,5 +1,6 @@
 import logging
 import math
+from abc import abstractmethod
 from enum import Enum
 from typing import Annotated, Optional
 
@@ -59,6 +60,7 @@ class PositionTypes(str, Enum):
 class QueryKeyValueTransform(nn.Module):
     """Query Key Value Transform base class."""
 
+    @abstractmethod
     def forward(
         self,
         q: torch.Tensor,
@@ -76,7 +78,7 @@ class QueryKeyValueTransform(nn.Module):
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
         """
-        pass
+        raise NotImplementedError
 
 
 class IdentityTransform(QueryKeyValueTransform):

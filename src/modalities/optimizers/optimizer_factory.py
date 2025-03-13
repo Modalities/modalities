@@ -5,8 +5,7 @@ import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Adam, AdamW, Optimizer
 
-from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
-from modalities.checkpointing.fsdp.app_state import AppState
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
@@ -41,39 +40,15 @@ class OptimizerFactory:
 
     @staticmethod
     def get_checkpointed_optimizer(
-        checkpoint_loading: LocalCheckpointLoadingIF,
+        checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         wrapped_model: nn.Module,
         optimizer: Optimizer,
     ) -> Optimizer:
-        wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint(
+        wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint_(
             file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
         )
         return wrapped_optimizer
-
-    @staticmethod
-    def get_dcp_checkpointed_optimizer(
-        checkpoint_loading: DistributedCheckpointLoadingIF, checkpoint_path: Path, app_state: AppState
-    ) -> nn.Module:
-        """
-        Loads optimizer from distributed checkpoint.
-
-        Args:
-            checkpoint_loading (DistributedCheckpointLoadingIF): The checkpoint loading approach used to
-                load the distributed optimizer checkpoint.
-            checkpoint_path (Path): The path to the checkpoint folder.
-            app_state (AppState): The application state object containing the model and optimizer.
-                NOTE: The model must be already FSDP-wrapped.
-        Returns:
-            nn.Module: The loaded model.
-
-        """
-        if not app_state.is_loaded:
-            checkpoint_loading.load_checkpoint_(
-                checkpoint_directory_path=checkpoint_path,
-                app_state=app_state,
-            )
-        return app_state.optimizer
 
 
 def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]) -> OptimizerGroups:

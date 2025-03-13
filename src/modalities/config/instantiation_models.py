@@ -5,16 +5,14 @@ from typing import Annotated, Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
 from modalities.config.pydanctic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
-    PydanticLRSchedulerIFType,
     PydanticMessageSubscriberIFType,
-    PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
-    PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
 )
@@ -168,9 +166,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             return self
 
     settings: Settings
-    wrapped_model: PydanticPytorchModuleType
-    optimizer: PydanticOptimizerIFType
-    scheduler: PydanticLRSchedulerIFType
+    app_state: PydanticAppStateType
     loss_fn: PydanticLossIFType
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticLLMDataLoaderIFType

@@ -14,15 +14,15 @@ from typing_extensions import deprecated
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydanctic_if_types import (
     PydanticAppStateType,
-    PydanticCheckpointLoadingIFType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
-    PydanticDistributedCheckpointLoadingIFType,
+    PydanticFSDP1CheckpointLoadingIFType,
     PydanticFSDPModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
@@ -95,7 +95,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
         return parse_torch_device(device)
 
 
-class FSDPCheckpointLoadingConfig(BaseModel):
+class FSDP1CheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     block_names: list[str]
     mixed_precision_settings: MixedPrecisionSettings
@@ -122,7 +122,7 @@ class DCPCheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
-class FSDPCheckpointSavingConfig(BaseModel):
+class FSDP1CheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
@@ -223,28 +223,16 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
 
 
 class CheckpointedOptimizerConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
-class DCPCheckpointedOptimizerConfig(BaseModel):
-    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
-    checkpoint_path: Path
-    app_state: PydanticAppStateType
-
-
 class CheckpointedModelConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
-
-
-class DCPCheckpointedModelConfig(BaseModel):
-    checkpoint_loading: PydanticDistributedCheckpointLoadingIFType
-    checkpoint_path: Path
-    app_state: PydanticAppStateType
 
 
 @deprecated(
@@ -318,9 +306,15 @@ class ActivationCheckpointedModelConfig(BaseModel):
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
-class AppStateConfig(BaseModel):
+class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
+    lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
+
+
+class DCPAppStateConfig(BaseModel):
+    raw_app_state: PydanticAppStateType
+    checkpoint_dir_path: Path
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

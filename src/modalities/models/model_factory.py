@@ -12,8 +12,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP  # TODO: ren
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
-from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, LocalCheckpointLoadingIF
-from modalities.checkpointing.fsdp.app_state import AppState
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -35,8 +34,21 @@ class ModelFactory:
     """Model factory class to create models."""
 
     @staticmethod
+    def _is_model_on_meta_device(model: nn.Module) -> bool:
+        meta_counter = 0
+        param_counter = 0
+        for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
+            if tensor.device == torch.device("meta"):
+                meta_counter += 1
+            param_counter += 1
+
+        if meta_counter > 0 and meta_counter < param_counter:
+            raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
+        return meta_counter > 0
+
+    @staticmethod
     def get_checkpointed_model(
-        checkpoint_loading: LocalCheckpointLoadingIF,
+        checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
     ) -> nn.Module:
@@ -52,35 +64,11 @@ class ModelFactory:
             nn.Module: The loaded wrapped model.
 
         """
-        wrapped_model = checkpoint_loading.load_model_checkpoint(
+        wrapped_model = checkpoint_loading.load_model_checkpoint_(
             file_path=checkpoint_path,
             model=model,
         )
         return wrapped_model
-
-    @staticmethod
-    def get_dcp_checkpointed_model(
-        checkpoint_loading: DistributedCheckpointLoadingIF, checkpoint_path: Path, app_state: AppState
-    ) -> nn.Module:
-        """
-        Loads model from distributed checkpoint.
-
-        Args:
-            checkpoint_loading (DistributedCheckpointLoadingIF): The checkpoint loading approach used to
-                load the distributed model checkpoint.
-            checkpoint_path (Path): The path to the checkpoint file.
-            app_state (AppState): The application state object containing the model and optimizer.
-                NOTE: The model must be already FSDP-wrapped.
-        Returns:
-            nn.Module: The loaded model.
-
-        """
-        if not app_state.is_loaded:
-            checkpoint_loading.load_checkpoint_(
-                checkpoint_directory_path=checkpoint_path,
-                app_state=app_state,
-            )
-        return app_state.model
 
     @deprecated(
         "With version 0.4, we upgraded FSDP to FSDP 2.0. "
@@ -112,6 +100,9 @@ class ModelFactory:
             'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
             Different auto wrap policies may be supported in the future.
         """
+        if ModelFactory._is_model_on_meta_device(model=model):
+            raise ModelStateError("Meta device initialization is not supported for FSDP1. Use FSDP2 instead.")
+
         print(
             f"Unsharded number of parameters on rank {dist.get_rank()}: "
             f"{get_local_number_of_trainable_parameters(model)}"
@@ -205,19 +196,7 @@ class ModelFactory:
                 module.reset_parameters()
 
         # initialize the weights if they are on a meta device
-        def is_model_on_meta_device(model: nn.Module) -> bool:
-            meta_counter = 0
-            param_counter = 0
-            for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
-                if tensor.device == torch.device("meta"):
-                    meta_counter += 1
-                param_counter += 1
-
-            if meta_counter > 0 and meta_counter < param_counter:
-                raise ModelStateError("Either all or none of the parameters and buffers must be on meta device!")
-            return meta_counter > 0
-
-        if is_model_on_meta_device(model=model):
+        if ModelFactory._is_model_on_meta_device(model=model):
             # Allocate buffers and sharded parameters on GPU
             model = model.to_empty(device="cuda")
 

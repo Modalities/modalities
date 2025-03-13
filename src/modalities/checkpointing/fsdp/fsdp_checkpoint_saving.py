@@ -8,10 +8,9 @@ import torch.distributed.checkpoint as dcp
 from torch.distributed.fsdp import FullOptimStateDictConfig, FullStateDictConfig
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import StateDictType
-from torch.optim import Optimizer
 
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
-from modalities.checkpointing.fsdp.app_state import AppState
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.exceptions import CheckpointingError
 from modalities.training.training_progress import TrainingProgress
 from modalities.utils.logging import get_logger
@@ -84,11 +83,13 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, training_progress: TrainingProgress):
+    def _save_checkpoint(self, app_state: AppState, training_progress: TrainingProgress):
         get_logger().info("Gathering model and optimizer checkpoint...")
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
+        model = app_state.model
+        optimizer = app_state.optimizer
         with FSDP.state_dict_type(
             module=model,
             state_dict_type=StateDictType.FULL_STATE_DICT,
@@ -224,7 +225,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
-    def _save_checkpoint(self, model: FSDP, optimizer: Optimizer, training_progress: TrainingProgress):
+    def _save_checkpoint(self, app_state: AppState, training_progress: TrainingProgress):
         get_logger().info("Gathering model and optimizer checkpoint...")
 
         # save distributed checkpoint (DCP)
@@ -238,7 +239,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
 
         distributed_checkpoint_path.mkdir(parents=True, exist_ok=True)
         get_logger().info(f"Saving distributed model checkpoint to {distributed_checkpoint_path}...")
-        state_dict = {"app": AppState(model, optimizer)}
+        state_dict = {"app": app_state}
         dcp.save(state_dict, checkpoint_id=distributed_checkpoint_path)
         get_logger().info("Distributed checkpoint saved.")
 

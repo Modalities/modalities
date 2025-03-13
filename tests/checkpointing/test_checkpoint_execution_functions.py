@@ -4,7 +4,7 @@ import pytest
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
-from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDP1CheckpointSaving
 from modalities.training.training_progress import TrainingProgress
 
 
@@ -23,7 +23,7 @@ CONTENT = "model"
 
 
 def test_get_paths_to_delete(tmp_path):  # pytest temp path
-    checkpointing = FSDPCheckpointSaving(
+    checkpointing = FSDP1CheckpointSaving(
         checkpoint_path=tmp_path,
         experiment_id=str(1),
         global_rank=0,
@@ -62,7 +62,7 @@ def test_delete_checkpoint(tmpdir):
     model_path = directory / experiment_id / model_file_name
     model_path.write_text(CONTENT)
 
-    checkpoint_saving = FSDPCheckpointSaving(
+    checkpoint_saving = FSDP1CheckpointSaving(
         checkpoint_path=directory,
         experiment_id=experiment_id,
         global_rank=0,
