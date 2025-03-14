@@ -46,6 +46,7 @@ class FSDP1GradientClipper(GradientClipperIF):
         self.max_norm = max_norm
         self.norm_type = norm_type
 
+    @torch.no_grad()
     def clip_gradients(self) -> torch.Tensor:
         """
         Clips the gradients of the wrapped model using the specified maximum norm and norm type.

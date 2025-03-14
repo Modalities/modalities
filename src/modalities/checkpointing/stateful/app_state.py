@@ -24,24 +24,35 @@ class StatefulComponents(Enum):
 
 class AppState(Stateful):
     """
-    Note: this class has been copied from https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html
-
-    This is a useful wrapper for checkpointing the Application State. Since this object is compliant
-    with the Stateful protocol, DCP will automatically call state_dict/load_stat_dict as needed in the
-    dcp.save/load APIs.
+    This is a useful wrapper for checkpointing the application state (i.e., model, optimizer, lr scheduler).
+    Since this object is compliant with the Stateful protocol, DCP will automatically call
+    state_dict/load_stat_dict as needed in the dcp.save/load APIs.
 
     Note: We take advantage of this wrapper to hande calling distributed state dict methods on the model
     and optimizer.
+    Note: this class has been copied and adapted from
+    https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html
     """
 
     def __init__(self, model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None):
+        """Initializes the AppState object.
+
+        Args:
+            model (nn.Module): The model can be either a non-sharded model, FSDP1 or FSDP2 model.
+            optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
+            lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.
+        """
         self._model = model
         self._optimizer = optimizer
         self._lr_scheduler = lr_scheduler
         self._is_loaded = False
 
     @property
-    def is_loaded(self):
+    def is_loaded(self) -> bool:
+        """Returns whether the state dict has been loaded.
+        Returns:
+            bool: Flag indicating whether the state dict has been loaded.
+        """
         return self._is_loaded
 
     @property
@@ -57,6 +68,11 @@ class AppState(Stateful):
         return self._lr_scheduler
 
     def state_dict(self) -> dict[str, Any]:
+        """Returns the state dict of the AppState object.
+
+        Returns:
+            dict[str, Any]: The state dict of the AppState object.
+        """
         # this line automatically manages FSDP FQN's, as well as sets the default
         # state dict type to FSDP.SHARDED_STATE_DICT
         # model_state_dict, optimizer_state_dict = get_state_dict(self._model, self._optimizer)
@@ -71,6 +87,14 @@ class AppState(Stateful):
         return sd
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        """Loads the state dict into the AppState object.
+
+        Args:
+            state_dict (dict[str, Any]): The state dict to load into the AppState object.
+
+        Raises:
+            RuntimeError: If the state dict has already been loaded.
+        """
         # sets our state dicts on the model, optimizer and lr scheduler.
         if self._is_loaded:
             raise RuntimeError(
@@ -90,14 +114,39 @@ class AppState(Stateful):
 
 
 class StateRetrieverIF(ABC):
+    """State retriever interface for loading and getting state dicts of
+    models, optimizers and lr schedulers. Other stateful components can be added as needed
+    by having the retriever implement this interface.
+    """
+
     @staticmethod
     @abstractmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        """Loads the state dict into the AppState object.
+
+        Args:
+            app_state (AppState): The application state object.
+            state_dict (dict[str, Any]): The state dict to load into the AppState object.
+
+        Raises:
+            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
+        """
         raise NotImplementedError
 
     @staticmethod
     @abstractmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        """Returns the state dict of the AppState object.
+
+        Args:
+            app_state (AppState): The application state object.
+
+        Raises:
+            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
+
+        Returns:
+            dict[str, Any]: The state dict of the AppState object.
+        """
         raise NotImplementedError
 
 

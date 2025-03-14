@@ -88,6 +88,21 @@ def get_device_mesh(
     enable_loss_parallel: bool,
     world_size: int,
 ) -> DeviceMesh:
+    """Gets the device mesh for the specified parallelism degrees.
+
+    Args:
+        device_type (str): The device type.
+        data_parallel_replicate_degree (int): The data parallel replicate degree.
+        data_parallel_shard_degree (int): The data parallel shard degree.
+        tensor_parallel_degree (int): The tensor parallel degree.
+        pipeline_parallel_degree (int): The pipeline parallel degree.
+        context_parallel_degree (int): The context parallel degree.
+        enable_loss_parallel (bool): Whether to enable loss parallelism.
+        world_size (int): The world size.
+
+    Returns:
+        DeviceMesh: The device mesh.
+    """
     dims = []
     names = []
     for dim, name in zip(
