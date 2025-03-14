@@ -801,8 +801,8 @@ class GPT2LLM(NNModel):
             seed (int, optional): The random seed. Defaults to None.
         """
         weight_decay_groups = {
-            "linear": [".attn", ".mlp"],
-            "embedding": [".wte", ".wpe", "lm_head.weight"],
+            "linear": [".attn", ".mlp", "lm_head.weight"],
+            "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
