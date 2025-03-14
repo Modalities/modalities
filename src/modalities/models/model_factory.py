@@ -64,7 +64,7 @@ class ModelFactory:
             nn.Module: The loaded wrapped model.
 
         """
-        wrapped_model = checkpoint_loading.load_model_checkpoint_(
+        wrapped_model = checkpoint_loading.load_model_checkpoint(
             file_path=checkpoint_path,
             model=model,
         )

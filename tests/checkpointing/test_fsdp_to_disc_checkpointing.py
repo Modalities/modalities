@@ -260,7 +260,7 @@ class TestFSDPToDiscCheckpointing:
             num_target_steps=training_progress.num_target_steps,
             num_target_tokens=training_progress.num_target_tokens,
         )
-        fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint_(
+        fsdp_wrapped_model_2 = checkpoint_loading.load_model_checkpoint(
             model=gpt2_model_2, file_path=model_checkpointing_path
         )
 

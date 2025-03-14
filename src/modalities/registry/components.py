@@ -163,7 +163,7 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer_, CheckpointedOptimizerConfig
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),

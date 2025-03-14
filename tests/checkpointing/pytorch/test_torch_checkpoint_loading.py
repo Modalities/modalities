@@ -37,7 +37,7 @@ def test_load_model_checkpoint(tmp_path):
     gpu_device = torch.device("cuda:0")
     loaded_model_1: DummyModel = TorchCheckpointLoading(
         device=gpu_device, precision=PrecisionEnum.FP32
-    ).load_model_checkpoint_(model_2, tmp_file_path)
+    ).load_model_checkpoint(model_2, tmp_file_path)
 
     assert torch.equal(model_1._weights.weight.to(gpu_device), loaded_model_1._weights.weight)
     assert torch.equal(model_1._weights.bias.to(gpu_device), loaded_model_1._weights.bias)
@@ -49,7 +49,5 @@ def test_load_model_checkpoint(tmp_path):
 
     # if we don't specify the precision, the model will be loaded with the precision of the state dict.
     # In this case, BF16 is used as defined for model_1.
-    loaded_model_2: DummyModel = TorchCheckpointLoading(device=gpu_device).load_model_checkpoint_(
-        model_3, tmp_file_path
-    )
+    loaded_model_2: DummyModel = TorchCheckpointLoading(device=gpu_device).load_model_checkpoint(model_3, tmp_file_path)
     assert loaded_model_2._weights.weight.dtype == torch.bfloat16

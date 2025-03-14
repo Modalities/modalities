@@ -39,16 +39,16 @@ class OptimizerFactory:
         return optimizer
 
     @staticmethod
-    def get_checkpointed_optimizer(
+    def get_checkpointed_optimizer_(
         checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         wrapped_model: nn.Module,
         optimizer: Optimizer,
     ) -> Optimizer:
-        wrapped_optimizer = checkpoint_loading.load_optimizer_checkpoint_(
+        checkpoint_loading.load_optimizer_checkpoint_(
             file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
         )
-        return wrapped_optimizer
+        return optimizer
 
 
 def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_excluded: list[str]) -> OptimizerGroups:
