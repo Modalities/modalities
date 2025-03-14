@@ -12,6 +12,18 @@ class DistributedCheckpointLoadingIF(ABC):
 
     @abstractmethod
     def load_checkpoint_(self, app_state: AppState, checkpoint_directory_path: Path) -> AppState:
+        """Loads the distributed checkpoint from the specified directory path into the AppState.
+
+        Args:
+            app_state (AppState): The application state with the model, optimizer and lr scheduler.
+            checkpoint_directory_path (Path): The directory path to the distributed checkpoint.
+
+        Raises:
+            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
+
+        Returns:
+            AppState: The application state with the loaded checkpoint.
+        """
         raise NotImplementedError
 
 

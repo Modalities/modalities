@@ -83,6 +83,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
+    @torch.no_grad()
     def _save_checkpoint(self, app_state: AppState, training_progress: TrainingProgress):
         get_logger().info("Gathering model and optimizer checkpoint...")
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
@@ -175,7 +176,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
 
 
 class DCPCheckpointSaving(CheckpointSavingExecutionABC):
-    """DCPCheckpointSaving class for saving checkpoints of FSDP models and optimizers in a
+    """DCPCheckpointSaving class for saving checkpoints of FSDP2 models and optimizers in a
     distributed fashion. Each rank saves its own model and optimizer state in a combined file.
     The advantage over FSDP1CheckpointSaving is that the model and optimizer states do not have to
     synced to rank 0 or loaded into CPU memory.
@@ -225,6 +226,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
         full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
         return full_path
 
+    @torch.no_grad()
     def _save_checkpoint(self, app_state: AppState, training_progress: TrainingProgress):
         get_logger().info("Gathering model and optimizer checkpoint...")
 

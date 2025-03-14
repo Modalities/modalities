@@ -229,7 +229,7 @@ class CheckpointedOptimizerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
 
-class CheckpointedModelConfig(BaseModel):
+class FSDP1CheckpointedModelConfig(BaseModel):
     checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType

@@ -20,7 +20,6 @@ from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
-    CheckpointedModelConfig,
     CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
@@ -34,6 +33,7 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    FSDP1CheckpointedModelConfig,
     FSDP1CheckpointLoadingConfig,
     FSDP1CheckpointSavingConfig,
     FSDP2WrappedModelConfig,
@@ -135,7 +135,9 @@ COMPONENTS = [
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
-    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
+    ComponentEntity(
+        "model", "fsdp1_checkpointed", ModelFactory.get_fsdp1_checkpointed_model, FSDP1CheckpointedModelConfig
+    ),
     ComponentEntity("model", "fsdp1_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp2_wrapped", ModelFactory.get_fsdp_2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(

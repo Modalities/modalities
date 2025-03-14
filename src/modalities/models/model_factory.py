@@ -47,16 +47,17 @@ class ModelFactory:
         return meta_counter > 0
 
     @staticmethod
-    def get_checkpointed_model(
+    def get_fsdp1_checkpointed_model(
         checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
     ) -> nn.Module:
         """
-        Loads a checkpointed model from the given checkpoint path.
+        Loads a FSDP1 checkpointed model from the given checkpoint path.
 
         Args:
-            checkpoint_loading (CheckpointLoadingIF): The checkpoint loading approach used to load the model checkpoint.
+            checkpoint_loading (FSDP1CheckpointLoadingIF): The checkpoint loading
+                approach used to load the model checkpoint.
             checkpoint_path (Path): The path to the checkpoint file.
             model (nn.Module): The model to be loaded with the checkpoint.
 
@@ -135,10 +136,21 @@ class ModelFactory:
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
     ) -> FSDP2:
-        """
+        """Get the FSDP2-wrapped model.
+
         Based on https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/parallelisms/parallelize_llama.py#L459
         and https://github.com/pytorch/torchtitan/blob/43584e0a4e72645e25cccd05d86f9632587a8beb/docs/fsdp.md
         NOTE: Torch Titan already implement pipeline parallelism. We skip that here for now.
+
+        Args:
+            model (nn.Module): The original model to be wrapped.
+            block_names (list[str]): List of block names.
+            device_mesh (DeviceMesh): The device mesh.
+            mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.
+            reshard_after_forward (bool): Whether to reshard after forward.
+
+        Returns:
+            FSDP2: The FSDP2-wrapped model.
         """
 
         print(
@@ -202,8 +214,9 @@ class ModelFactory:
 
         # call reset_parameters on all nn.Modules that implement this function
         # (normally all norms)
-        reset_parameters_if_function_exists(module=model)
-        model_initializer.initialize_in_place(model)
+        with torch.no_grad():
+            reset_parameters_if_function_exists(module=model)
+            model_initializer.initialize_in_place(model)
         return model
 
     @staticmethod

@@ -40,6 +40,7 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
 
+    @torch.no_grad()
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads the checkpoint as full state dict into the model on rank 0.
@@ -113,6 +114,7 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
         """
         self._global_rank = global_rank
 
+    @torch.no_grad()
     def load_checkpoint_(self, app_state: AppState, checkpoint_dir_path: Path):
         """Loads the distributed checkpoint from the specified directory path.
         NOTE: The model in the app_state must be already FSDP-wrapped.

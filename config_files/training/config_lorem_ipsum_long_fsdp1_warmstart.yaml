@@ -209,7 +209,7 @@ app_state:
 
 wrapped_model:
   component_key: model
-  variant_key: checkpointed
+  variant_key: fsdp1_checkpointed
   config:
     model:
       instance_key: initialized_model
