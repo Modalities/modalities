@@ -21,7 +21,7 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 256
