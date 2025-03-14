@@ -55,7 +55,7 @@ def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    config_dict = load_app_config_dict(dummy_config_path)
+    config_dict = load_app_config_dict(dummy_config_path, experiment_id="0")
     return config_dict
 
 
