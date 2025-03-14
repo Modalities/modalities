@@ -203,7 +203,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         """
         grads = [p.grad for p in self.wrapped_model.parameters() if p.grad is not None]
         total_norm = torch.nn.utils.get_total_norm(
-            tensors=grads, norm_type=self.norm_type, error_if_nonfinite=False, foreach=True
+            tensors=grads, norm_type=self.norm_type.value, error_if_nonfinite=False, foreach=True
         )
         if isinstance(total_norm, DTensor):
             # Will reach here if any non-PP parallelism is used.

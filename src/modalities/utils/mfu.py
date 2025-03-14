@@ -7,8 +7,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.types import Number
 
 from modalities.util import get_total_number_of_trainable_parameters
-
-FSDP = FSDP1 | FSDP2  # TODO: Move this to a central place & import
+from modalities.utils.typing import FSDPX
 
 # A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/
 # H100: https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/
@@ -40,13 +39,13 @@ def _get_theoretical_gpu_peak_performance_single(precision: torch.dtype, gpu_typ
         return None
 
 
-def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Optional[Number]:
+def get_theoretical_gpu_peak_performance(model: FSDPX, world_size: int) -> Optional[Number]:
     """
     Calculates the accumulated theoretical peak performance based on all GPUs, i.e.,
       #GPU=world_size, in units FLOPs / s for given gpu type.
 
     Args:
-        model (FSDP): The model for which to calculate the theoretical peak performance.
+        model (FSDPX): The model for which to calculate the theoretical peak performance.
         world_size (int): The number of GPUs used in parallel.
 
     Returns:
@@ -63,7 +62,7 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
             warnings.warn("MFU is computed based on the assumption that bf16 precision is used.")
             precision = torch.bfloat16
         else:
-            raise TypeError(f"Model should be of type FSDP, but is {type(model)} instead.")
+            raise TypeError(f"Model should be of type FSDPX, but is {type(model)} instead.")
 
         device_name = torch.cuda.get_device_name()
         if device_name.startswith("NVIDIA A100"):
@@ -85,14 +84,14 @@ def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Option
         return None
 
 
-def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optional[int]]:
+def get_theoretical_flops_per_token(model: FSDPX) -> tuple[Optional[int], Optional[int]]:
     """
     Calculates the theoretical number of floating point operations (FLOPs) per token for a given model.
     compute theoretical_flops_per_token = 6*N + 12*L*T*H
     See App. B in the PaLM paper (https://arxiv.org/pdf/2204.02311)
 
     Args:
-        model (FSDP): The model for which to calculate the FLOPs per token.
+        model (FSDPX): The model for which to calculate the FLOPs per token.
 
     Returns:
         tuple[(int, optional), (int, optional)]: A tuple containing the theoretical FLOPs per token
@@ -111,7 +110,7 @@ def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optiona
         elif isinstance(model, FSDP2):
             model_module = model
         else:
-            raise TypeError(f"Model should be of type FSDP, but is {type(model)} instead.")
+            raise TypeError(f"Model should be of type FSDPX, but is {type(model)} instead.")
 
         try:
             L = model_module.n_layer
