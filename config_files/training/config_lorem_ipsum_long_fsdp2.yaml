@@ -294,7 +294,7 @@ optimizer:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp2
   config:
     wrapped_model:
       instance_key: initialized_model

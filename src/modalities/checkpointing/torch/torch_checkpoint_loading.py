@@ -29,7 +29,7 @@ class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
         self.device = device
         self.precision = precision
 
-    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads a model checkpoint from the specified file path.
 
@@ -65,17 +65,14 @@ class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
         )
         return model
 
-    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path):
         """
-        Load the optimizer checkpoint from the specified file path.
+        Load the optimizer checkpoint from the specified file path (in-plce).
 
         Args:
-            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).
             model (nn.Module): The model associated with the optimizer.
             file_path (Path): The path to the checkpoint file.
-
-        Returns:
-            Optimizer: The optimizer with the loaded checkpoint.
 
         Raises:
             NotImplementedError: This method is not implemented yet. It is reserved for future work.

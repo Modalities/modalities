@@ -14,7 +14,7 @@ from modalities.utils.logging import get_logger
 
 
 class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
-    """FSDP checkpoint loading class."""
+    """FSDP1 checkpoint loading class."""
 
     def __init__(
         self,
@@ -24,7 +24,7 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         sharding_strategy: ShardingStrategy,
     ):
         """
-        Initializes the FSDPCheckpointLoading object.
+        Initializes the FSDP1CheckpointLoading object.
 
         Args:
             global_rank (int): The global rank of the process.
@@ -40,7 +40,8 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
 
-    def load_model_checkpoint_(self, model: nn.Module, file_path: Path) -> nn.Module:
+    @torch.no_grad()
+    def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         """
         Loads the checkpoint as full state dict into the model on rank 0.
         After loading the model to CPU RAM, the model is wrapped with FSDP and sharded
@@ -73,17 +74,14 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         get_logger().info(f"Model checkpoint loaded on rank {self.global_rank}.")
         return fsdp_model
 
-    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: FSDP, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: FSDP, file_path: Path):
         """
-        Loads the checkpoint as full state dict into the optimizer on rank 0
+        Loads the checkpoint as full state dict into the optimizer on rank 0 (in-place)
 
         Args:
-            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).
             model (FSDP): The FSDP-wrapped model.
             file_path (Path): The path to the checkpoint file.
-
-        Returns:
-            Optimizer: The optimizer with the loaded checkpoint.
         """
         get_logger().info(f"Loading optimizer checkpoint from {file_path} on rank {self.global_rank}...")
         # NOTE: model must be FSDP-wrapped model!
@@ -99,7 +97,6 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         )
         optimizer.load_state_dict(sharded_optimizer_state_dict)
         get_logger().info(f"Optimizer checkpoint loaded on rank {self.global_rank}.")
-        return optimizer
 
 
 class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
@@ -117,6 +114,7 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
         """
         self._global_rank = global_rank
 
+    @torch.no_grad()
     def load_checkpoint_(self, app_state: AppState, checkpoint_dir_path: Path):
         """Loads the distributed checkpoint from the specified directory path.
         NOTE: The model in the app_state must be already FSDP-wrapped.

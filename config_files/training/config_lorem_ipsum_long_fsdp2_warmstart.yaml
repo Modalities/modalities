@@ -214,7 +214,7 @@ app_state_raw:
   variant_key: raw
   config:
     model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
@@ -223,7 +223,7 @@ app_state_raw:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model:
+initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
@@ -313,7 +313,6 @@ lr_scheduler:
     anneal_strategy: cos
     # last_epoch: -1 # ${settings.training_progress.last_step}
 
-
 optimizer:
   component_key: optimizer
   variant_key: adam_w
@@ -324,15 +323,15 @@ optimizer:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0

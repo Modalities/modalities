@@ -112,7 +112,7 @@ class HuggingFacePretrainedModel(NNModel):
         Returns:
             dict[str, torch.Tensor]: A dictionary containing output tensors.
         """
-        output = self.huggingface_model.forward(inputs[self.sample_key])
+        output = self.huggingface_model(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
 
     @property
