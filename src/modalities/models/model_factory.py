@@ -246,6 +246,30 @@ class ModelFactory:
                 )
         return model
 
+    @staticmethod
+    def get_compiled_model(model: nn.Module, block_names: list[str]) -> nn.Module:
+        """
+        Apply torch.compile to each transformer block, which makes compilation efficient due to
+        repeated structure. Alternatively one can compile the whole model (after applying DP).
+        Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275
+        """
+
+        def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> nn.Module:
+            for _, parent_candidate in model.named_modules():
+                for child_name, child_candidate in parent_candidate.named_children():
+                    if child_candidate is child_module:
+                        return parent_candidate, child_name
+            raise ModelStateError("No valid parent candidate")
+
+        block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
+
+        for _, module in model.named_modules():
+            if isinstance(module, block_types):
+                compiled_module = torch.compile(module, fullgraph=True)
+                parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
+                parent_module.register_module(name=child_name, module=compiled_module)
+        return model
+
 
 class GPT2ModelFactory:
     @staticmethod
