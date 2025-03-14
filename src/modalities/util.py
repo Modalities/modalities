@@ -16,6 +16,7 @@ from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.utils.typing import FSDPX
 
 
 def print_rank_0(message: str):
@@ -110,7 +111,7 @@ def get_local_number_of_trainable_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def get_total_number_of_trainable_parameters(model: FSDP | FSDP2) -> Number:
+def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
     if isinstance(model, FSDP):
         num_params = get_local_number_of_trainable_parameters(model)
         num_params_tensor = torch.tensor(num_params).cuda()
