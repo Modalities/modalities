@@ -11,6 +11,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.create_packed_data import PackedDataGenerator
@@ -150,9 +151,14 @@ def optimizer_with_param_groups_mock():
 
 @pytest.fixture(scope="function")
 def scheduler_mock():
-    mocked_lr_schdeduler = MagicMock(spec=LRScheduler)
-    mocked_lr_schdeduler.get_last_lr = lambda: [0.0]
-    return mocked_lr_schdeduler
+    mocked_lr_scheduler = MagicMock(spec=LRScheduler)
+    mocked_lr_scheduler.get_last_lr = lambda: [0.0]
+    return mocked_lr_scheduler
+
+
+@pytest.fixture(scope="function")
+def app_state_mock():
+    return MagicMock(spec=AppState)
 
 
 @pytest.fixture(scope="function")
