@@ -57,3 +57,6 @@ COVERAGE_FILE=.coverage_reports/.coverage.part10 CUDA_VISIBLE_DEVICES=$DEV0 cove
 # test activation checkpointing
 COVERAGE_FILE=.coverage_reports/.coverage.part11 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/training/test_activation_checkpointing.py $COVERAGE
 
+# test_utils
+COVERAGE_FILE=.coverage_reports/.coverage.part12 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/end2end_tests/test_utils.py $COVERAGE
+

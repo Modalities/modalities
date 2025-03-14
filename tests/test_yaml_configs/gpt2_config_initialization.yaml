@@ -10,10 +10,9 @@ model:
       variant_key: composed
       config:
         model_type: gpt2
-        weight_init_type: WILL_BE_REPLACED
+        weight_init_type: scaled
         mean: 0.0
-        std: WILL_BE_REPLACED
-        hidden_dim: ${model_raw.config.n_embd}
+        std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
 model_raw:
@@ -36,23 +35,20 @@ model_raw:
       qkv_transforms: []
     attention_implementation: manual
     activation_type: gelu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
