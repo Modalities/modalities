@@ -48,6 +48,7 @@ model_raw -> fsdp_model -> initialized_model
 
 ## Difference between FSDP1 and FSDP2
 The main difference in the instantiation dependencies between FSDP1 and FSDP2 is that in FSDP1, the model is wrapped after the weights are initialized, while in FSDP2, the model is wrapped before the weights are initialized. Therefore, FSDP1 requires the model to be fully materialized in CPU RAM before wrapping, as otherwise the weights cannot be initialized. In the case of FSDP2, we can have the model on a meta device, shard it and then move it to the data device during the initialization. This way, only the shards are materialized in GPU RAM and we have an extremely low CPU RAM footprint. 
+See also the torch titan [documentation](https://github.com/pytorch/torchtitan/blob/main/docs/fsdp.md) on the differences between FSDP1 and FSDP2. 
 
 
 # Instantiation dependencies (Warmstart)
@@ -65,17 +66,21 @@ optimizer_original -> optimizer (checkpoint loaded)
 ```
 
 #### LR Scheduler requirements
-- optimizer
+- optimizer (checkpoint loaded)
+
+### Optimizer (initial) requirements
+- wrapped_model (fsdp1 wrapped) [Reference](https://github.com/lessw2020/transformer_framework/blob/main/model_checkpointing/load_save_full.ipynb)
 
 #### Optimizer (checkpoint loaded) requirements
 - optimizer_inital (optimizer, same as for training)
+- wrapped_model (fsdp1 wrapped) [Reference](https://github.com/lessw2020/transformer_framework/blob/main/model_checkpointing/load_save_full.ipynb)
 
 #### Gradient clipper requirements
-- wrapped_model (fsdp1 wrapped and checkpoint loaded)
+- wrapped_model (fsdp1 wrapped and checkpoint loaded) [Reference](https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.clip_grad_norm_)
 
 #### AppState requirements
 - wrapped_model (fsdp1 wrapped and checkpoint loaded)
-- optimizer
+- optimizer (checkpoint loaded)
 - lr_scheduler
 
 
@@ -89,21 +94,22 @@ model_raw -> fsdp_model -> initialized_model
 ```
 
 
-
 #### LR Scheduler requirements
-- optimizer
+- optimizer (does not contain checkpoint!) [Reference](https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/train.py#L207)
 
 #### Optimizer requirements
-- initialized_model (does not contain checkpoint!)
+- initialized_model (init + sharded but does not contain checkpoint!) [Reference](https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/train.py#L206)
 
 #### Gradient clipper requirements
-- initialized_model (does not contain checkpoint!)
+- initialized_model ((init + sharded but does not contain checkpoint!)
+
+We pass in the reference to the initialized model even though torch titan uses the checkpointed one (from the app_state). Nevertheless, this should not make a difference since the reference to the intialized and checkpointed model should be the same and the gradient clipper is stateless.
 
 #### AppState (raw) requirements
-- initialized_model (does not contain checkpoint!)
+- initialized_model ((init + sharded but does not contain checkpoint!)
 - optimizer
 - lr_scheduler
 
 
 #### AppState (checkpoint loaded) requirements
-- raw_app_state (contains initialized_model, optimizer, lr_scheduler)
+- raw_app_state (contains initialized_model, optimizer, lr_scheduler) [Reference 1](https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L429) and [Reference 2](https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L289)
