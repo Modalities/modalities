@@ -12,7 +12,7 @@ def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def create_gpt2llm(use_weight_tying: bool) -> GPT2LLM:
+def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
     vocab_size = VOCAB_SIZE
     n_embd = EMBEDDING_DIM
     sequence_length = 128
@@ -67,7 +67,7 @@ def create_gpt2llm(use_weight_tying: bool) -> GPT2LLM:
 
 @pytest.mark.parametrize("use_weight_tying", [True, False])
 def test_weight_tying_behavior(use_weight_tying):
-    model = create_gpt2llm(use_weight_tying)
+    model = create_gpt2_model(use_weight_tying)
     if use_weight_tying:
         assert (
             model.transformer.wte.weight is model.lm_head.weight
@@ -80,12 +80,12 @@ def test_weight_tying_behavior(use_weight_tying):
 
 @pytest.mark.parametrize("use_weight_tying", [True, False])
 def test_weight_tying_parameter_count(use_weight_tying):
-    model = create_gpt2llm(use_weight_tying)
+    model = create_gpt2_model(use_weight_tying)
     param_count = count_parameters(model)
     print(f"Parameter count with weight tying ({use_weight_tying}): {param_count}")
 
     if not use_weight_tying:
-        model_with_tying = create_gpt2llm(True)
+        model_with_tying = create_gpt2_model(True)
         param_count_tied = count_parameters(model_with_tying)
         expected_difference = VOCAB_SIZE * EMBEDDING_DIM
         assert (
