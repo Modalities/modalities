@@ -8,11 +8,11 @@ VOCAB_SIZE = 1000
 EMBEDDING_DIM = 64
 
 
-def count_parameters(model):
+def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def create_gpt2llm(use_weight_tying):
+def create_gpt2llm(use_weight_tying: bool) -> GPT2LLM:
     vocab_size = VOCAB_SIZE
     n_embd = EMBEDDING_DIM
     sequence_length = 128
