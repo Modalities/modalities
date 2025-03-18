@@ -235,6 +235,7 @@ model_raw:
     n_embd: 128
     dropout: 0.0
     bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    use_weight_tying: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
