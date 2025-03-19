@@ -211,7 +211,7 @@ model_raw:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
@@ -220,25 +220,23 @@ model_raw:
             n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
             base_freq: 10000
-    attention_implementation: manual
-    activation_type: gelu
+    attention_implementation: pytorch_flash
+    activation_type: swiglu
     attention_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1.0e-05
     ffn_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1.0e-05
     lm_head_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
@@ -298,5 +296,5 @@ evaluation_subscriber:
     project: modalities_getting_started
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: data/wandb_storage
     config_file_path: ${settings.config_file_path}
