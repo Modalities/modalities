@@ -133,9 +133,7 @@ class TestFSDPToDiscCheckpointing:
         optimizer.zero_grad()
 
         # forward pass
-        predictions = model.forward(inputs=batch_input_ids_dict)[
-            gpt2_model_config["model_raw"]["config"]["prediction_key"]
-        ]
+        predictions = model(inputs=batch_input_ids_dict)[gpt2_model_config["model_raw"]["config"]["prediction_key"]]
         predictions = predictions.contiguous()
         # backward pass
         loss = ce_loss(predictions.view(-1, predictions.size(-1)), batch_target_ids.view(-1))
