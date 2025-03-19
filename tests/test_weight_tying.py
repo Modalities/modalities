@@ -91,3 +91,18 @@ def test_weight_tying_parameter_count(use_weight_tying):
         assert (
             param_count == param_count_tied + expected_difference
         ), "Parameter count mismatch when using weight tying."
+
+
+@pytest.mark.parametrize("use_weight_tying", [True, False])
+def test_weight_tying_named_parameters(use_weight_tying):
+    model = create_gpt2_model(use_weight_tying)
+    named_params = [name for name, _ in model.named_parameters()]
+
+    if use_weight_tying:
+        assert (
+            "lm_head.weight" not in named_params
+        ), "lm_head.weight should not appear in named_parameters when weight tying is used."
+    else:
+        assert (
+            "lm_head.weight" in named_params
+        ), "lm_head.weight should appear in named_parameters when weight tying is not used."
