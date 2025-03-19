@@ -20,9 +20,11 @@ from modalities.api import (
     convert_pytorch_to_hf_checkpoint,
     create_raw_data_index,
     create_shuffled_dataset_chunk,
+    create_shuffled_jsonl_dataset_chunk,
     generate_text,
     merge_packed_data_files,
     pack_encoded_data,
+    shuffle_jsonl_data,
     shuffle_tokenized_data,
 )
 from modalities.batch import EvaluationResultBatch
@@ -308,6 +310,88 @@ def CMD_create_shuffled_dataset_chunk(
     )
 
 
+@data.command(name="create_shuffled_jsonl_chunk")
+@click.option(
+    "--input_file_list_path",
+    type=Path,
+    required=True,
+    help="Path to the file containing the list of jsonl files to be chunked.",
+)
+@click.option(
+    "--input_data_root_path",
+    type=Path,
+    required=True,
+    help="Directory path to the root of the input data.",
+)
+@click.option(
+    "--output_chunk_file_path",
+    type=Path,
+    required=True,
+    help="Path where the chunked jsonl dataset will be saved.",
+)
+@click.option(
+    "--chunk_id",
+    type=int,
+    required=True,
+    help="The id of the chunk to be created.",
+)
+@click.option(
+    "--num_chunks",
+    type=int,
+    required=True,
+    help="The number of chunks to create.",
+)
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+@click.option(
+    "--global_seed",
+    type=int,
+    default=None,
+    help="The global seed to use for shuffling.",
+)
+def CMD_create_shuffled_jsonl_dataset_chunk(
+    input_file_list_path: Path,
+    input_data_root_path: Path,
+    output_chunk_file_path: Path,
+    chunk_id: int,
+    num_chunks: int,
+    file_existence_policy: FileExistencePolicy,
+    global_seed: Optional[int],
+):
+    """Utility to create a shuffled jsonl dataset chunk from a list of jsonl files.
+
+    Args:
+        input_file_list_path (Path): Path to file that contains relative paths of
+            jsonl files to be chunked and shuffled (one per line).
+        input_data_root_path (Path): Path to the root directory that contains the jsonl files to be chunked.
+        output_chunk_file_path (Path): File path to the chunked jsonl dataset.
+        chunk_id (int): The id of the chunk to be created.
+        num_chunks (int): Number of chunks in total.
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
+        global_seed (Optional[int]): The global seed to use for shuffling.
+    """
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+
+    with open(input_file_list_path, "r", encoding="utf-8") as f:
+        file_path_list = f.readlines()
+    file_path_list = [
+        input_data_root_path / Path(file_path.strip()).with_suffix(".jsonl") for file_path in file_path_list
+    ]
+
+    create_shuffled_jsonl_dataset_chunk(
+        file_path_list=file_path_list,
+        output_chunk_file_path=output_chunk_file_path,
+        chunk_id=chunk_id,
+        num_chunks=num_chunks,
+        file_existence_policy=file_existence_policy,
+        global_seed=global_seed,
+    )
+
+
 @data.command(name="merge_packed_data")
 @click.argument("src_paths", type=click.types.Path(exists=True, path_type=Path), nargs=-1, required=True)
 @click.argument("target_path", type=click.types.Path(file_okay=False, dir_okay=False, path_type=Path))
@@ -374,6 +458,54 @@ def CMD_shuffle_tokenized_data(
         input_data_path=input_data_path,
         output_data_path=output_data_path,
         batch_size=batch_size,
+        file_existence_policy=file_existence_policy,
+        seed=seed,
+    )
+
+
+@data.command(name="shuffle_jsonl_data")
+@click.option(
+    "--input_data_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a jsonl file (.jsonl).",
+)
+@click.option(
+    "--output_data_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to write the shuffled jsonl data (.jsonl).",
+)
+@click.option(
+    "--file_existence_policy",
+    type=click.Choice([policy.value for policy in FileExistencePolicy]),
+    default=FileExistencePolicy.ERROR.value,
+    help="Policy for handling existing files.",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    help="The seed for shuffling the data.",
+)
+def CMD_shuffle_jsonl_data(
+    input_data_path: Path, output_data_path: Path, file_existence_policy, seed: Optional[int]
+) -> None:
+    """Entrypoint for shuffling jsonl data.
+
+    Args:
+        input_data_path (Path): The path to the input jsonl data (.jsonl).
+        output_data_path (Path): File path to write the shuffled jsonl data (.jsonl).
+        file_existence_policy (FileExistencePolicy): Policy for handling existing files.
+        seed (Optional[int]): The seed for shuffling the data. Default is None.
+    Returns:
+        None
+    """
+    file_existence_policy = FileExistencePolicy(file_existence_policy)
+
+    shuffle_jsonl_data(
+        input_data_path=input_data_path,
+        output_data_path=output_data_path,
         file_existence_policy=file_existence_policy,
         seed=seed,
     )

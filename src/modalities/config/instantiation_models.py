@@ -79,7 +79,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
         class WarmstartCheckpointPaths(BaseModel):
             model_checkpoint_path: Path
-            optimizer_checkpoint_path: Path
+            optimizer_checkpoint_path: Optional[Path] = None
 
         experiment_id: str
         config_file_path: FilePath
