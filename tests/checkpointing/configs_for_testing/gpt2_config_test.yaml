@@ -45,6 +45,7 @@ model:
         ndim: ${model.config.n_embd}
         bias: true
         epsilon: 1e-5
+    use_weight_tying: false
 
 checkpointed_model:
   component_key: model
