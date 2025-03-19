@@ -783,7 +783,7 @@ class GPT2LLM(NNModel):
             use_weight_tying (bool): Whether to use weight tying.
         """
         weight_decay_groups = {
-            "linear": [".attn", ".mlp"],
+            "linear": [".attn", ".mlp", ".lm_head.weight"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
