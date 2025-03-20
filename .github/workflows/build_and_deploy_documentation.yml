@@ -17,7 +17,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install myst-parser
-        pip install .
         pip install sphinx-rtd-theme sphinx-autodoc-typehints sphinx-click sphinx-automodapi texext
     - name: "Parse into HTML"
       run: |
