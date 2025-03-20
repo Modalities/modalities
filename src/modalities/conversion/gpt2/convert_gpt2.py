@@ -20,6 +20,7 @@ options:
 
 import argparse
 import os
+from pathlib import Path
 
 from modalities.config.config import load_app_config_dict
 from modalities.conversion.gpt2.conversion_code import transfer_model_code
@@ -47,7 +48,7 @@ def convert_gpt2(
         device_modalities (str, optional): Device for the modalities model. Defaults to "cpu".
         device_hf (str, optional): Device for the Hugging Face model. Defaults to "cpu".
     """
-    modalities_config = load_app_config_dict(modalities_config_path)
+    modalities_config = load_app_config_dict(Path(modalities_config_path))
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
     if num_testruns > 0:
