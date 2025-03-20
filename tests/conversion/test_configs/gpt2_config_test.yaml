@@ -14,6 +14,7 @@ model:
     n_embd: 256
     dropout: 0.0
     bias: false # True: bias in Linears, like GPT-2. False: a bit better and faster
+    use_weight_tying: false
     attention_config:
       qkv_transforms:
       - type_hint: RotaryTransform

@@ -80,9 +80,8 @@ model:
       component_key: layer_norm
       variant_key: layer_norm
       config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model.config.n_embd}
+        eps: 1e-5
     use_weight_tying: true
 
 tokenizer:
