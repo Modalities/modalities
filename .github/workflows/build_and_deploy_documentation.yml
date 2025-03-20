@@ -18,6 +18,7 @@ jobs:
       run: |
         pip install myst-parser
         pip install torch==2.6.0
+        export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
         pip install .
         pip install sphinx-rtd-theme sphinx-autodoc-typehints sphinx-click sphinx-automodapi texext
     - name: "Parse into HTML"
