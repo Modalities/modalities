@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.config.component_factory &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.config.component_factory</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.config.component_factory</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">TypeVar</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.registry.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">print_rank_0</span>
+
+<span class="n">BaseModelChild</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;BaseModelChild&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">BaseModel</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ComponentFactory">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.component_factory.ComponentFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ComponentFactory</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class to build the components from a config dictionary.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the ComponentFactory with a registry.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            registry (Registry): Registry object to get the component and config classes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span> <span class="o">=</span> <span class="n">registry</span>
+
+<div class="viewcode-block" id="ComponentFactory.build_components">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.component_factory.ComponentFactory.build_components">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_components</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">components_model_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModelChild</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">BaseModelChild</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Builds the components from a config dictionary. All components specified in `components_model_type`</span>
+<span class="sd">        are built from the config dictionary in a recursive manner.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config_dict (dict): Dictionary with the configuration of the components.</span>
+<span class="sd">            components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            BaseModelChild: Instance of the components_model_type with the built components.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">component_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">components_model_type</span><span class="o">.</span><span class="n">model_fields</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">component_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_config</span><span class="p">(</span><span class="n">config_dict</span><span class="o">=</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">component_names</span><span class="o">=</span><span class="n">component_names</span><span class="p">)</span>
+        <span class="n">components</span> <span class="o">=</span> <span class="n">components_model_type</span><span class="p">(</span><span class="o">**</span><span class="n">component_dict</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">components</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">component_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">component_dict_filtered</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">config_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">component_names</span><span class="p">}</span>
+        <span class="n">components</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_component</span><span class="p">(</span>
+            <span class="n">current_component_config</span><span class="o">=</span><span class="n">component_dict_filtered</span><span class="p">,</span>
+            <span class="n">component_config</span><span class="o">=</span><span class="n">config_dict</span><span class="p">,</span>
+            <span class="n">top_level_components</span><span class="o">=</span><span class="p">{},</span>
+            <span class="n">traversal_path</span><span class="o">=</span><span class="p">[],</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">components</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_component</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">current_component_config</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">component_config</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">top_level_components</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">traversal_path</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="c1"># build sub components first via recursion</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_component_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="c1"># if the entities are top level components, we return the component,</span>
+            <span class="c1"># as it must have been built already via a referencing component</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">traversal_path</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">traversal_path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">top_level_components</span><span class="p">:</span>
+                <span class="n">entity_key</span> <span class="o">=</span> <span class="n">traversal_path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">return</span> <span class="n">top_level_components</span><span class="p">[</span><span class="n">entity_key</span><span class="p">],</span> <span class="n">top_level_components</span>
+            <span class="c1"># if it is not a component that has been built already, we need to build it.</span>
+            <span class="c1"># We first traverse the config for possible sub components that need to build beforehand.</span>
+            <span class="n">materialized_component_config</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">sub_entity_key</span><span class="p">,</span> <span class="n">sub_component_config_dict</span> <span class="ow">in</span> <span class="n">current_component_config</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">materialized_component_config</span><span class="p">[</span><span class="n">sub_entity_key</span><span class="p">],</span> <span class="n">top_level_components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_component</span><span class="p">(</span>
+                    <span class="n">current_component_config</span><span class="o">=</span><span class="n">sub_component_config_dict</span><span class="p">,</span>
+                    <span class="n">component_config</span><span class="o">=</span><span class="n">component_config</span><span class="p">,</span>
+                    <span class="n">top_level_components</span><span class="o">=</span><span class="n">top_level_components</span><span class="p">,</span>
+                    <span class="n">traversal_path</span><span class="o">=</span><span class="n">traversal_path</span> <span class="o">+</span> <span class="p">[</span><span class="n">sub_entity_key</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="c1"># After building all the sub components, we can now build the actual component</span>
+            <span class="c1"># if the config is component_config then we instantiate the component</span>
+            <span class="k">if</span> <span class="n">ComponentFactory</span><span class="o">.</span><span class="n">_is_component_config</span><span class="p">(</span><span class="n">config_dict</span><span class="o">=</span><span class="n">current_component_config</span><span class="p">):</span>
+                <span class="c1"># instantiate component config</span>
+                <span class="n">component_key</span> <span class="o">=</span> <span class="n">current_component_config</span><span class="p">[</span><span class="s2">&quot;component_key&quot;</span><span class="p">]</span>
+                <span class="n">variant_key</span> <span class="o">=</span> <span class="n">current_component_config</span><span class="p">[</span><span class="s2">&quot;variant_key&quot;</span><span class="p">]</span>
+                <span class="n">current_component_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_component_config</span><span class="p">(</span>
+                    <span class="n">component_key</span><span class="o">=</span><span class="n">component_key</span><span class="p">,</span>
+                    <span class="n">variant_key</span><span class="o">=</span><span class="n">variant_key</span><span class="p">,</span>
+                    <span class="n">config_dict</span><span class="o">=</span><span class="n">materialized_component_config</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="c1"># instantiate component</span>
+                <span class="n">component</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_component</span><span class="p">(</span>
+                    <span class="n">component_key</span><span class="o">=</span><span class="n">component_key</span><span class="p">,</span> <span class="n">variant_key</span><span class="o">=</span><span class="n">variant_key</span><span class="p">,</span> <span class="n">component_config</span><span class="o">=</span><span class="n">current_component_config</span>
+                <span class="p">)</span>
+                <span class="n">print_rank_0</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Instantiated </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">component</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="s1">&#39; -&gt; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traversal_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># if the component is a top level component, then we add it to the top level components dictionary</span>
+                <span class="c1"># to make sure that we don&#39;t build it again. Building it again would mean that we work by-value</span>
+                <span class="c1"># instead of by reference.</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">traversal_path</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">entity_key</span> <span class="o">=</span> <span class="n">traversal_path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">top_level_components</span><span class="p">[</span><span class="n">entity_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">component</span>
+                <span class="k">return</span> <span class="n">component</span><span class="p">,</span> <span class="n">top_level_components</span>
+
+            <span class="c1"># if the config is a reference_config then check if it exists and if not, we build it</span>
+            <span class="k">if</span> <span class="n">ComponentFactory</span><span class="o">.</span><span class="n">_is_reference_config</span><span class="p">(</span><span class="n">config_dict</span><span class="o">=</span><span class="n">current_component_config</span><span class="p">):</span>
+                <span class="n">referenced_entity_key</span> <span class="o">=</span> <span class="n">current_component_config</span><span class="p">[</span><span class="s2">&quot;instance_key&quot;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">referenced_entity_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">top_level_components</span><span class="p">:</span>
+                    <span class="n">materialized_referenced_component</span><span class="p">,</span> <span class="n">top_level_components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_component</span><span class="p">(</span>
+                        <span class="n">current_component_config</span><span class="o">=</span><span class="n">component_config</span><span class="p">[</span><span class="n">referenced_entity_key</span><span class="p">],</span>
+                        <span class="n">component_config</span><span class="o">=</span><span class="n">component_config</span><span class="p">,</span>
+                        <span class="n">top_level_components</span><span class="o">=</span><span class="n">top_level_components</span><span class="p">,</span>
+                        <span class="n">traversal_path</span><span class="o">=</span><span class="p">[</span><span class="n">referenced_entity_key</span><span class="p">],</span>
+                    <span class="p">)</span>
+                    <span class="c1"># we add the newly build reference config to the top level components dict</span>
+                    <span class="c1"># so that we don&#39;t instantiate it again when we reach the respective component config</span>
+                    <span class="c1"># in the subsequent config traversal</span>
+                    <span class="n">top_level_components</span><span class="p">[</span><span class="n">referenced_entity_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">materialized_referenced_component</span>
+                <span class="k">return</span> <span class="n">top_level_components</span><span class="p">[</span><span class="n">referenced_entity_key</span><span class="p">],</span> <span class="n">top_level_components</span>
+
+            <span class="k">return</span> <span class="n">materialized_component_config</span><span class="p">,</span> <span class="n">top_level_components</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_component_config</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">materialized_component_configs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">sub_entity_key</span><span class="p">,</span> <span class="n">sub_component_config</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">current_component_config</span><span class="p">):</span>
+                <span class="n">materialized_component_config</span><span class="p">,</span> <span class="n">top_level_components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_component</span><span class="p">(</span>
+                    <span class="n">current_component_config</span><span class="o">=</span><span class="n">sub_component_config</span><span class="p">,</span>
+                    <span class="n">component_config</span><span class="o">=</span><span class="n">component_config</span><span class="p">,</span>
+                    <span class="n">top_level_components</span><span class="o">=</span><span class="n">top_level_components</span><span class="p">,</span>
+                    <span class="n">traversal_path</span><span class="o">=</span><span class="n">traversal_path</span> <span class="o">+</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">sub_entity_key</span><span class="p">)],</span>
+                <span class="p">)</span>
+                <span class="n">materialized_component_configs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">materialized_component_config</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">materialized_component_configs</span><span class="p">,</span> <span class="n">top_level_components</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># we return the raw sub config if the sub config is not a dictionary or a list</span>
+            <span class="c1"># i.e., just a &quot;scalar&quot; value (e.g., string, int, etc.), since we don&#39;t have to build it.</span>
+            <span class="k">return</span> <span class="n">current_component_config</span><span class="p">,</span> <span class="n">top_level_components</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_component_config</span><span class="p">(</span><span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="c1"># TODO instead of field checks, we should introduce an enum for the config type.</span>
+        <span class="k">return</span> <span class="s2">&quot;component_key&quot;</span> <span class="ow">in</span> <span class="n">config_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_reference_config</span><span class="p">(</span><span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="c1"># TODO instead of field checks, we should introduce an enum for the config type.</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;instance_key&quot;</span><span class="p">,</span> <span class="s2">&quot;pass_type&quot;</span><span class="p">}</span> <span class="o">==</span> <span class="n">config_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_instantiate_component_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseModel</span><span class="p">:</span>
+        <span class="n">component_config_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">get_config</span><span class="p">(</span><span class="n">component_key</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_valid_config_keys</span><span class="p">(</span>
+            <span class="n">component_key</span><span class="o">=</span><span class="n">component_key</span><span class="p">,</span>
+            <span class="n">variant_key</span><span class="o">=</span><span class="n">variant_key</span><span class="p">,</span>
+            <span class="n">config_dict</span><span class="o">=</span><span class="n">config_dict</span><span class="p">,</span>
+            <span class="n">component_config_type</span><span class="o">=</span><span class="n">component_config_type</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">comp_config</span> <span class="o">=</span> <span class="n">component_config_type</span><span class="p">(</span><span class="o">**</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">comp_config</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_assert_valid_config_keys</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">component_config_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModelChild</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">required_keys</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">optional_keys</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">component_config_type</span><span class="o">.</span><span class="n">model_fields</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">is_required</span><span class="p">():</span>
+                <span class="n">required_keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">optional_keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="n">invalid_keys</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">config_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_keys</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">optional_keys</span><span class="p">:</span>
+                <span class="n">invalid_keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">invalid_keys</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Invalid keys </span><span class="si">{</span><span class="n">invalid_keys</span><span class="si">}</span><span class="s2"> for config `</span><span class="si">{</span><span class="n">component_key</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">variant_key</span><span class="si">}</span><span class="s2">`&quot;</span>
+            <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; of type </span><span class="si">{</span><span class="n">component_config_type</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="si">{</span><span class="n">config_dict</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Required keys: </span><span class="si">{</span><span class="n">required_keys</span><span class="si">}</span><span class="se">\n</span><span class="s2">Optional keys: </span><span class="si">{</span><span class="n">optional_keys</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_instantiate_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">component_config</span><span class="p">:</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">component_type</span><span class="p">:</span> <span class="n">Type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">get_component</span><span class="p">(</span><span class="n">component_key</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">)</span>
+        <span class="n">component_config_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_model_to_dict</span><span class="p">(</span><span class="n">component_config</span><span class="p">)</span>
+        <span class="n">component</span> <span class="o">=</span> <span class="n">component_type</span><span class="p">(</span><span class="o">**</span><span class="n">component_config_dict</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">component</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_base_model_to_dict</span><span class="p">(</span><span class="n">base_model</span><span class="p">:</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="c1"># converts top level structure of base_model into dictionary while maintaining substructure</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">base_model</span><span class="o">.</span><span class="n">model_fields</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">base_model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="n">output</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">return</span> <span class="n">output</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

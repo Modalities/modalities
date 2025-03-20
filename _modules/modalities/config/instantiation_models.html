@@ -1,0 +1,512 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.config.instantiation_models &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.config.instantiation_models</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.config.instantiation_models</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">FilePath</span><span class="p">,</span> <span class="n">field_validator</span><span class="p">,</span> <span class="n">model_validator</span><span class="p">,</span> <span class="n">root_validator</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.pydanctic_if_types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PydanticCheckpointSavingIFType</span><span class="p">,</span>
+    <span class="n">PydanticDatasetIFType</span><span class="p">,</span>
+    <span class="n">PydanticGradientClipperIFType</span><span class="p">,</span>
+    <span class="n">PydanticLLMDataLoaderIFType</span><span class="p">,</span>
+    <span class="n">PydanticLossIFType</span><span class="p">,</span>
+    <span class="n">PydanticLRSchedulerIFType</span><span class="p">,</span>
+    <span class="n">PydanticMessageSubscriberIFType</span><span class="p">,</span>
+    <span class="n">PydanticOptimizerIFType</span><span class="p">,</span>
+    <span class="n">PydanticPytorchDeviceType</span><span class="p">,</span>
+    <span class="n">PydanticPytorchModuleType</span><span class="p">,</span>
+    <span class="n">PydanticTextInferenceComponentType</span><span class="p">,</span>
+    <span class="n">PydanticTokenizerIFType</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_torch_device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">warn_rank_0</span>
+
+
+<div class="viewcode-block" id="CudaEnvSettings">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.CudaEnvSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CudaEnvSettings</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">local_rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">world_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="StepProfile">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.StepProfile">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StepProfile</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">local_train_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="ConsistencyEnforcement">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.ConsistencyEnforcement">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConsistencyEnforcement</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">enforce_tokens_per_step_consistency</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">enforce_last_step_logged</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">enforce_last_step_evaluated</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">enforce_last_step_checkpointed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="Intervals">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.Intervals">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Intervals</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">training_log_interval_in_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">checkpointing_interval_in_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">evaluation_interval_in_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="TrainingTarget">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingTarget">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrainingTarget</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_target_tokens</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">num_target_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="TrainingProgress">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingProgress">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrainingProgress</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">global_num_seen_tokens</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">num_seen_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">num_seen_samples</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">last_step</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="TrainingComponentsInstantiationModel">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingComponentsInstantiationModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrainingComponentsInstantiationModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<div class="viewcode-block" id="TrainingComponentsInstantiationModel.Settings">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingComponentsInstantiationModel.Settings">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">Settings</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<div class="viewcode-block" id="TrainingComponentsInstantiationModel.Settings.Paths">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingComponentsInstantiationModel.Settings.Paths">[docs]</a>
+        <span class="k">class</span><span class="w"> </span><span class="nc">Paths</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+            <span class="n">checkpoint_saving_path</span><span class="p">:</span> <span class="n">Path</span>  <span class="c1"># Explicitly defined field</span>
+
+<div class="viewcode-block" id="TrainingComponentsInstantiationModel.Settings.Paths.Config">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingComponentsInstantiationModel.Settings.Paths.Config">[docs]</a>
+            <span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
+                <span class="n">extra</span> <span class="o">=</span> <span class="s2">&quot;allow&quot;</span></div>
+
+
+            <span class="nd">@root_validator</span><span class="p">(</span><span class="n">pre</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">_validate_all_paths</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>  <span class="c1"># If a value is a string, convert it to Path</span>
+                        <span class="n">values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Path</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Field &#39;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">&#39; must be of type Path, but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2"> instead.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">values</span></div>
+
+
+<div class="viewcode-block" id="TrainingComponentsInstantiationModel.Settings.WarmstartCheckpointPaths">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingComponentsInstantiationModel.Settings.WarmstartCheckpointPaths">[docs]</a>
+        <span class="k">class</span><span class="w"> </span><span class="nc">WarmstartCheckpointPaths</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+            <span class="n">model_checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
+            <span class="n">optimizer_checkpoint_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="n">config_file_path</span><span class="p">:</span> <span class="n">FilePath</span>
+        <span class="n">referencing_keys</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+        <span class="n">cuda_env</span><span class="p">:</span> <span class="n">CudaEnvSettings</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="n">Paths</span>
+        <span class="n">intervals</span><span class="p">:</span> <span class="n">Intervals</span>
+        <span class="n">consistency_enforcement</span><span class="p">:</span> <span class="n">ConsistencyEnforcement</span>
+        <span class="n">step_profile</span><span class="p">:</span> <span class="n">StepProfile</span>
+        <span class="n">training_target</span><span class="p">:</span> <span class="n">TrainingTarget</span>
+        <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span>
+        <span class="n">warmstart_checkpoint_paths</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarmstartCheckpointPaths</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_check_tokens_per_step_conistency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TrainingComponentsInstantiationModel.Settings&quot;</span><span class="p">:</span>
+            <span class="c1"># Check if the number of target steps and target tokens are consistent with the step profile</span>
+            <span class="n">required_num_tokens_per_step</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">global_num_seen_tokens</span>
+            <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span><span class="p">)</span>
+            <span class="n">step_profile_num_tokens_per_step</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">local_train_micro_batch_size</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">gradient_accumulation_steps</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">world_size</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">required_num_tokens_per_step</span> <span class="o">!=</span> <span class="n">step_profile_num_tokens_per_step</span><span class="p">:</span>
+                <span class="n">warning_message</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Required number of tokens per step is (</span><span class="si">{</span><span class="n">required_num_tokens_per_step</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;which does not match the number of tokens per step (</span><span class="si">{</span><span class="n">step_profile_num_tokens_per_step</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="s2">&quot;from the step profile.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="o">.</span><span class="n">enforce_tokens_per_step_consistency</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+                <span class="n">warn_rank_0</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_check_last_step_logged</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TrainingComponentsInstantiationModel.Settings&quot;</span><span class="p">:</span>
+            <span class="c1"># Check if the training is logged after the last step</span>
+            <span class="n">remaining_steps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span>
+            <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">training_log_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">warning_message</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;Last step will not be logged. Since remaining_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="s2">&quot;is not a multiple of training_log_interval_in_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">training_log_interval_in_steps</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="o">.</span><span class="n">enforce_last_step_logged</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+                <span class="n">warn_rank_0</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_check_last_step_evaluated</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TrainingComponentsInstantiationModel.Settings&quot;</span><span class="p">:</span>
+            <span class="c1"># Check if the model is evaluated after the last step</span>
+            <span class="n">remaining_steps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span>
+            <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">evaluation_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">warning_message</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;Last step will not be evaluated. Since remaining_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="s2">&quot;is not a multiple of evaluation_interval_in_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">evaluation_interval_in_steps</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="o">.</span><span class="n">enforce_last_step_evaluated</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+                <span class="n">warn_rank_0</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_check_last_step_checkpointed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TrainingComponentsInstantiationModel.Settings&quot;</span><span class="p">:</span>
+            <span class="c1"># Check if the model is evaluated after the last step</span>
+            <span class="n">remaining_steps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span>
+            <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">checkpointing_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">warning_message</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;Last step will not be checkpointed. Since remaining_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="s2">&quot;is not a multiple of checkpointing_interval_in_steps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">checkpointing_interval_in_steps</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="o">.</span><span class="n">enforce_last_step_checkpointed</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+                <span class="n">warn_rank_0</span><span class="p">(</span><span class="n">warning_message</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="n">settings</span><span class="p">:</span> <span class="n">Settings</span>
+    <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">scheduler</span><span class="p">:</span> <span class="n">PydanticLRSchedulerIFType</span>
+    <span class="n">loss_fn</span><span class="p">:</span> <span class="n">PydanticLossIFType</span>
+    <span class="n">train_dataset</span><span class="p">:</span> <span class="n">PydanticDatasetIFType</span>
+    <span class="n">train_dataloader</span><span class="p">:</span> <span class="n">PydanticLLMDataLoaderIFType</span>
+    <span class="n">eval_dataloaders</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PydanticLLMDataLoaderIFType</span><span class="p">]</span>
+    <span class="n">progress_subscriber</span><span class="p">:</span> <span class="n">PydanticMessageSubscriberIFType</span>
+    <span class="n">evaluation_subscriber</span><span class="p">:</span> <span class="n">PydanticMessageSubscriberIFType</span>
+    <span class="n">checkpoint_saving</span><span class="p">:</span> <span class="n">PydanticCheckpointSavingIFType</span>
+    <span class="n">gradient_clipper</span><span class="p">:</span> <span class="n">PydanticGradientClipperIFType</span>
+
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_token_amount_in_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TrainingComponentsInstantiationModel.Settings&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_dataset</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span>
+            <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Not enough tokens in the dataset. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Actual: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_dataset</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected: &gt;=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+
+<div class="viewcode-block" id="PackedDatasetComponentsInstantiationModel">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.PackedDatasetComponentsInstantiationModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PackedDatasetComponentsInstantiationModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<div class="viewcode-block" id="PackedDatasetComponentsInstantiationModel.PackedDatasetSettings">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.PackedDatasetComponentsInstantiationModel.PackedDatasetSettings">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">PackedDatasetSettings</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+        <span class="n">src_path</span><span class="p">:</span> <span class="n">FilePath</span>
+        <span class="n">dst_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">index_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FilePath</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">jq_pattern</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="n">num_cpus</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+        <span class="n">eod_token</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="n">processing_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">raw_samples_queue_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">processed_samples_queue_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">PydanticTokenizerIFType</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">PackedDatasetSettings</span></div>
+
+
+
+<div class="viewcode-block" id="TextGenerationInstantiationModel">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TextGenerationInstantiationModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TextGenerationInstantiationModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<div class="viewcode-block" id="TextGenerationInstantiationModel.TextGenerationSettings">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TextGenerationInstantiationModel.TextGenerationSettings">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">TextGenerationSettings</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+        <span class="n">model_path</span><span class="p">:</span> <span class="n">FilePath</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">PydanticPytorchDeviceType</span>
+        <span class="n">referencing_keys</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+
+        <span class="c1"># avoid warning about protected namespace &#39;model_&#39;, see</span>
+        <span class="c1"># https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces</span>
+        <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">protected_namespaces</span><span class="o">=</span><span class="p">())</span>
+
+<div class="viewcode-block" id="TextGenerationInstantiationModel.TextGenerationSettings.parse_device">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TextGenerationInstantiationModel.TextGenerationSettings.parse_device">[docs]</a>
+        <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">parse_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PydanticPytorchDeviceType</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">parse_torch_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span></div>
+</div>
+
+
+    <span class="n">text_inference_component</span><span class="p">:</span> <span class="n">PydanticTextInferenceComponentType</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">TextGenerationSettings</span></div>
+
+
+
+<div class="viewcode-block" id="TrainingReportGenerator">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingReportGenerator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrainingReportGenerator</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">training_target</span><span class="p">:</span> <span class="n">TrainingTarget</span><span class="p">,</span>
+        <span class="n">intervals</span><span class="p">:</span> <span class="n">Intervals</span><span class="p">,</span>
+        <span class="n">step_profile</span><span class="p">:</span> <span class="n">StepProfile</span><span class="p">,</span>
+        <span class="n">cuda_env</span><span class="p">:</span> <span class="n">CudaEnvSettings</span><span class="p">,</span>
+        <span class="n">consistency_enforcement</span><span class="p">:</span> <span class="n">ConsistencyEnforcement</span><span class="p">,</span>
+        <span class="n">train_dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span>
+        <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span> <span class="o">=</span> <span class="n">training_target</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span> <span class="o">=</span> <span class="n">intervals</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span> <span class="o">=</span> <span class="n">step_profile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cuda_env</span> <span class="o">=</span> <span class="n">cuda_env</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_dataset</span> <span class="o">=</span> <span class="n">train_dataset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span> <span class="o">=</span> <span class="n">consistency_enforcement</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span> <span class="o">=</span> <span class="n">training_progress</span>
+
+<div class="viewcode-block" id="TrainingReportGenerator.get_report">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.instantiation_models.TrainingReportGenerator.get_report">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_get_formatted_dict_str</span><span class="p">(</span><span class="n">d</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_get_formatted_list_str</span><span class="p">(</span><span class="n">lst</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lst</span><span class="p">)</span>
+
+        <span class="n">training_target_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="p">))</span>
+        <span class="n">interval_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">))</span>
+        <span class="n">step_profile_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="p">))</span>
+        <span class="n">cuda_env_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cuda_env</span><span class="p">))</span>
+        <span class="n">consistency_enforcement_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="p">))</span>
+        <span class="n">training_progress_str</span> <span class="o">=</span> <span class="n">_get_formatted_dict_str</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="p">))</span>
+        <span class="n">warnings_str</span> <span class="o">=</span> <span class="n">_get_formatted_list_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_issue_warnings</span><span class="p">())</span>
+
+        <span class="n">report</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;</span><span class="se">\n\n\n</span><span class="s2">======================== Training Report ========================</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Training target: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">training_target_str</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Intervals: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">interval_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Step profile: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">step_profile_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CUDA environment settings: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">cuda_env_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Consistency enforcement: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">consistency_enforcement_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Training progress: </span><span class="se">\n\t</span><span class="si">{</span><span class="n">training_progress_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Warnings: </span><span class="se">\n\t\033</span><span class="s2">[38;5;214m</span><span class="si">{</span><span class="n">warnings_str</span><span class="si">}</span><span class="s2"> </span><span class="se">\033</span><span class="s2">[0m </span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;====================================================================</span><span class="se">\n\n\n</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">report</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_issue_warnings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="n">issue_warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">num_tokens</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">local_train_micro_batch_size</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">gradient_accumulation_steps</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">world_size</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span>
+        <span class="p">)</span>
+        <span class="c1"># Check if the number of target tokens and (number of tokens per step * num steps) are consistent</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span> <span class="o">!=</span> <span class="n">num_tokens</span><span class="p">:</span>
+            <span class="n">missing_percentage</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">num_tokens</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+            <span class="n">issue_warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Number of target tokens (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="si">}</span><span class="s2">) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;does not match the number of tokens per step * num steps (</span><span class="si">{</span><span class="n">num_tokens</span><span class="si">}</span><span class="s2">).&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Missing </span><span class="si">{</span><span class="n">missing_percentage</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% of target tokens.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Check if the number of tokens in the dataset and the number of target tokens are consistent</span>
+        <span class="n">tokens_in_dataset</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_dataset</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span>
+        <span class="k">if</span> <span class="n">tokens_in_dataset</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">:</span>
+            <span class="n">missing_percentage</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">num_tokens</span> <span class="o">/</span> <span class="n">tokens_in_dataset</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+            <span class="n">issue_warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Number of tokens in the dataset (</span><span class="si">{</span><span class="n">tokens_in_dataset</span><span class="si">}</span><span class="s2">) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;does not match the number of target tokens (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="si">}</span><span class="s2">). &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Missing </span><span class="si">{</span><span class="n">missing_percentage</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% of tokens in the dataset.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Check if the training is logged after the last step</span>
+        <span class="n">remaining_steps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span>
+        <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">training_log_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">issue_warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Last step will not be logged. Since remaining_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                <span class="s2">&quot;is not a multiple of training_log_interval_in_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">training_log_interval_in_steps</span><span class="si">}</span><span class="s2">).&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Check if the model is evaluated after the last step</span>
+        <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">evaluation_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">issue_warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Last step will not be evaluated. Since remaining_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                <span class="s2">&quot;is not a multiple of evaluation_interval_in_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">evaluation_interval_in_steps</span><span class="si">}</span><span class="s2">).&quot;</span>
+            <span class="p">)</span>
+        <span class="c1"># Check if the model is checkpointed after the last step</span>
+        <span class="k">if</span> <span class="n">remaining_steps</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">checkpointing_interval_in_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">issue_warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Last step will not be checkpointed. Since remaining_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">remaining_steps</span><span class="si">}</span><span class="s2">) &quot;</span>
+                <span class="s2">&quot;is not a multiple of checkpointing_interval_in_steps &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">checkpointing_interval_in_steps</span><span class="si">}</span><span class="s2">).&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">issue_warnings</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

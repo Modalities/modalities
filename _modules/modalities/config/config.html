@@ -1,0 +1,687 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.config.config &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.config.config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.config.config</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">omegaconf</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmegaConf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">FilePath</span><span class="p">,</span> <span class="n">PositiveInt</span><span class="p">,</span> <span class="n">field_validator</span><span class="p">,</span> <span class="n">model_validator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShardingStrategy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2TokenizerFast</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.models.llama.tokenization_llama_fast</span><span class="w"> </span><span class="kn">import</span> <span class="n">LlamaTokenizerFast</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.lookup_enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">LookupEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.pydanctic_if_types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PydanticCheckpointLoadingIFType</span><span class="p">,</span>
+    <span class="n">PydanticCheckpointSavingExecutionIFType</span><span class="p">,</span>
+    <span class="n">PydanticCheckpointSavingStrategyIFType</span><span class="p">,</span>
+    <span class="n">PydanticCollateFnIFType</span><span class="p">,</span>
+    <span class="n">PydanticDatasetIFType</span><span class="p">,</span>
+    <span class="n">PydanticFSDPModuleType</span><span class="p">,</span>
+    <span class="n">PydanticLLMDataLoaderIFType</span><span class="p">,</span>
+    <span class="n">PydanticModelInitializationIFType</span><span class="p">,</span>
+    <span class="n">PydanticOptimizerIFType</span><span class="p">,</span>
+    <span class="n">PydanticPytorchDeviceType</span><span class="p">,</span>
+    <span class="n">PydanticPytorchModuleType</span><span class="p">,</span>
+    <span class="n">PydanticSamplerIFType</span><span class="p">,</span>
+    <span class="n">PydanticTokenizerIFType</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_torch_device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.env_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedPrecisionSettings</span><span class="p">,</span> <span class="n">has_bfloat_support</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_experiment_id_of_run</span><span class="p">,</span> <span class="n">parse_enum_by_name</span>
+
+
+<div class="viewcode-block" id="ProcessGroupBackendType">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.ProcessGroupBackendType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ProcessGroupBackendType</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">nccl</span> <span class="o">=</span> <span class="s2">&quot;nccl&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TokenizerTypes">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.TokenizerTypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TokenizerTypes</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">GPT2TokenizerFast</span> <span class="o">=</span> <span class="n">GPT2TokenizerFast</span>
+    <span class="n">LlamaTokenizerFast</span> <span class="o">=</span> <span class="n">LlamaTokenizerFast</span></div>
+
+
+
+<div class="viewcode-block" id="PassType">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PassType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PassType</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">BY_VALUE</span> <span class="o">=</span> <span class="s2">&quot;by_value&quot;</span>
+    <span class="n">BY_REFERENCE</span> <span class="o">=</span> <span class="s2">&quot;by_reference&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="WandbMode">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.WandbMode">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WandbMode</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">ONLINE</span> <span class="o">=</span> <span class="s2">&quot;ONLINE&quot;</span>
+    <span class="n">OFFLINE</span> <span class="o">=</span> <span class="s2">&quot;OFFLINE&quot;</span>
+    <span class="n">DISABLED</span> <span class="o">=</span> <span class="s2">&quot;DISABLED&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="PrecisionEnum">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PrecisionEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PrecisionEnum</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">FP32</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+    <span class="n">FP16</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float16</span>
+    <span class="n">BF16</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span></div>
+
+
+
+<div class="viewcode-block" id="ReferenceConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.ReferenceConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ReferenceConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">instance_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">pass_type</span><span class="p">:</span> <span class="n">PassType</span></div>
+
+
+
+<div class="viewcode-block" id="CLMCrossEntropyLossConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CLMCrossEntropyLossConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CLMCrossEntropyLossConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">target_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<span class="c1"># Checkpointing</span>
+<div class="viewcode-block" id="SaveEveryKStepsCheckpointingStrategyConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.SaveEveryKStepsCheckpointingStrategyConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SaveEveryKStepsCheckpointingStrategyConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">k</span><span class="p">:</span> <span class="n">PositiveInt</span></div>
+
+
+
+<div class="viewcode-block" id="SaveKMostRecentCheckpointsStrategyConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.SaveKMostRecentCheckpointsStrategyConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SaveKMostRecentCheckpointsStrategyConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">k</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="TorchCheckpointLoadingConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.TorchCheckpointLoadingConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TorchCheckpointLoadingConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">PydanticPytorchDeviceType</span>
+    <span class="n">precision</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PrecisionEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="TorchCheckpointLoadingConfig.parse_device">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.TorchCheckpointLoadingConfig.parse_device">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PydanticPytorchDeviceType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">parse_torch_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FSDPCheckpointLoadingConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPCheckpointLoadingConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDPCheckpointLoadingConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span>
+    <span class="n">sharding_strategy</span><span class="p">:</span> <span class="n">ShardingStrategy</span>
+
+<div class="viewcode-block" id="FSDPCheckpointLoadingConfig.parse_mixed_precision_setting_by_name">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPCheckpointLoadingConfig.parse_mixed_precision_setting_by_name">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;mixed_precision_settings&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_mixed_precision_setting_by_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span> <span class="o">=</span> <span class="n">parse_enum_by_name</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">enum_type</span><span class="o">=</span><span class="n">MixedPrecisionSettings</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">has_bfloat_support</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">mixed_precision_settings</span> <span class="o">==</span> <span class="n">MixedPrecisionSettings</span><span class="o">.</span><span class="n">BF_16</span>
+            <span class="ow">or</span> <span class="n">mixed_precision_settings</span> <span class="o">==</span> <span class="n">MixedPrecisionSettings</span><span class="o">.</span><span class="n">BF_16_WORKING</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;BF16 not supported in the current environment&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mixed_precision_settings</span></div>
+
+
+<div class="viewcode-block" id="FSDPCheckpointLoadingConfig.parse_sharding_strategy_by_name">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPCheckpointLoadingConfig.parse_sharding_strategy_by_name">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;sharding_strategy&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_sharding_strategy_by_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">parse_enum_by_name</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">enum_type</span><span class="o">=</span><span class="n">ShardingStrategy</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FSDPCheckpointSavingConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPCheckpointSavingConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDPCheckpointSavingConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="CheckpointSavingConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CheckpointSavingConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CheckpointSavingConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">checkpoint_saving_strategy</span><span class="p">:</span> <span class="n">PydanticCheckpointSavingStrategyIFType</span>
+    <span class="n">checkpoint_saving_execution</span><span class="p">:</span> <span class="n">PydanticCheckpointSavingExecutionIFType</span></div>
+
+
+
+<div class="viewcode-block" id="AdamOptimizerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.AdamOptimizerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AdamOptimizerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">lr</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">betas</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+    <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="AdamWOptimizerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.AdamWOptimizerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AdamWOptimizerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">lr</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">betas</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+    <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="DummyLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.DummyLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DummyLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span></div>
+
+
+
+<div class="viewcode-block" id="StepLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.StepLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StepLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">step_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gamma</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="n">last_epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="OneCycleLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.OneCycleLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OneCycleLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">max_lr</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]]</span>
+    <span class="n">total_steps</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">epochs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">steps_per_epoch</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">pct_start</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)]</span>
+    <span class="n">anneal_strategy</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">cycle_momentum</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">base_momentum</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span>
+        <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="mf">0.85</span>
+    <span class="n">max_momentum</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span>
+        <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="mf">0.95</span>
+    <span class="n">div_factor</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="n">final_div_factor</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="n">three_phase</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">last_epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="OneCycleLRSchedulerConfig.check_totals_steps_and_epchs">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.OneCycleLRSchedulerConfig.check_totals_steps_and_epchs">[docs]</a>
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_totals_steps_and_epchs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;OneCycleLRSchedulerConfig&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_steps</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">epochs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps_per_epoch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Please define total_steps or (epochs and steps_per_epoch).&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ConstantLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.ConstantLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConstantLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">factor</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)]</span>
+    <span class="n">total_iters</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">last_epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="LinearLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.LinearLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LinearLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">start_factor</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)]</span>
+    <span class="n">end_factor</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)]</span>
+    <span class="n">total_iters</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">last_epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="CosineAnnealingLRSchedulerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CosineAnnealingLRSchedulerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CosineAnnealingLRSchedulerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span>
+    <span class="n">t_max</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">eta_min</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span>
+    <span class="n">last_epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="CheckpointedOptimizerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CheckpointedOptimizerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CheckpointedOptimizerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">checkpoint_loading</span><span class="p">:</span> <span class="n">PydanticCheckpointLoadingIFType</span>
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">PydanticOptimizerIFType</span></div>
+
+
+
+<div class="viewcode-block" id="CheckpointedModelConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CheckpointedModelConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CheckpointedModelConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">checkpoint_loading</span><span class="p">:</span> <span class="n">PydanticCheckpointLoadingIFType</span>
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span></div>
+
+
+
+<div class="viewcode-block" id="FSDPWrappedModelConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPWrappedModelConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDPWrappedModelConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">sync_module_states</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span>
+    <span class="n">sharding_strategy</span><span class="p">:</span> <span class="n">ShardingStrategy</span>
+    <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+
+<div class="viewcode-block" id="FSDPWrappedModelConfig.parse_mixed_precision_setting_by_name">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPWrappedModelConfig.parse_mixed_precision_setting_by_name">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;mixed_precision_settings&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_mixed_precision_setting_by_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span> <span class="o">=</span> <span class="n">parse_enum_by_name</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">enum_type</span><span class="o">=</span><span class="n">MixedPrecisionSettings</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">has_bfloat_support</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">mixed_precision_settings</span> <span class="o">==</span> <span class="n">MixedPrecisionSettings</span><span class="o">.</span><span class="n">BF_16</span>
+            <span class="ow">or</span> <span class="n">mixed_precision_settings</span> <span class="o">==</span> <span class="n">MixedPrecisionSettings</span><span class="o">.</span><span class="n">BF_16_WORKING</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;BF16 not supported in the current environment&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mixed_precision_settings</span></div>
+
+
+<div class="viewcode-block" id="FSDPWrappedModelConfig.parse_sharding_strategy_by_name">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.FSDPWrappedModelConfig.parse_sharding_strategy_by_name">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;sharding_strategy&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_sharding_strategy_by_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">parse_enum_by_name</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">enum_type</span><span class="o">=</span><span class="n">ShardingStrategy</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="WeightInitializedModelConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.WeightInitializedModelConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WeightInitializedModelConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">PydanticPytorchModuleType</span>
+    <span class="n">model_initializer</span><span class="p">:</span> <span class="n">PydanticModelInitializationIFType</span>
+
+    <span class="c1"># avoid warning about protected namespace &#39;model_&#39;, see</span>
+    <span class="c1"># https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">protected_namespaces</span><span class="o">=</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="ActivationCheckpointedModelConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.ActivationCheckpointedModelConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ActivationCheckpointedModelConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">PydanticFSDPModuleType</span>
+    <span class="n">activation_checkpointing_modules</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PreTrainedHFTokenizerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PreTrainedHFTokenizerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreTrainedHFTokenizerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">pretrained_model_name_or_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">max_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">truncation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">padding</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">special_tokens</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="PreTrainedSPTokenizerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PreTrainedSPTokenizerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreTrainedSPTokenizerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">tokenizer_model_file</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="SequentialSamplerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.SequentialSamplerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SequentialSamplerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">data_source</span><span class="p">:</span> <span class="n">PydanticDatasetIFType</span></div>
+
+
+
+<div class="viewcode-block" id="DistributedSamplerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.DistributedSamplerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DistributedSamplerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">num_replicas</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">shuffle</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">PydanticDatasetIFType</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">drop_last</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="kc">True</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="ResumableDistributedSamplerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.ResumableDistributedSamplerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ResumableDistributedSamplerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">PydanticDatasetIFType</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">num_replicas</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">epoch</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">shuffle</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">drop_last</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="kc">True</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">skip_num_global_samples</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="MemMapDatasetConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.MemMapDatasetConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MemMapDatasetConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">raw_data_path</span><span class="p">:</span> <span class="n">FilePath</span>
+    <span class="n">index_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FilePath</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">PydanticTokenizerIFType</span>
+    <span class="n">jq_pattern</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="PackedMemMapDatasetContinuousConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PackedMemMapDatasetContinuousConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PackedMemMapDatasetContinuousConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">raw_data_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="PackedMemMapDatasetMegatronConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.PackedMemMapDatasetMegatronConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PackedMemMapDatasetMegatronConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">raw_data_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">block_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="CombinedDatasetConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.CombinedDatasetConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CombinedDatasetConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">datasets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PydanticDatasetIFType</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="BatchSamplerConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.BatchSamplerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BatchSamplerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">sampler</span><span class="p">:</span> <span class="n">PydanticSamplerIFType</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">drop_last</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="kc">True</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="GPT2LLMCollateFnConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.GPT2LLMCollateFnConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2LLMCollateFnConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">target_key</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="LLMDataLoaderConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.LLMDataLoaderConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LLMDataLoaderConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">dataloader_tag</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">PydanticDatasetIFType</span>
+    <span class="n">batch_sampler</span><span class="p">:</span> <span class="n">PydanticSamplerIFType</span>
+    <span class="n">collate_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PydanticCollateFnIFType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">num_workers</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">pin_memory</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="DummyProgressSubscriberConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.DummyProgressSubscriberConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DummyProgressSubscriberConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="RichProgressSubscriberConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.RichProgressSubscriberConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RichProgressSubscriberConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">eval_dataloaders</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">PydanticLLMDataLoaderIFType</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">train_dataloader_tag</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">num_seen_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">num_target_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="DummyResultSubscriberConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.DummyResultSubscriberConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DummyResultSubscriberConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="WandBEvaluationResultSubscriberConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.WandBEvaluationResultSubscriberConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WandBEvaluationResultSubscriberConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">project</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="n">WandbMode</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span></div>
+
+
+
+<div class="viewcode-block" id="RichResultSubscriberConfig">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.RichResultSubscriberConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RichResultSubscriberConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_ranks</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span></div>
+
+
+
+<div class="viewcode-block" id="load_app_config_dict">
+<a class="viewcode-back" href="../../../api/modalities.config.html#modalities.config.config.load_app_config_dict">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_app_config_dict</span><span class="p">(</span>
+    <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">additional_resolver_funs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the application configuration from the given YAML file.</span>
+<span class="sd">    The function defines custom resolvers for the OmegaConf library to resolve environment variables and</span>
+<span class="sd">    Modalities-specific variables.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_file_path (Path): YAML config file.</span>
+<span class="sd">        additional_resolver_funs (dict[str, Callable], optional): Additional resolver functions. Defaults to None.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary representation of the config file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cuda_env_resolver_fun</span><span class="p">(</span><span class="n">var_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">int_env_variable_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LOCAL_RANK&quot;</span><span class="p">,</span> <span class="s2">&quot;WORLD_SIZE&quot;</span><span class="p">,</span> <span class="s2">&quot;RANK&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">var_name</span><span class="p">))</span> <span class="k">if</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="n">int_env_variable_names</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">var_name</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">modalities_env_resolver_fun</span><span class="p">(</span><span class="n">var_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">var_name</span> <span class="o">==</span> <span class="s2">&quot;experiment_id&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">get_experiment_id_of_run</span><span class="p">(</span><span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">var_name</span> <span class="o">==</span> <span class="s2">&quot;config_file_path&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">config_file_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown modalities_env variable: </span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">node_env_resolver_fun</span><span class="p">(</span><span class="n">var_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">var_name</span> <span class="o">==</span> <span class="s2">&quot;num_cpus&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+
+    <span class="n">OmegaConf</span><span class="o">.</span><span class="n">register_new_resolver</span><span class="p">(</span><span class="s2">&quot;cuda_env&quot;</span><span class="p">,</span> <span class="n">cuda_env_resolver_fun</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">OmegaConf</span><span class="o">.</span><span class="n">register_new_resolver</span><span class="p">(</span>
+        <span class="s2">&quot;modalities_env&quot;</span><span class="p">,</span> <span class="n">partial</span><span class="p">(</span><span class="n">modalities_env_resolver_fun</span><span class="p">,</span> <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span><span class="p">),</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+    <span class="n">OmegaConf</span><span class="o">.</span><span class="n">register_new_resolver</span><span class="p">(</span><span class="s2">&quot;node_env&quot;</span><span class="p">,</span> <span class="n">node_env_resolver_fun</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">additional_resolver_funs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">resolver_name</span><span class="p">,</span> <span class="n">resolver_fun</span> <span class="ow">in</span> <span class="n">additional_resolver_funs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">OmegaConf</span><span class="o">.</span><span class="n">register_new_resolver</span><span class="p">(</span><span class="n">resolver_name</span><span class="p">,</span> <span class="n">resolver_fun</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">cfg</span> <span class="o">=</span> <span class="n">OmegaConf</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">)</span>
+    <span class="n">config_dict</span> <span class="o">=</span> <span class="n">OmegaConf</span><span class="o">.</span><span class="n">to_container</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">resolve</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">config_dict</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

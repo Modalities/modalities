@@ -1,0 +1,221 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing.torch.torch_checkpoint_saving &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing.torch.torch_checkpoint_saving</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.checkpointing.torch.torch_checkpoint_saving</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optimizer</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_saving_execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointSavingExecutionABC</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_saving_instruction</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointingInstruction</span>
+
+
+<div class="viewcode-block" id="TorchCheckpointSaving">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.torch.html#modalities.checkpointing.torch.torch_checkpoint_saving.TorchCheckpointSaving">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TorchCheckpointSaving</span><span class="p">(</span><span class="n">CheckpointSavingExecutionABC</span><span class="p">):</span>
+    <span class="n">CHECKPOINT_STRUCTURE</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;eid_</span><span class="si">{experiment_id}</span><span class="s2">-</span><span class="si">{entity}</span><span class="s2">-seen_steps_</span><span class="si">{num_seen_steps}</span><span class="s2">-seen_tokens_</span><span class="si">{num_seen_tokens}</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;-target_steps_</span><span class="si">{num_target_steps}</span><span class="s2">-target_tokens_</span><span class="si">{num_target_tokens}</span><span class="s2">.bin&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the TorchCheckpointSaving object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): The path to save the checkpoint.</span>
+<span class="sd">            experiment_id (str): The ID of the experiment.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">checkpoint_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span> <span class="o">=</span> <span class="n">experiment_id</span>
+
+<div class="viewcode-block" id="TorchCheckpointSaving.run_checkpoint_instruction">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.torch.html#modalities.checkpointing.torch.torch_checkpoint_saving.TorchCheckpointSaving.run_checkpoint_instruction">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_checkpoint_instruction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpointing_instruction</span><span class="p">:</span> <span class="n">CheckpointingInstruction</span><span class="p">,</span>
+        <span class="n">num_train_steps_done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">target_train_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Runs the checkpointing instruction for saving checkpoints.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpointing_instruction (CheckpointingInstruction): The instruction for checkpointing.</span>
+<span class="sd">            num_train_steps_done (int): The number of training steps done.</span>
+<span class="sd">            target_train_steps (int): The target number of training steps.</span>
+<span class="sd">            model (nn.Module): The model to be saved.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer to be saved.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This method is not implemented yet. It is reserved for future work.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>  <span class="c1"># TODO Future work</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_checkpoint</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span> <span class="n">num_train_steps_done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">target_train_steps</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the checkpoint of the model and optimizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to be saved.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer to be saved.</span>
+<span class="sd">            num_train_steps_done (int): The number of training steps completed.</span>
+<span class="sd">            target_train_steps (int): The target number of training steps.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This method is not implemented and should be overridden in a subclass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>  <span class="c1"># TODO Future work</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_delete_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_train_steps_done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">target_train_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deletes the checkpoint based on the number of performed train steps and target train steps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_train_steps_done (int): The number of training steps completed.</span>
+<span class="sd">            target_train_steps (int): The target number of training steps.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>  <span class="c1"># TODO Future work</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

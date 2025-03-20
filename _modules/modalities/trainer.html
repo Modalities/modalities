@@ -1,0 +1,474 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.trainer &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.trainer</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.trainer</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optimizer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim.lr_scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">LRScheduler</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.batch</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetBatch</span><span class="p">,</span> <span class="n">EvaluationResultBatch</span><span class="p">,</span> <span class="n">ResultItem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataloader</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLMDataLoader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.messages</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExperimentStatus</span><span class="p">,</span> <span class="n">MessageTypes</span><span class="p">,</span> <span class="n">ProgressUpdate</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.publisher</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessagePublisher</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.loss_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Loss</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">model_predict_batch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.reducer</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reducer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.gradient_clipping.gradient_clipper</span><span class="w"> </span><span class="kn">import</span> <span class="n">GradientClipperIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.training_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingProgress</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">Aggregator</span><span class="p">,</span> <span class="n">TimeRecorder</span><span class="p">,</span> <span class="n">print_rank_0</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.mfu</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_mfu</span><span class="p">,</span> <span class="n">get_theoretical_flops_per_token</span><span class="p">,</span> <span class="n">get_theoretical_gpu_peak_performance</span>
+
+
+<div class="viewcode-block" id="ThroughputAggregationKeys">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.trainer.ThroughputAggregationKeys">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ThroughputAggregationKeys</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">NUM_SAMPLES</span> <span class="o">=</span> <span class="s2">&quot;NUM_SAMPLES&quot;</span>
+    <span class="n">FORWARD_BACKWARD_TIME</span> <span class="o">=</span> <span class="s2">&quot;FORWARD_BACKWARD_TIME&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="Trainer">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.trainer.Trainer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Trainer</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">progress_publisher</span><span class="p">:</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">ProgressUpdate</span><span class="p">],</span>
+        <span class="n">evaluation_result_publisher</span><span class="p">:</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">EvaluationResultBatch</span><span class="p">],</span>
+        <span class="n">gradient_acc_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">global_num_tokens_per_train_step</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_seen_train_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">global_num_seen_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_target_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_target_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">gradient_clipper</span><span class="p">:</span> <span class="n">GradientClipperIF</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the Trainer object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            global_rank (int): The global rank to which operates the trainer object.</span>
+<span class="sd">            progress_publisher (MessagePublisher[ProgressUpdate]): The publisher for progress updates.</span>
+<span class="sd">            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):</span>
+<span class="sd">                The publisher for evaluation result batches.</span>
+<span class="sd">            gradient_acc_steps (int): The number of gradient accumulation steps.</span>
+<span class="sd">            global_num_tokens_per_train_step (int): The number of global tokens per training step.</span>
+<span class="sd">            target_train_steps (int): The target number of training steps.</span>
+<span class="sd">            gradient_clipper (GradientClipperIF): The gradient clipper.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">=</span> <span class="n">global_rank</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">progress_publisher</span> <span class="o">=</span> <span class="n">progress_publisher</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evaluation_result_publisher</span> <span class="o">=</span> <span class="n">evaluation_result_publisher</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gradient_acc_steps</span> <span class="o">=</span> <span class="n">gradient_acc_steps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_num_tokens_per_train_step</span> <span class="o">=</span> <span class="n">global_num_tokens_per_train_step</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_seen_train_steps</span> <span class="o">=</span> <span class="n">num_seen_train_steps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">=</span> <span class="n">num_target_steps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_target_tokens</span> <span class="o">=</span> <span class="n">num_target_tokens</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_num_seen_tokens</span> <span class="o">=</span> <span class="n">global_num_seen_tokens</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gradient_clipper</span> <span class="o">=</span> <span class="n">gradient_clipper</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_num_train_steps_done</span><span class="p">(</span><span class="n">micro_batch_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">gradient_acc_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates the number of training steps done based on the micro batch ID and gradient accumulation steps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            micro_batch_id (int): The ID of the current micro batch.</span>
+<span class="sd">            gradient_acc_steps (int): The number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The number of training steps done.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">micro_batch_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">gradient_acc_steps</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_train_batch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">DatasetBatch</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">FSDP</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span>
+        <span class="n">scheduler</span><span class="p">:</span> <span class="n">LRScheduler</span><span class="p">,</span>
+        <span class="n">loss_fun</span><span class="p">:</span> <span class="n">Loss</span><span class="p">,</span>
+        <span class="n">micro_batch_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Conducts a training step on batch of data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            batch (DatasetBatch): The input batch of data.</span>
+<span class="sd">            model (FSDP): The model to train.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer used for training.</span>
+<span class="sd">            scheduler (LRScheduler): The learning rate scheduler.</span>
+<span class="sd">            loss_fun (Loss): The loss function used for training.</span>
+<span class="sd">            micro_batch_id (int): The ID of the micro batch.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:</span>
+<span class="sd">                A tuple containing the following:</span>
+<span class="sd">                    - step_performed (bool): Indicates whether a training step was performed.</span>
+<span class="sd">                    - num_train_steps_done (int): The number of training steps done.</span>
+<span class="sd">                    - loss (torch.Tensor): The computed loss.</span>
+<span class="sd">                    - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,</span>
+<span class="sd">                        if a training step was performed otherwise return None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result_batch</span> <span class="o">=</span> <span class="n">model_predict_batch</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_fun</span><span class="p">(</span><span class="n">result_batch</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">loss</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_acc_steps</span><span class="p">)</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">micro_batch_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_acc_steps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">gradient_norm_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_clipper</span><span class="o">.</span><span class="n">clip_gradients</span><span class="p">()</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+            <span class="n">scheduler</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+            <span class="n">step_performed</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">step_performed</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">gradient_norm_score</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">num_train_steps_done</span> <span class="o">=</span> <span class="n">Trainer</span><span class="o">.</span><span class="n">_get_num_train_steps_done</span><span class="p">(</span>
+            <span class="n">micro_batch_id</span><span class="o">=</span><span class="n">micro_batch_id</span><span class="p">,</span> <span class="n">gradient_acc_steps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">gradient_acc_steps</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">step_performed</span><span class="p">,</span> <span class="n">num_train_steps_done</span><span class="p">,</span> <span class="n">loss</span><span class="p">,</span> <span class="n">gradient_norm_score</span>
+
+<div class="viewcode-block" id="Trainer.train">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.trainer.Trainer.train">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">train_loader</span><span class="p">:</span> <span class="n">LLMDataLoader</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span>
+        <span class="n">scheduler</span><span class="p">:</span> <span class="n">LRScheduler</span><span class="p">,</span>
+        <span class="n">loss_fun</span><span class="p">:</span> <span class="n">Loss</span><span class="p">,</span>
+        <span class="n">training_log_interval_in_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">evaluation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">TrainingProgress</span><span class="p">],</span> <span class="kc">None</span><span class="p">],</span>
+        <span class="n">checkpointing_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">TrainingProgress</span><span class="p">],</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Trains the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to be trained.</span>
+<span class="sd">            train_loader (LLMDataLoader): The data loader containing the training data.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer used for gradient updates.</span>
+<span class="sd">            scheduler (LRScheduler): The learning rate scheduler.</span>
+<span class="sd">            loss_fun (Loss): The loss function used for training.</span>
+<span class="sd">            training_log_interval_in_steps (int): The interval at which training progress is logged.</span>
+<span class="sd">            evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.</span>
+<span class="sd">            checkpointing_callback (Callable[[TrainingProgress], None]): A callback function for checkpointing.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+        <span class="n">cumulated_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reset_tracked_losses</span><span class="p">()</span>
+
+        <span class="c1"># throughput &amp; MFU</span>
+        <span class="n">thoughput_aggregator</span> <span class="o">=</span> <span class="n">Aggregator</span><span class="p">[</span><span class="n">ThroughputAggregationKeys</span><span class="p">]()</span>
+        <span class="n">theoretical_gpu_peak_performance</span> <span class="o">=</span> <span class="n">get_theoretical_gpu_peak_performance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">world_size</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">())</span>
+        <span class="n">theoretical_flops_per_token</span><span class="p">,</span> <span class="n">sequence_length</span> <span class="o">=</span> <span class="n">get_theoretical_flops_per_token</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+
+        <span class="c1"># batch loop</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">DatasetBatch</span>
+        <span class="c1"># TODO: why do we need a barrier here?</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+        <span class="n">forward_backward_time_recorder</span> <span class="o">=</span> <span class="n">TimeRecorder</span><span class="p">()</span>
+        <span class="n">forward_backward_time_recorder</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="n">gradient_norm_scores</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># run evaluation callback and checkpointing callback before the first optimizer step</span>
+        <span class="n">evaluation_callback</span><span class="p">(</span><span class="n">num_train_steps_done</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_seen_train_steps</span><span class="p">)</span>
+        <span class="n">training_progress</span> <span class="o">=</span> <span class="n">TrainingProgress</span><span class="p">(</span>
+            <span class="n">num_seen_steps_previous_run</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_seen_train_steps</span><span class="p">,</span>
+            <span class="n">num_seen_tokens_previous_run</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">global_num_seen_tokens</span><span class="p">,</span>
+            <span class="n">num_seen_steps_current_run</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">num_seen_tokens_current_run</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">checkpointing_callback</span><span class="p">(</span><span class="n">training_progress</span><span class="o">=</span><span class="n">training_progress</span><span class="p">)</span>
+
+        <span class="n">num_steps_todo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_target_steps</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_seen_train_steps</span>
+        <span class="n">num_batches_todo</span> <span class="o">=</span> <span class="n">num_steps_todo</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_acc_steps</span>
+        <span class="c1"># Because we might resume training, we add the starting batch id of the data loader</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">micro_batch_id</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_batches_todo</span><span class="p">),</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">)):</span>
+            <span class="c1"># Train single batch</span>
+            <span class="p">(</span>
+                <span class="n">step_performed</span><span class="p">,</span>
+                <span class="n">num_train_steps_done</span><span class="p">,</span>
+                <span class="n">batch_loss</span><span class="p">,</span>
+                <span class="n">gradient_norm_score</span><span class="p">,</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_train_batch</span><span class="p">(</span>
+                <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span>
+                <span class="n">scheduler</span><span class="o">=</span><span class="n">scheduler</span><span class="p">,</span>
+                <span class="n">loss_fun</span><span class="o">=</span><span class="n">loss_fun</span><span class="p">,</span>
+                <span class="n">micro_batch_id</span><span class="o">=</span><span class="n">micro_batch_id</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">forward_backward_time_recorder</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_current_run</span> <span class="o">=</span> <span class="n">num_train_steps_done</span>
+            <span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_current_run</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_num_tokens_per_train_step</span> <span class="o">*</span> <span class="n">num_train_steps_done</span>
+
+            <span class="c1"># Save the batch loss</span>
+            <span class="n">cumulated_losses</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">batch_loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="c1"># This works, because we always drop the last batch in case it has less samples than the batch size</span>
+            <span class="n">cumulated_losses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># number of local batches</span>
+
+            <span class="c1"># gradient norm is already synced across all ranks</span>
+            <span class="k">if</span> <span class="n">gradient_norm_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">gradient_norm_scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gradient_norm_score</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">batch_length_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">thoughput_aggregator</span><span class="o">.</span><span class="n">add_value</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">ThroughputAggregationKeys</span><span class="o">.</span><span class="n">NUM_SAMPLES</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">batch_length_tensor</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_publish_progress</span><span class="p">(</span>
+                <span class="n">progress_publisher</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">progress_publisher</span><span class="p">,</span>
+                <span class="n">num_train_steps_done</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+                <span class="n">dataloader_tag</span><span class="o">=</span><span class="n">train_loader</span><span class="o">.</span><span class="n">dataloader_tag</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># Check if model performance should be logged</span>
+            <span class="k">if</span> <span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span> <span class="o">%</span> <span class="n">training_log_interval_in_steps</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">step_performed</span><span class="p">:</span>
+                <span class="n">forward_backward_time</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">forward_backward_time_recorder</span><span class="o">.</span><span class="n">delta_t</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                <span class="n">forward_backward_time_recorder</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+                <span class="n">thoughput_aggregator</span><span class="o">.</span><span class="n">add_value</span><span class="p">(</span>
+                    <span class="n">key</span><span class="o">=</span><span class="n">ThroughputAggregationKeys</span><span class="o">.</span><span class="n">FORWARD_BACKWARD_TIME</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">forward_backward_time</span>
+                <span class="p">)</span>
+                <span class="n">synced_num_samples</span> <span class="o">=</span> <span class="n">thoughput_aggregator</span><span class="o">.</span><span class="n">get_all_reduced_value</span><span class="p">(</span><span class="n">ThroughputAggregationKeys</span><span class="o">.</span><span class="n">NUM_SAMPLES</span><span class="p">)</span>
+                <span class="n">synced_forward_backward_time</span> <span class="o">=</span> <span class="n">thoughput_aggregator</span><span class="o">.</span><span class="n">get_all_reduced_value</span><span class="p">(</span>
+                    <span class="n">ThroughputAggregationKeys</span><span class="o">.</span><span class="n">FORWARD_BACKWARD_TIME</span><span class="p">,</span> <span class="n">reduce_operation</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">MAX</span>
+                <span class="p">)</span>
+                <span class="n">synced_num_samples_per_second</span> <span class="o">=</span> <span class="n">synced_num_samples</span> <span class="o">/</span> <span class="n">synced_forward_backward_time</span>
+                <span class="c1"># TODO: insert reducer from outside so Trainer is independent of FSDP</span>
+                <span class="c1"># add the loss and gradient norm for the LAST batch</span>
+                <span class="n">cumulated_losses</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch_loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+                <span class="n">reduced_losses</span> <span class="o">=</span> <span class="n">Reducer</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span>
+                    <span class="n">tensor</span><span class="o">=</span><span class="n">cumulated_losses</span><span class="p">,</span>
+                    <span class="n">operation</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">SUM</span><span class="p">,</span>
+                    <span class="c1"># 1.) summed batch loss / (num batches * world size)</span>
+                    <span class="c1"># 2.) last batch loss / world size</span>
+                    <span class="n">post_processing_fun</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">t</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()]),</span>
+                <span class="p">)</span>
+
+                <span class="n">train_loss_avg</span><span class="p">,</span> <span class="n">train_loss_last_batch</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">reduced_losses</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="n">reduced_losses</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="n">losses</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;train loss avg&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">train_loss_avg</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+                    <span class="s2">&quot;train loss last&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">train_loss_last_batch</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+                <span class="p">}</span>
+
+                <span class="n">consumed_tokens</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">])</span>
+                <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;consumed tokens&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">consumed_tokens</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="s2">&quot;grad norm avg&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">gradient_norm_scores</span><span class="p">)),</span> <span class="mi">2</span><span class="p">),</span>
+                    <span class="s2">&quot;grad norm last&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">gradient_norm_scores</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="mi">2</span><span class="p">),</span>
+                <span class="p">}</span>
+                <span class="n">gradient_norm_scores</span> <span class="o">=</span> <span class="p">[]</span>
+
+                <span class="n">mfu</span> <span class="o">=</span> <span class="n">compute_mfu</span><span class="p">(</span>
+                    <span class="n">synced_num_samples_per_second</span><span class="p">,</span>
+                    <span class="n">sequence_length</span><span class="p">,</span>
+                    <span class="n">theoretical_flops_per_token</span><span class="p">,</span>
+                    <span class="n">theoretical_gpu_peak_performance</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">training_metrics</span> <span class="o">=</span> <span class="n">EvaluationResultBatch</span><span class="p">(</span>
+                    <span class="n">losses</span><span class="o">=</span><span class="n">losses</span><span class="p">,</span>
+                    <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
+                    <span class="c1"># TODO: hardcoded metric key</span>
+                    <span class="n">throughput_metrics</span><span class="o">=</span><span class="p">{</span>
+                        <span class="s2">&quot;train samples/s&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">synced_num_samples_per_second</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                        <span class="s2">&quot;train mfu&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">mfu</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                        <span class="s2">&quot;lr mean&quot;</span><span class="p">:</span> <span class="n">ResultItem</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">scheduler</span><span class="o">.</span><span class="n">get_last_lr</span><span class="p">())</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+                    <span class="p">},</span>
+                    <span class="n">dataloader_tag</span><span class="o">=</span><span class="n">train_loader</span><span class="o">.</span><span class="n">dataloader_tag</span><span class="p">,</span>
+                    <span class="n">num_train_steps_done</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">print_rank_0</span><span class="p">(</span><span class="n">training_metrics</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_publish_evaluation_result</span><span class="p">(</span>
+                    <span class="n">evaluation_result_publisher</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">evaluation_result_publisher</span><span class="p">,</span>
+                    <span class="n">evaluation_result</span><span class="o">=</span><span class="n">training_metrics</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">thoughput_aggregator</span><span class="o">.</span><span class="n">remove_keys</span><span class="p">()</span>
+
+                <span class="n">cumulated_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reset_tracked_losses</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">step_performed</span><span class="p">:</span>
+                <span class="n">evaluation_callback</span><span class="p">(</span><span class="n">num_train_steps_done</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">)</span>
+                <span class="n">checkpointing_callback</span><span class="p">(</span><span class="n">training_progress</span><span class="o">=</span><span class="n">training_progress</span><span class="p">)</span>
+            <span class="c1"># we start the time recoder here again to also capture the time spend loading</span>
+            <span class="c1"># via the dataloader.</span>
+            <span class="n">forward_backward_time_recorder</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reset_tracked_losses</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Initializes and returns a tensor representing the cumulated loss and gradient norm.</span>
+        <span class="c1"># The tensor is initialized with zeros and its device is set based on the availability of CUDA.</span>
+
+        <span class="n">cumulated_loss_and_gradient_norm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="n">cumulated_loss_and_gradient_norm</span> <span class="o">=</span> <span class="n">cumulated_loss_and_gradient_norm</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cumulated_loss_and_gradient_norm</span> <span class="o">=</span> <span class="n">cumulated_loss_and_gradient_norm</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cumulated_loss_and_gradient_norm</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_publish_progress</span><span class="p">(</span>
+        <span class="n">progress_publisher</span><span class="p">:</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">ProgressUpdate</span><span class="p">],</span>
+        <span class="n">num_train_steps_done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dataloader_tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="c1"># Publishes the progress of the training, i.e., number of training steps done.</span>
+
+        <span class="n">payload</span> <span class="o">=</span> <span class="n">ProgressUpdate</span><span class="p">(</span>
+            <span class="n">num_steps_done</span><span class="o">=</span><span class="n">num_train_steps_done</span><span class="p">,</span>
+            <span class="n">experiment_status</span><span class="o">=</span><span class="n">ExperimentStatus</span><span class="o">.</span><span class="n">TRAIN</span><span class="p">,</span>
+            <span class="n">dataloader_tag</span><span class="o">=</span><span class="n">dataloader_tag</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">progress_publisher</span><span class="o">.</span><span class="n">publish_message</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">message_type</span><span class="o">=</span><span class="n">MessageTypes</span><span class="o">.</span><span class="n">BATCH_PROGRESS_UPDATE</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_publish_evaluation_result</span><span class="p">(</span>
+        <span class="n">evaluation_result_publisher</span><span class="p">:</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">EvaluationResultBatch</span><span class="p">],</span>
+        <span class="n">evaluation_result</span><span class="p">:</span> <span class="n">EvaluationResultBatch</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="c1"># Publishes the evaluation result.</span>
+
+        <span class="n">evaluation_result_publisher</span><span class="o">.</span><span class="n">publish_message</span><span class="p">(</span>
+            <span class="n">payload</span><span class="o">=</span><span class="n">evaluation_result</span><span class="p">,</span> <span class="n">message_type</span><span class="o">=</span><span class="n">MessageTypes</span><span class="o">.</span><span class="n">EVALUATION_RESULT</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
