@@ -266,6 +266,7 @@ model_raw:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
+    use_weight_tying: true
 
 scheduler:
   component_key: scheduler

@@ -295,6 +295,7 @@ class GPT2LLMConfig(BaseModel):
         attention_norm (PydanticPytorchModuleType): The normalization type for attention.
         ffn_norm (PydanticPytorchModuleType): The normalization type for feed-forward network.
         lm_head_norm (PydanticPytorchModuleType): The normalization type for the language model head.
+        use_weight_tying (bool): Whether to use weight tying.
     """
 
     sample_key: str
@@ -317,6 +318,7 @@ class GPT2LLMConfig(BaseModel):
     attention_norm: PydanticPytorchModuleType
     ffn_norm: PydanticPytorchModuleType
     lm_head_norm: PydanticPytorchModuleType
+    use_weight_tying: bool
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -752,6 +754,7 @@ class GPT2LLM(NNModel):
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
         lm_head_norm: nn.Module,
+        use_weight_tying: bool,
         seed: int = None,
     ):
         """
@@ -777,9 +780,10 @@ class GPT2LLM(NNModel):
             ffn_norm (nn.Module): The feed-forward network normalization module.
             lm_head_norm (nn.Module): The language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
+            use_weight_tying (bool): Whether to use weight tying.
         """
         weight_decay_groups = {
-            "linear": [".attn", ".mlp"],
+            "linear": [".attn", ".mlp", ".lm_head.weight"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
@@ -841,7 +845,8 @@ class GPT2LLM(NNModel):
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+        if use_weight_tying:
+            self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
