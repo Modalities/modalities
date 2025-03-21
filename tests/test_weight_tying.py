@@ -89,7 +89,6 @@ def test_weight_tying_parameter_count():
     assert (
         param_count_not_tied == param_count_tied + expected_difference
     ), "Parameter count mismatch when using weight tying."
-        
 
 
 @pytest.mark.parametrize("use_weight_tying", [True, False])
