@@ -78,19 +78,18 @@ def test_weight_tying_behavior(use_weight_tying):
         ), "Weight tying failed: Embedding and LM head weights should be different."
 
 
-@pytest.mark.parametrize("use_weight_tying", [True, False])
-def test_weight_tying_parameter_count(use_weight_tying):
-    model = create_gpt2_model(use_weight_tying)
-    param_count = count_parameters(model)
-    print(f"Parameter count with weight tying ({use_weight_tying}): {param_count}")
+def test_weight_tying_parameter_count():
+    model_with_tying = create_gpt2_model(use_weight_tying=True)
+    param_count_tied = count_parameters(model_with_tying)
+    print(f"Parameter count with weight tying: {param_count_tied}")
 
-    if not use_weight_tying:
-        model_with_tying = create_gpt2_model(True)
-        param_count_tied = count_parameters(model_with_tying)
-        expected_difference = VOCAB_SIZE * EMBEDDING_DIM
-        assert (
-            param_count == param_count_tied + expected_difference
-        ), "Parameter count mismatch when using weight tying."
+    model_without_tying = create_gpt2_model(use_weight_tying=False)
+    param_count_not_tied = count_parameters(model_without_tying)
+    expected_difference = VOCAB_SIZE * EMBEDDING_DIM
+    assert (
+        param_count_not_tied == param_count_tied + expected_difference
+    ), "Parameter count mismatch when using weight tying."
+        
 
 
 @pytest.mark.parametrize("use_weight_tying", [True, False])
