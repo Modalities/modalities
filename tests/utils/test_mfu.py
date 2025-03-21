@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Optional
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -65,23 +66,34 @@ def _load_gpt2(mixed_precision_settings: MixedPrecisionSettings) -> FSDP:
     reason="This test requires 1 GPU and a torchrun distributed environment.",
 )
 @pytest.mark.parametrize(
-    "mixed_precision_settings, world_size, expected_theoretical_gpu_peak_performance",
+    "mixed_precision_settings, world_size, simulated_gpu_type, expected_theoretical_gpu_peak_performance",
     [
-        (MixedPrecisionSettings.BF_16, 2, 624e12),
-        (MixedPrecisionSettings.FP_16, 2, 624e12),
-        (MixedPrecisionSettings.BF_16, 10, 312e13),
-        (MixedPrecisionSettings.FP_16, 10, 312e13),
-        (MixedPrecisionSettings.BF_16_WORKING, 1, None),
-        (MixedPrecisionSettings.FP_32, 1, None),
-        (MixedPrecisionSettings.MIXED_PRECISION_MEGATRON, 1, None),
-        (MixedPrecisionSettings.NO_MIXED_PRECISION, 1, None),
+        # A100
+        (MixedPrecisionSettings.BF_16, 2, "NVIDIA A100", 624e12),
+        (MixedPrecisionSettings.FP_16, 2, "NVIDIA A100", 624e12),
+        (MixedPrecisionSettings.BF_16, 10, "NVIDIA A100", 312e13),
+        (MixedPrecisionSettings.FP_16, 10, "NVIDIA A100", 312e13),
+        # H100
+        (MixedPrecisionSettings.BF_16, 2, "NVIDIA H100", 1978e12),
+        (MixedPrecisionSettings.FP_16, 2, "NVIDIA H100", 1978e12),
+        (MixedPrecisionSettings.BF_16, 10, "NVIDIA H100", 989e13),
+        (MixedPrecisionSettings.FP_16, 10, "NVIDIA H100", 989e13),
+        # unsupported precision
+        (MixedPrecisionSettings.BF_16_WORKING, 1, "NVIDIA A100", None),
+        (MixedPrecisionSettings.FP_32, 1, "NVIDIA A100", None),
+        (MixedPrecisionSettings.MIXED_PRECISION_MEGATRON, 1, "NVIDIA A100", None),
+        (MixedPrecisionSettings.NO_MIXED_PRECISION, 1, "NVIDIA A100", None),
     ],
 )
 def test_get_theoretical_gpu_peak_performance(
     mixed_precision_settings: MixedPrecisionSettings,
     world_size: int,
+    simulated_gpu_type: str,
     expected_theoretical_gpu_peak_performance: int,
 ):
+    torch.cuda.get_device_name = Mock()
+    torch.cuda.get_device_name.return_value = simulated_gpu_type
+
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         model = _load_gpt2(mixed_precision_settings)
         theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(model, world_size)
