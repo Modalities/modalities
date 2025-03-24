@@ -12,13 +12,25 @@ permissions:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
     steps:
     - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        pip install myst-parser
-        pip install .
-        pip install sphinx-rtd-theme sphinx-autodoc-typehints sphinx-click sphinx-automodapi texext
+        sudo apt-get update
+        sudo apt-get install git -y
+        python -m pip install torch==2.6.0
+        python -m pip install --upgrade pip setuptools wheel
+        export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
+        python -m pip install -e .
+        python -m pip install myst-parser
+        python -m pip install sphinx-rtd-theme sphinx-autodoc-typehints sphinx-click sphinx-automodapi texext
     - name: "Parse into HTML"
       run: |
         sphinx-apidoc -o docs/source/api src/modalities
