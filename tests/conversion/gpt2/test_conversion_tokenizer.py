@@ -12,7 +12,7 @@ def test_converted_tokenizer_produces_same_tokens_as_original(
 ):
     converted_token_ids = converted_tokenizer(text)
     sp_token_ids = sp_tokenizer.tokenize(text)
-    assert converted_token_ids["input_ids"] == sp_token_ids
+    assert converted_token_ids["input_ids"] == sp_token_ids, "Converted token IDs do not match original token IDs."
 
 
 def test_converted_tokenizer_detokenizes_same_as_original(
@@ -20,7 +20,7 @@ def test_converted_tokenizer_detokenizes_same_as_original(
 ):
     converted_tokens = converted_tokenizer.decode(token_ids)
     sp_tokens = sp_tokenizer.decode(token_ids)
-    assert converted_tokens == sp_tokens
+    assert converted_tokens == sp_tokens, "Decoded tokens do not match between converted and original tokenizers."
 
 
 @pytest.fixture

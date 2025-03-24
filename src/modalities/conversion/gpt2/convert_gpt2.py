@@ -19,6 +19,7 @@ options:
 """
 
 import argparse
+import logging
 import os
 from pathlib import Path
 
@@ -26,6 +27,8 @@ from modalities.config.config import load_app_config_dict
 from modalities.conversion.gpt2.conversion_code import transfer_model_code
 from modalities.conversion.gpt2.conversion_model import check_converted_model, convert_model_checkpoint
 from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
+
+logger = logging.getLogger(__name__)
 
 
 def convert_gpt2(
@@ -65,6 +68,8 @@ def convert_gpt2(
         hf_model.config.bos_token_id = bos_token_id
         hf_model.config.eos_token_id = eos_token_id
         hf_model.config.pad_token_id = pad_token_id
+    else:
+        logger.warning("No tokenizer specified in the config. Skipping tokenizer conversion.")
     hf_model.config.auto_map = {
         "AutoConfig": "configuration_gpt2.GPT2Config",
         "AutoModel": "modeling_gpt2.GPT2Model",
