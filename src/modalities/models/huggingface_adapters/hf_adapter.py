@@ -114,7 +114,7 @@ class HFModelAdapter(PreTrainedModel):
         if output_attentions or output_hidden_states:
             raise NotImplementedError
         model_input = {"input_ids": input_ids, "attention_mask": attention_mask}
-        model_forward_output: dict[str, torch.Tensor] = self.model.forward(model_input)
+        model_forward_output: dict[str, torch.Tensor] = self.model(model_input)
         if return_dict:
             return ModalitiesModelOutput(**model_forward_output)
         else:

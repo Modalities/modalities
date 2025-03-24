@@ -42,7 +42,7 @@ def test_run_scheduler(
         checkpointing_interval_in_steps=1,
         evaluation_interval_in_steps=1,
     )
-    nn_model_mock.forward.assert_has_calls([call(b.samples) for b in batches])
+    nn_model_mock.assert_has_calls([call(b.samples) for b in batches])
     scheduler_mock.step.assert_called()
 
 
