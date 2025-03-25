@@ -1,0 +1,306 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.conversion.gpt2.conversion_model &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.conversion.gpt2.conversion_model</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.conversion.gpt2.conversion_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.configuration_gpt2</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2Config</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.modeling_gpt2</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2DecoderLayer</span><span class="p">,</span> <span class="n">GPT2ForCausalLM</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.components.layer_norms</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayerNormConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.gpt2.gpt2_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2LLM</span><span class="p">,</span> <span class="n">GPT2Block</span><span class="p">,</span> <span class="n">PositionTypes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">SwiGLU</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelTypeEnum</span><span class="p">,</span> <span class="n">get_model_from_config</span>
+
+
+<div class="viewcode-block" id="convert_model_checkpoint">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.conversion_model.convert_model_checkpoint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_model_checkpoint</span><span class="p">(</span><span class="n">modalities_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">GPT2ForCausalLM</span><span class="p">,</span> <span class="n">GPT2LLM</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts the modalities model to a Huggingface transformers model.</span>
+<span class="sd">       Both the loaded modalities model and the converted Huggingface model are returned</span>
+<span class="sd">       so that they can be compared.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        modalities_config (dict): Modalities config dictionary.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[GPT2ForCausalLM, GPT2LLM]: Converted Hugging Face model and the original modalities model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">gpt2_config</span> <span class="o">=</span> <span class="n">convert_model_config</span><span class="p">(</span><span class="n">modalities_config</span><span class="p">)</span>
+    <span class="n">hf_model</span> <span class="o">=</span> <span class="n">GPT2ForCausalLM</span><span class="p">(</span><span class="n">gpt2_config</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+    <span class="n">modalities_model</span> <span class="o">=</span> <span class="n">get_model_from_config</span><span class="p">(</span><span class="n">modalities_config</span><span class="p">,</span> <span class="n">model_type</span><span class="o">=</span><span class="n">ModelTypeEnum</span><span class="o">.</span><span class="n">CHECKPOINTED_MODEL</span><span class="p">)</span>
+    <span class="n">_copy_weights_model</span><span class="p">(</span><span class="n">hf_model</span><span class="p">,</span> <span class="n">modalities_model</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">hf_model</span><span class="p">,</span> <span class="n">modalities_model</span></div>
+
+
+
+<div class="viewcode-block" id="convert_model_config">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.conversion_model.convert_model_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_model_config</span><span class="p">(</span><span class="n">modalities_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GPT2Config</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts the modalities model configuration to a Huggingface transformers configuration.</span>
+<span class="sd">       For this the model_raw or model section of the modalities config is used.</span>
+<span class="sd">       Corresponding entries are mapped to the Huggingface configuration.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        modalities_config (dict): Modalities config dictionary.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        GPT2Config: Converted Huggingface model configuration.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">modalities_config</span><span class="p">[</span><span class="s2">&quot;model_raw&quot;</span> <span class="k">if</span> <span class="s2">&quot;model_raw&quot;</span> <span class="ow">in</span> <span class="n">modalities_config</span> <span class="k">else</span> <span class="s2">&quot;model&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">]</span>
+    <span class="n">_check_conversion_criteria</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">GPT2Config</span><span class="p">(</span>
+        <span class="n">vocab_size</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;vocab_size&quot;</span><span class="p">],</span>
+        <span class="n">hidden_size</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;n_embd&quot;</span><span class="p">],</span>
+        <span class="n">pad_token_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_hidden_layers</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;n_layer&quot;</span><span class="p">],</span>
+        <span class="n">num_key_value_heads</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;n_head_kv&quot;</span><span class="p">],</span>
+        <span class="n">num_attention_heads</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;n_head_q&quot;</span><span class="p">],</span>
+        <span class="n">intermediate_size</span><span class="o">=</span><span class="n">SwiGLU</span><span class="o">.</span><span class="n">_get_hidden_dim</span><span class="p">(</span><span class="n">ffn_hidden</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;ffn_hidden&quot;</span><span class="p">]),</span>
+        <span class="n">attention_bias</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;bias&quot;</span><span class="p">],</span>
+        <span class="n">mlp_bias</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;bias&quot;</span><span class="p">],</span>
+        <span class="n">hidden_act</span><span class="o">=</span><span class="s2">&quot;silu&quot;</span><span class="p">,</span>
+        <span class="n">layer_norm_eps</span><span class="o">=</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;ffn_norm&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;eps&quot;</span><span class="p">),</span>
+        <span class="n">layer_norm_elementwise_affine</span><span class="o">=</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;ffn_norm&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;elementwise_affine&quot;</span><span class="p">),</span>
+        <span class="n">layer_norm_bias</span><span class="o">=</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;ffn_norm&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;bias&quot;</span><span class="p">),</span>
+        <span class="n">max_position_embeddings</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;sequence_length&quot;</span><span class="p">],</span>
+        <span class="n">rope_theta</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;attention_config&quot;</span><span class="p">][</span><span class="s2">&quot;qkv_transforms&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">][</span><span class="s2">&quot;base_freq&quot;</span><span class="p">],</span>
+        <span class="n">_attn_implementation</span><span class="o">=</span><span class="n">_map_attention_type</span><span class="p">(</span><span class="n">config</span><span class="p">),</span>
+        <span class="n">output_attentions</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="check_converted_model">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.conversion_model.check_converted_model">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_converted_model</span><span class="p">(</span><span class="n">hf_model</span><span class="p">:</span> <span class="n">GPT2ForCausalLM</span><span class="p">,</span> <span class="n">modalities_model</span><span class="p">:</span> <span class="n">GPT2LLM</span><span class="p">,</span> <span class="n">num_testruns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">vocab_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tests the converted model by inputting a random token sequence and comparing the output logits of both models.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hf_model (GPT2ForCausalLM): Huggingface transformers model.</span>
+<span class="sd">        modalities_model (GPT2LLM): Modalities model.</span>
+<span class="sd">        num_testruns (int): Number of test runs to perform.</span>
+<span class="sd">        vocab_size (int): Vocabulary size of the model. (Required for generating random input tokens.)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_testruns</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Testing converted model&quot;</span><span class="p">):</span>
+        <span class="n">input_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">vocab_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">modalities_model</span><span class="o">.</span><span class="n">sequence_length</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">hf_model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="n">modalities_model</span><span class="o">.</span><span class="n">sample_key</span><span class="p">:</span> <span class="n">input_ids</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">modalities_model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">wte</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">device</span><span class="p">)}</span>
+
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">llama_logits</span> <span class="o">=</span> <span class="n">hf_model</span><span class="p">(</span><span class="n">input_ids</span><span class="o">=</span><span class="n">input_ids</span><span class="p">)</span><span class="o">.</span><span class="n">logits</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+            <span class="n">modalities_logits</span> <span class="o">=</span> <span class="n">modalities_model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)[</span><span class="n">modalities_model</span><span class="o">.</span><span class="n">prediction_key</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="n">llama_logits</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">modalities_logits</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">llama_logits</span><span class="p">,</span> <span class="n">modalities_logits</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_conversion_criteria</span><span class="p">(</span><span class="n">model_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks that the modalities config fulfills criteria necessary for conversion</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model_config (dict): model or model_raw part of the Modalities config dictionary.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">model_config</span><span class="p">[</span><span class="s2">&quot;poe_type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">PositionTypes</span><span class="o">.</span><span class="n">NOPE</span>
+    <span class="k">assert</span> <span class="n">model_config</span><span class="p">[</span><span class="s2">&quot;activation_type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;swiglu&quot;</span>
+    <span class="k">assert</span> <span class="n">model_config</span><span class="p">[</span><span class="s2">&quot;attention_implementation&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;pytorch_flash&quot;</span><span class="p">,</span> <span class="s2">&quot;manual&quot;</span><span class="p">]</span>
+
+    <span class="n">norms</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;attention_norm&quot;</span><span class="p">,</span> <span class="s2">&quot;ffn_norm&quot;</span><span class="p">,</span> <span class="s2">&quot;lm_head_norm&quot;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">norm</span> <span class="ow">in</span> <span class="n">norms</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">model_config</span><span class="p">[</span><span class="n">norm</span><span class="p">][</span><span class="s2">&quot;variant_key&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;layer_norm&quot;</span>
+
+    <span class="k">assert</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">model_config</span><span class="p">[</span><span class="n">norm</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;bias&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">norm</span> <span class="ow">in</span> <span class="n">norms</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">),</span> <span class="s2">&quot;All norms must have the same bias setting.&quot;</span>
+    <span class="k">assert</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">model_config</span><span class="p">[</span><span class="n">norm</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;elementwise_affine&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">norm</span> <span class="ow">in</span> <span class="n">norms</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">),</span> <span class="s2">&quot;All norms must have the same elementwise_affine setting.&quot;</span>
+    <span class="k">assert</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">_get_layer_norm_value</span><span class="p">(</span><span class="n">model_config</span><span class="p">[</span><span class="n">norm</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">],</span> <span class="s2">&quot;eps&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">norm</span> <span class="ow">in</span> <span class="n">norms</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">),</span> <span class="s2">&quot;All norms must have the same eps setting.&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_layer_norm_value</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">field</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">default</span> <span class="o">=</span> <span class="n">LayerNormConfig</span><span class="o">.</span><span class="n">model_fields</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">default</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_map_attention_type</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;attention_implementation&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;pytorch_flash&quot;</span><span class="p">:</span>
+        <span class="n">attention_impl</span> <span class="o">=</span> <span class="s2">&quot;sdpa&quot;</span>
+    <span class="k">elif</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;attention_implementation&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;manual&quot;</span><span class="p">:</span>
+        <span class="n">attention_impl</span> <span class="o">=</span> <span class="s2">&quot;eager&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown or unsupported attention implementation </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;attention_implementation&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">attention_impl</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_weights_model</span><span class="p">(</span><span class="n">hf_model</span><span class="p">:</span> <span class="n">GPT2ForCausalLM</span><span class="p">,</span> <span class="n">modalities_model</span><span class="p">:</span> <span class="n">GPT2LLM</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copies the weights of the modalities model to the Huggingface transformers model.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hf_model (GPT2ForCausalLM): The uninitialized Huggingface transformers model.</span>
+<span class="sd">                                    The weights will be copied here.</span>
+<span class="sd">        modalities_model (GPT2LLM): The modalities model from which the weights will be copied.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">hf_model</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">embed_tokens</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">modalities_model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">wte</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">hf_layer</span><span class="p">,</span> <span class="n">modalities_layer</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">hf_model</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span> <span class="n">modalities_model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">h</span><span class="p">):</span>
+        <span class="n">_copy_weights_attention</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">)</span>
+        <span class="n">_copy_weights_mlp</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">)</span>
+        <span class="n">_copy_weights_layer_norms</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_model</span><span class="o">.</span><span class="n">lm_head</span><span class="p">,</span> <span class="n">modalities_model</span><span class="o">.</span><span class="n">lm_head</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_model</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">norm</span><span class="p">,</span> <span class="n">modalities_model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">lm_head_norm</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_weights_attention</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">:</span> <span class="n">GPT2DecoderLayer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">:</span> <span class="n">GPT2Block</span><span class="p">):</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">self_attn</span><span class="o">.</span><span class="n">q_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">q_attn</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">self_attn</span><span class="o">.</span><span class="n">k_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">k_attn</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">self_attn</span><span class="o">.</span><span class="n">v_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">v_attn</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">self_attn</span><span class="o">.</span><span class="n">o_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">c_proj</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_weights_mlp</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">:</span> <span class="n">GPT2DecoderLayer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">:</span> <span class="n">GPT2Block</span><span class="p">):</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">down_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">W_2</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">gate_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">W</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">up_proj</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">mlp</span><span class="o">.</span><span class="n">V</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_weights_layer_norms</span><span class="p">(</span><span class="n">hf_layer</span><span class="p">:</span> <span class="n">GPT2DecoderLayer</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="p">:</span> <span class="n">GPT2Block</span><span class="p">):</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">input_layernorm</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">attention_norm</span><span class="p">)</span>
+    <span class="n">_copy_weights_base_modules</span><span class="p">(</span><span class="n">hf_layer</span><span class="o">.</span><span class="n">post_attention_layernorm</span><span class="p">,</span> <span class="n">modalities_layer</span><span class="o">.</span><span class="n">ffn_norm</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_weights_base_modules</span><span class="p">(</span><span class="n">m1</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span> <span class="o">|</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">,</span> <span class="n">m2</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span> <span class="o">|</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">m1</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">m2</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">m1</span><span class="o">.</span><span class="n">bias</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">m2</span><span class="o">.</span><span class="n">bias</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">m1</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">m2</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">m1</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">m2</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">m1</span><span class="o">.</span><span class="n">bias</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">m1</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">m2</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

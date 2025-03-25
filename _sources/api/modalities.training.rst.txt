@@ -1,0 +1,37 @@
+modalities.training package
+===========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.training.gradient_clipping
+
+Submodules
+----------
+
+modalities.training.activation\_checkpointing module
+----------------------------------------------------
+
+.. automodule:: modalities.training.activation_checkpointing
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.training.training\_progress module
+---------------------------------------------
+
+.. automodule:: modalities.training.training_progress
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.training
+   :members:
+   :show-inheritance:
+   :undoc-members:

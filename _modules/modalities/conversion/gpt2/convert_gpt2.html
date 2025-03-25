@@ -1,0 +1,236 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.conversion.gpt2.convert_gpt2 &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.conversion.gpt2.convert_gpt2</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.conversion.gpt2.convert_gpt2</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">usage: convert_gpt2.py [-h] [--num_testruns NUM_TESTRUNS] [--device_modalities DEVICE_MODALITIES]</span>
+<span class="sd">                       [--device_hf DEVICE_HF] modalities_config output_dir</span>
+
+<span class="sd">Convert GPT-2 model checkpoint to Huggingface transformers format.</span>
+
+<span class="sd">positional arguments:</span>
+<span class="sd">  modalities_config     Path to the modalities config file.</span>
+<span class="sd">  output_dir            Directory to save the converted model.</span>
+
+<span class="sd">options:</span>
+<span class="sd">  -h, --help            show this help message and exit</span>
+<span class="sd">  --num_testruns NUM_TESTRUNS</span>
+<span class="sd">                        Number of test runs to perform.</span>
+<span class="sd">  --device_modalities DEVICE_MODALITIES</span>
+<span class="sd">                        Device for the modalities model.</span>
+<span class="sd">  --device_hf DEVICE_HF</span>
+<span class="sd">                        Device for the Hugging Face model.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_app_config_dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.conversion_code</span><span class="w"> </span><span class="kn">import</span> <span class="n">transfer_model_code</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.conversion_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_converted_model</span><span class="p">,</span> <span class="n">convert_model_checkpoint</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.conversion_tokenizer</span><span class="w"> </span><span class="kn">import</span> <span class="n">convert_tokenizer</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_gpt2">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.convert_gpt2.convert_gpt2">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_gpt2</span><span class="p">(</span>
+    <span class="n">modalities_config_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">num_testruns</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">device_modalities</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+    <span class="n">device_hf</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Takes a modalities gpt2 model and converts it to a Huggingface transformers model.</span>
+<span class="sd">       The provided config yaml file should contain the model_raw or model section with the model configuration.</span>
+<span class="sd">       Additionally, the checkpointed_model section should be present and contain the path to the model checkpoint.</span>
+<span class="sd">       Optionally, the function can run a number of test runs to compare the converted model with the original one.</span>
+<span class="sd">       If a tokenizer is specified in the config, it will be converted as well.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        modalities_config_path (str): Path to the modalities config file.</span>
+<span class="sd">        output_dir (str): Directory to save the converted model.</span>
+<span class="sd">        num_testruns (int, optional): Number of test runs to perform. Defaults to 0.</span>
+<span class="sd">        device_modalities (str, optional): Device for the modalities model. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">        device_hf (str, optional): Device for the Hugging Face model. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">modalities_config</span> <span class="o">=</span> <span class="n">load_app_config_dict</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">modalities_config_path</span><span class="p">))</span>
+    <span class="n">hf_model</span><span class="p">,</span> <span class="n">modalities_model</span> <span class="o">=</span> <span class="n">convert_model_checkpoint</span><span class="p">(</span><span class="n">modalities_config</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">num_testruns</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">check_converted_model</span><span class="p">(</span>
+            <span class="n">hf_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device_hf</span><span class="p">),</span>
+            <span class="n">modalities_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device_modalities</span><span class="p">),</span>
+            <span class="n">num_testruns</span><span class="p">,</span>
+            <span class="n">modalities_config</span><span class="p">[</span><span class="s2">&quot;model_raw&quot;</span> <span class="k">if</span> <span class="s2">&quot;model_raw&quot;</span> <span class="ow">in</span> <span class="n">modalities_config</span> <span class="k">else</span> <span class="s2">&quot;model&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">][</span><span class="s2">&quot;vocab_size&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;tokenizer&quot;</span> <span class="ow">in</span> <span class="n">modalities_config</span><span class="p">:</span>
+        <span class="n">tokenizer_model</span> <span class="o">=</span> <span class="n">modalities_config</span><span class="p">[</span><span class="s2">&quot;tokenizer&quot;</span><span class="p">][</span><span class="s2">&quot;config&quot;</span><span class="p">][</span><span class="s2">&quot;tokenizer_model_file&quot;</span><span class="p">]</span>
+        <span class="n">bos_token_id</span><span class="p">,</span> <span class="n">eos_token_id</span><span class="p">,</span> <span class="n">pad_token_id</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_tokenizer</span><span class="p">(</span><span class="n">tokenizer_model</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+        <span class="c1"># The values bos=1, eos=2 and pad=None are set by default in the model config (as taken from Llama).</span>
+        <span class="c1"># Overwrite them, with the actual values from the internal SentencePiece tokenizer.</span>
+        <span class="c1"># Note, that the LlamaTokenizer wrapping around the SentencePiece tokenizer does not know about these values.</span>
+        <span class="c1"># The unk token id is not set in the model config.</span>
+        <span class="n">hf_model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">bos_token_id</span> <span class="o">=</span> <span class="n">bos_token_id</span>
+        <span class="n">hf_model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">eos_token_id</span> <span class="o">=</span> <span class="n">eos_token_id</span>
+        <span class="n">hf_model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pad_token_id</span> <span class="o">=</span> <span class="n">pad_token_id</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No tokenizer specified in the config. Skipping tokenizer conversion.&quot;</span><span class="p">)</span>
+    <span class="n">hf_model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">auto_map</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;AutoConfig&quot;</span><span class="p">:</span> <span class="s2">&quot;configuration_gpt2.GPT2Config&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;AutoModel&quot;</span><span class="p">:</span> <span class="s2">&quot;modeling_gpt2.GPT2Model&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;AutoModelForCausalLM&quot;</span><span class="p">:</span> <span class="s2">&quot;modeling_gpt2.GPT2ForCausalLM&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">hf_model</span><span class="o">.</span><span class="n">save_pretrained</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+    <span class="n">transfer_model_code</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;LOCAL_RANK&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;WORLD_SIZE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RANK&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Convert GPT-2 model checkpoint to Huggingface transformers format.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;modalities_config&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Path to the modalities config file.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;output_dir&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Directory to save the converted model.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--num_testruns&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of test runs to perform.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--device_modalities&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Device for the modalities model.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--device_hf&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Device for the Hugging Face model.&quot;</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">convert_gpt2</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">modalities_config</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">num_testruns</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">device_modalities</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">device_hf</span><span class="p">,</span>
+    <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

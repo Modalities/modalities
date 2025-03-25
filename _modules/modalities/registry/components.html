@@ -1,0 +1,462 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.registry.components &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.registry.components</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.registry.components</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Type</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">BatchSampler</span><span class="p">,</span> <span class="n">DistributedSampler</span><span class="p">,</span> <span class="n">SequentialSampler</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_saving</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointSaving</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_saving_strategies</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SaveEveryKStepsCheckpointingStrategy</span><span class="p">,</span>
+    <span class="n">SaveKMostRecentCheckpointsStrategy</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.fsdp.fsdp_checkpoint_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPCheckpointLoading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.fsdp.fsdp_checkpoint_saving</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPCheckpointSaving</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.torch.torch_checkpoint_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchCheckpointLoading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ActivationCheckpointedModelConfig</span><span class="p">,</span>
+    <span class="n">AdamOptimizerConfig</span><span class="p">,</span>
+    <span class="n">AdamWOptimizerConfig</span><span class="p">,</span>
+    <span class="n">BatchSamplerConfig</span><span class="p">,</span>
+    <span class="n">CheckpointedModelConfig</span><span class="p">,</span>
+    <span class="n">CheckpointedOptimizerConfig</span><span class="p">,</span>
+    <span class="n">CheckpointSavingConfig</span><span class="p">,</span>
+    <span class="n">CLMCrossEntropyLossConfig</span><span class="p">,</span>
+    <span class="n">CombinedDatasetConfig</span><span class="p">,</span>
+    <span class="n">ConstantLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">CosineAnnealingLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">DistributedSamplerConfig</span><span class="p">,</span>
+    <span class="n">DummyLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">DummyProgressSubscriberConfig</span><span class="p">,</span>
+    <span class="n">DummyResultSubscriberConfig</span><span class="p">,</span>
+    <span class="n">FSDPCheckpointLoadingConfig</span><span class="p">,</span>
+    <span class="n">FSDPCheckpointSavingConfig</span><span class="p">,</span>
+    <span class="n">FSDPWrappedModelConfig</span><span class="p">,</span>
+    <span class="n">GPT2LLMCollateFnConfig</span><span class="p">,</span>
+    <span class="n">LinearLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">LLMDataLoaderConfig</span><span class="p">,</span>
+    <span class="n">MemMapDatasetConfig</span><span class="p">,</span>
+    <span class="n">OneCycleLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">PackedMemMapDatasetContinuousConfig</span><span class="p">,</span>
+    <span class="n">PackedMemMapDatasetMegatronConfig</span><span class="p">,</span>
+    <span class="n">PreTrainedHFTokenizerConfig</span><span class="p">,</span>
+    <span class="n">PreTrainedSPTokenizerConfig</span><span class="p">,</span>
+    <span class="n">ResumableDistributedSamplerConfig</span><span class="p">,</span>
+    <span class="n">RichProgressSubscriberConfig</span><span class="p">,</span>
+    <span class="n">RichResultSubscriberConfig</span><span class="p">,</span>
+    <span class="n">SaveEveryKStepsCheckpointingStrategyConfig</span><span class="p">,</span>
+    <span class="n">SaveKMostRecentCheckpointsStrategyConfig</span><span class="p">,</span>
+    <span class="n">SequentialSamplerConfig</span><span class="p">,</span>
+    <span class="n">StepLRSchedulerConfig</span><span class="p">,</span>
+    <span class="n">TorchCheckpointLoadingConfig</span><span class="p">,</span>
+    <span class="n">WandBEvaluationResultSubscriberConfig</span><span class="p">,</span>
+    <span class="n">WeightInitializedModelConfig</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataloader_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataloaderFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">DummyDatasetConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataset_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.samplers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResumableDistributedSampler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.subscriber_impl.subscriber_factory</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ProgressSubscriberFactory</span><span class="p">,</span>
+    <span class="n">ResultsSubscriberFactory</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.loss_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">CLMCrossEntropyLoss</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.coca.coca_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoCa</span><span class="p">,</span> <span class="n">CoCaConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.coca.collator</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoCaCollateFnConfig</span><span class="p">,</span> <span class="n">CoCaCollatorFn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.components.layer_norms</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayerNormConfig</span><span class="p">,</span> <span class="n">RMSLayerNorm</span><span class="p">,</span> <span class="n">RMSLayerNormConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.gpt2.collator</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2LLMCollateFn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.gpt2.gpt2_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2LLM</span><span class="p">,</span> <span class="n">GPT2LLMConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.huggingface.huggingface_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">HuggingFacePretrainedModel</span><span class="p">,</span> <span class="n">HuggingFacePretrainedModelConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.nn.model_initialization.composed_initialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ComposedInitializationRoutines</span><span class="p">,</span>
+    <span class="n">ComposedModelInitializationConfig</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.optimizers.lr_schedulers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DummyLRScheduler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.optimizers.optimizer_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptimizerFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.tokenization.tokenizer_wrapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">PreTrainedHFTokenizer</span><span class="p">,</span> <span class="n">PreTrainedSPTokenizer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.gradient_clipping.fsdp_gradient_clipper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DummyGradientClipper</span><span class="p">,</span>
+    <span class="n">FSDPGradientClipper</span><span class="p">,</span>
+    <span class="n">FSDPLoggingOnlyGradientClipper</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.gradient_clipping.fsdp_gradient_clipper_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DummyGradientClipperConfig</span><span class="p">,</span>
+    <span class="n">FSDPDummyGradientClipperConfig</span><span class="p">,</span>
+    <span class="n">FSDPGradientClipperConfig</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.number_conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">LocalNumBatchesFromNumSamplesConfig</span><span class="p">,</span>
+    <span class="n">LocalNumBatchesFromNumTokensConfig</span><span class="p">,</span>
+    <span class="n">NumberConversion</span><span class="p">,</span>
+    <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="n">NumSamplesFromNumTokensConfig</span><span class="p">,</span>
+    <span class="n">NumStepsFromNumSamplesConfig</span><span class="p">,</span>
+    <span class="n">NumStepsFromNumTokensConfig</span><span class="p">,</span>
+    <span class="n">NumStepsFromRawDatasetIndexConfig</span><span class="p">,</span>
+    <span class="n">NumTokensFromNumStepsConfig</span><span class="p">,</span>
+    <span class="n">NumTokensFromPackedMemMapDatasetContinuousConfig</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="ComponentEntity">
+<a class="viewcode-back" href="../../../api/modalities.registry.html#modalities.registry.components.ComponentEntity">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ComponentEntity</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dataclass to store the component entity.</span>
+<span class="sd">    The component entity stores the component key, the variant key, the component type and the component config type.</span>
+<span class="sd">    The component key is used to identify the component type, whereas the variant key is used to identify the component.</span>
+<span class="sd">    An example of a component entity is the GPT2 model with the component key &quot;model&quot; and the variant key &quot;gpt2&quot;.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        component_key (str): Key to identify the component type.</span>
+<span class="sd">        variant_key (str): Variant key to identify the component.</span>
+<span class="sd">        component_type (Type | Callable): Type of the component.</span>
+<span class="sd">        component_config_type (Type[BaseModel]): Type of the component config.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">component_type</span><span class="p">:</span> <span class="n">Type</span> <span class="o">|</span> <span class="n">Callable</span>
+    <span class="n">component_config_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]</span></div>
+
+
+
+<span class="n">COMPONENTS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># models</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt2&quot;</span><span class="p">,</span> <span class="n">GPT2LLM</span><span class="p">,</span> <span class="n">GPT2LLMConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;huggingface_pretrained_model&quot;</span><span class="p">,</span> <span class="n">HuggingFacePretrainedModel</span><span class="p">,</span> <span class="n">HuggingFacePretrainedModelConfig</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;checkpointed&quot;</span><span class="p">,</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">get_checkpointed_model</span><span class="p">,</span> <span class="n">CheckpointedModelConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;fsdp_wrapped&quot;</span><span class="p">,</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">get_fsdp_wrapped_model</span><span class="p">,</span> <span class="n">FSDPWrappedModelConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;model_initialized&quot;</span><span class="p">,</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">get_weight_initalized_model</span><span class="p">,</span> <span class="n">WeightInitializedModelConfig</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;activation_checkpointed&quot;</span><span class="p">,</span>
+        <span class="n">ModelFactory</span><span class="o">.</span><span class="n">get_activation_checkpointed_model</span><span class="p">,</span>
+        <span class="n">ActivationCheckpointedModelConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;coca&quot;</span><span class="p">,</span> <span class="n">CoCa</span><span class="p">,</span> <span class="n">CoCaConfig</span><span class="p">),</span>
+    <span class="c1"># weight initializers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;model_initialization&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;composed&quot;</span><span class="p">,</span>
+        <span class="n">ComposedInitializationRoutines</span><span class="o">.</span><span class="n">get_composed_model_initializer</span><span class="p">,</span>
+        <span class="n">ComposedModelInitializationConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="c1"># losses</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;loss&quot;</span><span class="p">,</span> <span class="s2">&quot;clm_cross_entropy_loss&quot;</span><span class="p">,</span> <span class="n">CLMCrossEntropyLoss</span><span class="p">,</span> <span class="n">CLMCrossEntropyLossConfig</span><span class="p">),</span>
+    <span class="c1"># optmizers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;adam&quot;</span><span class="p">,</span> <span class="n">OptimizerFactory</span><span class="o">.</span><span class="n">get_adam</span><span class="p">,</span> <span class="n">AdamOptimizerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;adam_w&quot;</span><span class="p">,</span> <span class="n">OptimizerFactory</span><span class="o">.</span><span class="n">get_adam_w</span><span class="p">,</span> <span class="n">AdamWOptimizerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;checkpointed&quot;</span><span class="p">,</span> <span class="n">OptimizerFactory</span><span class="o">.</span><span class="n">get_checkpointed_optimizer</span><span class="p">,</span> <span class="n">CheckpointedOptimizerConfig</span>
+    <span class="p">),</span>
+    <span class="c1"># schedulers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;dummy_lr&quot;</span><span class="p">,</span> <span class="n">DummyLRScheduler</span><span class="p">,</span> <span class="n">DummyLRSchedulerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;step_lr&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">StepLR</span><span class="p">,</span> <span class="n">StepLRSchedulerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;constant_lr&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">ConstantLR</span><span class="p">,</span> <span class="n">ConstantLRSchedulerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;linear_lr&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">LinearLR</span><span class="p">,</span> <span class="n">LinearLRSchedulerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;onecycle_lr&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">OneCycleLR</span><span class="p">,</span> <span class="n">OneCycleLRSchedulerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;scheduler&quot;</span><span class="p">,</span> <span class="s2">&quot;cosine_annealing_lr&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">CosineAnnealingLR</span><span class="p">,</span> <span class="n">CosineAnnealingLRSchedulerConfig</span>
+    <span class="p">),</span>
+    <span class="c1"># tokenizers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;tokenizer&quot;</span><span class="p">,</span> <span class="s2">&quot;pretrained_hf_tokenizer&quot;</span><span class="p">,</span> <span class="n">PreTrainedHFTokenizer</span><span class="p">,</span> <span class="n">PreTrainedHFTokenizerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;tokenizer&quot;</span><span class="p">,</span> <span class="s2">&quot;pretrained_sp_tokenizer&quot;</span><span class="p">,</span> <span class="n">PreTrainedSPTokenizer</span><span class="p">,</span> <span class="n">PreTrainedSPTokenizerConfig</span><span class="p">),</span>
+    <span class="c1"># ComponentEntity(&quot;tokenizer&quot;, &quot;llama_tokenizer_fast&quot;, GPT2TokenizerFast, None),  # TODO</span>
+    <span class="c1"># datasets</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="s2">&quot;mem_map_dataset&quot;</span><span class="p">,</span> <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_mem_map_dataset</span><span class="p">,</span> <span class="n">MemMapDatasetConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;packed_mem_map_dataset_continuous&quot;</span><span class="p">,</span>
+        <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_packed_mem_map_dataset_continuous</span><span class="p">,</span>
+        <span class="n">PackedMemMapDatasetContinuousConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;packed_mem_map_dataset_megatron&quot;</span><span class="p">,</span>
+        <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_packed_mem_map_dataset_megatron</span><span class="p">,</span>
+        <span class="n">PackedMemMapDatasetMegatronConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="s2">&quot;dummy_dataset&quot;</span><span class="p">,</span> <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_dummy_dataset</span><span class="p">,</span> <span class="n">DummyDatasetConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="s2">&quot;combined&quot;</span><span class="p">,</span> <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_combined_dataset</span><span class="p">,</span> <span class="n">CombinedDatasetConfig</span><span class="p">),</span>
+    <span class="c1"># samplers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;sequential_sampler&quot;</span><span class="p">,</span> <span class="n">SequentialSampler</span><span class="p">,</span> <span class="n">SequentialSamplerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;distributed_sampler&quot;</span><span class="p">,</span> <span class="n">DistributedSampler</span><span class="p">,</span> <span class="n">DistributedSamplerConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;resumable_distributed_sampler&quot;</span><span class="p">,</span> <span class="n">ResumableDistributedSampler</span><span class="p">,</span> <span class="n">ResumableDistributedSamplerConfig</span>
+    <span class="p">),</span>
+    <span class="c1"># batch samplers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;batch_sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">BatchSampler</span><span class="p">,</span> <span class="n">BatchSamplerConfig</span><span class="p">),</span>
+    <span class="c1"># collators</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;collate_fn&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt_2_llm_collator&quot;</span><span class="p">,</span> <span class="n">GPT2LLMCollateFn</span><span class="p">,</span> <span class="n">GPT2LLMCollateFnConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;collate_fn&quot;</span><span class="p">,</span> <span class="s2">&quot;coca_collator&quot;</span><span class="p">,</span> <span class="n">CoCaCollatorFn</span><span class="p">,</span> <span class="n">CoCaCollateFnConfig</span><span class="p">),</span>
+    <span class="c1"># data loaders</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;data_loader&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">DataloaderFactory</span><span class="o">.</span><span class="n">get_dataloader</span><span class="p">,</span> <span class="n">LLMDataLoaderConfig</span><span class="p">),</span>
+    <span class="c1"># checkpointing</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;checkpoint_saving&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">CheckpointSaving</span><span class="p">,</span> <span class="n">CheckpointSavingConfig</span><span class="p">),</span>
+    <span class="c1"># checkpointing strategies</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;checkpoint_saving_strategy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;save_every_k_steps_checkpointing_strategy&quot;</span><span class="p">,</span>
+        <span class="n">SaveEveryKStepsCheckpointingStrategy</span><span class="p">,</span>
+        <span class="n">SaveEveryKStepsCheckpointingStrategyConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;checkpoint_saving_strategy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;save_k_most_recent_checkpoints_strategy&quot;</span><span class="p">,</span>
+        <span class="n">SaveKMostRecentCheckpointsStrategy</span><span class="p">,</span>
+        <span class="n">SaveKMostRecentCheckpointsStrategyConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="c1"># checkpoint saving execution</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;checkpoint_saving_execution&quot;</span><span class="p">,</span> <span class="s2">&quot;fsdp&quot;</span><span class="p">,</span> <span class="n">FSDPCheckpointSaving</span><span class="p">,</span> <span class="n">FSDPCheckpointSavingConfig</span><span class="p">),</span>
+    <span class="c1"># checkpoint loading</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;checkpoint_loading&quot;</span><span class="p">,</span> <span class="s2">&quot;fsdp&quot;</span><span class="p">,</span> <span class="n">FSDPCheckpointLoading</span><span class="p">,</span> <span class="n">FSDPCheckpointLoadingConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;checkpoint_loading&quot;</span><span class="p">,</span> <span class="s2">&quot;torch&quot;</span><span class="p">,</span> <span class="n">TorchCheckpointLoading</span><span class="p">,</span> <span class="n">TorchCheckpointLoadingConfig</span><span class="p">),</span>
+    <span class="c1"># Progress subscriber</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;progress_subscriber&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;dummy&quot;</span><span class="p">,</span>
+        <span class="n">ProgressSubscriberFactory</span><span class="o">.</span><span class="n">get_dummy_progress_subscriber</span><span class="p">,</span>
+        <span class="n">DummyProgressSubscriberConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;progress_subscriber&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;rich&quot;</span><span class="p">,</span>
+        <span class="n">ProgressSubscriberFactory</span><span class="o">.</span><span class="n">get_rich_progress_subscriber</span><span class="p">,</span>
+        <span class="n">RichProgressSubscriberConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="c1"># Results subscriber</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;results_subscriber&quot;</span><span class="p">,</span> <span class="s2">&quot;dummy&quot;</span><span class="p">,</span> <span class="n">ResultsSubscriberFactory</span><span class="o">.</span><span class="n">get_dummy_result_subscriber</span><span class="p">,</span> <span class="n">DummyResultSubscriberConfig</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;results_subscriber&quot;</span><span class="p">,</span> <span class="s2">&quot;rich&quot;</span><span class="p">,</span> <span class="n">ResultsSubscriberFactory</span><span class="o">.</span><span class="n">get_rich_result_subscriber</span><span class="p">,</span> <span class="n">RichResultSubscriberConfig</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;results_subscriber&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wandb&quot;</span><span class="p">,</span>
+        <span class="n">ResultsSubscriberFactory</span><span class="o">.</span><span class="n">get_wandb_result_subscriber</span><span class="p">,</span>
+        <span class="n">WandBEvaluationResultSubscriberConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="c1"># layer norms</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;layer_norm&quot;</span><span class="p">,</span> <span class="s2">&quot;rms_norm&quot;</span><span class="p">,</span> <span class="n">RMSLayerNorm</span><span class="p">,</span> <span class="n">RMSLayerNormConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;layer_norm&quot;</span><span class="p">,</span> <span class="s2">&quot;layer_norm&quot;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">,</span> <span class="n">LayerNormConfig</span><span class="p">),</span>
+    <span class="c1"># gradient clippers</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;gradient_clipper&quot;</span><span class="p">,</span> <span class="s2">&quot;fsdp&quot;</span><span class="p">,</span> <span class="n">FSDPGradientClipper</span><span class="p">,</span> <span class="n">FSDPGradientClipperConfig</span><span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;gradient_clipper&quot;</span><span class="p">,</span> <span class="s2">&quot;fsdp_logging_only&quot;</span><span class="p">,</span> <span class="n">FSDPLoggingOnlyGradientClipper</span><span class="p">,</span> <span class="n">FSDPDummyGradientClipperConfig</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span><span class="s2">&quot;gradient_clipper&quot;</span><span class="p">,</span> <span class="s2">&quot;dummy&quot;</span><span class="p">,</span> <span class="n">DummyGradientClipper</span><span class="p">,</span> <span class="n">DummyGradientClipperConfig</span><span class="p">),</span>
+    <span class="c1"># Number conversion</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;local_num_batches_from_num_samples&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_local_num_batches_from_num_samples</span><span class="p">,</span>
+        <span class="n">LocalNumBatchesFromNumSamplesConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;local_num_batches_from_num_tokens&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_local_num_batches_from_num_tokens</span><span class="p">,</span>
+        <span class="n">LocalNumBatchesFromNumTokensConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_samples_from_num_tokens&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_samples_from_num_tokens</span><span class="p">,</span>
+        <span class="n">NumSamplesFromNumTokensConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_steps_from_num_samples&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_num_samples</span><span class="p">,</span>
+        <span class="n">NumStepsFromNumSamplesConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_steps_from_num_tokens&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_num_tokens</span><span class="p">,</span>
+        <span class="n">NumStepsFromNumTokensConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_tokens_from_num_steps&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_tokens_from_num_steps</span><span class="p">,</span>
+        <span class="n">NumTokensFromNumStepsConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;last_step_from_checkpoint_path&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_last_step_from_checkpoint_path</span><span class="p">,</span>
+        <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_seen_steps_from_checkpoint_path&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_seen_steps_from_checkpoint_path</span><span class="p">,</span>
+        <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;global_num_seen_tokens_from_checkpoint_path&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_global_num_seen_tokens_from_checkpoint_path</span><span class="p">,</span>
+        <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_target_steps_from_checkpoint_path&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_target_steps_from_checkpoint_path</span><span class="p">,</span>
+        <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;global_num_target_tokens_from_checkpoint_path&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_global_num_target_tokens_from_checkpoint_path</span><span class="p">,</span>
+        <span class="n">NumberConversionFromCheckpointPathConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_tokens_from_packed_mem_map_dataset_continuous&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_tokens_from_packed_mem_map_dataset_continuous</span><span class="p">,</span>
+        <span class="n">NumTokensFromPackedMemMapDatasetContinuousConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">ComponentEntity</span><span class="p">(</span>
+        <span class="s2">&quot;number_conversion&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_steps_from_raw_dataset_index&quot;</span><span class="p">,</span>
+        <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_raw_dataset_index</span><span class="p">,</span>
+        <span class="n">NumStepsFromRawDatasetIndexConfig</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
