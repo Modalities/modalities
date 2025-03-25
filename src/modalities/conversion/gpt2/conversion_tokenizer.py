@@ -31,9 +31,10 @@ def convert_tokenizer(tokenizer_model_path: str, output_dir: str) -> tuple[int, 
         )
     hf_tokenizer.add_bos_token = False
     hf_tokenizer.add_eos_token = False
+    # With legacy=True the LlamaTokenizer tokenizer will use the SentencePiece tokenizer for tokenization
+    # and not run any special token logic.
     hf_tokenizer.legacy = True
     hf_tokenizer.save_pretrained(output_dir)
-    # TODO: Remove or set dummy values?:
     return (
         sp_tokenizer.tokenizer.bos_id(),
         sp_tokenizer.tokenizer.eos_id(),

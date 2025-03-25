@@ -65,6 +65,10 @@ def convert_gpt2(
     if "tokenizer" in modalities_config:
         tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
         bos_token_id, eos_token_id, pad_token_id, _ = convert_tokenizer(tokenizer_model, output_dir)
+        # The values bos=1, eos=2 and pad=None are set by default in the model config (as taken from Llama).
+        # Overwrite them, with the actual values from the internal SentencePiece tokenizer.
+        # Note, that the LlamaTokenizer wrapping around the SentencePiece tokenizer does not know about these values.
+        # The unk token id is not set in the model config.
         hf_model.config.bos_token_id = bos_token_id
         hf_model.config.eos_token_id = eos_token_id
         hf_model.config.pad_token_id = pad_token_id
