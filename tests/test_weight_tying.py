@@ -1,7 +1,15 @@
 import pytest
 import torch.nn as nn
 
-from modalities.models.gpt2.gpt2_model import GPT2LLM, AttentionConfig, AttentionImplementation, PositionTypes
+from modalities.models.components.layer_norms import LayerNormConfig
+from modalities.models.gpt2.gpt2_model import (
+    GPT2LLM,
+    AttentionConfig,
+    AttentionImplementation,
+    LayerNorms,
+    LayerNormWrapperConfig,
+    PositionTypes,
+)
 from modalities.models.model import ActivationType
 
 VOCAB_SIZE = 1000
@@ -38,9 +46,15 @@ def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
             )
         ]
     )
-    attention_norm = nn.LayerNorm(n_embd)
-    ffn_norm = nn.LayerNorm(n_embd)
-    lm_head_norm = nn.LayerNorm(n_embd)
+    attention_norm_config = LayerNormWrapperConfig(
+        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
+    )
+    ffn_norm_config = LayerNormWrapperConfig(
+        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
+    )
+    lm_head_norm_config = LayerNormWrapperConfig(
+        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
+    )
 
     return GPT2LLM(
         sample_key="input_ids",
@@ -58,9 +72,9 @@ def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
         activation_type=activation_type,
         attention_implementation=attention_implementation,
         attention_config=attention_config,
-        attention_norm=attention_norm,
-        ffn_norm=ffn_norm,
-        lm_head_norm=lm_head_norm,
+        attention_norm_config=attention_norm_config,
+        ffn_norm_config=ffn_norm_config,
+        lm_head_norm_config=lm_head_norm_config,
         use_weight_tying=use_weight_tying,
     )
 
@@ -70,11 +84,11 @@ def test_weight_tying_behavior(use_weight_tying):
     model = create_gpt2_model(use_weight_tying)
     if use_weight_tying:
         assert (
-            model.transformer.wte.weight is model.lm_head.weight
+            model.transformer.wte.weight is model.transformer.lm_head.weight
         ), "Weight tying failed: Embedding and LM head weights are not the same."
     else:
         assert (
-            model.transformer.wte.weight is not model.lm_head.weight
+            model.transformer.wte.weight is not model.transformer.lm_head.weight
         ), "Weight tying failed: Embedding and LM head weights should be different."
 
 
@@ -98,9 +112,9 @@ def test_weight_tying_named_parameters(use_weight_tying):
 
     if use_weight_tying:
         assert (
-            "lm_head.weight" not in named_params
-        ), "lm_head.weight should not appear in named_parameters when weight tying is used."
+            "transformer.lm_head.weight" not in named_params
+        ), "transformer.lm_head.weight should not appear in named_parameters when weight tying is used."
     else:
         assert (
-            "lm_head.weight" in named_params
-        ), "lm_head.weight should appear in named_parameters when weight tying is not used."
+            "transformer.lm_head.weight" in named_params
+        ), "transformer.lm_head.weight should appear in named_parameters when weight tying is not used."

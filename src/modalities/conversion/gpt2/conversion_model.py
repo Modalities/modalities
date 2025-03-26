@@ -53,9 +53,9 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
-        layer_norm_eps=_get_layer_norm_value(config["ffn_norm"]["config"], "eps"),
-        layer_norm_elementwise_affine=_get_layer_norm_value(config["ffn_norm"]["config"], "elementwise_affine"),
-        layer_norm_bias=_get_layer_norm_value(config["ffn_norm"]["config"], "bias"),
+        layer_norm_eps=_get_layer_norm_value(config["ffn_norm_config"]["config"], "eps"),
+        layer_norm_elementwise_affine=_get_layer_norm_value(config["ffn_norm_config"]["config"], "elementwise_affine"),
+        layer_norm_bias=_get_layer_norm_value(config["ffn_norm_config"]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation=_map_attention_type(config),
@@ -97,9 +97,9 @@ def _check_conversion_criteria(model_config: dict) -> None:
     assert model_config["activation_type"] == "swiglu"
     assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
 
-    norms = ["attention_norm", "ffn_norm", "lm_head_norm"]
+    norms = ["attention_norm_config", "ffn_norm_config", "lm_head_norm_config"]
     for norm in norms:
-        assert model_config[norm]["variant_key"] == "layer_norm"
+        assert model_config[norm]["norm_type"] == "layer_norm"
 
     assert (
         len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
@@ -140,7 +140,7 @@ def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
         _copy_weights_attention(hf_layer, modalities_layer)
         _copy_weights_mlp(hf_layer, modalities_layer)
         _copy_weights_layer_norms(hf_layer, modalities_layer)
-    _copy_weights_base_modules(hf_model.lm_head, modalities_model.lm_head)
+    _copy_weights_base_modules(hf_model.lm_head, modalities_model.transformer.lm_head)
     _copy_weights_base_modules(hf_model.model.norm, modalities_model.transformer.lm_head_norm)
 
 
