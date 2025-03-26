@@ -10,11 +10,13 @@ from typing import Callable, Generic, Optional, Type, TypeVar
 import torch
 import torch.distributed as dist
 from pydantic import ValidationError
+from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.utils.typing import FSDPX
 
 
 def print_rank_0(message: str):
@@ -128,22 +130,28 @@ def get_local_number_of_trainable_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def get_total_number_of_trainable_parameters(model: FSDP) -> Number:
-    num_params = get_local_number_of_trainable_parameters(model)
-    num_params_tensor = torch.tensor(num_params).cuda()
-    dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
-    num_params_tensor.item()
-    # # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
-    # # TODO: Define constant instead of hardcoding string
-    # if model.sharding_strategy.name == "HYBRID_SHARD":
-    #     # Assumes that CUDA is available and each node has the same number of GPUs
-    #     # Note: Per default FSDP constructs process groups for the user to shard intra-node and replicate inter-node.
-    #     # However, users can also provide their own sharding process groups (currently not supported in Modalities)
-    #     # which would require to adapt the code.
-    #     sharding_factor_hybrid_sharding = dist.get_world_size() // torch.cuda.device_count()
-    #     total_num_params = total_num_params // sharding_factor_hybrid_sharding
-
-    return -1  # TODO We need to fix this by calculating the correct value based on the device-mesh!
+def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
+    if isinstance(model, FSDP):
+        num_params = get_local_number_of_trainable_parameters(model)
+        num_params_tensor = torch.tensor(num_params).cuda()
+        dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
+        total_num_params = num_params_tensor.item()
+        # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
+        # TODO: Define constant instead of hardcoding string
+        # Assumes that CUDA is available and each node has the same number of GPUs
+        # Note: Per default FSDP constructs process groups for the user to shard intra-node and replicate inter-node.
+        # However, users can also provide their own sharding process groups (currently not supported in Modalities)
+        # which would require to adapt the code.
+        if model.sharding_strategy.name == "NO_SHARD":
+            sharding_factor = dist.get_world_size()
+        if model.sharding_strategy.name == "HYBRID_SHARD":
+            sharding_factor = dist.get_world_size() // torch.cuda.device_count()
+        elif model.sharding_strategy.name == "FULL_SHARD":
+            sharding_factor = 1
+        total_num_params = total_num_params // sharding_factor
+        return total_num_params
+    elif isinstance(model, FSDP2):
+        return -1  # TODO We need to fix this by calculating the correct value based on the device-mesh!
 
 
 class TimeRecorderStates(Enum):

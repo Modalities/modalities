@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
@@ -25,7 +25,7 @@ settings:
     local_train_micro_batch_size: 1
     sequence_length: 256
   training_target:
-    num_target_tokens:      
+    num_target_tokens:
       component_key: number_conversion
       variant_key: num_tokens_from_packed_mem_map_dataset_continuous
       config:
@@ -176,7 +176,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: fsdp1
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -189,9 +189,23 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
 wrapped_model:
   component_key: model
-  variant_key: fsdp_wrapped
+  variant_key: fsdp1_wrapped
   config:
     model:
       instance_key: model
@@ -213,7 +227,7 @@ model:
       variant_key: composed
       config:
         model_type: gpt2
-        weight_init_type: scaled_embed
+        weight_init_type: scaled
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
@@ -243,30 +257,24 @@ model_raw:
             seq_length_dim: -2
             base_freq: 10000
     attention_implementation: manual
-    activation_type: gelu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    activation_type: swiglu
+    attention_norm_config:
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    ffn_norm_config:
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    lm_head_norm_config:
+      norm_type: layer_norm
       config:
-        ndim: ${model_raw.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
