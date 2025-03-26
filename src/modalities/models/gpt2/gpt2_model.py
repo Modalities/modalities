@@ -873,7 +873,9 @@ class GPT2LLM(NNModel):
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         if use_weight_tying:
-            self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+            self.transformer.wte.weight = (
+                self.transformer.lm_head.weight
+            )  # https://paperswithcode.com/method/weight-tying
 
     def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """

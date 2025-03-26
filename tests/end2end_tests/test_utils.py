@@ -91,7 +91,6 @@ def test_get_total_number_of_trainable_parameters(
 ):
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         model = _load_model(model_name, sharding_strategy=sharding_strategy)
-        print(model)  # for debugging
         assert model.sharding_strategy == sharding_strategy
 
         nr_parameters = get_total_number_of_trainable_parameters(model)

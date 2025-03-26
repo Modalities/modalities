@@ -268,6 +268,7 @@ class GPT2ModelFactory:
         attention_norm_config: LayerNormWrapperConfig,
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
+        use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
         seed: int = None,
     ) -> GPT2LLM:
@@ -291,6 +292,7 @@ class GPT2ModelFactory:
             ffn_norm_config=ffn_norm_config,
             lm_head_norm_config=lm_head_norm_config,
             seed=seed,
+            use_weight_tying=use_weight_tying,
         )
 
         if use_meta_device:
