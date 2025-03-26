@@ -225,7 +225,7 @@ model_raw:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
@@ -254,6 +254,7 @@ model_raw:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
+    use_weight_tying: true
 
 lr_scheduler:
   component_key: scheduler
@@ -308,5 +309,5 @@ evaluation_subscriber:
     project: modalities_getting_started
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: data/wandb_storage
     config_file_path: ${settings.config_file_path}

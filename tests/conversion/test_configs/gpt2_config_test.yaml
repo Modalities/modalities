@@ -1,0 +1,63 @@
+model:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: input_ids
+    poe_type: NOPE
+    sequence_length: 128
+    prediction_key: logits
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 3
+    n_head_q: 4
+    n_head_kv: 4
+    ffn_hidden: 512
+    n_embd: 256
+    dropout: 0.0
+    bias: false # True: bias in Linears, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+      - type_hint: RotaryTransform
+        config:
+          n_embd: ${model.config.n_embd}
+          n_head: ${model.config.n_head_q} #it has to be head_q here
+          seq_length_dim: -2
+          base_freq: 500000
+    attention_implementation: pytorch_flash # manual
+    activation_type: swiglu
+    attention_norm:
+      component_key: layer_norm
+      variant_key: layer_norm
+      config:
+        normalized_shape: ${model.config.n_embd}
+        eps: 1e-5
+        bias: true
+    ffn_norm:
+      component_key: layer_norm
+      variant_key: layer_norm
+      config:
+        normalized_shape: ${model.config.n_embd}
+        eps: 1e-5
+        bias: true
+    lm_head_norm:
+      component_key: layer_norm
+      variant_key: layer_norm
+      config:
+        normalized_shape: ${model.config.n_embd}
+        eps: 1e-5
+        bias: true
+    use_weight_tying: true
+
+checkpointed_model:
+  component_key: model
+  variant_key: checkpointed
+  config:
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: cpu
+        precision: BF16
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    checkpoint_path: null

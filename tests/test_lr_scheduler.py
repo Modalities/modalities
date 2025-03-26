@@ -39,7 +39,7 @@ def test_run_scheduler(
         evaluation_interval_in_steps=1,
     )
     app_state_mock.model.assert_has_calls([call(b.samples) for b in batches])
-    app_state_mock.optimizer.step.assert_called()
+    app_state_mock.lr_scheduler.step.assert_called()
 
 
 def test_dummy_lr_scheduler(optimizer_with_param_groups_mock):

@@ -77,7 +77,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
         class WarmstartCheckpointPaths(BaseModel):
             model_checkpoint_path: Path
-            optimizer_checkpoint_path: Path
+            optimizer_checkpoint_path: Optional[Path] = None
 
         class DCPWarmstartCheckpointPaths(BaseModel):
             checkpoint_folder_path: Path

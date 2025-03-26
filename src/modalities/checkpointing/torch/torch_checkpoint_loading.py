@@ -51,7 +51,7 @@ class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
         if self.precision is not None and self.precision.value != model_state_dtype:
             warning(
                 f"WARNING: Model checkpoint was stored with precision {model_state_dtype} "
-                "but is loaded with precision {self.precision.value}."
+                f"but is loaded with precision {self.precision.value}."
             )
 
         # assign=True makes sure that the model is loaded with the same precision

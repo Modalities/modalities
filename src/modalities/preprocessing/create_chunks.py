@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class Chunking:
         return [start, end]
 
     @staticmethod
-    def get_file_chunk(dataset: PackedMemMapDatasetBase, num_chunks: int, chunk_id: int) -> list[np.ndarray]:
+    def get_tokenized_file_chunk(dataset: PackedMemMapDatasetBase, num_chunks: int, chunk_id: int) -> list[np.ndarray]:
         chunk_range = Chunking._get_chunk_range(num_chunks=num_chunks, num_samples=len(dataset), chunk_id=chunk_id)
         if chunk_range[0] == chunk_range[1]:
             return []
@@ -48,6 +48,12 @@ class Chunking:
         return chunk
 
     @staticmethod
-    def shuffle_file_chunks_in_place(file_chunks: list[np.ndarray], seed: Optional[int] = None) -> None:
+    def get_jsonl_file_chunk(dataset: list[Any], num_chunks: int, chunk_id: int) -> list[Any]:
+        chunk_range = Chunking._get_chunk_range(num_chunks=num_chunks, num_samples=len(dataset), chunk_id=chunk_id)
+        chunk = dataset[chunk_range[0] : chunk_range[1]]
+        return chunk
+
+    @staticmethod
+    def shuffle_file_chunks_in_place(file_chunks: list[Any], seed: Optional[int] = None) -> None:
         rng = np.random.default_rng(seed)  # Create a local random generator
         rng.shuffle(file_chunks)  # Shuffle using the local generator

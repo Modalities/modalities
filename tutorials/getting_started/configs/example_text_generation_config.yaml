@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: ./checkpoints/2024-06-27__14-17-52/eid_2024-06-27__14-17-52-model-num_steps_48-num_tokens_393216.bin
+  model_path: ./checkpoints/2025-02-24__08-53-31_5b6cf982/eid_2025-02-24__08-53-31_5b6cf982-model-seen_steps_48-seen_tokens_393216-target_steps_95-target_tokens_778240.bin
   device: 0
   sequence_length: 1024
 
@@ -53,7 +53,7 @@ model:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
@@ -62,29 +62,27 @@ model:
             n_head: ${model.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
             base_freq: 10000
-    attention_implementation: manual
-    activation_type: gelu
+    attention_implementation: pytorch_flash
+    activation_type: swiglu
     attention_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model.config.n_embd}
+        eps: 1.0e-05
     ffn_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model.config.n_embd}
+        eps: 1.0e-05
     lm_head_norm:
       component_key: layer_norm
-      variant_key: rms_norm
+      variant_key: layer_norm
       config:
-        ndim: ${model.config.n_embd}
-        bias: true
-        epsilon: 1e-5
+        normalized_shape: ${model.config.n_embd}
+        eps: 1e-5
+    use_weight_tying: true
 
 tokenizer:
   component_key: tokenizer

@@ -1,4 +1,5 @@
 import math
+import os
 import pickle
 from itertools import repeat
 from pathlib import Path
@@ -43,7 +44,14 @@ class TokenizedFileWriter:
                 write_batch_size=write_batch_size,
             )
             TokenizedFileWriter._write_index_segment(chunk_file, index_list)
-        TokenizedFileWriter._update_data_length_in_initial_header(tokenized_dataset_file_path, index_list)
+        if len(index_list) > 0:
+            TokenizedFileWriter._update_data_length_in_initial_header(tokenized_dataset_file_path, index_list)
+        else:
+            # normally we could have checked this in the beginning via len(tokenized_dataset) == 0
+            # but if the dataset is processed lazily via a generator, len(...) would load
+            # the whole dataset into memory
+            os.remove(tokenized_dataset_file_path)
+            raise ValueError("The tokenized dataset did not create any data.")
 
     @staticmethod
     def _write_initial_header_segment(file_descriptor, token_size_in_bytes: int) -> None:

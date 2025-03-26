@@ -83,7 +83,10 @@ def _assert_existence_of_weight_decay_groups_excluded(
     that are to be excluded from weight decay
 
     Example GPT2:
-        weight_decay_groups = {"linear": [".attn", ".mlp"], "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
+        weight_decay_groups = {
+            "linear": [".attn", ".mlp", ".lm_head.weight"],
+            "embedding": [".wte", ".wpe"], "layernorm": [".*_norm"]]
+        }
         weight_decay_groups_excluded = ["embedding", "layernorm"]
     """
     # FSDP 1
