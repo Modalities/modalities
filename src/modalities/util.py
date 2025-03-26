@@ -45,22 +45,6 @@ def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
         raise ValidationError(f"Invalid {enum_type} member name: {name}")
 
 
-def get_callback_interval_in_batches_per_rank(
-    local_callback_interval_in_samples: int, local_train_micro_batch_size: int, gradient_acc_steps: int
-):
-    num_local_train_micro_batches_exact = local_callback_interval_in_samples / local_train_micro_batch_size
-    num_local_train_micro_batches_ret = max(local_callback_interval_in_samples // local_train_micro_batch_size, 1)
-    if num_local_train_micro_batches_exact != num_local_train_micro_batches_ret:
-        warnings.warn(
-            f"Calculated callback_interval_in_batches_per_rank is not an integer."
-            f"Clipping {num_local_train_micro_batches_exact} to {num_local_train_micro_batches_ret} "
-        )
-    assert (
-        num_local_train_micro_batches_ret % gradient_acc_steps == 0
-    ), "callback_interval_in_batches_per_rank must be divisible by gradient_acc_steps"
-    return num_local_train_micro_batches_ret
-
-
 def get_experiment_id_of_run(
     config_file_path: Path, hash_length: Optional[int] = 8, max_experment_id_byte_length: Optional[int] = 1024
 ) -> str:
