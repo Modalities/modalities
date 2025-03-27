@@ -24,6 +24,7 @@ from modalities.config.config import (
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
+    CompiledModelConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DCPAppStateConfig,
@@ -149,6 +150,7 @@ COMPONENTS = [
         ModelFactory.get_activation_checkpointed_model,
         ActivationCheckpointedModelConfig,
     ),
+    ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
