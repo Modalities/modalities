@@ -1,11 +1,12 @@
 import warnings
+from typing import Optional
 
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 
 class DummyLRScheduler(LRScheduler):
-    def __init__(self, optimizer: Optimizer, last_epoch=-1, verbose=False):
+    def __init__(self, optimizer: Optimizer, last_epoch: Optional[int] = -1, verbose: Optional[bool] = False):
         super().__init__(optimizer, last_epoch, verbose)
 
     def get_lr(self) -> list[float]:

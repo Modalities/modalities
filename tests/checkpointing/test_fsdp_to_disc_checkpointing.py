@@ -14,8 +14,9 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
-from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDPCheckpointSaving
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDP1CheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDP1CheckpointSaving
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
@@ -201,13 +202,13 @@ class TestFSDPToDiscCheckpointing:
         gradient_accumulation_steps = 1
         sequence_length = gpt2_model_config_dict["model_raw"]["config"]["sequence_length"]
 
-        checkpoint_saving = FSDPCheckpointSaving(
+        checkpoint_saving = FSDP1CheckpointSaving(
             checkpoint_path=temporary_checkpoint_folder_path,
             experiment_id=experiment_id,
             global_rank=dist.get_rank(),
         )
 
-        checkpoint_loading = FSDPCheckpointLoading(
+        checkpoint_loading = FSDP1CheckpointLoading(
             global_rank=dist.get_rank(),
             block_names=["GPT2Block"],
             mixed_precision_settings=MixedPrecisionSettings.FP_16,
@@ -245,9 +246,8 @@ class TestFSDPToDiscCheckpointing:
             * gradient_accumulation_steps
             * 2,
         )
-        checkpoint_saving._save_checkpoint(
-            model=fsdp_wrapped_model, optimizer=optimizer, training_progress=training_progress
-        )
+        app_state = AppState(model=fsdp_wrapped_model, optimizer=optimizer)
+        checkpoint_saving._save_checkpoint(app_state=app_state, training_progress=training_progress)
 
         # load the model checkpoint
         model_checkpointing_path = checkpoint_saving._get_checkpointing_path(
@@ -272,7 +272,7 @@ class TestFSDPToDiscCheckpointing:
             num_target_steps=training_progress.num_target_steps,
             num_target_tokens=training_progress.num_target_tokens,
         )
-        checkpoint_loading.load_optimizer_checkpoint(
+        checkpoint_loading.load_optimizer_checkpoint_(
             optimizer=optimizer_2, model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 

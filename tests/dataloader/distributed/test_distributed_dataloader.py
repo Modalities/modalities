@@ -31,8 +31,8 @@ def test_dataloader_without_shuffling():
     # to receive [[0, 2], [4, 6]] and [[1, 3], [5, 7]], respectively.
     config_file_path = working_dir / "dist_dataloader_config_without_shuffling.yaml"
 
-    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(config_file_path)
         main.add_custom_component(
             component_key="dataset",
             variant_key="test",
@@ -76,8 +76,8 @@ def test_dataloader_with_shuffling_without_skipping():
 
     config_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
 
-    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(config_file_path)
         main.add_custom_component(
             component_key="dataset",
             variant_key="test",
@@ -121,15 +121,14 @@ def test_dataloader_with_shuffling_and_skipped_batches():
     # to receive one batch of size two without overlap, e.g., [[5, 6]] and [[4, 1]], respectively.
 
     config_shuffled_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
-    main_shuffled = Main(config_shuffled_file_path)
 
     config_shuffled_and_skipped_file_path = (
         working_dir / "dist_dataloader_config_with_shuffling_and_skipped_batches.yaml"
     )
 
-    main_shuffled_and_skipped = Main(config_shuffled_and_skipped_file_path)
-
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_shuffled = Main(config_shuffled_file_path)
+        main_shuffled_and_skipped = Main(config_shuffled_and_skipped_file_path)
         main_shuffled.add_custom_component(
             component_key="dataset",
             variant_key="test",

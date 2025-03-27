@@ -27,8 +27,8 @@ class ActivationCheckpointingInstantiationModel(BaseModel):
 def test_activation_checkpointing():
     config_file_path = working_dir / "config_activation_checkpointing.yaml"
 
-    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(config_file_path)
         components = main.build_components(components_model_type=ActivationCheckpointingInstantiationModel)
         modules = dict(components.activation_checkpointed_model.named_modules())
 

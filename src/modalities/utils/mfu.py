@@ -2,10 +2,12 @@ import warnings
 from typing import Optional
 
 import torch
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FSDPModule as FSDP2
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.types import Number
 
 from modalities.util import get_total_number_of_trainable_parameters
+from modalities.utils.typing import FSDPX
 
 # A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/
 # H100: https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/
@@ -37,53 +39,59 @@ def _get_theoretical_gpu_peak_performance_single(precision: torch.dtype, gpu_typ
         return None
 
 
-def get_theoretical_gpu_peak_performance(model: FSDP, world_size: int) -> Optional[Number]:
+def get_theoretical_gpu_peak_performance(model: FSDPX, world_size: int) -> Optional[Number]:
     """
-    Calculates the accummulated theoretical peak performance based on all GPUs, i.e.,
+    Calculates the accumulated theoretical peak performance based on all GPUs, i.e.,
       #GPU=world_size, in units FLOPs / s for given gpu type.
 
     Args:
-        model (FSDP): The model for which to calculate the theoretical peak performance.
+        model (FSDPX): The model for which to calculate the theoretical peak performance.
         world_size (int): The number of GPUs used in parallel.
 
     Returns:
-        (Number, optional): The accummulated theoretical peak performance of all GPUs,
+        (Number, optional): The accumulated theoretical peak performance of all GPUs,
           or None if it cannot be calculated.
     """
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-        precision = model.mixed_precision.param_dtype
-        if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
-            warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
+        if isinstance(model, FSDP1):
+            precision = model.mixed_precision.param_dtype
+            if model.mixed_precision.reduce_dtype != precision or model.mixed_precision.buffer_dtype != precision:
+                warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
+                return None
+        elif isinstance(model, FSDP2):
+            warnings.warn("MFU is computed based on the assumption that bf16 precision is used.")
+            precision = torch.bfloat16
+        else:
+            raise TypeError(f"Model should be of type FSDPX, but is {type(model)} instead.")
+
+        device_name = torch.cuda.get_device_name()
+        if device_name.startswith("NVIDIA A100"):
+            single_gpu_peak_performance = _get_theoretical_gpu_peak_performance_single(precision, "A100")
+        elif device_name.startswith("NVIDIA H100"):
+            single_gpu_peak_performance = _get_theoretical_gpu_peak_performance_single(precision, "H100")
+        else:
+            warnings.warn(f"Could not get theoretical GPU peak performance for unknown device = {device_name}.")
+            return None
+        if single_gpu_peak_performance is None:
+            warnings.warn(
+                f"Could not get theoretical GPU peak performance for device = {device_name} "
+                f"and mixed precision type = {precision}."
+            )
             return None
         else:
-            device_name = torch.cuda.get_device_name()
-            if device_name.startswith("NVIDIA A100"):
-                single_gpu_peak_performance = _get_theoretical_gpu_peak_performance_single(precision, "A100")
-            elif device_name.startswith("NVIDIA H100"):
-                single_gpu_peak_performance = _get_theoretical_gpu_peak_performance_single(precision, "H100")
-            else:
-                warnings.warn(f"Could not get theoretical GPU peak performance for unknown device = {device_name}.")
-                return None
-            if single_gpu_peak_performance is None:
-                warnings.warn(
-                    f"Could not get theoretical GPU peak performance for device = {device_name} "
-                    f"and mixed precision type = {precision}."
-                )
-                return None
-            else:
-                return single_gpu_peak_performance * world_size
+            return single_gpu_peak_performance * world_size
     else:
         return None
 
 
-def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optional[int]]:
+def get_theoretical_flops_per_token(model: FSDPX) -> tuple[Optional[int], Optional[int]]:
     """
     Calculates the theoretical number of floating point operations (FLOPs) per token for a given model.
     compute theoretical_flops_per_token = 6*N + 12*L*T*H
     See App. B in the PaLM paper (https://arxiv.org/pdf/2204.02311)
 
     Args:
-        model (FSDP): The model for which to calculate the FLOPs per token.
+        model (FSDPX): The model for which to calculate the FLOPs per token.
 
     Returns:
         tuple[(int, optional), (int, optional)]: A tuple containing the theoretical FLOPs per token
@@ -96,12 +104,21 @@ def get_theoretical_flops_per_token(model: FSDP) -> tuple[Optional[int], Optiona
         torch.cuda.is_available() and torch.cuda.device_count() > 0
     ):  # NOTE: This is a workaround to make cpu-only tests work
         N = get_total_number_of_trainable_parameters(model)
+
+        if isinstance(model, FSDP1):
+            model_module = model.module
+        elif isinstance(model, FSDP2):
+            model_module = model
+        else:
+            raise TypeError(f"Model should be of type FSDPX, but is {type(model)} instead.")
+
         try:
-            L = model.module.n_layer
-            T = model.module.sequence_length
-            H = model.module.n_embd
+            L = model_module.n_layer
+            T = model_module.sequence_length
+            H = model_module.n_embd
             return 6 * N + 12 * L * T * H, T
         except AttributeError:
+            warnings.warn("Could not get theoretical flops per token for model.")
             return None, None
     else:
         return None, None

@@ -11,9 +11,7 @@ def test_run_scheduler(
     set_env_cpu,
     checkpoint_saving_mock,
     evaluator_mock,
-    nn_model_mock,
-    optimizer_mock,
-    scheduler_mock,
+    app_state_mock,
     loss_mock,
     llm_data_loader_mock,
     trainer,
@@ -32,9 +30,7 @@ def test_run_scheduler(
 
     gym = Gym(trainer=trainer, evaluator=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
     gym.run(
-        model=nn_model_mock,
-        optimizer=optimizer_mock,
-        scheduler=scheduler_mock,
+        app_state=app_state_mock,
         train_data_loader=llm_data_loader_mock,
         evaluation_data_loaders=[],
         checkpoint_saving=checkpoint_saving_mock,
@@ -42,8 +38,8 @@ def test_run_scheduler(
         checkpointing_interval_in_steps=1,
         evaluation_interval_in_steps=1,
     )
-    nn_model_mock.assert_has_calls([call(b.samples) for b in batches])
-    scheduler_mock.step.assert_called()
+    app_state_mock.model.assert_has_calls([call(b.samples) for b in batches])
+    app_state_mock.lr_scheduler.step.assert_called()
 
 
 def test_dummy_lr_scheduler(optimizer_with_param_groups_mock):
