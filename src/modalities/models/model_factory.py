@@ -73,11 +73,11 @@ class ModelFactory:
 
     @deprecated(
         "With version 0.4, we upgraded FSDP to FSDP 2.0. "
-        "Use GeneralModelFactory.get_fsdp_2_wrapped_model(...) instead.",
+        "Use GeneralModelFactory.get_fsdp2_wrapped_model(...) instead.",
         category=FutureWarning,
     )
     @staticmethod
-    def get_fsdp_wrapped_model(
+    def get_fsdp1_wrapped_model(
         model: nn.Module,
         sync_module_states: bool,
         block_names: list[str],
@@ -129,7 +129,7 @@ class ModelFactory:
         return fsdp_model
 
     @staticmethod
-    def get_fsdp_2_wrapped_model(
+    def get_fsdp2_wrapped_model(
         model: nn.Module,
         block_names: list[str],
         device_mesh: DeviceMesh,

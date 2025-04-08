@@ -64,7 +64,7 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         # TODO nasty workaround to prevent circular imports
         from modalities.models.model_factory import ModelFactory
 
-        fsdp_model = ModelFactory.get_fsdp_wrapped_model(
+        fsdp_model = ModelFactory.get_fsdp1_wrapped_model(
             model=model,
             sync_module_states=True,
             block_names=self.block_names,

@@ -41,7 +41,7 @@ working_dir = Path(os.path.dirname(__file__))
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
-class TestFSDPToDiscCheckpointing:
+class TestFSDP1ToDiscCheckpointing:
     def get_gpt2_model_from_config(self, gpt2_model_config_dict: dict) -> GPT2LLM:
         class GPT2InstantationModel(BaseModel):
             model: PydanticPytorchModuleType
@@ -71,8 +71,8 @@ class TestFSDPToDiscCheckpointing:
         return self.get_gpt2_model_from_config(gpt2_model_config_dict)
 
     @pytest.fixture
-    def fsdp_wrapped_model(self, gpt2_model: GPT2LLM) -> FSDP:
-        wrapped_model: FSDP = ModelFactory.get_fsdp_wrapped_model(
+    def fsdp1_wrapped_model(self, gpt2_model: GPT2LLM) -> FSDP:
+        wrapped_model: FSDP = ModelFactory.get_fsdp1_wrapped_model(
             gpt2_model,
             sync_module_states=True,
             block_names=["GPT2Block"],
@@ -82,9 +82,9 @@ class TestFSDPToDiscCheckpointing:
         return wrapped_model
 
     @pytest.fixture
-    def optimizer(self, fsdp_wrapped_model: nn.Module) -> Optimizer:
+    def optimizer(self, fsdp1_wrapped_model: nn.Module) -> Optimizer:
         optimizer = OptimizerFactory.get_adam_w(
-            wrapped_model=fsdp_wrapped_model,
+            wrapped_model=fsdp1_wrapped_model,
             lr=0.001,
             betas=[0.9, 0.95],
             eps=1e-8,
@@ -189,7 +189,7 @@ class TestFSDPToDiscCheckpointing:
 
     def test_save_checkpoint_after_backward_pass(
         self,
-        fsdp_wrapped_model: FSDP,
+        fsdp1_wrapped_model: FSDP,
         optimizer: Optimizer,
         temporary_checkpoint_folder_path: Path,
         gpt2_model_2: GPT2LLM,
@@ -215,19 +215,19 @@ class TestFSDPToDiscCheckpointing:
             sharding_strategy=ShardingStrategy.FULL_SHARD,
         )
 
-        untrained_model_parameters = self._clone_parameters(fsdp_wrapped_model)
+        untrained_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
         untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
         batch_input_ids_dict, batch_target_ids = self._generate_batch(gpt2_model_config_dict)
         self._forward_backward_pass(
             gpt2_model_config=gpt2_model_config_dict,
-            model=fsdp_wrapped_model,
+            model=fsdp1_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
-        updated_model_parameters = self._clone_parameters(fsdp_wrapped_model)
+        updated_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
@@ -246,7 +246,7 @@ class TestFSDPToDiscCheckpointing:
             * gradient_accumulation_steps
             * 2,
         )
-        app_state = AppState(model=fsdp_wrapped_model, optimizer=optimizer)
+        app_state = AppState(model=fsdp1_wrapped_model, optimizer=optimizer)
         checkpoint_saving._save_checkpoint(app_state=app_state, training_progress=training_progress)
 
         # load the model checkpoint
@@ -276,7 +276,7 @@ class TestFSDPToDiscCheckpointing:
             optimizer=optimizer_2, model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
-        loaded_and_updated_model_parameters = self._clone_parameters(fsdp_wrapped_model)
+        loaded_and_updated_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
         loaded_and_updated_optimizer_state_dict = deepcopy(optimizer_2.state_dict())
 
         # make sure that after the update all weights are DIFFERENT from the original ones
@@ -303,7 +303,7 @@ class TestFSDPToDiscCheckpointing:
 
         loss_1 = self._forward_backward_pass(
             gpt2_model_config=gpt2_model_config_dict,
-            model=fsdp_wrapped_model,
+            model=fsdp1_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
@@ -320,7 +320,7 @@ class TestFSDPToDiscCheckpointing:
 
         # make sure that after another update the two models and optimizers are the same
         self._assert_equality_two_models(
-            fsdp_wrapped_model.parameters(), fsdp_wrapped_model_2.parameters(), must_be_equal=True
+            fsdp1_wrapped_model.parameters(), fsdp_wrapped_model_2.parameters(), must_be_equal=True
         )
         self._assert_equality_optimizer_param_group(
             optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True
@@ -328,7 +328,9 @@ class TestFSDPToDiscCheckpointing:
         self._assert_equality_optimizer_state(optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True)
 
         # make sure that the weights and state has changed to the previous forward backward pass
-        self._assert_equality_two_models(fsdp_wrapped_model.parameters(), updated_model_parameters, must_be_equal=False)
+        self._assert_equality_two_models(
+            fsdp1_wrapped_model.parameters(), updated_model_parameters, must_be_equal=False
+        )
         self._assert_equality_optimizer_param_group(
             optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=True
         )

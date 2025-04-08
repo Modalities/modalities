@@ -62,7 +62,7 @@ def _load_gpt2(initialization_type: str, std: float | str) -> FSDP:
     config_dict = _replace_config_dict(config_dict, initialization_type, std)
 
     gpt2_model = get_model_from_config(config_dict)
-    gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    gpt2_wrapped_model = ModelFactory.get_fsdp1_wrapped_model(
         gpt2_model,
         sync_module_states=True,
         block_names=["GPT2Block"],
@@ -79,7 +79,7 @@ def _load_coca(initialization_type: str, std: float | str) -> FSDP:
     config_dict = _replace_config_dict(config_dict, initialization_type, std)
 
     coca_model = get_model_from_config(config_dict)
-    coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    coca_wrapped_model = ModelFactory.get_fsdp1_wrapped_model(
         coca_model,
         sync_module_states=True,
         block_names=["TransformerBlock", "VisionTransformerBlock"],
