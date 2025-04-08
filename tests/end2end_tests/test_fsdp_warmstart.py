@@ -3,7 +3,6 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 import torch
@@ -16,8 +15,8 @@ from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoa
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
-from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
+from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
 
 
 def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
@@ -35,22 +34,6 @@ def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
 
 
 working_dir = Path(os.path.dirname(__file__))
-
-
-class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
-    def __init__(self):
-        self.message_list: list[Message[EvaluationResultBatch]] = []
-
-    def consume_message(self, message: Message[EvaluationResultBatch]):
-        """Consumes a message from a message broker."""
-        self.message_list.append(message)
-
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
-        pass
-
-
-class SaveAllResultSubscriberConfig(BaseModel):
-    pass
 
 
 class TrainDataloaderInstantiationModel(BaseModel):
