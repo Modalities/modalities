@@ -21,7 +21,9 @@ class CudaEnv:
         """
         self.process_group_backend = process_group_backend
         # TODO we might want to set this from outside via the config
-        self.local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        self.local_rank = int(os.getenv("LOCAL_RANK", "-1"))
+        if self.local_rank == -1:
+            raise ValueError("LOCAL_RANK environment variable is not set. Please set it before using CudaEnv.")
 
     def __enter__(self) -> "CudaEnv":
         """Sets the CUDA environment for distributed training.
