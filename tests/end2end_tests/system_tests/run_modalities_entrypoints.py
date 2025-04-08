@@ -8,9 +8,9 @@ from modalities.running_env.cuda_env import CudaEnv
 from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
 
 
-def run_modalities_training(process_id: int, world_size: int, config_file_path: Path):
+def run_modalities_training(process_id: int, world_size: int, rdvz_port: int, config_file_path: Path):
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
+    os.environ["MASTER_PORT"] = str(rdvz_port)
     os.environ["RANK"] = str(process_id)
     os.environ["LOCAL_RANK"] = str(process_id)
     os.environ["WORLD_SIZE"] = str(world_size)
