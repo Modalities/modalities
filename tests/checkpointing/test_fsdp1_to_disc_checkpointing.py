@@ -6,143 +6,76 @@ from pathlib import Path
 import pytest
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn as nn
-from pydantic import BaseModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
-from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 
 from modalities.__main__ import load_app_config_dict
 from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDP1CheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import CheckpointingEntityType, FSDP1CheckpointSaving
 from modalities.checkpointing.stateful.app_state import AppState
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import ProcessGroupBackendType, PydanticPytorchModuleType
+from modalities.config.config import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
-from modalities.running_env.cuda_env import CudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.training.training_progress import TrainingProgress
+from tests.checkpointing.checkpointing_test_utils import CheckpointingTestUtils
+from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
-# NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
-# CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
-#   $(which pytest) path/to/test_fsdp_to_disc_checkpointing.py
-
-
-_ROOT_DIR = Path(__file__).parents[1]
 working_dir = Path(os.path.dirname(__file__))
 
 
+def get_gpt2_model(gpt2_model_config_dict: GPT2LLMConfig) -> GPT2LLM:
+    return CheckpointingTestUtils.get_gpt2_model_from_config(gpt2_model_config_dict)
+
+
+def get_fsdp1_wrapped_model(gpt2_model: GPT2LLM) -> FSDP:
+    wrapped_model: FSDP = ModelFactory.get_fsdp1_wrapped_model(
+        gpt2_model,
+        sync_module_states=True,
+        block_names=["GPT2Block"],
+        mixed_precision_settings=MixedPrecisionSettings.FP_16,
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+    )
+    return wrapped_model
+
+
+def get_optimizer(fsdp1_wrapped_model: nn.Module) -> Optimizer:
+    optimizer = OptimizerFactory.get_adam_w(
+        wrapped_model=fsdp1_wrapped_model,
+        lr=0.001,
+        betas=[0.9, 0.95],
+        eps=1e-8,
+        weight_decay=1e-1,
+        weight_decay_groups_excluded=[],
+    )
+    return optimizer
+
+
+@pytest.fixture
+def temporary_checkpoint_folder_path():
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        yield Path(tmp_dir_path)
+
+
+@pytest.fixture
+def gpt2_model_config_dict() -> dict:
+    config_file_path = working_dir / "gpt2_config.yaml"
+    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    return config_dict
+
+
 @pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
+    torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
 class TestFSDP1ToDiscCheckpointing:
-    def get_gpt2_model_from_config(self, gpt2_model_config_dict: dict) -> GPT2LLM:
-        class GPT2InstantationModel(BaseModel):
-            model: PydanticPytorchModuleType
-
-        registry = Registry(COMPONENTS)
-        component_factory = ComponentFactory(registry=registry)
-
-        components = component_factory.build_components(
-            config_dict=gpt2_model_config_dict, components_model_type=GPT2InstantationModel
-        )
-
-        model = components.model
-        return model
-
-    @pytest.fixture(scope="function")
-    def gpt2_model_config_dict(self) -> dict:
-        config_file_path = working_dir / "gpt2_config.yaml"
-        config_dict = load_app_config_dict(config_file_path=config_file_path)
-        return config_dict
-
-    @pytest.fixture(scope="function")
-    def gpt2_model(self, gpt2_model_config_dict: GPT2LLMConfig) -> GPT2LLM:
-        return self.get_gpt2_model_from_config(gpt2_model_config_dict)
-
-    @pytest.fixture(scope="function")
-    def gpt2_model_2(self, gpt2_model_config_dict: GPT2LLMConfig) -> GPT2LLM:
-        return self.get_gpt2_model_from_config(gpt2_model_config_dict)
-
-    @pytest.fixture
-    def fsdp1_wrapped_model(self, gpt2_model: GPT2LLM) -> FSDP:
-        wrapped_model: FSDP = ModelFactory.get_fsdp1_wrapped_model(
-            gpt2_model,
-            sync_module_states=True,
-            block_names=["GPT2Block"],
-            mixed_precision_settings=MixedPrecisionSettings.FP_16,
-            sharding_strategy=ShardingStrategy.FULL_SHARD,
-        )
-        return wrapped_model
-
-    @pytest.fixture
-    def optimizer(self, fsdp1_wrapped_model: nn.Module) -> Optimizer:
-        optimizer = OptimizerFactory.get_adam_w(
-            wrapped_model=fsdp1_wrapped_model,
-            lr=0.001,
-            betas=[0.9, 0.95],
-            eps=1e-8,
-            weight_decay=1e-1,
-            weight_decay_groups_excluded=[],
-        )
-        return optimizer
-
-    @pytest.fixture
-    def temporary_checkpoint_folder_path(self):
-        with tempfile.TemporaryDirectory() as tmp_dir_path:
-            yield Path(tmp_dir_path)
-
-    @pytest.fixture(autouse=True)
-    def cuda_env_context(self):
-        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            yield
-
     @staticmethod
-    def _clone_parameters(fsdp_wrapped_model):
+    def _clone_parameters(fsdp_wrapped_model: FSDP):
         return [p.clone() for p in fsdp_wrapped_model.parameters() if p.requires_grad and p.numel() > 0]
-
-    @staticmethod
-    def _generate_batch(gpt2_model_config: dict):
-        # prepare input and targets
-        data = torch.randint(
-            0,  # lowest token_id
-            gpt2_model_config["model_raw"]["config"]["vocab_size"],  # highest token_id + 1, i.e. vocab_size
-            (8, gpt2_model_config["model_raw"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
-        ).cuda()
-        batch_input_ids_dict = {gpt2_model_config["model_raw"]["config"]["sample_key"]: data[:, :-1]}
-        batch_target_ids = data[:, 1:]
-        batch_target_ids = batch_target_ids.contiguous()
-        return batch_input_ids_dict, batch_target_ids
-
-    @staticmethod
-    def _forward_backward_pass(
-        gpt2_model_config: dict,
-        model: FSDP,
-        optimizer: Optimizer,
-        batch_input_ids_dict: dict,
-        batch_target_ids: torch.Tensor,
-    ):
-        ce_loss = CrossEntropyLoss()
-
-        # clear the gradients
-        optimizer.zero_grad()
-
-        # forward pass
-        predictions = model(inputs=batch_input_ids_dict)[gpt2_model_config["model_raw"]["config"]["prediction_key"]]
-        predictions = predictions.contiguous()
-        # backward pass
-        loss = ce_loss(predictions.view(-1, predictions.size(-1)), batch_target_ids.view(-1))
-        loss.backward()
-
-        # update the weights based on the gradients
-        optimizer.step()
-        return loss
 
     @staticmethod
     def _assert_equality_optimizer_param_group(
@@ -180,15 +113,51 @@ class TestFSDP1ToDiscCheckpointing:
                     ), "_assert_equality_optimizer_state failed (must_be_equal = False)"
 
     @staticmethod
-    def _assert_equality_two_models(params_1, params_2, must_be_equal: bool):
+    def _assert_equality_two_models(params_1: list[torch.Tensor], params_2: list[torch.Tensor], must_be_equal: bool):
         for p1, p2 in zip(params_1, params_2):
             if must_be_equal:
                 assert torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = True)"
             else:
                 assert not torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = False)"
 
-    def test_save_checkpoint_after_backward_pass(
-        self,
+    @staticmethod
+    def test_save_checkpoint_after_backward_pass(temporary_checkpoint_folder_path: Path, gpt2_model_config_dict: dict):
+        world_size = 2
+        mp.spawn(
+            TestFSDP1ToDiscCheckpointing._test_save_checkpoint_after_backward_pass_impl_wrapper,
+            args=(world_size, temporary_checkpoint_folder_path, gpt2_model_config_dict),
+            nprocs=world_size,
+            join=True,
+        )
+
+    @staticmethod
+    def _test_save_checkpoint_after_backward_pass_impl_wrapper(
+        process_id: int, world_size: int, temporary_checkpoint_folder_path: Path, gpt2_model_config_dict: dict
+    ):
+        # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
+        with MultiProcessingCudaEnv(
+            process_group_backend=ProcessGroupBackendType.nccl,
+            global_rank=process_id,
+            local_rank=process_id,
+            world_size=world_size,
+            rdvz_port=22355,
+        ):
+            gpt2_model = get_gpt2_model(gpt2_model_config_dict=gpt2_model_config_dict)
+            fsdp1_wrapped_model = get_fsdp1_wrapped_model(gpt2_model=gpt2_model)
+            optimizer = get_optimizer(fsdp1_wrapped_model=fsdp1_wrapped_model)
+
+            gpt2_model_2 = get_gpt2_model(gpt2_model_config_dict=gpt2_model_config_dict)
+
+            TestFSDP1ToDiscCheckpointing._test_save_checkpoint_after_backward_pass_impl(
+                fsdp1_wrapped_model=fsdp1_wrapped_model,
+                optimizer=optimizer,
+                temporary_checkpoint_folder_path=temporary_checkpoint_folder_path,
+                gpt2_model_2=gpt2_model_2,
+                gpt2_model_config_dict=gpt2_model_config_dict,
+            )
+
+    @staticmethod
+    def _test_save_checkpoint_after_backward_pass_impl(
         fsdp1_wrapped_model: FSDP,
         optimizer: Optimizer,
         temporary_checkpoint_folder_path: Path,
@@ -215,19 +184,19 @@ class TestFSDP1ToDiscCheckpointing:
             sharding_strategy=ShardingStrategy.FULL_SHARD,
         )
 
-        untrained_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
+        untrained_model_parameters = TestFSDP1ToDiscCheckpointing._clone_parameters(fsdp1_wrapped_model)
         untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
-        batch_input_ids_dict, batch_target_ids = self._generate_batch(gpt2_model_config_dict)
-        self._forward_backward_pass(
+        batch_input_ids_dict, batch_target_ids = CheckpointingTestUtils.generate_batch(gpt2_model_config_dict)
+        CheckpointingTestUtils.forward_backward_pass(
             gpt2_model_config=gpt2_model_config_dict,
             model=fsdp1_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
-        updated_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
+        updated_model_parameters = TestFSDP1ToDiscCheckpointing._clone_parameters(fsdp1_wrapped_model)
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
@@ -276,39 +245,41 @@ class TestFSDP1ToDiscCheckpointing:
             optimizer=optimizer_2, model=fsdp_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
-        loaded_and_updated_model_parameters = self._clone_parameters(fsdp1_wrapped_model)
+        loaded_and_updated_model_parameters = TestFSDP1ToDiscCheckpointing._clone_parameters(fsdp1_wrapped_model)
         loaded_and_updated_optimizer_state_dict = deepcopy(optimizer_2.state_dict())
 
         # make sure that after the update all weights are DIFFERENT from the original ones
-        self._assert_equality_two_models(updated_model_parameters, untrained_model_parameters, must_be_equal=False)
-        self._assert_equality_optimizer_param_group(
+        TestFSDP1ToDiscCheckpointing._assert_equality_two_models(
+            updated_model_parameters, untrained_model_parameters, must_be_equal=False
+        )
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_param_group(
             updated_optimizer_state_dict, untrained_optimizer_state_dict, must_be_equal=True
         )
 
         # make sure that the updated parameters are EQUAL to the ones that we saved subsequently
-        self._assert_equality_two_models(
+        TestFSDP1ToDiscCheckpointing._assert_equality_two_models(
             updated_model_parameters, loaded_and_updated_model_parameters, must_be_equal=True
         )
-        self._assert_equality_optimizer_param_group(
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_param_group(
             updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
         )
-        self._assert_equality_optimizer_state(
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_state(
             updated_optimizer_state_dict, loaded_and_updated_optimizer_state_dict, must_be_equal=True
         )
 
         # we do another forward/backward pass and check
         #  if the weights are equally updated for the loaded model as for the not-loaded model
         # run backward pass
-        batch_input_ids_dict, batch_target_ids = self._generate_batch(gpt2_model_config_dict)
+        batch_input_ids_dict, batch_target_ids = CheckpointingTestUtils.generate_batch(gpt2_model_config_dict)
 
-        loss_1 = self._forward_backward_pass(
+        loss_1 = CheckpointingTestUtils.forward_backward_pass(
             gpt2_model_config=gpt2_model_config_dict,
             model=fsdp1_wrapped_model,
             optimizer=optimizer,
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
-        loss_2 = self._forward_backward_pass(
+        loss_2 = CheckpointingTestUtils.forward_backward_pass(
             gpt2_model_config=gpt2_model_config_dict,
             model=fsdp_wrapped_model_2,
             optimizer=optimizer_2,
@@ -319,19 +290,23 @@ class TestFSDP1ToDiscCheckpointing:
         assert loss_1 == loss_2, f"loss_1 = {loss_1} does not equal loss_2 = {loss_2}"
 
         # make sure that after another update the two models and optimizers are the same
-        self._assert_equality_two_models(
+        TestFSDP1ToDiscCheckpointing._assert_equality_two_models(
             fsdp1_wrapped_model.parameters(), fsdp_wrapped_model_2.parameters(), must_be_equal=True
         )
-        self._assert_equality_optimizer_param_group(
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_param_group(
             optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True
         )
-        self._assert_equality_optimizer_state(optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True)
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_state(
+            optimizer.state_dict(), optimizer_2.state_dict(), must_be_equal=True
+        )
 
         # make sure that the weights and state has changed to the previous forward backward pass
-        self._assert_equality_two_models(
+        TestFSDP1ToDiscCheckpointing._assert_equality_two_models(
             fsdp1_wrapped_model.parameters(), updated_model_parameters, must_be_equal=False
         )
-        self._assert_equality_optimizer_param_group(
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_param_group(
             optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=True
         )
-        self._assert_equality_optimizer_state(optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False)
+        TestFSDP1ToDiscCheckpointing._assert_equality_optimizer_state(
+            optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False
+        )
