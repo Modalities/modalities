@@ -1,6 +1,16 @@
-from modalities.training.gradient_clipping.fsdp_gradient_clipper import DummyGradientClipper, FSDP1GradientClipper, FSDP1LoggingOnlyGradientClipper, FSDP2GradientClipper, FSDP2LoggingOnlyGradientClipper, GradientClippingMode
-import torch
 from unittest.mock import MagicMock
+
+import torch
+
+from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
+    DummyGradientClipper,
+    FSDP1GradientClipper,
+    FSDP1LoggingOnlyGradientClipper,
+    FSDP2GradientClipper,
+    FSDP2LoggingOnlyGradientClipper,
+    GradientClippingMode,
+)
+
 
 class MockFSDP2Model:
     def __init__(self):
@@ -11,7 +21,10 @@ class MockFSDP2Model:
 
     def parameters(self):
         return [self.param1, self.param2]
+
+
 # Note: Replace 'your_module' above with the correct module path where the gradient clipping classes are defined.
+
 
 def test_fsdp1_gradient_clipper():
     """
@@ -25,7 +38,7 @@ def test_fsdp1_gradient_clipper():
     clipper = FSDP1GradientClipper(wrapped_model=mock_model, max_norm=max_norm, norm_type=norm_type)
 
     # Call clip_gradients
-    norm = clipper.clip_gradients()
+    clipper.clip_gradients()
 
     # Verify that clip_grad_norm_ was called with the correct arguments
     mock_model.clip_grad_norm_.assert_called_once_with(max_norm=max_norm, norm_type=norm_type.value)
@@ -43,7 +56,7 @@ def test_fsdp1_logging_only_gradient_clipper():
     clipper = FSDP1LoggingOnlyGradientClipper(wrapped_model=mock_model, norm_type=norm_type)
 
     # Call clip_gradients
-    norm = clipper.clip_gradients()
+    clipper.clip_gradients()
 
     # Verify that clip_grad_norm_ was called with max_norm=torch.inf
     mock_model.clip_grad_norm_.assert_called_once_with(max_norm=torch.inf, norm_type=norm_type.value)
@@ -66,18 +79,14 @@ def test_fsdp2_clip_grad_norm():
 
     # Test case 1: max_norm > total_norm (no clipping)
     max_norm = expected_norm + 1  # 3.0
-    norm = FSDP2GradientClipper.clip_grad_norm_(
-        parameters=parameters, max_norm=max_norm, norm_type=2.0
-    )
+    norm = FSDP2GradientClipper.clip_grad_norm_(parameters=parameters, max_norm=max_norm, norm_type=2.0)
     assert torch.allclose(norm, torch.tensor(expected_norm)), "Norm should match expected total norm"
     assert torch.allclose(param1.grad, torch.tensor([1.0, 1.0])), "Gradients should not be clipped"
     assert torch.allclose(param2.grad, torch.tensor([1.0, 1.0])), "Gradients should not be clipped"
 
     # Test case 2: max_norm < total_norm (clipping occurs)
     max_norm = expected_norm / 2  # 1.0
-    norm = FSDP2GradientClipper.clip_grad_norm_(
-        parameters=parameters, max_norm=max_norm, norm_type=2.0
-    )
+    norm = FSDP2GradientClipper.clip_grad_norm_(parameters=parameters, max_norm=max_norm, norm_type=2.0)
     assert torch.allclose(norm, torch.tensor(expected_norm)), "Norm should match pre-clipping total norm"
     scale = max_norm / expected_norm  # 1.0 / 2.0 = 0.5
     expected_grad = torch.tensor([1.0 * scale, 1.0 * scale])
@@ -91,7 +100,6 @@ def test_fsdp2_gradient_clipper():
     """
     # Create a mock FSDP2 model with parameters
 
-        
     mock_model = MockFSDP2Model()
     max_norm = 1.0
     norm_type = GradientClippingMode.P2_NORM
