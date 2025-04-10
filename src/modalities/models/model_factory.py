@@ -247,7 +247,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_compiled_model(model: nn.Module, block_names: list[str]) -> nn.Module:
+    def get_compiled_model(model: nn.Module, block_names: list[str]) -> tuple[nn.Module, str]:
         """
         Apply torch.compile to each transformer block, which makes compilation efficient due to
         repeated structure. Alternatively one can compile the whole model (after applying DP).
