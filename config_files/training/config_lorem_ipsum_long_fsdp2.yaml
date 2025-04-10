@@ -172,7 +172,7 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: 4
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
     world_size: ${settings.cuda_env.world_size}
 
 app_state:
@@ -226,6 +226,7 @@ model_raw:
   variant_key: gpt2
   config:
     use_meta_device: true
+    use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
