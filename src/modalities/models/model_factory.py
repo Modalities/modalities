@@ -254,14 +254,19 @@ class ModelFactory:
         Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275
         """
 
-        def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> tuple[nn.Module, str]:
+        def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> nn.Module:
             for _, parent_candidate in model.named_modules():
                 for child_name, child_candidate in parent_candidate.named_children():
                     if child_candidate is child_module:
                         return parent_candidate, child_name
             raise ModelStateError("No valid parent candidate")
 
-        block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
+        block_types = []
+        for name in block_names:
+            module_class = get_module_class_from_name(model, name)
+            if module_class is not None:
+                block_types.append(module_class)
+        block_types = tuple(block_types)
 
         for _, module in model.named_modules():
             if isinstance(module, block_types):
