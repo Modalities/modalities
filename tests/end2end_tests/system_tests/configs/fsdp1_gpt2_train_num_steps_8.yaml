@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
@@ -21,7 +21,7 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
@@ -44,7 +44,7 @@ settings:
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
+  training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0
