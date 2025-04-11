@@ -9,6 +9,7 @@ from modalities.models.gpt2.gpt2_model import (
     LayerNorms,
     LayerNormWrapperConfig,
     PositionTypes,
+    QueryKeyValueTransformType,
 )
 from modalities.models.model_factory import ModelFactory
 
@@ -17,7 +18,7 @@ def create_gpt2_configs():
     attention_config = AttentionConfig(
         qkv_transforms=[
             AttentionConfig.QueryKeyValueTransformConfig(
-                type_hint="RotaryTransform",
+                type_hint=QueryKeyValueTransformType.RotaryTransform.name,
                 config=AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig(
                     n_embd=512, n_head=8, seq_length_dim=-2, base_freq=10000
                 ),
@@ -50,7 +51,7 @@ def gpt2_model():
         attention_norm_config=norm_config,
         ffn_norm_config=norm_config,
         lm_head_norm_config=norm_config,
-        use_weight_tying=False,
+        use_weight_tying=True,
     )
     return model
 
@@ -72,28 +73,12 @@ def test_get_compiled_model_compiles_blocks(gpt2_model):
     assert result_model is gpt2_model, "Should return the same model instance"
 
 
-def test_get_compiled_model_invalid_block_name(gpt2_model):
-    """
-    Test that get_compiled_model does nothing when given an invalid block name.
-    """
-    original_model_dict = dict(gpt2_model.named_modules())
-    block_names = ["InvalidBlock"]
-    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names)
-
-    new_model_dict = dict(result_model.named_modules())
-    assert new_model_dict == original_model_dict, "Model should remain unchanged with invalid block name"
-
-
 def test_get_compiled_model_no_matching_blocks(gpt2_model):
     """
-    Test that get_compiled_model does nothing if no blocks match the specified types.
+    Test that get_compiled_model raises a ValueError if no blocks match the specified types.
     """
-    original_model_dict = dict(gpt2_model.named_modules())
-    block_names = ["Conv2d"]
-    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names)
-
-    new_model_dict = dict(result_model.named_modules())
-    assert new_model_dict == original_model_dict, "Model should remain unchanged when no blocks match"
+    with pytest.raises(ValueError, match="None of the provided block_names match any modules in the model"):
+        ModelFactory.get_compiled_model(gpt2_model, block_names=["Conv2d"])
 
 
 def test_get_compiled_model_empty_block_names(gpt2_model):

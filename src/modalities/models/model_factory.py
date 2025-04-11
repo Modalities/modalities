@@ -266,6 +266,9 @@ class ModelFactory:
             module_class = get_module_class_from_name(model, name)
             if module_class is not None:
                 block_types.append(module_class)
+            if block_names and not block_types:
+                raise ValueError("None of the provided block_names match any modules in the model")
+
         block_types = tuple(block_types)
 
         for _, module in model.named_modules():
