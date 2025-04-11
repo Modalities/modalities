@@ -247,7 +247,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_compiled_model(model: nn.Module, block_names: list[str]) -> nn.Module:
+    def get_compiled_model(model: nn.Module, block_names: list[str], debug: bool) -> nn.Module:
         """
         Apply torch.compile to each transformer block, which makes compilation efficient due to
         repeated structure. Alternatively one can compile the whole model (after applying DP).
@@ -265,7 +265,8 @@ class ModelFactory:
 
         for _, module in model.named_modules():
             if isinstance(module, block_types):
-                compiled_module = torch.compile(module, fullgraph=True)
+                options = {"trace.enabled": True} if debug else {}
+                compiled_module = torch.compile(module, fullgraph=True, options=options)
                 parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
                 parent_module.register_module(name=child_name, module=compiled_module)
         return model

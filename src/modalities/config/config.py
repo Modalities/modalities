@@ -290,6 +290,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     block_names: list[str]
+    debug: Optional[bool] = False
 
 
 class WeightInitializedModelConfig(BaseModel):
