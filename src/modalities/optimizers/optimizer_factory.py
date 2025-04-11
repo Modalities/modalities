@@ -2,13 +2,17 @@ import re
 from pathlib import Path
 
 import torch.nn as nn
+from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
+from torch.distributed.tensor import DTensor
 from torch.optim import Adam, AdamW, Optimizer
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
+from modalities.utils.typing import FSDPX
 
 OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
 
@@ -105,19 +109,31 @@ def _assert_existence_of_weight_decay_groups_excluded(
 
 
 def _create_optimizer_groups(
-    model: nn.Module, weight_decay: float, weight_decay_groups_excluded: list[str]
+    model: FSDPX, weight_decay: float, weight_decay_groups_excluded: list[str]
 ) -> tuple[OptimizerGroups, list[str]]:
     """
     create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW
     """
     # FSDP 1
-    if hasattr(model, "module"):
+    if isinstance(model, FSDP1):
         nn_model: NNModel = model.module
+        weight_decay_groups = nn_model.weight_decay_groups
+        params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+
     # FSDP 2
-    else:
+    elif isinstance(model, FSDP2):
         nn_model = model
-    weight_decay_groups = nn_model.weight_decay_groups
-    params = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
+        weight_decay_groups = nn_model.weight_decay_groups
+        params = {
+            name: param
+            for name, param in model.named_parameters()
+            if param.requires_grad and (not isinstance(param, DTensor) or param.to_local().numel() > 0)
+        }
+
+    else:
+        raise OptimizerError(
+            f"model {type(model)} is not an instance of FSDP1 or FSDP2. " "Please use the correct model type."
+        )
 
     if (
         False
@@ -184,7 +200,18 @@ def _assert_completeness_of_optimizer_groups(model: nn.Module, optimizer_groups:
     sum up to the total number of model parameters as expected
     """
     num_params_check = get_local_number_of_trainable_parameters(model)
-    num_params = sum(p.numel() for optimizer_group in optimizer_groups for p in optimizer_group["params"])
+    if isinstance(model, FSDP1):
+        num_params = sum(p.numel() for optimizer_group in optimizer_groups for p in optimizer_group["params"])
+    elif isinstance(model, FSDP2):
+        num_params = sum(
+            (p.to_local().numel() if isinstance(p, DTensor) else p.numel())
+            for optimizer_group in optimizer_groups
+            for p in optimizer_group["params"]
+        )
+    else:
+        raise OptimizerError(
+            f"Model {type(model)} is not an instance of FSDP1 or FSDP2. Please use the correct model type."
+        )
     if num_params != num_params_check:
         raise OptimizerError(
             f"ERROR! Inconsistent number of parameters (found {num_params}, "

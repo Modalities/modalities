@@ -14,6 +14,7 @@ from modalities.config.pydanctic_if_types import (
     PydanticMessageSubscriberIFType,
     PydanticMFUCalculatorABCType,
     PydanticPytorchDeviceType,
+    PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
 )
@@ -176,7 +177,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
-    mfu_calculator: PydanticMFUCalculatorABCType
+    mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
+    model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")
     def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel.Settings":

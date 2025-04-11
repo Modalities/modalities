@@ -28,6 +28,9 @@ from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing import apply_activation_checkpointing_inplace
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
+from modalities.utils.logging import get_logger
+
+logger = get_logger("model_factory")
 
 
 class ModelFactory:
@@ -104,8 +107,8 @@ class ModelFactory:
         if ModelFactory._is_model_on_meta_device(model=model):
             raise ModelStateError("Meta device initialization is not supported for FSDP1. Use FSDP2 instead.")
 
-        print(
-            f"Unsharded number of parameters on rank {dist.get_rank()}: "
+        logger.info(
+            f"Rank {dist.get_rank()} unsharded number of parameters: "
             f"{get_local_number_of_trainable_parameters(model)}"
         )
         # Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!
@@ -122,8 +125,8 @@ class ModelFactory:
             sync_module_states=sync_module_states,
             use_orig_params=True,
         )
-        print(
-            f"Sharded number of parameters on rank {dist.get_rank()}:"
+        logger.info(
+            f"Rank {dist.get_rank()} sharded number of parameters: "
             f"{get_local_number_of_trainable_parameters(fsdp_model)}"
         )
         return fsdp_model
@@ -152,9 +155,8 @@ class ModelFactory:
         Returns:
             FSDP2: The FSDP2-wrapped model.
         """
-
-        print(
-            f"Unsharded number of parameters on rank {dist.get_rank()}: "
+        logger.info(
+            f"Rank {dist.get_rank()} unsharded number of parameters (possibly on meta device): "
             f"{get_local_number_of_trainable_parameters(model)}"
         )
         # map the block names to the actual block class (e.b., GPT2Block)
@@ -181,7 +183,10 @@ class ModelFactory:
                 )
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
-
+        logger.info(
+            f"Rank {dist.get_rank()} sharded number of parameters: "
+            f"{get_local_number_of_trainable_parameters(model)}"
+        )
         return model
 
     @staticmethod

@@ -30,13 +30,32 @@ class ComponentFactory:
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.
         """
-        component_names = list(components_model_type.model_fields.keys())
-        component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
+        # the componentsinstantiaton model allows for the definition of required and optional top-level components
+        # for example the mfu_calculator might not always be required.
+        component_names_required = [
+            name for name, field in components_model_type.model_fields.items() if field.is_required()
+        ]
+        component_names_optional = [
+            name for name, field in components_model_type.model_fields.items() if not field.is_required()
+        ]
+
+        component_dict = self._build_config(
+            config_dict=config_dict,
+            component_names_required=component_names_required,
+            component_names_optional=component_names_optional,
+        )
         components = components_model_type(**component_dict)
         return components
 
-    def _build_config(self, config_dict: dict, component_names: list[str]) -> dict[str, Any]:
-        component_dict_filtered = {name: config_dict[name] for name in component_names}
+    def _build_config(
+        self, config_dict: dict, component_names_required: list[str], component_names_optional: list[str]
+    ) -> dict[str, Any]:
+        component_dict_filtered = {name: config_dict[name] for name in component_names_required}
+        # we only add the optional components if they are present in the config_dict
+        for name in component_names_optional:
+            if name in config_dict:
+                component_dict_filtered[name] = config_dict[name]
+
         components, _ = self._build_component(
             current_component_config=component_dict_filtered,
             component_config=config_dict,

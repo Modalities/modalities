@@ -39,7 +39,7 @@ class Trainer:
         num_target_steps: int,
         num_target_tokens: int,
         gradient_clipper: GradientClipperIF,
-        mfu_calculator: MFUCalculatorABC,
+        mfu_calculator: Optional[MFUCalculatorABC] = None,
     ) -> None:
         """
         Initializes the Trainer object.
@@ -56,7 +56,7 @@ class Trainer:
             num_target_steps (int): The target number of training steps.
             num_target_tokens (int): The target number of tokens.
             gradient_clipper (GradientClipperIF): The gradient clipper.
-            mfu_calculator (MFUCalculatorABC): The MFU calculator.
+            mfu_calculator (Optional[MFUCalculatorABC]): The MFU calculator.
 
         Returns:
             None
@@ -269,7 +269,9 @@ class Trainer:
                     "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
                 }
                 gradient_norm_scores = []
-                mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
+                mfu_score = torch.tensor(-1.0)
+                if self.mfu_calculator is not None:
+                    mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
