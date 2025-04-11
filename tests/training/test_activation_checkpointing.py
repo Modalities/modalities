@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import PydanticFSDPModuleType, PydanticPytorchModuleType
+from modalities.config.pydanctic_if_types import PydanticFSDP1ModuleType, PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2Block
 from modalities.running_env.cuda_env import CudaEnv
 
@@ -15,8 +15,8 @@ working_dir = Path(os.path.dirname(__file__))
 
 
 class ActivationCheckpointingInstantiationModel(BaseModel):
-    activation_checkpointed_model: PydanticFSDPModuleType
-    wrapped_model: PydanticFSDPModuleType
+    activation_checkpointed_model: PydanticFSDP1ModuleType
+    wrapped_model: PydanticFSDP1ModuleType
     model_raw: PydanticPytorchModuleType
 
 

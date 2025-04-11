@@ -18,7 +18,7 @@ from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
 from modalities.util import Aggregator, TimeRecorder, print_rank_0
-from modalities.utils.mfu import compute_mfu, get_theoretical_flops_per_token, get_theoretical_gpu_peak_performance
+from modalities.utils.mfu import MFUCalculatorABC
 
 
 class ThroughputAggregationKeys(Enum):
@@ -39,6 +39,7 @@ class Trainer:
         num_target_steps: int,
         num_target_tokens: int,
         gradient_clipper: GradientClipperIF,
+        mfu_calculator: MFUCalculatorABC,
     ) -> None:
         """
         Initializes the Trainer object.
@@ -50,8 +51,12 @@ class Trainer:
                 The publisher for evaluation result batches.
             gradient_acc_steps (int): The number of gradient accumulation steps.
             global_num_tokens_per_train_step (int): The number of global tokens per training step.
-            target_train_steps (int): The target number of training steps.
+            num_seen_train_steps (int): The number of training steps already seen.
+            global_num_seen_tokens (int): The number of tokens already seen.
+            num_target_steps (int): The target number of training steps.
+            num_target_tokens (int): The target number of tokens.
             gradient_clipper (GradientClipperIF): The gradient clipper.
+            mfu_calculator (MFUCalculatorABC): The MFU calculator.
 
         Returns:
             None
@@ -66,6 +71,7 @@ class Trainer:
         self.num_target_tokens = num_target_tokens
         self.global_num_seen_tokens = global_num_seen_tokens
         self.gradient_clipper = gradient_clipper
+        self.mfu_calculator = mfu_calculator
 
     @staticmethod
     def _get_num_train_steps_done(micro_batch_id: int, gradient_acc_steps: int) -> int:
@@ -159,11 +165,8 @@ class Trainer:
 
         cumulated_losses = self._reset_tracked_losses()
 
-        # throughput & MFU
+        # throughput
         thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
-        theoretical_gpu_peak_performance = get_theoretical_gpu_peak_performance(model, world_size=dist.get_world_size())
-        theoretical_flops_per_token, sequence_length = get_theoretical_flops_per_token(model)
-
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # batch loop
@@ -266,20 +269,14 @@ class Trainer:
                     "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
                 }
                 gradient_norm_scores = []
-
-                mfu = compute_mfu(
-                    synced_num_samples_per_second,
-                    sequence_length,
-                    theoretical_flops_per_token,
-                    theoretical_gpu_peak_performance,
-                )
+                mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
-                        "train mfu (16-bit)": ResultItem(mfu, 2),
+                        "train mfu (16-bit)": ResultItem(mfu_score, 2),
                         "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
                     },
                     dataloader_tag=train_loader.dataloader_tag,

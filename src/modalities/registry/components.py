@@ -40,6 +40,7 @@ from modalities.config.config import (
     FSDP2WrappedModelConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
+    GPT2MFUCalculatorConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -96,6 +97,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
+from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
@@ -275,6 +277,8 @@ COMPONENTS = [
         "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # MFU calculators
+    ComponentEntity("mfu_calculator", "gpt2", GPT2MFUCalculator, GPT2MFUCalculatorConfig),
     # Number conversion
     ComponentEntity(
         "number_conversion",

@@ -607,6 +607,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
+            mfu_calculator=components.mfu_calculator,
         )
 
         # Evaluator
