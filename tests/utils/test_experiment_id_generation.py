@@ -62,7 +62,9 @@ class TestExperimentIdGeneration:
             (22358, "../end2end_tests/system_tests/configs/fsdp2_gpt2_train_num_steps_8.yaml"),
         ],
     )
-    def test_experiment_id_generation(rdvz_port, relative_config_path: str, temporary_folder_path: Path):
+    def test_experiment_id_generation_and_syncing(rdvz_port, relative_config_path: str, temporary_folder_path: Path):
+        # This test checks that the experiment_id generation and syncing works correctly across multiple processes,
+        # such that each rank has the same experiment_id.
         working_dir = Path(os.path.dirname(__file__))
         config_file_path = working_dir / relative_config_path
         world_size = 2
