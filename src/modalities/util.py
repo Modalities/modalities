@@ -9,9 +9,11 @@ from typing import Callable, Generic, Optional, Type, TypeVar
 
 import torch
 import torch.distributed as dist
+import torch.nn as nn
 from pydantic import ValidationError
 from torch.distributed.fsdp import FSDPModule as FSDP2
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
+from torch.distributed.tensor import DTensor
 from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
@@ -110,12 +112,38 @@ def format_metrics_to_gb(item):
     return metric_num
 
 
-def get_local_number_of_trainable_parameters(model: torch.nn.Module) -> int:
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+def get_local_number_of_trainable_parameters(model: nn.Module) -> int:
+    """Returns the number of trainable parameters that are materialized on the current rank.
+    The model can be sharded with FSDP1 or FSDP2 or not sharded at all.
+
+    Args:
+        model (nn.Module): The model for which to calculate the number of trainable parameters.
+
+    Returns:
+        int: The number of trainable parameters materialized on the current rank.
+    """
+    if isinstance(model, FSDP2):
+        num_params = sum(
+            (p.to_local().numel() if isinstance(p, DTensor) else p.numel())
+            for p in model.parameters()
+            if p.requires_grad
+        )
+    elif isinstance(model, (FSDP1, nn.Module)):
+        num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return num_params
 
 
 def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
-    if isinstance(model, FSDP):
+    """Returns the total number of trainable parameters across all ranks.
+    The model must be sharded with FSDP1 or FSDP2.
+
+    Args:
+        model (FSDPX): The model for which to calculate the number of trainable parameters.
+
+    Returns:
+        Number: The total number of trainable parameters across all ranks.
+    """
+    if isinstance(model, FSDP1):
         num_params = get_local_number_of_trainable_parameters(model)
         num_params_tensor = torch.tensor(num_params).cuda()
         dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM)
@@ -123,7 +151,7 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         # For HYBRID sharding, divide by sharding factor to get the correct number of parameters
         # TODO: Define constant instead of hardcoding string
         # Assumes that CUDA is available and each node has the same number of GPUs
-        # Note: Per default FSDP constructs process groups for the user to shard intra-node and replicate inter-node.
+        # Note: Per default FSDP1 constructs process groups for the user to shard intra-node and replicate inter-node.
         # However, users can also provide their own sharding process groups (currently not supported in Modalities)
         # which would require to adapt the code.
         if model.sharding_strategy.name == "NO_SHARD":
@@ -135,7 +163,8 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         total_num_params = total_num_params // sharding_factor
         return total_num_params
     elif isinstance(model, FSDP2):
-        return -1  # TODO We need to fix this by calculating the correct value based on the device-mesh!
+        total_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        return total_num_params
 
 
 class TimeRecorderStates(Enum):

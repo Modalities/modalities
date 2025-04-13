@@ -20,7 +20,8 @@ from modalities.config.pydanctic_if_types import (
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
     PydanticFSDP1CheckpointLoadingIFType,
-    PydanticFSDPModuleType,
+    PydanticFSDP1ModuleType,
+    PydanticFSDP2ModuleType,
     PydanticLLMDataLoaderIFType,
     PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
@@ -303,7 +304,7 @@ class WeightInitializedModelConfig(BaseModel):
 
 
 class ActivationCheckpointedModelConfig(BaseModel):
-    model: PydanticFSDPModuleType
+    model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
@@ -426,6 +427,15 @@ class WandBEvaluationResultSubscriberConfig(BaseModel):
 class RichResultSubscriberConfig(BaseModel):
     num_ranks: int
     global_rank: int
+
+
+class GPT2MFUCalculatorConfig(BaseModel):
+    n_layer: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    n_embd: Annotated[int, Field(strict=True, gt=0)]
+    world_size: Annotated[int, Field(strict=True, gt=0)]
+    raw_model: PydanticPytorchModuleType
+    wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
 
 
 def load_app_config_dict(
