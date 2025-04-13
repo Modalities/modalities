@@ -140,6 +140,11 @@ def _create_optimizer_groups(
     ):  # This is for debugging only, and may serve as a convenient helper tool during the development of new models
         _print_params(params)
 
+    if len(params) == 0:
+        raise OptimizerError(
+            f"model {type(model)} has no parameters with requires_grad=True (i.e., no traininable parameters)."
+        )
+
     optimizer_groups = [
         {
             "params": _filter_params_for_weight_decay_group(params, regex_expressions=weight_decay_groups[group]),
