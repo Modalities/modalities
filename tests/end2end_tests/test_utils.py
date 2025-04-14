@@ -66,10 +66,11 @@ def _load_model(
     std: float | str = 0.02,
     sharding_strategy: ShardingStrategy = ShardingStrategy.NO_SHARD,
 ) -> FSDP:
-    """load gpt2 or coca model from config and fsdp-wrap it"""
+    """load gpt2 from config and fsdp-wrap it"""
     if model_name == "gpt2":
         model = _load_gpt2(initialization_type=initialization, std=std, sharding_strategy=sharding_strategy)
     else:
+        # TODO implement support for COCA
         raise Exception(f"model = {model_name} not implemented.")
     return model
 

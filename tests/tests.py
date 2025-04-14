@@ -145,7 +145,7 @@ def subprocess_run(command: str) -> None:
     try:
         subprocess.run(command, shell=True, capture_output=False, check=True, text=True)
     except subprocess.CalledProcessError:
-        raise Exception(f"Subproces run failed with command {command}.")
+        raise Exception(f"Subproces run failed with command {command}")
 
 
 def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: str = "0,1"):
