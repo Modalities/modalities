@@ -96,7 +96,7 @@ def test_is_model_on_meta_device_true():
 
 def test_is_model_on_meta_device_false():
     model = AllRealDeviceModel()
-    assert ModelFactory._is_model_on_meta_device(model) is False
+    assert not ModelFactory._is_model_on_meta_device(model)
 
 
 def test_is_model_on_meta_device_mixed_raises():
