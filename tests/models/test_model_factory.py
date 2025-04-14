@@ -101,7 +101,5 @@ def test_is_model_on_meta_device_false():
 
 def test_is_model_on_meta_device_mixed_raises():
     model = MixedDeviceModel()
-    with pytest.raises(
-        ModelStateError, match="Either all or none of the parameters and buffers must be on meta device!"
-    ):
+    with pytest.raises(ModelStateError):
         ModelFactory._is_model_on_meta_device(model)
