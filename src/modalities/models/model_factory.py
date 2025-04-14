@@ -266,7 +266,15 @@ class ModelFactory:
                         return parent_candidate, child_name
             raise ModelStateError("No valid parent candidate")
 
-        block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
+        block_types = []
+        for name in block_names:
+            module_class = get_module_class_from_name(model, name)
+            if module_class is not None:
+                block_types.append(module_class)
+            else:
+                raise ValueError("None of the provided block_names match any modules in the model")
+
+        block_types = tuple(block_types)
 
         for _, module in model.named_modules():
             if isinstance(module, block_types):
