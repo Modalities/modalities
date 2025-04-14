@@ -91,7 +91,7 @@ class MixedDeviceModel(nn.Module):
 
 def test_is_model_on_meta_device_true():
     model = AllMetaDeviceModel()
-    assert ModelFactory._is_model_on_meta_device(model) is True
+    assert ModelFactory._is_model_on_meta_device(model)
 
 
 def test_is_model_on_meta_device_false():
