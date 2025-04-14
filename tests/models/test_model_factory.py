@@ -5,6 +5,7 @@ import torch.distributed
 import torch.nn as nn
 
 import modalities.models.model_factory as mf
+from modalities.exceptions import ModelStateError
 from modalities.models.model_factory import ModelFactory
 
 
@@ -65,3 +66,42 @@ def test_get_fsdp2_wrapped_model(dummy_model):
     assert calls[-1][1]["reshard_after_forward"] is True
     # Because we are mocking fully_shard, we do not return a FSDP2 object
     assert isinstance(result, DummyModel)
+
+
+class AllMetaDeviceModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(4, 2, device="meta")
+        self.register_buffer("buffer", torch.empty(1, device="meta"))
+
+
+class AllRealDeviceModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(4, 2)
+        self.register_buffer("buffer", torch.empty(1))
+
+
+class MixedDeviceModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(4, 2, device="meta")
+        self.register_buffer("buffer", torch.empty(1))  # Not on meta device
+
+
+def test_is_model_on_meta_device_true():
+    model = AllMetaDeviceModel()
+    assert ModelFactory._is_model_on_meta_device(model) is True
+
+
+def test_is_model_on_meta_device_false():
+    model = AllRealDeviceModel()
+    assert ModelFactory._is_model_on_meta_device(model) is False
+
+
+def test_is_model_on_meta_device_mixed_raises():
+    model = MixedDeviceModel()
+    with pytest.raises(
+        ModelStateError, match="Either all or none of the parameters and buffers must be on meta device!"
+    ):
+        ModelFactory._is_model_on_meta_device(model)
