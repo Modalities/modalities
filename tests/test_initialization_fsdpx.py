@@ -27,7 +27,7 @@ from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 class WeightInitFSDPX:
     weight_init_type: str
     std: float
-    tied_weights: bool
+    use_weight_tying: bool
 
 
 @pytest.fixture
@@ -271,15 +271,15 @@ class TestWeightInitFSDPX:
         ],
     )
     def test_weight_distribution(
-        rdvz_port, relative_config_path: str, temporary_folder_path: Path, weight_init_params: WeightInitFSDPX
+        rdvz_port: int, relative_config_path: str, temporary_folder_path: Path, weight_init_params: WeightInitFSDPX
     ):
         working_dir = Path(os.path.dirname(__file__))
         # load, update and save tmp config
         config_file_path = working_dir / relative_config_path
-        config = TestWeightInitFSDPX._load_yaml_config(config_file_path)
-        config_updated = TestWeightInitFSDPX._update_config(config, weight_init_params=weight_init_params)
+        config = TestWeightInitFSDPX._load_yaml_config(config_file_path=config_file_path)
+        config_updated = TestWeightInitFSDPX._update_config(config=config, weight_init_params=weight_init_params)
         tmp_config_file_path = temporary_folder_path / "config.yaml"
-        TestWeightInitFSDPX._save_yaml_config(tmp_config_file_path, config_updated)
+        TestWeightInitFSDPX._save_yaml_config(config_file_path=tmp_config_file_path, config=config_updated)
 
         # run the test in a distributed environment
         world_size = 2
@@ -398,13 +398,13 @@ class TestWeightInitFSDPX:
         if weight_init_params.std != "auto":
             initialized_model_config["model_initializer"]["config"]["hidden_dim"] = None  # replace
 
-        config["model_raw"]["config"]["use_weight_tying"] = weight_init_params.tied_weights
+        config["model_raw"]["config"]["use_weight_tying"] = weight_init_params.use_weight_tying
         return config
 
     @staticmethod
     def _get_group_params(state_dict: dict[str, Any]) -> dict[str, torch.Tensor]:
         """
-        divide all model parameters into initialization groups
+        Divide all model parameters into initialization groups
         """
         mapping = {
             "embedding": [r"wte.weight$", r"wpe.weight$", r"lm_head.weight$"],

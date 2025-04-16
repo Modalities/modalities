@@ -351,9 +351,13 @@ def test_statistical_distribution_for_each_initialization_group(
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if not success:
             with pytest.raises(Exception):
-                model = _load_model(model_name, use_weight_tying, initialization, std)
+                model = _load_model(
+                    model_name=model_name, use_weight_tying=use_weight_tying, initialization=initialization, std=std
+                )
         else:
-            model = _load_model(model_name, use_weight_tying, initialization, std)
+            model = _load_model(
+                model_name=model_name, use_weight_tying=use_weight_tying, initialization=initialization, std=std
+            )
 
             print(model)  # for debugging
 

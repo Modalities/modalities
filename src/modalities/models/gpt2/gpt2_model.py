@@ -864,6 +864,8 @@ class GPT2LLM(NNModel):
                     ]
                 ),
                 lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
+                # NOTE: If we make the bias configurable, we must update the number of parameters calculation
+                # in the test_initialization_fsdp1.py, accordingly.
                 lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
