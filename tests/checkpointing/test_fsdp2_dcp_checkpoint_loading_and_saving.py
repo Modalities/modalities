@@ -30,20 +30,14 @@ def temporary_checkpoint_folder_path():
 
 @pytest.fixture
 def gpt2_model_config_path() -> Path:
-    Path(os.path.dirname(__file__))
-    config_file_path = Path(
-        "/raid/s3/opengptx/max_lue/repositories/modalities/tests/checkpointing/fsdp2_gpt2_config.yaml"
-    )  # working_dir / "gpt2_config.yaml"
+    working_dir = Path(os.path.dirname(__file__))
+    config_file_path = working_dir / "fsdp2_gpt2_config.yaml"
     return config_file_path
 
 
 def get_gpt2_model_config_dict(gpt2_model_config_path: Path) -> dict:
     config_dict = load_app_config_dict(config_file_path=gpt2_model_config_path)
     return config_dict
-
-
-class ComponentsInstantiationModel(BaseModel):
-    app_state: PydanticAppStateType
 
 
 @pytest.mark.skipif(
@@ -53,8 +47,10 @@ class ComponentsInstantiationModel(BaseModel):
 class TestFSDP2DCPCheckpointing:
     @staticmethod
     def _get_app_state(config_file_path: Path) -> AppState:
+        class ComponentsInstantiationModel(BaseModel):
+            app_state: PydanticAppStateType
+
         main_obj = Main(config_file_path)
-        # build the components (indluduing the custom component)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )
@@ -138,7 +134,6 @@ class TestFSDP2DCPCheckpointing:
         prediction_key = gpt2_model_config_dict["model_raw"]["config"]["prediction_key"]
 
         # save the initial model and optimizer state dicts
-
         untrained_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
         untrained_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
 
