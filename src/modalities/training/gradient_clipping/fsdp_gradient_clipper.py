@@ -160,7 +160,9 @@ class FSDP2GradientClipper(GradientClipperIF):
 
         """
         grads = [p.grad for p in parameters if p.grad is not None]
-        total_norm = torch.nn.utils.get_total_norm(grads, norm_type, error_if_nonfinite, foreach)
+        total_norm = torch.nn.utils.get_total_norm(
+            tensors=grads, norm_type=norm_type, error_if_nonfinite=error_if_nonfinite, foreach=foreach
+        )
 
         # If total_norm is a DTensor, the placements must be `torch.distributed._tensor.ops.math_ops._NormPartial`.
         # We can simply reduce the DTensor to get the total norm in this tensor's process group
@@ -171,7 +173,9 @@ class FSDP2GradientClipper(GradientClipperIF):
             # If only using PP, total_norm will be a local tensor.
             total_norm = total_norm.full_tensor()
 
-        torch.nn.utils.clip_grads_with_norm_(parameters, max_norm, total_norm, foreach)
+        torch.nn.utils.clip_grads_with_norm_(
+            parameters=parameters, max_norm=max_norm, total_norm=total_norm, foreach=foreach
+        )
         return total_norm
 
 

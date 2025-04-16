@@ -17,7 +17,7 @@ class AppStateFactory:
     def get_raw_app_state(
         model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None
     ) -> AppState:
-        """Creates a new (non-checkpoint loaded) AppState object from an instanitated
+        """Creates a new (non-checkpoint loaded) AppState object from an instantiated
         model, optimizer, and optional learning rate scheduler.
 
         Args:

@@ -67,7 +67,7 @@ class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
 
     def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path):
         """
-        Load the optimizer checkpoint from the specified file path (in-plce).
+        Load the optimizer checkpoint from the specified file path (in-place).
 
         Args:
             optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).

@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Callable, Literal, Optional
+from typing import Annotated, Any, Callable, Literal, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -291,6 +291,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     block_names: list[str]
+    fullgraph: Optional[bool] = True
     debug: Optional[bool] = False
 
 
@@ -449,6 +450,7 @@ def load_app_config_dict(
 
     Args:
         config_file_path (Path): YAML config file.
+        experiment_id (str, optional): The experiment_id of the current run. Defaults to None.
         additional_resolver_funs (dict[str, Callable], optional): Additional resolver functions. Defaults to None.
 
     Returns:
@@ -459,7 +461,7 @@ def load_app_config_dict(
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str, kwargs: Path | str) -> str | Path:
+    def modalities_env_resolver_fun(var_name: str, kwargs: dict[str, Any]) -> str | Path:
         if var_name in kwargs:
             return kwargs[var_name]
         else:

@@ -28,7 +28,7 @@ class AppState(Stateful):
     Since this object is compliant with the Stateful protocol, DCP will automatically call
     state_dict/load_stat_dict as needed in the dcp.save/load APIs.
 
-    Note: We take advantage of this wrapper to hande calling distributed state dict methods on the model
+    Note: We take advantage of this wrapper to handle calling distributed state dict methods on the model
     and optimizer.
     Note: this class has been copied and adapted from
     https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html
@@ -153,25 +153,55 @@ class StateRetrieverIF(ABC):
 class ModelStateRetriever(StateRetrieverIF):
     @staticmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        """Returns the state dict of the model in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the model.
+
+        Returns:
+            dict[str, Any]: The state dict of the model in the AppState object.
+        """
         return get_model_state_dict(model=app_state.model)
 
     @staticmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        """Loads the state dict into the model in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the model.
+            state_dict (dict[str, Any]): The state dict to load into the model.
+        """
         set_model_state_dict(model=app_state.model, model_state_dict=state_dict, options=StateDictOptions(strict=False))
 
 
 class OptimizerStateRetriever(StateRetrieverIF):
     @staticmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        """Returns the state dict of the optimizer in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the optimizer.
+
+        Returns:
+            dict[str, Any]: The state dict of the optimizer in the AppState object.
+        """
         sd = get_optimizer_state_dict(
             model=app_state.model,
             optimizers=app_state.optimizer,
+            # NOTE: Flattening is required for pipeline parallelism to work correctly.
+            # see https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L193-L214
             options=StateDictOptions(flatten_optimizer_state_dict=True),
         )
         return sd
 
     @staticmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        """Loads the state dict into the optimizer in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the optimizer.
+            state_dict (dict[str, Any]): The state dict to load into the optimizer.
+        """
         set_optimizer_state_dict(
             model=app_state.model,
             optimizers=app_state.optimizer,
@@ -183,10 +213,24 @@ class OptimizerStateRetriever(StateRetrieverIF):
 class LRSchedulerStateRetriever(StateRetrieverIF):
     @staticmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
+        """Returns the state dict of the lr scheduler in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the lr scheduler.
+
+        Returns:
+            dict[str, Any]: The state dict of the lr scheduler in the AppState object.
+        """
         return app_state.lr_scheduler.state_dict()
 
     @staticmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
+        """Loads the state dict into the lr scheduler in the AppState object.
+
+        Args:
+            app_state (AppState): The app_state object containing the lr scheduler.
+            state_dict (dict[str, Any]): The state dict to load into the lr scheduler.
+        """
         # NOTE from torchtitan:
         # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/optimizer.py#L363
         # The key value we're concerned

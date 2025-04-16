@@ -40,7 +40,7 @@ class ModelFactory:
     def _is_model_on_meta_device(model: nn.Module) -> bool:
         meta_counter = 0
         param_counter = 0
-        for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
+        for _, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
             if tensor.device == torch.device("meta"):
                 meta_counter += 1
             param_counter += 1
@@ -212,11 +212,11 @@ class ModelFactory:
             if hasattr(module, "reset_parameters") and callable(getattr(module, "reset_parameters")):
                 module.reset_parameters()
 
-        # initialize the weights if they are on a meta device
         if ModelFactory._is_model_on_meta_device(model=model):
             # Allocate buffers and sharded parameters on GPU
             model = model.to_empty(device="cuda")
 
+        # initialize the weights if they are on a meta device
         # call reset_parameters on all nn.Modules that implement this function
         # (normally all norms)
         with torch.no_grad():
@@ -252,11 +252,22 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_compiled_model(model: nn.Module, block_names: list[str], debug: bool) -> nn.Module:
-        """
-        Apply torch.compile to each transformer block, which makes compilation efficient due to
+    def get_compiled_model(model: nn.Module, block_names: list[str], fullgraph: bool, debug: bool) -> nn.Module:
+        """Apply torch.compile to each transformer block, which makes compilation efficient due to
         repeated structure. Alternatively one can compile the whole model (after applying DP).
         Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275
+
+        Note: With fullgraph=True, we enforce the block to be compiled as a whole, which raises an error on
+              graph breaks and maximizes speedup.
+
+        Args:
+            model (nn.Module): The model to be compiled.
+            block_names (list[str]): List of block names to be compiled individually.
+            fullgraph (bool): Flag enforcing the block to be compiled without graph breaks.
+            debug (bool): Flag to enable debug mode.
+
+        Returns:
+            nn.Module: The compiled model.
         """
 
         def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> tuple[nn.Module, str]:
@@ -279,7 +290,7 @@ class ModelFactory:
         for _, module in model.named_modules():
             if isinstance(module, block_types):
                 options = {"trace.enabled": True} if debug else {}
-                compiled_module = torch.compile(module, fullgraph=True, options=options)
+                compiled_module = torch.compile(module, fullgraph=fullgraph, options=options)
                 parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
                 parent_module.register_module(name=child_name, module=compiled_module)
         return model
