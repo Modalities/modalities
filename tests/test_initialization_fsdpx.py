@@ -367,6 +367,9 @@ class TestWeightInitFSDPX:
                     atol=2e-4,  # default value for torch.float32: 1e-5 (see https://pytorch.org/docs/stable/testing.html)
                     rtol=0,  # default value for torch.float32: 1.3e-6
                 )
+            if group == "other":
+                # other group should be empty
+                assert group_params[group] is None, f"other group should be empty, but got {group_params[group]}"
 
     @staticmethod
     def _load_yaml_config(config_file_path: Path) -> dict:
