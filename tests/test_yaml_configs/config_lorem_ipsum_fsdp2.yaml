@@ -18,9 +18,10 @@ settings:
     evaluation_interval_in_steps: 1
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
+    enforce_last_step_logged: true
     enforce_last_step_evaluated: true
     enforce_last_step_checkpointed: true
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
@@ -43,7 +44,7 @@ settings:
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
+  training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0
@@ -176,7 +177,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp1
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -189,12 +190,21 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    world_size: ${settings.cuda_env.world_size}
+
 app_state:
   component_key: app_state
   variant_key: raw
   config:
     model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
@@ -203,24 +213,12 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model:
-  component_key: model
-  variant_key: fsdp1_wrapped
-  config:
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
-
-model:
+initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: model_raw
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
@@ -232,10 +230,27 @@ model:
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
 model_raw:
   component_key: model
   variant_key: gpt2
   config:
+    use_meta_device: true
+    use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -273,7 +288,6 @@ model_raw:
       config:
         normalized_shape: ${model_raw.config.n_embd}
         eps: 1e-5
-    use_weight_tying: true
 
 lr_scheduler:
   component_key: scheduler
@@ -300,15 +314,15 @@ optimizer:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp1_logging_only
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
 
@@ -341,5 +355,5 @@ mfu_calculator:
       instance_key: model_raw
       pass_type: BY_REFERENCE
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
