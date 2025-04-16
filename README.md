@@ -94,7 +94,7 @@ Example:
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --rdzv-endpoint localhost:29515 \
                                         --nnodes 1 \
                                         --nproc_per_node 4 \
-                                        $(which modalities) run --config_file_path configs/pretraining_config.yaml
+                                        $(which modalities) run --config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml
 ```
 
 Explanation:
@@ -111,7 +111,7 @@ Explanation:
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `configs/pretraining_config.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+* `--config_file_path config_files/training//config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
 
 If you are a VSCode user, you may want to add this to your `launch.json`:
 ```json
