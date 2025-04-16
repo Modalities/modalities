@@ -1,4 +1,16 @@
-model: 
+tested_model:
+  component_key: model
+  variant_key: fsdp1_wrapped
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
+initialized_model: 
   component_key: model
   variant_key: model_initialized
   config:
