@@ -214,6 +214,7 @@ model_raw:
   variant_key: gpt2
   config:
     use_meta_device: false
+    use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -312,3 +313,18 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
+
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
+  config:
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    world_size: ${settings.cuda_env.world_size}
+    raw_model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    wrapped_model:
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
