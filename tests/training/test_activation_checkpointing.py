@@ -2,32 +2,49 @@ import os
 from pathlib import Path
 
 import pytest
-import torch
+import torch.multiprocessing as mp
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import PydanticFSDP1ModuleType, PydanticPytorchModuleType
+from modalities.config.pydanctic_if_types import PydanticFSDP1ModuleType, PydanticFSDP2ModuleType
 from modalities.models.gpt2.gpt2_model import GPT2Block
-from modalities.running_env.cuda_env import CudaEnv
+from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 working_dir = Path(os.path.dirname(__file__))
 
 
 class ActivationCheckpointingInstantiationModel(BaseModel):
-    activation_checkpointed_model: PydanticFSDP1ModuleType
-    wrapped_model: PydanticFSDP1ModuleType
-    model_raw: PydanticPytorchModuleType
+    activation_checkpointed_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
+@pytest.mark.parametrize(
+    "rdvz_port, world_size, relative_config_path",
+    [
+        (22310, 2, "config_activation_checkpointing_fsdp1.yaml"),
+        (22311, 2, "config_activation_checkpointing_fsdp2.yaml"),
+    ],
 )
-def test_activation_checkpointing():
-    config_file_path = working_dir / "config_activation_checkpointing.yaml"
+def test_activation_checkpointing(world_size: int, rdvz_port: int, relative_config_path: str):
+    mp.spawn(
+        _test_activation_checkpointing_thread,
+        args=(rdvz_port, world_size, relative_config_path),
+        nprocs=world_size,
+        join=True,
+    )
 
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+
+def _test_activation_checkpointing_thread(process_id: int, rdvz_port: int, world_size: int, relative_config_path: str):
+    working_dir = Path(os.path.dirname(__file__))
+    config_file_path = working_dir / relative_config_path
+
+    with MultiProcessingCudaEnv(
+        process_group_backend=ProcessGroupBackendType.nccl,
+        global_rank=process_id,
+        local_rank=process_id,
+        world_size=world_size,
+        rdvz_port=rdvz_port,
+    ):
         main = Main(config_file_path)
         components = main.build_components(components_model_type=ActivationCheckpointingInstantiationModel)
         modules = dict(components.activation_checkpointed_model.named_modules())

@@ -6,7 +6,8 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     apply_activation_checkpointing,
     checkpoint_wrapper,
 )
-from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FSDPModule as FSDP2
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP1
 
 from modalities.util import get_module_class_from_name
 
@@ -21,7 +22,7 @@ def apply_activation_checkpointing_inplace(model: torch.nn.Module, activation_ch
     activation_checkpointing_module_types = [
         get_module_class_from_name(model, m) for m in activation_checkpointing_modules
     ]
-    if not isinstance(model, FSDP):
+    if not isinstance(model, (FSDP1, FSDP2)):
         raise ValueError("activation checkpointing can only be applied to FSDP wrapped models!")
     non_reentrant_wrapper = partial(checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=False)
 
