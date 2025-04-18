@@ -71,6 +71,10 @@ class ComponentFactory:
         top_level_components: dict[str, Any],
         traversal_path: list,
     ) -> Any:
+        if len(traversal_path) == 1 and traversal_path[0] in top_level_components:
+            # if the top level component is already built due to a referencing config,
+            # we just return this component instead of building it again
+            return top_level_components[traversal_path[0]], top_level_components
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
             # We first traverse the config for possible sub components that need to build beforehand.
