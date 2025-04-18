@@ -345,7 +345,12 @@ class GPT2ModelFactory:
             seed=seed,
             use_weight_tying=use_weight_tying,
         )
-
+        if use_meta_device and use_weight_tying:
+            raise ValueError(
+                "Weight tying is not supported on meta device. "
+                "Please set use_weight_tying=False or use_weight_tying=True."
+                "https://github.com/Modalities/modalities/issues/357"
+            )
         if use_meta_device:
             with torch.device("meta"):
                 model = GPT2LLM(**config)
