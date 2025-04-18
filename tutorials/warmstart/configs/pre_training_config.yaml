@@ -156,6 +156,7 @@ model_raw:
   variant_key: gpt2
   config:
     use_meta_device: true
+    use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -196,7 +197,6 @@ model_raw:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    use_weight_tying: true
 
 lr_scheduler:
   component_key: scheduler
@@ -228,7 +228,7 @@ optimizer:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp1
   config:
     wrapped_model:
       instance_key: wrapped_model
