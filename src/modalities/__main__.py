@@ -514,8 +514,15 @@ def CMD_shuffle_jsonl_data(
 class Main:
     """Main class that orchestrates the training process."""
 
-    def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
-        experiment_id = get_experiment_id_of_run(config_path)
+    def __init__(
+        self,
+        config_path: Path,
+        additional_resolver_funs: Optional[dict[str, Callable]] = None,
+        experiment_id: Optional[str] = None,
+    ) -> None:
+        if experiment_id is None:
+            experiment_id = get_experiment_id_of_run(config_path)
+
         self.config_dict = load_app_config_dict(
             config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
         )
