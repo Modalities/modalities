@@ -1,45 +1,23 @@
-
-test_model:
+test_model: 
   component_key: model
-  variant_key: model_initialized
+  variant_key: activation_checkpointed
   config:
     model:
-      instance_key: fsdp_model
+      instance_key: wrapped_model
       pass_type: BY_REFERENCE
-    model_initializer:
-      component_key: model_initialization
-      variant_key: composed
-      config:
-        model_type: gpt2
-        weight_init_type: scaled
-        mean: 0.0
-        std: 0.02
-        num_layers: ${model_raw.config.n_layer}
+    activation_checkpointing_modules: [GPT2Block]
 
-fsdp_model:
+wrapped_model:
   component_key: model
-  variant_key: fsdp2_wrapped
+  variant_key: fsdp1_wrapped
   config:
-    model:
-      instance_key: activation_checkpointed_model
-      pass_type: BY_REFERENCE
-    device_mesh:
-      instance_key: device_mesh
-      pass_type: BY_REFERENCE
-    mixed_precision_settings:
-      param_dtype: BF_16
-      reduce_dtype: BF_16
-    block_names: [GPT2Block]
-
-activation_checkpointed_model: 
-  component_key: model
-  variant_key: selective_activation_checkpointed
-  config:
-    sac_variant: full_activation_checkpointing
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
-    layers_fqn: transformer.h
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
 
 model_raw:
   component_key: model
@@ -87,12 +65,3 @@ model_raw:
         epsilon: 1e-5
     use_weight_tying: true
     use_meta_device: false
-
-device_mesh:
-  component_key: device_mesh
-  variant_key: default
-  config:
-    device_type: cuda
-    data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${cuda_env:WORLD_SIZE} # i.e., fully sharded
-    world_size: ${cuda_env:WORLD_SIZE}
