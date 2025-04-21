@@ -67,12 +67,14 @@ def get_peak_memory(
     loss_fun: Callable,
     optimizer: Optional[torch.optim.Optimizer] = None,
 ) -> tuple[int, float, float, float]:
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
     # generate batch
     batch = batch_generator()
     batch.to(device=device)
+    torch.distributed.barrier()
+
     # forward pass
     torch.cuda.synchronize()
     start_forward = time.time()
