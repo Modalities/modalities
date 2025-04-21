@@ -39,6 +39,9 @@ from modalities.running_env.env_utils import (
     has_bfloat_support,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    SelectiveActivationCheckpointingVariants,
+)
 from modalities.util import parse_enum_by_name
 
 
@@ -305,8 +308,24 @@ class WeightInitializedModelConfig(BaseModel):
 
 
 class ActivationCheckpointedModelConfig(BaseModel):
-    model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class SelectiveActivationCheckpointedModelConfig(BaseModel):
+    class FullACParams(BaseModel):
+        pass
+
+    class SelectiveLayerACParams(BaseModel):
+        ac_freq: int
+
+    class SelectiveOpACParams(BaseModel):
+        pass
+
+    sac_variant: SelectiveActivationCheckpointingVariants
+    layers_fqn: str
+    model: PydanticPytorchModuleType | PydanticFSDP1ModuleType
+    sac_fun_params: Optional[FullACParams | SelectiveLayerACParams | SelectiveOpACParams] = None
 
 
 class RawAppStateConfig(BaseModel):

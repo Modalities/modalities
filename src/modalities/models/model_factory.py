@@ -8,11 +8,12 @@ import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP  # TODO: rename to FSDP1
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
+from modalities.config.config import SelectiveActivationCheckpointedModelConfig
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -26,7 +27,13 @@ from modalities.nn.model_initialization.initialization_if import ModelInitializa
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
-from modalities.training.activation_checkpointing import apply_activation_checkpointing_inplace
+from modalities.training.activation_checkpointing.activation_checkpointing import (
+    SelectiveActivationCheckpointing,
+    apply_activation_checkpointing_inplace,
+)
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    SelectiveActivationCheckpointingVariants,
+)
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
 from modalities.utils.logging import get_logger
 
@@ -86,9 +93,9 @@ class ModelFactory:
         block_names: list[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
-    ) -> FSDP:
+    ) -> FSDP1:
         """
-        Get the FSDP-wrapped model.
+        Get the FSDP1-wrapped model.
 
         Args:
             model (nn.Module): The original model to be wrapped.
@@ -98,7 +105,7 @@ class ModelFactory:
             sharding_strategy (ShardingStrategy): Sharding strategy.
 
         Returns:
-            FSDP: The FSDP-wrapped model.
+            FSDP1: The FSDP1-wrapped model.
 
         Note:
             'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
@@ -115,8 +122,8 @@ class ModelFactory:
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
 
-        # model is on CPU before input to FSDP
-        fsdp_model = FSDP(
+        # model is on CPU before input to FSDP1
+        fsdp_model = FSDP1(
             model,
             auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
             mixed_precision=mixed_precision_settings.value,
@@ -225,30 +232,54 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_model(model: FSDP, activation_checkpointing_modules: list[str]) -> FSDP:
+    def get_activation_checkpointed_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
         """Apply activation checkpointing to the given model (in-place operation).
 
         Args:
-            model (FSDP): The FSDP-wrapped model to apply activation checkpointing to.
+            model (FSDP1): The FSDP1-wrapped model to apply activation checkpointing to.
             activation_checkpointing_modules (list[str]): List of module names to apply activation checkpointing to.
 
         Raises:
-            ValueError: Activation checkpointing can only be applied to FSDP-wrapped models!
+            ValueError: Activation checkpointing can only be applied to FSDP1-wrapped models!
 
         Returns:
-            FSDP: The model with activation checkpointing applied.
+            FSDP1: The model with activation checkpointing applied.
         """
         if len(activation_checkpointing_modules) > 0:
-            if isinstance(model, FSDP):
+            if isinstance(model, FSDP1):
                 apply_activation_checkpointing_inplace(
                     model=model,
                     activation_checkpointing_modules=activation_checkpointing_modules,
                 )
             else:
                 raise ValueError(
-                    "Activation checkpointing can only be applied to FSDP-wrapped models! "
+                    "Activation checkpointing can only be applied to FSDP1-wrapped models! "
                     f"Current model type: {type(model)}"
                 )
+        return model
+
+    @staticmethod
+    def get_selective_activation_checkpointed_model(
+        sac_variant: SelectiveActivationCheckpointingVariants,
+        layers_fqn: str,
+        model: nn.Module,
+        sac_fun_params: (
+            SelectiveActivationCheckpointedModelConfig.FullACParams
+            | SelectiveActivationCheckpointedModelConfig.SelectiveLayerACParams
+            | SelectiveActivationCheckpointedModelConfig.SelectiveOpACParams
+        ),
+    ) -> nn.Module:
+        if not isinstance(model, (nn.Module, FSDP1)):
+            raise ValueError(
+                "Selective activation checkpointing can only be applied to FSDP1-wrapped or nn.Module models! "
+                f"Current model type: {type(model)}"
+            )
+        SelectiveActivationCheckpointing.apply_selective_activation_checkpointing_(
+            model=model,
+            layers_fqn=layers_fqn,
+            sac_variant=sac_variant,
+            sac_fun_params=sac_fun_params,
+        )
         return model
 
     @staticmethod
