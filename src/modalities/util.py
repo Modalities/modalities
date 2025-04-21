@@ -18,7 +18,7 @@ from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
-from modalities.utils.typing import FSDPX
+from modalities.utils.typing_utils import FSDPX
 
 
 def print_rank_0(message: str):

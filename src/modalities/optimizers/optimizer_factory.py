@@ -12,7 +12,7 @@ from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
-from modalities.utils.typing import FSDPX
+from modalities.utils.typing_utils import FSDPX
 
 OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
 

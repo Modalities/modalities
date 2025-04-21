@@ -35,7 +35,7 @@ from modalities.training.activation_checkpointing.activation_checkpointing_varia
     SelectiveActivationCheckpointingVariants,
 )
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 logger = get_logger("model_factory")
 
