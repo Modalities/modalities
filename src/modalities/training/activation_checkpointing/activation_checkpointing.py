@@ -71,12 +71,29 @@ class SelectiveActivationCheckpointing:
             | SelectiveActivationCheckpointedModelConfig.SelectiveOpACParams
         ),
     ):
+        """Applies activation checkpointing to a given model. There are three variants of activation checkpointing:
+        1. FULL_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers. In thise case,
+           only the inputs and outputs of each layer are saved, but not the intermediate activations.
+        2. SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING: applies activation checkpointing to every `ac_freq` layer.
+           It is similar to FULL_ACTIVATION_CHECKPOINTING, but only saves the inputs and outputs of every
+           `ac_freq` layer.
+        3. SELECTIVE_OP_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers, but only
+           saves the activations of certain operations. Usually these operations are compute intensive and
+           their activations are saved and not recomputed in the backward pass. All the remaining operations
+           are recomputed in the backward pass.
+
+        Args:
+            sac_variant (SelectiveActivationCheckpointingVariants): The activation checkpointing variant to use.
+            layers_fqn (str): The fully qualified name (FQN) of the layers to apply activation checkpointing to.
+            model (nn.Module): The model to apply activation checkpointing to (in place).
+            sac_fun_params (SelectiveActivationCheckpointedModelConfig.*Params): The parameters for the activation
+                 checkpointing function.
+
+        Raises:
+            ValueError: If the activation checkpointing variant is not recognized or if the layers_fqn does not
+                reference a ModuleList.
         """
-        Applies activation checkpointing to the gpt2 model. There are three variants of activation checkpointing:
-        1. FULL_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers
-        2. SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING: applies activation checkpointing to every `ac_freq` layer
-        3. SELECTIVE_OP_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers, but only saves the
-        """
+
         if sac_variant == SelectiveActivationCheckpointingVariants.FULL_ACTIVATION_CHECKPOINTING:
             apply_ac_fun = SelectiveActivationCheckpointing._apply_full_ac
         elif sac_variant == SelectiveActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING:
