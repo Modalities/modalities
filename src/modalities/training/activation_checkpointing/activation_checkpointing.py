@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import CheckpointImpl, apply_activation_checkpointing
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoint_wrapper as ptd_checkpoint_wrapper
-from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP1
 from torch.utils.checkpoint import CheckpointPolicy, create_selective_checkpoint_contexts
 
@@ -26,8 +25,8 @@ def apply_activation_checkpointing_inplace(model: nn.Module, activation_checkpoi
     activation_checkpointing_module_types = [
         get_module_class_from_name(model, m) for m in activation_checkpointing_modules
     ]
-    if not isinstance(model, (FSDP1, FSDP2)):
-        raise ValueError("activation checkpointing can only be applied to FSDP wrapped models!")
+    if not isinstance(model, (FSDP1)):
+        raise ValueError("activation checkpointing can only be applied to FSDP1 wrapped models!")
     non_reentrant_wrapper = partial(ptd_checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=False)
 
     apply_activation_checkpointing(
@@ -110,6 +109,8 @@ class SelectiveActivationCheckpointing:
         if not isinstance(layers, nn.ModuleList):
             raise ValueError(f"layers_fqn {layers_fqn} does not reference a ModuleList")
 
+        print_rank_0(f"Applying activation checkpointing to {len(list(layers.named_children()))} layers...")
+
         for layer_id, transformer_block in layers.named_children():
             print_rank_0(f"Applying activation checkpointing to {layer_id}...")
             module_saced = apply_ac_fun(transformer_block)
@@ -125,25 +126,8 @@ class SelectiveActivationCheckpointing:
 
     @staticmethod
     def _apply_selective_op_ac(module: nn.Module) -> nn.Module:
-        def _get_custom_policy(meta):  # closure to capture meta
+        def _get_custom_policy(meta, save_list):  # closure to capture meta
             def _custom_policy(ctx, func, *args, **kwargs):
-                # This is the list of ops that are saved by default in torch titan.
-                # These operations are typically compute intensive and their activations are
-                # therefore saved and not recomputed in the backward pass.
-                # This list differs from the compute intensive ops list in the
-                # pytorch AC tutorial: https://pytorch.org/blog/activation-checkpointing-techniques/
-                # TODO: Optimize this list for our GP2 implementation!
-                save_list = {  # default save list from torch titan
-                    torch.ops.aten.mm.default,
-                    torch.ops.aten._scaled_dot_product_efficient_attention.default,
-                    torch.ops.aten._scaled_dot_product_flash_attention.default,
-                    torch.ops._c10d_functional.reduce_scatter_tensor.default,
-                    # for low precision training, it's useful to always save
-                    # the result of max, since the absolute maximum is
-                    # used to compute the scaling factor for quantization.
-                    torch.ops.aten.max.default,
-                }
-
                 mode = "recompute" if ctx.is_recompute else "forward"
                 mm_count_key = f"{mode}_mm_count"
                 if func == torch.ops.aten.mm.default:
@@ -156,9 +140,40 @@ class SelectiveActivationCheckpointing:
 
         def _selective_checkpointing_context_fn():
             meta = defaultdict(int)
+            # This is the list of ops that are saved by default in torch titan.
+            # These operations are typically compute intensive and their activations are
+            # therefore saved and not recomputed in the backward pass.
+            # This list differs from the compute intensive ops list in the
+            # pytorch AC tutorial: https://pytorch.org/blog/activation-checkpointing-techniques/
+            # TODO: Optimize this list for our GP2 implementation!
+            save_list = {  # default save list from torch titan
+                torch.ops.aten.mm.default,
+                torch.ops.aten._scaled_dot_product_efficient_attention.default,
+                torch.ops.aten._scaled_dot_product_flash_attention.default,
+                torch.ops._c10d_functional.reduce_scatter_tensor.default,
+                # for low precision training, it's useful to always save
+                # the result of max, since the absolute maximum is
+                # used to compute the scaling factor for quantization.
+                torch.ops.aten.max.default,
+                # # pytorch tutorial ATen ops
+                # torch.ops.aten.mm,
+                # torch.ops.aten.convolution,
+                # torch.ops.aten.convolution_backward,
+                # torch.ops.aten.bmm,
+                # torch.ops.aten.addmm,
+                # torch.ops.aten._scaled_dot_product_flash_attention,
+                # torch.ops.aten._scaled_dot_product_efficient_attention,
+                # torch.ops.aten._flash_attention_forward,
+                # torch.ops.aten._efficient_attention_forward,
+                # torch.ops.aten.upsample_bilinear2d,
+                # torch.ops.aten._scaled_mm,
+                # # mine
+                # torch.ops.aten.add.Tensor,
+                # #torch.ops.aten.mul.Tensor
+            }
             # For now, we only allow for a single AC policy
             # (i.e., the torch titan LLama 3 one) to be used
-            policy = _get_custom_policy(meta)
+            policy = _get_custom_policy(meta, save_list)
             return create_selective_checkpoint_contexts(policy_fn_or_list=policy)
 
         module_saced = ptd_checkpoint_wrapper(
