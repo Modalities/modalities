@@ -1,0 +1,159 @@
+settings:
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  benchmark:
+    sequence_length: 4096
+    vocab_size: 50304
+    ac_mode: full_activation_checkpointed_model
+    batch_size: 1
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: compiled_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+full_activation_checkpointed_model: 
+  component_key: model
+  variant_key: selective_activation_checkpointed
+  config:
+    sac_variant: full_activation_checkpointing
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    layers_fqn: transformer.h
+
+selective_layer_activation_checkpointed_model: 
+  component_key: model
+  variant_key: selective_activation_checkpointed
+  config:
+    sac_variant: selective_layer_activation_checkpointing
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    layers_fqn: transformer.h
+    sac_fun_params:
+      ac_freq: 2
+
+selective_op_activation_checkpointed_model: 
+  component_key: model
+  variant_key: selective_activation_checkpointed
+  config:
+    sac_variant: selective_op_activation_checkpointing
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    layers_fqn: transformer.h
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: input_ids
+    poe_type: NOPE
+    sequence_length: 4096
+    prediction_key: logits
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 20
+    n_head_q: 8
+    n_head_kv: 8
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+            base_freq: 10000
+    attention_implementation: pytorch_flash
+    activation_type: gelu
+    attention_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    use_weight_tying: true
+    use_meta_device: false
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${cuda_env:WORLD_SIZE} # i.e., fully sharded
+    world_size: ${cuda_env:WORLD_SIZE}
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0001
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1
+    weight_decay_groups_excluded: [embedding, layernorm]
+    wrapped_model: 
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+
+dataset_batch_generator:
+  component_key: dataset_batch_generator
+  variant_key: random
+  config:
+    vocab_size: ${settings.benchmark.vocab_size}
+    sequence_length: ${settings.benchmark.sequence_length}
+    batch_size: ${settings.benchmark.batch_size}
