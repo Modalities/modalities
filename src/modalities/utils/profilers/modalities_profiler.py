@@ -120,7 +120,21 @@ class ModalitiesProfiler:
         experiment_folder_path: Path,
         num_warmup_steps: int,
         num_measurement_steps: int,
-    ):
+    ) -> Result:
+        """Profiles the training step of a model using the given config file and experiment folder path
+        w.r.t. peak memory, as well as, forward, backward and step time.
+
+        Args:
+            config_file_path (Path): Path to the config file.
+            experiment_folder_path (Path): Path to the experiment folder.
+            num_warmup_steps (int): Number of warmup steps to be used for the profiler.
+                No measurements are taken during the warmup steps.
+            num_measurement_steps (int): Number of measurement steps to be used for the profiler.
+
+        Returns:
+            Result: A dataclass containing the profiling results, including peak memory, forward time,
+                backward time, step time, and any error messages.
+        """
         error = ""
         try:
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -128,7 +142,7 @@ class ModalitiesProfiler:
                     get_synced_string(string_to_be_synced=str(experiment_folder_path), from_rank=0)
                 )
 
-                step_statistics = ModalitiesProfiler.get_train_step_statistics_impl(
+                step_statistics = ModalitiesProfiler._get_train_step_statistics_impl(
                     config_file_path=config_file_path,
                     num_warmup_steps=num_warmup_steps,
                     num_measurement_steps=num_measurement_steps,
@@ -164,7 +178,7 @@ class ModalitiesProfiler:
         return result
 
     @staticmethod
-    def get_train_step_statistics_impl(
+    def _get_train_step_statistics_impl(
         config_file_path: Path,
         num_warmup_steps: int,
         num_measurement_steps: int,
@@ -203,9 +217,8 @@ class ModalitiesProfiler:
         return statistics
 
     @staticmethod
-    def get_forward_pass_statistics(
+    def get_forward_pass_profiling(
         config_file_path: Path,
-        batch_generator: Callable[[], DatasetBatch],
         num_measurement_steps: int,
         profile_context_manager: torch.profiler.profile,
     ) -> TrainStepStatistics:
@@ -214,10 +227,11 @@ class ModalitiesProfiler:
             components = main_obj.build_components(components_model_type=InstantiationModel)
             model = components.initialized_model
             loss_fun: Loss = components.loss_fn
+            dataset_batch_generator: DatasetBatchGeneratorIF = components.dataset_batch_generator
             device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
             with profile_context_manager as profiler:
                 for _ in range(num_measurement_steps):
-                    batch = batch_generator()
+                    batch = dataset_batch_generator.get_dataset_batch()
                     batch.to(device=device)
                     torch.distributed.barrier()
                     ModalitiesProfiler._run_forward_pass(
@@ -271,24 +285,8 @@ class ModalitiesProfiler:
         }
 
     @staticmethod
-    def _run_forward_pass(model: FSDPX, batch: DatasetBatch, loss_fun: Callable):
+    def _run_forward_pass(model: FSDPX, batch: DatasetBatch, loss_fun: Optional[Callable] = None) -> None:
         predictions = model(batch.samples)
         result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
-        loss_fun(result_batch)
-
-
-def flatten_results(results: list[Result]) -> list[dict]:
-    flat_results = []
-    for r in results:
-        flat = {
-            **{
-                config_value.name: config_value.value for _, config_value in r.grid_search_config.items()
-            },  # flatten grid_search_config
-            "peak_memory": r.peak_memory,
-            "forward_time": r.forward_time,
-            "backward_time": r.backward_time,
-            "step_time": r.step_time,
-            "error": r.error,
-        }
-        flat_results.append(flat)
-    return flat_results
+        if loss_fun is not None:
+            loss_fun(result_batch)

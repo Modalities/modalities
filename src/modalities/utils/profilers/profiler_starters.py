@@ -3,6 +3,7 @@ from pathlib import Path
 
 import tqdm
 import yaml
+from torch.profiler import ProfilerActivity, profile, schedule
 
 from modalities import __main__
 from modalities.util import is_launched_via_torchrun
@@ -11,7 +12,7 @@ from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
 from modalities.utils.run_torchrun_script import run_torchrun_with_cleanup
 
 
-class TrainStepProfilerStarter:
+class ModalitiesProfilerStarter:
     @staticmethod
     def run_train_step_profiler(
         config_file_path: Path,
@@ -119,3 +120,26 @@ class TrainStepProfilerStarter:
                     raise RuntimeError(
                         "TrainStepProfilerStarter.run_train_step_profiler() must not be called from a torchrun process."
                     )
+
+    @staticmethod
+    def get_forward_pass_profiling(
+        num_measurements: int, config_file_path: Path, profiler_activities: list[ProfilerActivity] = None
+    ) -> profile:
+        if profiler_activities is None:
+            profiler_activities = [ProfilerActivity.CUDA]
+
+        profiler_context_manager = profile(
+            activities=profiler_activities,
+            schedule=schedule(wait=2, warmup=2, active=num_measurements),
+            record_shapes=True,
+            profile_memory=True,
+            with_flops=True,
+            with_stack=True,
+            with_modules=True,
+        )
+        ModalitiesProfiler.get_forward_pass_profiling(
+            config_file_path=config_file_path,
+            num_measurement_steps=num_measurements,
+            profile_context_manager=profiler_context_manager,
+        )
+        return profiler_context_manager
