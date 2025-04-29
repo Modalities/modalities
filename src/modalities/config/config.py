@@ -167,7 +167,6 @@ class StepLRSchedulerConfig(BaseModel):
     step_size: Annotated[int, Field(strict=True, gt=0)]
     gamma: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class OneCycleLRSchedulerConfig(BaseModel):
@@ -189,7 +188,6 @@ class OneCycleLRSchedulerConfig(BaseModel):
     final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     three_phase: bool = False
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
     @model_validator(mode="after")
     def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
@@ -203,7 +201,6 @@ class ConstantLRSchedulerConfig(BaseModel):
     factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class LinearLRSchedulerConfig(BaseModel):
@@ -212,7 +209,6 @@ class LinearLRSchedulerConfig(BaseModel):
     end_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class CosineAnnealingLRSchedulerConfig(BaseModel):
@@ -220,7 +216,6 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     t_max: Annotated[int, Field(strict=True, gt=0)]
     eta_min: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class CheckpointedOptimizerConfig(BaseModel):
