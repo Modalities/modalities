@@ -1,8 +1,10 @@
 from collections import defaultdict
 from functools import partial
+from typing import Set
 
 import torch
 import torch.nn as nn
+import torch.ops as ops
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import CheckpointImpl, apply_activation_checkpointing
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoint_wrapper as ptd_checkpoint_wrapper
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP1
@@ -59,6 +61,24 @@ class SelectiveActivationCheckpointing:
 
     """
 
+    SAVE_DICT = {
+        # as prposed by torch titan
+        # https://github.com/pytorch/torchtitan/blob/30b9ea0b1ad893379d2ff3b12dbf18600730c249/torchtitan/models/llama3/parallelize_llama.py#L218
+        # This is the list of ops that are saved by default in torch titan.
+        # These operations are typically compute intensive and their activations are
+        # therefore saved and not recomputed in the backward pass.
+        # This list differs from the compute intensive ops list in the
+        # pytorch AC tutorial: https://pytorch.org/blog/activation-checkpointing-techniques/
+        "ops.aten.mm.default": ops.aten.mm.default,
+        "ops.aten._scaled_dot_product_efficient_attention.default": ops.aten._scaled_dot_product_efficient_attention.default,  # noqa
+        "ops.aten._scaled_dot_product_flash_attention.default": ops.aten._scaled_dot_product_flash_attention.default,
+        "ops._c10d_functional.reduce_scatter_tensor.default": ops._c10d_functional.reduce_scatter_tensor.default,
+        # for low precision training, it's useful to always save
+        # the result of max, since the absolute maximum is
+        # used to compute the scaling factor for quantization.
+        "torch.ops.aten.max.default": ops.aten.max.default,
+    }
+
     @staticmethod
     def apply_selective_activation_checkpointing_(
         sac_variant: SelectiveActivationCheckpointingVariants,
@@ -101,7 +121,15 @@ class SelectiveActivationCheckpointing:
                 ac_freq=sac_fun_params.ac_freq,
             )
         elif sac_variant == SelectiveActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING:
-            apply_ac_fun = SelectiveActivationCheckpointing._apply_selective_op_ac
+            if len(sac_fun_params.save_ops_keys) > 0:
+                apply_ac_fun = partial(
+                    SelectiveActivationCheckpointing._apply_selective_op_ac, save_ops_keys=sac_fun_params.save_ops_keys
+                )
+            else:
+
+                def apply_ac_fun(model):
+                    return model
+
         else:
             raise ValueError(f"Unknown activation checkpointing variant: {sac_variant}")
 
@@ -125,55 +153,27 @@ class SelectiveActivationCheckpointing:
         return module_saced
 
     @staticmethod
-    def _apply_selective_op_ac(module: nn.Module) -> nn.Module:
-        def _get_custom_policy(meta, save_list):  # closure to capture meta
+    def _apply_selective_op_ac(module: nn.Module, save_ops_keys: list[str]) -> nn.Module:
+        def _get_custom_policy(meta, save_ops_set: Set):  # closure to capture meta
             def _custom_policy(ctx, func, *args, **kwargs):
                 mode = "recompute" if ctx.is_recompute else "forward"
                 mm_count_key = f"{mode}_mm_count"
                 if func == torch.ops.aten.mm.default:
                     meta[mm_count_key] += 1
                 # Saves output of all compute ops, except every second mm
-                to_save = func in save_list and not (func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0)
+                # NOTE: we should make this configurable and not hide it in the code
+                to_save = func in save_ops_set and not (
+                    func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0
+                )
                 return CheckpointPolicy.MUST_SAVE if to_save else CheckpointPolicy.PREFER_RECOMPUTE
 
             return _custom_policy
 
         def _selective_checkpointing_context_fn():
             meta = defaultdict(int)
-            # This is the list of ops that are saved by default in torch titan.
-            # These operations are typically compute intensive and their activations are
-            # therefore saved and not recomputed in the backward pass.
-            # This list differs from the compute intensive ops list in the
-            # pytorch AC tutorial: https://pytorch.org/blog/activation-checkpointing-techniques/
-            # TODO: Optimize this list for our GP2 implementation!
-            save_list = {  # default save list from torch titan
-                torch.ops.aten.mm.default,
-                torch.ops.aten._scaled_dot_product_efficient_attention.default,
-                torch.ops.aten._scaled_dot_product_flash_attention.default,
-                torch.ops._c10d_functional.reduce_scatter_tensor.default,
-                # for low precision training, it's useful to always save
-                # the result of max, since the absolute maximum is
-                # used to compute the scaling factor for quantization.
-                torch.ops.aten.max.default,
-                # # pytorch tutorial ATen ops
-                # torch.ops.aten.mm,
-                # torch.ops.aten.convolution,
-                # torch.ops.aten.convolution_backward,
-                # torch.ops.aten.bmm,
-                # torch.ops.aten.addmm,
-                # torch.ops.aten._scaled_dot_product_flash_attention,
-                # torch.ops.aten._scaled_dot_product_efficient_attention,
-                # torch.ops.aten._flash_attention_forward,
-                # torch.ops.aten._efficient_attention_forward,
-                # torch.ops.aten.upsample_bilinear2d,
-                # torch.ops.aten._scaled_mm,
-                # # mine
-                # torch.ops.aten.add.Tensor,
-                # #torch.ops.aten.mul.Tensor
-            }
-            # For now, we only allow for a single AC policy
-            # (i.e., the torch titan LLama 3 one) to be used
-            policy = _get_custom_policy(meta, save_list)
+            save_ops_set = {SelectiveActivationCheckpointing.SAVE_DICT[key] for key in save_ops_keys}
+
+            policy = _get_custom_policy(meta=meta, save_ops_set=save_ops_set)
             return create_selective_checkpoint_contexts(policy_fn_or_list=policy)
 
         module_saced = ptd_checkpoint_wrapper(
