@@ -71,7 +71,7 @@ class TestUtils:
                 elif sharding_strategy == "HYBRID_SHARD":
                     assert torch.cuda.device_count() % 2 == 0, (
                         "HYBRID_SHARD test requires even number of GPUs. "
-                        "Current number of GPUs: {torch.cuda.device_count()}"
+                        f"Current number of GPUs: {torch.cuda.device_count()}"
                     )
                     config["device_mesh"]["config"]["data_parallel_replicate_degree"] = 2
                     config["device_mesh"]["config"]["data_parallel_shard_degree"] = torch.cuda.device_count() // 2
