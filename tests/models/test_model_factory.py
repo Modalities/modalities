@@ -4,8 +4,8 @@ import pytest
 import torch.distributed
 import torch.nn as nn
 
-import modalities.models.model_factory as mf
 from modalities.exceptions import ModelStateError
+from modalities.models import model_factory
 from modalities.models.model_factory import ModelFactory
 
 
@@ -38,8 +38,8 @@ def test_get_fsdp2_wrapped_model(dummy_model):
 
     mock_fully_shard = MagicMock()
 
-    mf.get_module_class_from_name = mock_get_module_class_from_name
-    mf.fully_shard = mock_fully_shard
+    model_factory.get_module_class_from_name = mock_get_module_class_from_name
+    model_factory.fully_shard = mock_fully_shard
 
     torch.distributed.get_rank = lambda: 0
 

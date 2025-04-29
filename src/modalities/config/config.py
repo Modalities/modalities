@@ -430,7 +430,6 @@ class GPT2MFUCalculatorConfig(BaseModel):
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
-    raw_model: PydanticPytorchModuleType
     wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
 
 

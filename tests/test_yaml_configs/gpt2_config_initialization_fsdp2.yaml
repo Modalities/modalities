@@ -70,7 +70,7 @@ model_raw:
         bias: true
         epsilon: 1e-5
     use_weight_tying: WILL_BE_REPLACED
-    use_meta_device: true
+    use_meta_device: false
 
 device_mesh:
   component_key: device_mesh

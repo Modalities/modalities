@@ -249,7 +249,7 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_meta_device: true
+    use_meta_device: false
     use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
@@ -348,12 +348,9 @@ mfu_calculator:
   variant_key: gpt2
   config:
     n_layer: ${model_raw.config.n_layer}
-    sequence_length: ${settings.step_profile.sequence_length}
+    sequence_length: ${model_raw.config.sequence_length}
     n_embd: ${model_raw.config.n_embd}
     world_size: ${settings.cuda_env.world_size}
-    raw_model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
     wrapped_model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
