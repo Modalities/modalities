@@ -6,7 +6,8 @@ settings:
   benchmark:
     sequence_length: 4096
     vocab_size: 50304
-    ac_mode: full_activation_checkpointed_model
+    ac_ops_keys:
+      - torch.ops.aten.mm.default
     batch_size: 1
 
 initialized_model:
@@ -31,7 +32,7 @@ fsdp_model:
   variant_key: fsdp2_wrapped
   config:
     model:
-      instance_key: compiled_model
+      instance_key: selective_op_activation_checkpointed_model
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -40,28 +41,6 @@ fsdp_model:
       param_dtype: BF_16
       reduce_dtype: BF_16
     block_names: [GPT2Block]
-
-full_activation_checkpointed_model: 
-  component_key: model
-  variant_key: selective_activation_checkpointed
-  config:
-    sac_variant: full_activation_checkpointing
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    layers_fqn: transformer.h
-
-selective_layer_activation_checkpointed_model: 
-  component_key: model
-  variant_key: selective_activation_checkpointed
-  config:
-    sac_variant: selective_layer_activation_checkpointing
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    layers_fqn: transformer.h
-    sac_fun_params:
-      ac_freq: 2
 
 selective_op_activation_checkpointed_model: 
   component_key: model
@@ -72,6 +51,8 @@ selective_op_activation_checkpointed_model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
     layers_fqn: transformer.h
+    sac_fun_params:
+      save_ops_keys: ${settings.benchmark.ac_ops_keys}
 
 model_raw:
   component_key: model
