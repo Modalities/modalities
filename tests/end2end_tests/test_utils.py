@@ -43,8 +43,8 @@ class TestUtils:
             (22371, "../test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "FULL_SHARD", 6770176),
             (22372, "../test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "HYBRID_SHARD", 6770176),
             # FSDP2
-            (22371, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "FULL_SHARD", 6770176),
-            (22372, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "HYBRID_SHARD", 6770176),
+            (22374, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "FULL_SHARD", 6770176),
+            (22375, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "HYBRID_SHARD", 6770176),
         ],
     )
     def test_get_total_number_of_trainable_parameters_fsdpx(
@@ -69,7 +69,10 @@ class TestUtils:
                     config["device_mesh"]["config"]["data_parallel_replicate_degree"] = 1
                     config["device_mesh"]["config"]["data_parallel_shard_degree"] = torch.cuda.device_count()
                 elif sharding_strategy == "HYBRID_SHARD":
-                    assert torch.cuda.device_count() % 2 == 0, "HYBRID_SHARD test requires even number of GPUs"
+                    assert torch.cuda.device_count() % 2 == 0, (
+                        "HYBRID_SHARD test requires even number of GPUs. "
+                        "Current number of GPUs: {torch.cuda.device_count()}"
+                    )
                     config["device_mesh"]["config"]["data_parallel_replicate_degree"] = 2
                     config["device_mesh"]["config"]["data_parallel_shard_degree"] = torch.cuda.device_count() // 2
                 else:
