@@ -5,6 +5,9 @@ import subprocess
 from datetime import datetime
 from os.path import isdir, isfile, join
 from pathlib import Path
+from typing import Optional
+
+import torch
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -148,7 +151,7 @@ def subprocess_run(command: str) -> None:
         raise Exception(f"Subproces run failed with command {command}")
 
 
-def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, devices: str = "0,1"):
+def main(include_torchrun_tests: bool = False, devices: Optional[str] = None, test_name_filter: str = None) -> None:
     """
     Run tests on cpu, single gpu and multiple gpus
 
@@ -159,45 +162,48 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
     python tests/tests.py --single-gpu --devices 3: run CPU tests + single-GPU tests on GPU 3
     python tests/tests.py --multi-gpu --devices 3,4: run multi-GPU tests on GPUs 3/4
     """
-    # parse input
-    if not cpu and not single_gpu and not multi_gpu:  # run all tests
-        cpu, single_gpu, multi_gpu = True, True, True
-    if single_gpu:  # cpu & single_gpu are both executed together via pytest
-        cpu = True
-    try:
-        devices = [int(device) for device in devices.split(",")]  # e.g. '0,1' -> [0, 1]
-    except ValueError:
-        exit(f"ERROR! devices needs to be a string of comma-separated ints, e.g. '0,1'. Specified devices = {devices}")
-    devices = devices if len(devices) <= 2 else devices[:2]  # use max 2 devices
 
-    # check input
-    if single_gpu and len(devices) < 1:
-        exit(f"ERROR! Need at least 1 device to run single_gpu tests. Specified devices = {devices}")
-    if multi_gpu and len(devices) < 2:
-        exit(f"ERROR! Need 2 devices to run multi_gpu tests. Specified devices = {devices}")
+    if devices is None:
+        device_ids = list(range(torch.cuda.device_count()))
+    else:
+        try:
+            device_ids = devices.split(",")
+        except ValueError:
+            exit(
+                "ERROR! devices needs to be a string of comma-separated ints, e.g. '0,1'. "
+                f"Specified devices = {devices}"
+            )
 
-    # start
-    print(f"> TESTS ON          CPU: {cpu}")
-    print(f"> TESTS ON   SINGLE GPU: {single_gpu} " + f"(device={devices[0] if single_gpu else None})")
-    print(f"> TESTS ON MULTIPLE GPU: {multi_gpu} " + f"(devices={devices if multi_gpu else None})")
+    if not include_torchrun_tests:
+        return
 
-    # run cpu / single-gpu tests
-    if cpu or single_gpu:
-        print("\n=== RUN CPU & SINGLE-GPU TESTS ===" if single_gpu else "\n=== RUN CPU TESTS ===")
-        command_unit_tests = (
-            f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES={devices[0] if single_gpu else None} python -m pytest"
-        )
-        subprocess_run(command_unit_tests)
+    if len(device_ids) < 4:
+        exit("ERROR! Need at least 2 devices to run torchrun tests.")
+
+    # only run tests on max 2 devices
+    device_ids = device_ids[:4]
+    print(f"Using GPU devices: {device_ids}")
+
+    # run cpu / gpu tests not requiring torchrun
+    print(f"\n=== RUN TESTS on CPU and CUDA devices: {device_ids} ===")
+    command_unit_tests = (
+        f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES="
+        f"{','.join(map(str, device_ids)) if len(device_ids) >0 else ''} python -m pytest"
+    )
+    if test_name_filter is not None:
+        command_unit_tests += f" -k {test_name_filter}"
+    subprocess_run(command_unit_tests)
 
     # run multi-gpu tests
-    if multi_gpu:
+    if len(device_ids) > 1:
         # distributed tests
         print("\n=== RUN MULTI-GPU TESTS ===")
         run_distributed_tests_directory = _ROOT_DIR / "tests"
         run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
         assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
         command_end_to_end_tests = (
-            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh {devices[0]} {devices[1]} --no-cov"
+            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh "
+            f"{' '.join(map(str, device_ids))} --no-cov"
         )
         subprocess_run(command_end_to_end_tests)
 
@@ -211,7 +217,9 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
             run_getting_started_example_script
         ), f"ERROR! {run_getting_started_example_script} does not exist."
         command_getting_started_example = f"cd {run_getting_started_example_directory}; "
-        command_getting_started_example += f"bash scripts/run_getting_started_example.sh {devices[0]} {devices[1]}"
+        command_getting_started_example += (
+            f"bash scripts/run_getting_started_example.sh {' '.join(map(str, device_ids))}"
+        )
         date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
         subprocess_run(command_getting_started_example)
 
@@ -239,7 +247,7 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
         run_warmstart_example_script = _ROOT_DIR / "tutorials/warmstart/scripts/pre_train_and_warmstart.sh"
         assert isfile(run_warmstart_example_script), f"ERROR! {run_warmstart_example_script} does not exist."
         command_warmstart_example = (
-            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {devices[0]} {devices[1]}"
+            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {' '.join(map(str, device_ids))}"
         )
         subprocess_run(command_warmstart_example)
 
@@ -248,10 +256,13 @@ def main(cpu: bool = False, single_gpu: bool = False, multi_gpu: bool = False, d
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Description of your program")
-    parser.add_argument("--cpu", action=argparse.BooleanOptionalAction, help="Do cpu testing.")
-    parser.add_argument("--single-gpu", action=argparse.BooleanOptionalAction, help="Do single GPU testing.")
-    parser.add_argument("--multi-gpu", action=argparse.BooleanOptionalAction, help="Do multi GPU testing.")
-    parser.add_argument("--devices", type=str, default="0,1")
+    parser.add_argument(
+        "--include_torchrun_tests",
+        action=argparse.BooleanOptionalAction,
+        help="Run tests and examples requiring torchrun env.",
+        default=False,
+    )
+    parser.add_argument("--devices", type=str, default=None)
+    parser.add_argument("--test_name_filter", type=str, default=None)
     args = vars(parser.parse_args())
-    args = {k: v if v is not None else False for k, v in args.items()}  # None -> False
     main(**args)

@@ -8,7 +8,7 @@ tokenizer:
 
 checkpointed_model:
   component_key: model
-  variant_key: checkpointed
+  variant_key: fsdp1_checkpointed
   config:
     checkpoint_loading:
       component_key: checkpoint_loading
