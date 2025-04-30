@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - check_env_workflow
   workflow_dispatch:
 
 jobs:
@@ -21,3 +22,4 @@ jobs:
     - name: Install dependencies
       run: |
         nvidia-smi
+        echo $CUDA_VISIBLE_DEVICES
