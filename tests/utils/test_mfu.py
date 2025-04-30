@@ -71,6 +71,7 @@ class TestMFU:
             yaml.safe_dump(config, f)
 
     @staticmethod
+    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path, mixed_precision_settings, world_size_fake, "
         "simulated_gpu_type, expected_theoretical_gpu_peak_performance, warning_msg",
@@ -312,6 +313,7 @@ class TestMFU:
         assert theoretical_flops_per_token == expected_theoretical_flops_per_token
 
     @staticmethod
+    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path, num_samples_per_second, expected_mfu",
         [

@@ -22,6 +22,7 @@ def temporary_folder_path():
         yield Path(tmp_dir_path)
 
 
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
 class TestUtils:
     # number of parameters in the model calculated as follows:
     # Embeddings: 128*50304
