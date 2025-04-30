@@ -1,4 +1,4 @@
-name: Tests Full
+name: Check Arc Runner Environment
 
 on:
   push:
