@@ -23,7 +23,9 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
+    # install this directly via `pip install flash-attn --no-build-isolation` 
+    # with ninja (`pip install ninja`) compiling takes 3-5min instead of >2h 
+    "flash-attn",    
 ]
 
 [project.urls]
