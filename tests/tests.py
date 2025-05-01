@@ -174,18 +174,11 @@ def main(include_torchrun_tests: bool = False, devices: Optional[str] = None, te
                 f"Specified devices = {devices}"
             )
 
-    if not include_torchrun_tests:
-        return
-
-    if len(device_ids) < 4:
-        exit("ERROR! Need at least 2 devices to run torchrun tests.")
-
     # only run tests on max 2 devices
     device_ids = device_ids[:4]
-    print(f"Using GPU devices: {device_ids}")
 
     # run cpu / gpu tests not requiring torchrun
-    print(f"\n=== RUN TESTS on CPU and CUDA devices: {device_ids} ===")
+    print(f"\n=== RUN TESTS on CPU and CUDA devices {device_ids} ===")
     command_unit_tests = (
         f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES="
         f"{','.join(map(str, device_ids)) if len(device_ids) >0 else ''} python -m pytest"
@@ -194,62 +187,61 @@ def main(include_torchrun_tests: bool = False, devices: Optional[str] = None, te
         command_unit_tests += f" -k {test_name_filter}"
     subprocess_run(command_unit_tests)
 
-    # run multi-gpu tests
-    if len(device_ids) > 1:
-        # distributed tests
-        print("\n=== RUN MULTI-GPU TESTS ===")
-        run_distributed_tests_directory = _ROOT_DIR / "tests"
-        run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
-        assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
-        command_end_to_end_tests = (
-            f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh "
-            f"{' '.join(map(str, device_ids))} --no-cov"
-        )
-        subprocess_run(command_end_to_end_tests)
+    if not include_torchrun_tests:
+        print("\n=== SKIPPED torchrun tests ===")
+        print("\n=== DONE ===")
+        return
 
-        # getting started example
-        print("\n=== RUN GETTING STARTED EXAMPLE ===")
-        run_getting_started_example_directory = _ROOT_DIR / "tutorials" / "getting_started"
-        run_getting_started_example_script = (
-            _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_getting_started_example.sh"
-        )
-        assert isfile(
-            run_getting_started_example_script
-        ), f"ERROR! {run_getting_started_example_script} does not exist."
-        command_getting_started_example = f"cd {run_getting_started_example_directory}; "
-        command_getting_started_example += (
-            f"bash scripts/run_getting_started_example.sh {' '.join(map(str, device_ids))}"
-        )
-        date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-        subprocess_run(command_getting_started_example)
+    if len(device_ids) < 4:
+        exit("ERROR! Need at least 2 devices to run torchrun tests.")
+    # distributed tests
+    print("\n=== RUN TORCHRUN TESTS ===")
+    run_distributed_tests_directory = _ROOT_DIR / "tests"
+    run_distributed_tests_script = _ROOT_DIR / "tests" / "run_distributed_tests.sh"
+    assert isfile(run_distributed_tests_script), f"ERROR! {run_distributed_tests_script} does not exist."
+    command_end_to_end_tests = (
+        f"cd {run_distributed_tests_directory}; bash run_distributed_tests.sh "
+        f"{' '.join(map(str, device_ids))} --no-cov"
+    )
+    subprocess_run(command_end_to_end_tests)
 
-        # checkpoint conversion (based on getting started example)
-        print("\n=== RUN CHECKPOINT CONVERSION (BASED ON GETTING STARTED EXAMPLE) ===")
-        modalities_checkpoint = get_checkpoint_from_getting_started_example(run_getting_started_example_directory)
-        conversion_config_path = replace_checkpoint_in_conversion_config(
-            run_getting_started_example_directory, modalities_checkpoint
-        )
+    # getting started example
+    print("\n=== RUN GETTING STARTED EXAMPLE ===")
+    run_getting_started_example_directory = _ROOT_DIR / "tutorials" / "getting_started"
+    run_getting_started_example_script = (
+        _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_getting_started_example.sh"
+    )
+    assert isfile(run_getting_started_example_script), f"ERROR! {run_getting_started_example_script} does not exist."
+    command_getting_started_example = f"cd {run_getting_started_example_directory}; "
+    command_getting_started_example += f"bash scripts/run_getting_started_example.sh {' '.join(map(str, device_ids))}"
+    date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
+    subprocess_run(command_getting_started_example)
 
-        run_conversion_script = _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_checkpoint_conversion.sh"
-        assert isfile(run_conversion_script), f"ERROR! {run_conversion_script} does not exist."
-        command_conversion = f"cd {run_getting_started_example_directory}; "
-        command_conversion += f"sh scripts/run_checkpoint_conversion.sh {conversion_config_path} "
-        command_conversion += (
-            f"{run_getting_started_example_directory}/checkpoints/{modalities_checkpoint.split('/')[-1]}"
-        )
-        subprocess_run(command_conversion)
+    # checkpoint conversion (based on getting started example)
+    print("\n=== RUN CHECKPOINT CONVERSION (BASED ON GETTING STARTED EXAMPLE) ===")
+    modalities_checkpoint = get_checkpoint_from_getting_started_example(run_getting_started_example_directory)
+    conversion_config_path = replace_checkpoint_in_conversion_config(
+        run_getting_started_example_directory, modalities_checkpoint
+    )
 
-        check_existence_and_clear_getting_started_example_output(run_getting_started_example_directory, date_of_run)
+    run_conversion_script = _ROOT_DIR / "tutorials" / "getting_started" / "scripts" / "run_checkpoint_conversion.sh"
+    assert isfile(run_conversion_script), f"ERROR! {run_conversion_script} does not exist."
+    command_conversion = f"cd {run_getting_started_example_directory}; "
+    command_conversion += f"sh scripts/run_checkpoint_conversion.sh {conversion_config_path} "
+    command_conversion += f"{run_getting_started_example_directory}/checkpoints/{modalities_checkpoint.split('/')[-1]}"
+    subprocess_run(command_conversion)
 
-        # warmstart example
-        print("\n=== RUN WARMSTART EXAMPLE ===")
-        run_warmstart_example_directory = _ROOT_DIR / "tutorials/warmstart/scripts"
-        run_warmstart_example_script = _ROOT_DIR / "tutorials/warmstart/scripts/pre_train_and_warmstart.sh"
-        assert isfile(run_warmstart_example_script), f"ERROR! {run_warmstart_example_script} does not exist."
-        command_warmstart_example = (
-            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {' '.join(map(str, device_ids))}"
-        )
-        subprocess_run(command_warmstart_example)
+    check_existence_and_clear_getting_started_example_output(run_getting_started_example_directory, date_of_run)
+
+    # warmstart example
+    print("\n=== RUN WARMSTART EXAMPLE ===")
+    run_warmstart_example_directory = _ROOT_DIR / "tutorials/warmstart/scripts"
+    run_warmstart_example_script = _ROOT_DIR / "tutorials/warmstart/scripts/pre_train_and_warmstart.sh"
+    assert isfile(run_warmstart_example_script), f"ERROR! {run_warmstart_example_script} does not exist."
+    command_warmstart_example = (
+        f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {' '.join(map(str, device_ids))}"
+    )
+    subprocess_run(command_warmstart_example)
 
     print("\n=== DONE ===")
 
