@@ -315,25 +315,20 @@ class TestMFU:
     @staticmethod
     @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
     @pytest.mark.parametrize(
-        "rdvz_port, relative_config_path, num_samples_per_second, expected_single_gpu_mfu",
+        "rdvz_port, relative_config_path, num_samples_per_second_per_gpu, expected_mfu",
         [
-            # (2, 4, 6, 8, 6.0),  # 2*4*6/8 = 6
-            # (2, 4, None, 8, -1.0),
-            # (2, 4, 6, None, -1.0),
             # 125M model, see 3rd last row here:
             # https://github.com/mosaicml/llm-foundry/blob/main/scripts/train/benchmarking/README.md
-            # NOTE: MFU is >1 since 532 samples per second would require more FLOPs
-            # than the theoretical peak performance of a single GPU.
-            (22301, "../test_yaml_configs/gpt2_config_mfu_fsdp1.yaml", 532, 3.42),
-            (22302, "../test_yaml_configs/gpt2_config_mfu_fsdp2.yaml", 532, 3.42),
+            (22301, "../test_yaml_configs/gpt2_config_mfu_fsdp1.yaml", 66.5, 0.4275),
+            (22302, "../test_yaml_configs/gpt2_config_mfu_fsdp2.yaml", 66.5, 0.4275),
         ],
     )
     def test_compute_mfu(
         rdvz_port: int,
         temporary_folder_path: Path,
         relative_config_path: str,
-        num_samples_per_second: int,
-        expected_single_gpu_mfu: Number,
+        num_samples_per_second_per_gpu: int,
+        expected_mfu: Number,
     ):
         working_dir = Path(os.path.dirname(__file__))
         # load, update and save tmp config
@@ -345,9 +340,10 @@ class TestMFU:
 
         # run the test in a distributed environment
         world_size = torch.cuda.device_count()
+        num_samples_per_second = num_samples_per_second_per_gpu * world_size
         mp.spawn(
             TestMFU._test_compute_mfu_thread,
-            args=(rdvz_port, world_size, tmp_config_file_path, num_samples_per_second, expected_single_gpu_mfu),
+            args=(rdvz_port, world_size, tmp_config_file_path, num_samples_per_second, expected_mfu),
             nprocs=world_size,
             join=True,
         )
@@ -359,7 +355,7 @@ class TestMFU:
         world_size: int,
         tmp_config_file_path: Path,
         num_samples_per_second: int,
-        expected_single_gpu_mfu: float,
+        expected_mfu: float,
     ):
         class CustomComponentInstantiationModel(BaseModel):
             mfu_calculator: PydanticMFUCalculatorABCType
@@ -379,5 +375,5 @@ class TestMFU:
             mfu_value = mfu_calculator.compute(num_samples_per_second=torch.tensor(num_samples_per_second))
 
         torch.testing.assert_close(
-            mfu_value, torch.tensor(expected_single_gpu_mfu) / world_size, atol=0.005, rtol=0.005
+            mfu_value, torch.tensor(expected_mfu), atol=0.001, rtol=0
         )  # only absolute difference matters
