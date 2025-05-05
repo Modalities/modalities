@@ -148,7 +148,7 @@ def subprocess_run(command: str) -> None:
     try:
         subprocess.run(command, shell=True, capture_output=False, check=True, text=True)
     except subprocess.CalledProcessError:
-        raise Exception(f"Subproces run failed with command {command}")
+        raise Exception(f"Subprocess run failed with command {command}")
 
 
 def main(
@@ -181,6 +181,8 @@ def main(
     python tests/tests.py --include_main_tests --include_torchrun_tests --include_examples: run all tests and examples
     python tests/tests.py --include_main_tests --include_torchrun_tests --include_examples --devices 0,1,2,3:
         run all tests and examples on devices 0, 1, 2 and 3
+    python tests/tests.py --include_main_tests --main_tests_name_filter test_initialization_fsdpx: run main tests that
+        match specified filter `test_initialization_fsdpx`
     """
     if not any([include_main_tests, include_torchrun_tests, include_examples]):
         print(
@@ -217,7 +219,7 @@ def main(
             command_unit_tests += f" -k {main_tests_name_filter}"
         subprocess_run(command_unit_tests)
 
-    if len(device_ids) < 2:
+    if len(device_ids) < 2 and (include_torchrun_tests or include_examples):
         exit("ERROR! Need at least 2 devices to run torchrun tests and examples.")
 
     if include_torchrun_tests:
@@ -244,7 +246,7 @@ def main(
         ), f"ERROR! {run_getting_started_example_script} does not exist."
         command_getting_started_example = f"cd {run_getting_started_example_directory}; "
         command_getting_started_example += (
-            f"bash scripts/run_getting_started_example.sh {' '.join(map(str, device_ids))}"
+            f"bash scripts/run_getting_started_example.sh {' '.join(map(str, device_ids[:2]))}"
         )
         date_of_run = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
         subprocess_run(command_getting_started_example)
@@ -273,7 +275,7 @@ def main(
         run_warmstart_example_script = _ROOT_DIR / "tutorials/warmstart/scripts/pre_train_and_warmstart.sh"
         assert isfile(run_warmstart_example_script), f"ERROR! {run_warmstart_example_script} does not exist."
         command_warmstart_example = (
-            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {' '.join(map(str, device_ids))}"
+            f"cd {run_warmstart_example_directory}; sh pre_train_and_warmstart.sh {' '.join(map(str, device_ids[:2]))}"
         )
         subprocess_run(command_warmstart_example)
 
@@ -283,24 +285,27 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Description of your program")
     parser.add_argument(
+        "-m",
         "--include_main_tests",
         action=argparse.BooleanOptionalAction,
         help="Run the main tests on CPU and GPU.",
         default=False,
     )
     parser.add_argument(
+        "-t",
         "--include_torchrun_tests",
         action=argparse.BooleanOptionalAction,
         help="Run the tests that require to be launched in a torchrun environment.",
         default=False,
     )
     parser.add_argument(
+        "-e",
         "--include_examples",
         action=argparse.BooleanOptionalAction,
         help="Run the examples.",
         default=False,
     )
-    parser.add_argument("--devices", type=str, default=None)
-    parser.add_argument("--main_tests_name_filter", type=str, default=None)
+    parser.add_argument("-d", "--devices", type=str, default=None)
+    parser.add_argument("-f", "--main_tests_name_filter", type=str, default=None)
     args = vars(parser.parse_args())
     main(**args)
