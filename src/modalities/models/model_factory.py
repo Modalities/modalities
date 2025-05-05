@@ -252,7 +252,9 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_compiled_model(model: nn.Module, block_names: list[str], fullgraph: bool, debug: bool) -> nn.Module:
+    def get_compiled_model(
+        model: nn.Module, block_names: list[str], fullgraph: bool, debug: Optional[bool] = False
+    ) -> nn.Module:
         """Apply torch.compile to each transformer block, which makes compilation efficient due to
         repeated structure. Alternatively one can compile the whole model (after applying DP).
         Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275
@@ -264,7 +266,7 @@ class ModelFactory:
             model (nn.Module): The model to be compiled.
             block_names (list[str]): List of block names to be compiled individually.
             fullgraph (bool): Flag enforcing the block to be compiled without graph breaks.
-            debug (bool): Flag to enable debug mode.
+            debug (Optional[bool]): Flag to enable debug mode. Default is False.
 
         Returns:
             nn.Module: The compiled model.
@@ -343,7 +345,12 @@ class GPT2ModelFactory:
             seed=seed,
             use_weight_tying=use_weight_tying,
         )
-
+        if use_meta_device and use_weight_tying:
+            raise ValueError(
+                "Weight tying is not supported on meta device. "
+                "Please set use_weight_tying=False or use_weight_tying=True."
+                "https://github.com/Modalities/modalities/issues/357"
+            )
         if use_meta_device:
             with torch.device("meta"):
                 model = GPT2LLM(**config)

@@ -165,6 +165,11 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
     elif isinstance(model, FSDP2):
         total_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         return total_num_params
+    else:
+        raise ValueError(
+            f"Model type {type(model)} is not supported. "
+            "Please use either FullyShardedDataParallel (FSDP1) or FullyShardedDataParallel (FSDP2)."
+        )
 
 
 class TimeRecorderStates(Enum):

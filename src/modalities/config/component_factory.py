@@ -71,14 +71,12 @@ class ComponentFactory:
         top_level_components: dict[str, Any],
         traversal_path: list,
     ) -> Any:
+        if len(traversal_path) == 1 and traversal_path[0] in top_level_components:
+            # if the top level component is already built due to a referencing config,
+            # we just return this component instead of building it again
+            return top_level_components[traversal_path[0]], top_level_components
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
-            # if the entities are top level components, we return the component,
-            # as it must have been built already via a referencing component
-            if len(traversal_path) > 0 and traversal_path[-1] in top_level_components:
-                entity_key = traversal_path[-1]
-                return top_level_components[entity_key], top_level_components
-            # if it is not a component that has been built already, we need to build it.
             # We first traverse the config for possible sub components that need to build beforehand.
             materialized_component_config = {}
             for sub_entity_key, sub_component_config_dict in current_component_config.items():

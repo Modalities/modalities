@@ -1,0 +1,25 @@
+name: Check Arc Runner Environment
+
+on:
+  push:
+    branches:
+      - main
+      - check_env_workflow
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: arc-runner-set
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: check arc runner environment
+      run: |
+        nvidia-smi
+        echo $CUDA_VISIBLE_DEVICES

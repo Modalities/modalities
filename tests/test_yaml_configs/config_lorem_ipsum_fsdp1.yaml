@@ -11,19 +11,18 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ./data/lorem_ipsum_long.pbin
-    test_dataset_path: ./data/lorem_ipsum.pbin
+    train_dataset_path: ./data/lorem_ipsum.pbin
   intervals:
     training_log_interval_in_steps: 1
-    checkpointing_interval_in_steps: 32
-    evaluation_interval_in_steps: 32
+    checkpointing_interval_in_steps: 1
+    evaluation_interval_in_steps: 1
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
-    enforce_last_step_logged: false
-    enforce_last_step_evaluated: false
-    enforce_last_step_checkpointed: false
+    enforce_last_step_logged: true
+    enforce_last_step_evaluated: true
+    enforce_last_step_checkpointed: true
   step_profile:
-    gradient_accumulation_steps: 2
+    gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
   training_target:
@@ -99,23 +98,15 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-test_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_continuous
-  config:
-    raw_data_path: ${settings.paths.test_dataset_path}
-    sequence_length: ${settings.step_profile.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
-
-test_dataloader:
+val_dataloader:
   component_key: data_loader
   variant_key: default
   config:
     num_workers: 2
     pin_memory: true
-    dataloader_tag: test
+    dataloader_tag: val
     dataset:
-      instance_key: test_dataset
+      instance_key: train_dataset
       pass_type: BY_REFERENCE
     batch_sampler:
       component_key: batch_sampler
@@ -132,13 +123,46 @@ test_dataloader:
             shuffle: false
             drop_last: true
             dataset:
-              instance_key: test_dataset
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: test
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            drop_last: true
+            dataset:
+              instance_key: train_dataset
               pass_type: BY_REFERENCE
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
 eval_dataloaders:
+  - instance_key: val_dataloader
+    pass_type: BY_REFERENCE
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE
 
@@ -185,14 +209,14 @@ wrapped_model:
   variant_key: fsdp1_wrapped
   config:
     model:
-      instance_key: initialized_model
+      instance_key: model
       pass_type: BY_REFERENCE
     sync_module_states: true
     mixed_precision_settings: BF_16
     sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
 
-initialized_model:
+model:
   component_key: model
   variant_key: model_initialized
   config:
@@ -213,8 +237,6 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_meta_device: false
-    use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -222,7 +244,7 @@ model_raw:
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head_q: 8
-    n_head_kv: 4
+    n_head_kv: 8
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
@@ -252,6 +274,7 @@ model_raw:
       config:
         normalized_shape: ${model_raw.config.n_embd}
         eps: 1e-5
+    use_weight_tying: true
 
 lr_scheduler:
   component_key: scheduler
@@ -283,13 +306,12 @@ optimizer:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp1
+  variant_key: fsdp1_logging_only
   config:
     wrapped_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
-    max_norm: 1.0
 
 progress_subscriber:
   component_key: progress_subscriber
@@ -305,14 +327,8 @@ progress_subscriber:
 
 evaluation_subscriber:
   component_key: results_subscriber
-  variant_key: wandb
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    project: modalities_dcp_tests
-    mode: OFFLINE
-    experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
-    config_file_path: ${settings.config_file_path}
+  variant_key: dummy
+  config: {}
 
 mfu_calculator:
   component_key: mfu_calculator

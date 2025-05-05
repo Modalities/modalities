@@ -104,7 +104,7 @@ eval_dataloaders: []
 
 checkpoint_loading:
   component_key: checkpoint_loading
-  variant_key: fsdp
+  variant_key: fsdp1
   config:
     global_rank: ${settings.cuda_env.global_rank}
     block_names: [GPT2Block]
@@ -135,9 +135,23 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: wrapped_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
 wrapped_model:
   component_key: model
-  variant_key: checkpointed
+  variant_key: fsdp1_checkpointed
   config:
     model:
       instance_key: model
@@ -169,6 +183,7 @@ model_raw:
   variant_key: gpt2
   config:
     use_meta_device: false
+    use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -255,7 +270,7 @@ optimizer_original:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp1
   config:
     wrapped_model:
       instance_key: wrapped_model
