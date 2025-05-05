@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.pydanctic_if_types import PydanticPytorchModuleType, PydanticTokenizerIFType
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -54,3 +54,16 @@ def get_model_from_config(config: dict, model_type: ModelTypeEnum):
 
     components = component_factory.build_components(config_dict=config, components_model_type=PydanticConfig)
     return getattr(components, model_type.value)
+
+
+def get_tokenizer_from_config(config: dict, tokenizer_type: str):
+    registry = Registry(COMPONENTS)
+    component_factory = ComponentFactory(registry=registry)
+
+    class PydanticConfig(BaseModel):
+        tokenizer: PydanticTokenizerIFType
+
+    components = component_factory.build_components(
+        config_dict=config, components_model_type=PydanticConfig
+    )
+    return getattr(components, tokenizer_type)
