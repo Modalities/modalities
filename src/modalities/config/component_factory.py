@@ -30,7 +30,7 @@ class ComponentFactory:
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.
         """
-        # the componentsinstantiaton model allows for the definition of required and optional top-level components
+        # the components instantiaton model allows for the definition of required and optional top-level components
         # for example the mfu_calculator might not always be required.
         component_names_required = [
             name for name, field in components_model_type.model_fields.items() if field.is_required()

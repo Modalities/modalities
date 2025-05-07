@@ -20,7 +20,6 @@ from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
-    CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
@@ -35,6 +34,7 @@ from modalities.config.config import (
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     FSDP1CheckpointedModelConfig,
+    FSDP1CheckpointedOptimizerConfig,
     FSDP1CheckpointLoadingConfig,
     FSDP1CheckpointSavingConfig,
     FSDP2WrappedModelConfig,
@@ -169,7 +169,10 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer_, CheckpointedOptimizerConfig
+        "optimizer",
+        "fsdp1_checkpointed",
+        OptimizerFactory.get_fsdp1_checkpointed_optimizer_,
+        FSDP1CheckpointedOptimizerConfig,
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),

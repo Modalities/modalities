@@ -183,8 +183,8 @@ class GPT2MFUCalculator(MFUCalculatorABC):
             torch.Tensor: The computed MFU.
         """
         return MFUCalculatorABC._compute_mfu_impl(
-            num_samples_per_second,
-            self._sequence_length,
-            self._theoretical_flops_per_token,
-            self._theoretical_gpu_peak_performance,
+            num_samples_per_second=num_samples_per_second,
+            sequence_length=self._sequence_length,
+            theoretical_flops_per_token=self._theoretical_flops_per_token,
+            theoretical_gpu_peak_performance=self._theoretical_gpu_peak_performance,
         )

@@ -869,7 +869,6 @@ class GPT2LLM(NNModel):
                 lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
-        # self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"

@@ -218,7 +218,7 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
 
 
-class CheckpointedOptimizerConfig(BaseModel):
+class FSDP1CheckpointedOptimizerConfig(BaseModel):
     checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType

@@ -242,7 +242,7 @@ lr_scheduler:
 
 optimizer:
   component_key: optimizer
-  variant_key: checkpointed
+  variant_key: fsdp1_checkpointed
   config:
     optimizer:
       instance_key: optimizer_original
