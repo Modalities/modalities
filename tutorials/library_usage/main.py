@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import torch
@@ -22,32 +23,48 @@ class CustomGPT2LLMCollateFn(CollateFnIF):
         self.sample_key = sample_key
         self.target_key = target_key
         self.custom_attribute = custom_attribute
+        self._num_calls = 0
+
+    @property
+    def num_calls(self) -> int:
+        return self._num_calls
 
     def __call__(self, batch: list[list[int]]) -> DatasetBatch:
         sample_tensor = torch.tensor(batch)
         samples = {self.sample_key: sample_tensor[:, :-1]}
         targets = {self.target_key: sample_tensor[:, 1:]}
+        self._num_calls += 1
         return DatasetBatch(targets=targets, samples=samples)
 
 
 def main():
     # load and parse the config file
     cwd = Path(__file__).parent
+    # change to cwd
+    os.chdir(cwd)
     config_file_path = cwd / Path("config_lorem_ipsum.yaml")
-    # instantiate the Main entrypoint of modalities by passing in the config path
-    modalities_main = Main(config_path=config_file_path)
 
-    # add the custom component to modalities
-    modalities_main.add_custom_component(
-        component_key="collate_fn",
-        variant_key="custom_gpt_2_llm_collator",
-        custom_component=CustomGPT2LLMCollateFn,
-        custom_config=CustomGPT2LLMCollateFnConfig,
-    )
-    # run the experiment
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        components = modalities_main.build_components(components_model_type=TrainingComponentsInstantiationModel)
+        # instantiate the Main entrypoint of modalities by passing in the config path
+        modalities_main = Main(config_path=config_file_path)
+
+        # add the custom component to modalities
+        modalities_main.add_custom_component(
+            component_key="collate_fn",
+            variant_key="custom_gpt_2_llm_collator",
+            custom_component=CustomGPT2LLMCollateFn,
+            custom_config=CustomGPT2LLMCollateFnConfig,
+        )
+        # run the experiment
+        components: TrainingComponentsInstantiationModel = modalities_main.build_components(
+            components_model_type=TrainingComponentsInstantiationModel
+        )
         modalities_main.run(components)
+
+        collate_fn = components.train_dataloader.collate_fn
+        if collate_fn.num_calls < 1:
+            raise ValueError("Custom collator was not called during training.")
+        print(f"Custom collator was called {collate_fn.num_calls} times during training.")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 2
     sequence_length: 256
@@ -86,10 +86,13 @@ train_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -120,7 +123,11 @@ val_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0
     pin_memory: true
     dataloader_tag: val
     dataset:
@@ -151,7 +158,11 @@ test_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0 
     pin_memory: true
     dataloader_tag: test
     dataset:
@@ -321,7 +332,7 @@ optimizer:
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp1
   config:
     wrapped_model:
       instance_key: wrapped_model
