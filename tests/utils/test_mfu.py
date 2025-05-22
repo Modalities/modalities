@@ -13,7 +13,7 @@ from torch.types import Number
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
     PydanticFSDP1ModuleType,
     PydanticFSDP2ModuleType,
     PydanticMFUCalculatorABCType,

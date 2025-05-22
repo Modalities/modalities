@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP  # TODO: rename to FSDP1
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
@@ -54,7 +54,7 @@ class ModelFactory:
         checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
-    ) -> nn.Module:
+    ) -> FSDP1:
         """
         Loads a FSDP1 checkpointed model from the given checkpoint path.
 
@@ -86,9 +86,9 @@ class ModelFactory:
         block_names: list[str],
         mixed_precision_settings: MixedPrecisionSettings,
         sharding_strategy: ShardingStrategy,
-    ) -> FSDP:
+    ) -> FSDP1:
         """
-        Get the FSDP-wrapped model.
+        Get the FSDP1-wrapped model.
 
         Args:
             model (nn.Module): The original model to be wrapped.
@@ -98,7 +98,7 @@ class ModelFactory:
             sharding_strategy (ShardingStrategy): Sharding strategy.
 
         Returns:
-            FSDP: The FSDP-wrapped model.
+            FSDP1: The FSDP1-wrapped model.
 
         Note:
             'FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.
@@ -116,7 +116,7 @@ class ModelFactory:
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
 
         # model is on CPU before input to FSDP
-        fsdp_model = FSDP(
+        fsdp_model = FSDP1(
             model,
             auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
             mixed_precision=mixed_precision_settings.value,
@@ -190,7 +190,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+    def get_weight_initialized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
         """
         Initializes the given model with weights using the provided model initializer.
         The model can be on a meta device.
@@ -225,28 +225,28 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_model(model: FSDP, activation_checkpointing_modules: list[str]) -> FSDP:
+    def get_activation_checkpointed_fsdp1_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
         """Apply activation checkpointing to the given model (in-place operation).
 
         Args:
-            model (FSDP): The FSDP-wrapped model to apply activation checkpointing to.
+            model (FSDP1): The FSDP1-wrapped model to apply activation checkpointing to.
             activation_checkpointing_modules (list[str]): List of module names to apply activation checkpointing to.
 
         Raises:
-            ValueError: Activation checkpointing can only be applied to FSDP-wrapped models!
+            ValueError: Activation checkpointing can only be applied to FSDP1-wrapped models!
 
         Returns:
-            FSDP: The model with activation checkpointing applied.
+            FSDP1: The model with activation checkpointing applied.
         """
         if len(activation_checkpointing_modules) > 0:
-            if isinstance(model, FSDP):
+            if isinstance(model, FSDP1):
                 apply_activation_checkpointing_inplace(
                     model=model,
                     activation_checkpointing_modules=activation_checkpointing_modules,
                 )
             else:
                 raise ValueError(
-                    "Activation checkpointing can only be applied to FSDP-wrapped models! "
+                    "Activation checkpointing can only be applied to FSDP1-wrapped models! "
                     f"Current model type: {type(model)}"
                 )
         return model
@@ -348,7 +348,7 @@ class GPT2ModelFactory:
         if use_meta_device and use_weight_tying:
             raise ValueError(
                 "Weight tying is not supported on meta device. "
-                "Please set use_weight_tying=False or use_weight_tying=True."
+                "Please set at least use_meta_device=False or use_weight_tying=False."
                 "https://github.com/Modalities/modalities/issues/357"
             )
         if use_meta_device:

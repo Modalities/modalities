@@ -14,5 +14,5 @@ class MessageSubscriberIF(ABC, Generic[T]):
         raise NotImplementedError
 
     @abstractmethod
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         raise NotImplementedError

@@ -4,7 +4,7 @@ import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Annotated
 
-from modalities.config.pydanctic_if_types import PydanticModelInitializationIFType
+from modalities.config.pydantic_if_types import PydanticModelInitializationIFType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
 from modalities.nn.model_initialization.parameter_name_filters import (

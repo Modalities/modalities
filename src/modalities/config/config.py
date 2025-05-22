@@ -12,7 +12,7 @@ from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
 from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,

@@ -74,8 +74,7 @@ def convert_gpt2(
         raise ValueError(
             "Multiple tokenizer configs found. Please specify only one tokenizer config in the modalities config file."
         )
-
-    if len(sentence_piece_tokenizer_configs) == 1:
+    elif len(sentence_piece_tokenizer_configs) == 1:
         tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
         bos_token_id, eos_token_id, pad_token_id, _ = convert_tokenizer(tokenizer_model, output_dir)
         # The values bos=1, eos=2 and pad=None are set by default in the model config (as taken from Llama).

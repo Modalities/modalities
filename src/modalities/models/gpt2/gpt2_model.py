@@ -313,7 +313,7 @@ class GPT2LLMConfig(BaseModel):
         attention_config (AttentionConfig): The attention configuration.
         attention_implementation (AttentionImplementation): The attention implementation.
         activation_type (ActivationType): The activation type.
-        attention_norm_config (LayerNormWrapperConfig): Config for normalization of the  for attention.
+        attention_norm_config (LayerNormWrapperConfig): Config for normalization of the attention.
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.

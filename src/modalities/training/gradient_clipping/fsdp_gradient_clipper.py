@@ -26,7 +26,7 @@ class GradientClippingMode(LookupEnum):
 
 class FSDP1GradientClipper(GradientClipperIF):
     """The FSDP1GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP.
-    Follows the documeentation from
+    Follows the documentation from
     https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.clip_grad_norm_
     """
 

@@ -144,12 +144,12 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp1_wrapped", ModelFactory.get_fsdp1_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp2_wrapped", ModelFactory.get_fsdp2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+        "model", "model_initialized", ModelFactory.get_weight_initialized_model, WeightInitializedModelConfig
     ),
     ComponentEntity(
         "model",
-        "activation_checkpointed",
-        ModelFactory.get_activation_checkpointed_model,
+        "activation_checkpointed_fsdp1",
+        ModelFactory.get_activation_checkpointed_fsdp1_model,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),

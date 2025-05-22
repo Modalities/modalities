@@ -28,7 +28,10 @@ class DeviceMeshConfig(BaseModel):
             or self.context_parallel_degree != 1
             or self.enable_loss_parallel
         ):
-            raise ConfigError("Only tensor parallelism, data parallelism and loss parallelism are not supported, yet.")
+            raise ConfigError(
+                "Tensor parallelism, pipeline parallelism, context parallelism and "
+                "loss parallelism are not supported, yet."
+            )
 
         for d in (
             self.data_parallel_replicate_degree,

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
-from modalities.config.pydanctic_if_types import PydanticThirdPartyTypeIF
+from modalities.config.pydantic_if_types import PydanticThirdPartyTypeIF
 from modalities.registry.components import ComponentEntity
 from modalities.registry.registry import Registry
 from tests.config.components import ComponentV, ComponentW, ComponentX, ComponentY

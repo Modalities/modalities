@@ -44,3 +44,7 @@ COVERAGE_FILE=.coverage_reports/.coverage.part5 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1
 
 # test optimizer
 COVERAGE_FILE=.coverage_reports/.coverage.part6 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_optimizer_factory.py $COVERAGE
+
+# test model initialization
+# note some of the tests are already implemented in tests/test_initialization_fsdpx.py and can be run without a torchrun env
+COVERAGE_FILE=.coverage_reports/.coverage.part9 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_initialization_fsdp1.py $COVERAGE

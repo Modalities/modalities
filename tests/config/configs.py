@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel
 
-from modalities.config.pydanctic_if_types import PydanticThirdPartyTypeIF
+from modalities.config.pydantic_if_types import PydanticThirdPartyTypeIF
 from tests.config.components import Component_V_W_X_IF
 
 PydanticComponent_V_W_X_IF_Type = Annotated[Component_V_W_X_IF, PydanticThirdPartyTypeIF(Component_V_W_X_IF)]
