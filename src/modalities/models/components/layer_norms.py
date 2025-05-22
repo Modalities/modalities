@@ -58,11 +58,13 @@ class RMSLayerNorm(nn.Module):
     def reset_parameters(self):
         # This function is called from the ModelFactory, when the model weights are initialized.
         # We recursively iterate through all the modules of a model and call reset_parameters if it exists.
-        # Subsequently, we apply run the weight initialization on top, applying custom weight initialization to
+        # Subsequently, we run the weight initialization on top, applying custom weight initialization to
         # a subset of modules based on the configuration.
         # Inpired by torch titan RMS Norm implementation:
         # https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/models/norms.py#L113C1-L114C57
         torch.nn.init.ones_(self.weight)
+        if self.bias is not None:
+            torch.nn.init.zeros_(self.bias)
 
 
 class LayerNormConfig(BaseModel):
