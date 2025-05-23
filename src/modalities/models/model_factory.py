@@ -166,8 +166,13 @@ class ModelFactory:
             param_dtype=mixed_precision_settings.param_dtype.value,
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
-
-        fsdp_config = {"mesh": device_mesh[ParallelismDegrees.DP_SHARD.value], "mp_policy": mp_policy}
+        # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
+        fsdp2_degrees = (
+            (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
+            if ParallelismDegrees.DP_REPLICATE in device_mesh.mesh_dim_names
+            else (ParallelismDegrees.DP_SHARD.value,)
+        )
+        fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
         # we first shard all the blocks
