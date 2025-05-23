@@ -176,7 +176,7 @@ COMPONENTS = [
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),
-    ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state, DCPAppStateConfig),
+    ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state_, DCPAppStateConfig),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
