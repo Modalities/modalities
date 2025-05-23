@@ -19,7 +19,7 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: check arc runner environment
+    - name: Check arc runner environment
       run: |
         nvidia-smi
         echo $CUDA_VISIBLE_DEVICES
