@@ -9,7 +9,7 @@ from torch.utils.data import BatchSampler, SequentialSampler
 
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
-from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.config.pydantic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataset import Dataset
 from modalities.registry.components import COMPONENTS

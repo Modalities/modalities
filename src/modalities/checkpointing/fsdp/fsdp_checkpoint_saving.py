@@ -32,7 +32,7 @@ class CheckpointingEntityType(Enum):
 class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
     """FSDP1CheckpointSaving class for saving checkpoints of FSDP models and optimizers.
     NOTE: This checkpoint saving routing loads the model into CPU memory before saving it to disk
-    and stores the model and optimizer in a separate file.
+    and stores the model and optimizer in separate files.
     This routine only works in conjunction with FSDP1.
     """
 

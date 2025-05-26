@@ -2,12 +2,11 @@ import warnings
 from typing import Optional
 
 import torch
-import torch.nn as nn
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.types import Number
 
-from modalities.util import get_local_number_of_trainable_parameters
+from modalities.util import get_total_number_of_trainable_parameters
 from modalities.utils.typing_utils import FSDPX
 
 # A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/
@@ -153,20 +152,25 @@ class GPT2MFUCalculator(MFUCalculatorABC):
         sequence_length: int,
         n_embd: int,
         world_size: int,
-        raw_model: nn.Module,
         wrapped_model: FSDPX,
     ):
-        self._num_params = get_local_number_of_trainable_parameters(raw_model)
+        self._num_params = get_total_number_of_trainable_parameters(wrapped_model)
         self._n_layer = n_layer
         self._sequence_length = sequence_length
         self._n_embd = n_embd
-        self._theoretical_flops_per_token = self._get_theoretical_flops_per_token()
+        self._theoretical_flops_per_token = GPT2MFUCalculator._get_theoretical_flops_per_token(
+            num_params=self._num_params,
+            n_layer=self._n_layer,
+            sequence_length=self._sequence_length,
+            n_embd=self._n_embd,
+        )
         self._theoretical_gpu_peak_performance = MFUCalculatorABC._get_theoretical_gpu_peak_performance(
             wrapped_model, world_size
         )
 
-    def _get_theoretical_flops_per_token(self) -> int:
-        return 6 * self._num_params + 12 * self._n_layer * self._sequence_length * self._n_embd
+    @staticmethod
+    def _get_theoretical_flops_per_token(num_params: int, n_layer: int, sequence_length: int, n_embd: int) -> int:
+        return 6 * num_params + 12 * n_layer * sequence_length * n_embd
 
     def compute(self, num_samples_per_second: torch.Tensor) -> torch.Tensor:
         """
@@ -179,8 +183,8 @@ class GPT2MFUCalculator(MFUCalculatorABC):
             torch.Tensor: The computed MFU.
         """
         return MFUCalculatorABC._compute_mfu_impl(
-            num_samples_per_second,
-            self._sequence_length,
-            self._theoretical_flops_per_token,
-            self._theoretical_gpu_peak_performance,
+            num_samples_per_second=num_samples_per_second,
+            sequence_length=self._sequence_length,
+            theoretical_flops_per_token=self._theoretical_flops_per_token,
+            theoretical_gpu_peak_performance=self._theoretical_gpu_peak_performance,
         )

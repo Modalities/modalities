@@ -61,7 +61,7 @@ class ModelFactory:
         checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
         model: nn.Module,
-    ) -> nn.Module:
+    ) -> FSDP1:
         """
         Loads a FSDP1 checkpointed model from the given checkpoint path.
 
@@ -173,8 +173,13 @@ class ModelFactory:
             param_dtype=mixed_precision_settings.param_dtype.value,
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
-
-        fsdp_config = {"mesh": device_mesh[ParallelismDegrees.DP_SHARD.value], "mp_policy": mp_policy}
+        # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
+        fsdp2_degrees = (
+            (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
+            if ParallelismDegrees.DP_REPLICATE in device_mesh.mesh_dim_names
+            else (ParallelismDegrees.DP_SHARD.value,)
+        )
+        fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
         # we first shard all the blocks
@@ -197,7 +202,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_weight_initalized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
+    def get_weight_initialized_model(model: nn.Module, model_initializer: ModelInitializationIF) -> nn.Module:
         """
         Initializes the given model with weights using the provided model initializer.
         The model can be on a meta device.
@@ -232,7 +237,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
+    def get_activation_checkpointed_fsdp1_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
         """Apply activation checkpointing to the given model (in-place operation).
 
         Args:
@@ -283,7 +288,9 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_compiled_model(model: nn.Module, block_names: list[str], fullgraph: bool, debug: bool) -> nn.Module:
+    def get_compiled_model(
+        model: nn.Module, block_names: list[str], fullgraph: bool, debug: Optional[bool] = False
+    ) -> nn.Module:
         """Apply torch.compile to each transformer block, which makes compilation efficient due to
         repeated structure. Alternatively one can compile the whole model (after applying DP).
         Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275
@@ -295,7 +302,7 @@ class ModelFactory:
             model (nn.Module): The model to be compiled.
             block_names (list[str]): List of block names to be compiled individually.
             fullgraph (bool): Flag enforcing the block to be compiled without graph breaks.
-            debug (bool): Flag to enable debug mode.
+            debug (Optional[bool]): Flag to enable debug mode. Default is False.
 
         Returns:
             nn.Module: The compiled model.
@@ -324,7 +331,7 @@ class ModelFactory:
             if module_class is not None:
                 block_types.append(module_class)
             else:
-                raise ValueError("None of the provided block_names match any modules in the model")
+                raise ValueError(f"The block name {name} does not match any modules in the model")
 
         block_types = tuple(block_types)
 
@@ -384,7 +391,12 @@ class GPT2ModelFactory:
             seed=seed,
             use_weight_tying=use_weight_tying,
         )
-
+        if use_meta_device and use_weight_tying:
+            raise ValueError(
+                "Weight tying is not supported on meta device. "
+                "Please set at least use_meta_device=False or use_weight_tying=False."
+                "https://github.com/Modalities/modalities/issues/357"
+            )
         if use_meta_device:
             with torch.device("meta"):
                 model = GPT2LLM(**config)

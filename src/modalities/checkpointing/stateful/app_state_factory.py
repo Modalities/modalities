@@ -32,11 +32,12 @@ class AppStateFactory:
         return app_state
 
     @staticmethod
-    def get_dcp_checkpointed_app_state(
+    def get_dcp_checkpointed_app_state_(
         raw_app_state: AppState,
         checkpoint_dir_path: Path,
     ) -> AppState:
-        """Loads the checkpointed state dict into the raw AppState object (i.e., non-checkpoint loaded AppState).
+        """Loads the checkpointed state dict into the raw AppState object
+        (i.e., non-checkpoint loaded AppState) in-place.
 
         Args:
             raw_app_state (AppState): The raw AppState object.

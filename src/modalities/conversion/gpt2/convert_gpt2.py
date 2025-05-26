@@ -51,7 +51,7 @@ def convert_gpt2(
         device_modalities (str, optional): Device for the modalities model. Defaults to "cpu".
         device_hf (str, optional): Device for the Hugging Face model. Defaults to "cpu".
     """
-    modalities_config = load_app_config_dict(Path(modalities_config_path))
+    modalities_config = load_app_config_dict(Path(modalities_config_path), experiment_id="-1")
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
     if num_testruns > 0:
@@ -62,7 +62,19 @@ def convert_gpt2(
             modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"],
         )
 
-    if "tokenizer" in modalities_config:
+    sentence_piece_tokenizer_configs = {
+        key: subconfig
+        for key, subconfig in modalities_config.items()
+        if "component_key" in subconfig
+        and subconfig["component_key"] == "tokenizer"
+        and subconfig["variant_key"] == "pretrained_sp_tokenizer"
+    }
+
+    if len(sentence_piece_tokenizer_configs) > 1:
+        raise ValueError(
+            "Multiple tokenizer configs found. Please specify only one tokenizer config in the modalities config file."
+        )
+    elif len(sentence_piece_tokenizer_configs) == 1:
         tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
         bos_token_id, eos_token_id, pad_token_id, _ = convert_tokenizer(tokenizer_model, output_dir)
         # The values bos=1, eos=2 and pad=None are set by default in the model config (as taken from Llama).

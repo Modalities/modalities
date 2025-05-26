@@ -19,7 +19,7 @@ from torch.distributed.fsdp import StateDictType
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import PydanticFSDP1ModuleType, PydanticFSDP2ModuleType
+from modalities.config.pydantic_if_types import PydanticFSDP1ModuleType, PydanticFSDP2ModuleType
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 

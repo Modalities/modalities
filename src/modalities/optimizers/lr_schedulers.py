@@ -6,8 +6,8 @@ from torch.optim.lr_scheduler import LRScheduler
 
 
 class DummyLRScheduler(LRScheduler):
-    def __init__(self, optimizer: Optimizer, last_epoch: Optional[int] = -1, verbose: Optional[bool] = False):
-        super().__init__(optimizer, last_epoch, verbose)
+    def __init__(self, optimizer: Optimizer, last_epoch: Optional[int] = -1):
+        super().__init__(optimizer, last_epoch)
 
     def get_lr(self) -> list[float]:
         if not self._get_lr_called_within_step:  # type error expected due to internal pytorch implementation

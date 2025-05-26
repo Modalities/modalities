@@ -23,7 +23,7 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 2
     sequence_length: 256
@@ -45,7 +45,7 @@ settings:
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
+  training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0
@@ -86,10 +86,13 @@ train_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -120,7 +123,11 @@ val_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0
     pin_memory: true
     dataloader_tag: val
     dataset:
@@ -151,7 +158,11 @@ test_dataloader:
   component_key: data_loader
   variant_key: default
   config:
-    num_workers: 2
+    # we set num_workers to 0 so that the the data is loaded in the main process
+    # this is required to track how often the collator has been called 
+    # in the library tutorials. Otherwise the collator will be copied for each worker
+    # and the number of call is out of scope.
+    num_workers: 0 
     pin_memory: true
     dataloader_tag: test
     dataset:
@@ -195,7 +206,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp1
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -208,12 +219,21 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    world_size: ${settings.cuda_env.world_size}
+
 app_state:
   component_key: app_state
   variant_key: raw
   config:
     model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
@@ -222,24 +242,12 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model:
-  component_key: model
-  variant_key: fsdp1_wrapped
-  config:
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
-
-model:
+initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: model_raw
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
@@ -251,10 +259,27 @@ model:
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
 model_raw:
   component_key: model
   variant_key: gpt2
   config:
+    use_meta_device: false
+    use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: ABSOLUTE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -289,7 +314,6 @@ model_raw:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    use_weight_tying: true
 
 lr_scheduler:
   component_key: scheduler
@@ -316,15 +340,15 @@ optimizer:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
@@ -346,8 +370,8 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: modalities_library_usage_example
-    mode: ONLINE
+    project: modalities_dcp_tests
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: wandb
     config_file_path: ${settings.config_file_path}

@@ -1,6 +1,6 @@
 test_model: 
   component_key: model
-  variant_key: activation_checkpointed
+  variant_key: activation_checkpointed_fsdp1
   config:
     model:
       instance_key: wrapped_model

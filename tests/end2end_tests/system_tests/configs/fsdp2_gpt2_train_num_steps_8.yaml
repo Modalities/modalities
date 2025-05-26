@@ -183,7 +183,7 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_meta_device: true
+    use_meta_device: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
