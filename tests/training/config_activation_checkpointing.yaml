@@ -29,6 +29,9 @@ selective_op_activation_checkpointed_model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
     layers_fqn: transformer.h
+    sac_fun_params:
+      save_ops_keys:
+        - torch.ops.aten.mm.default
 
 model_raw:
   component_key: model

@@ -315,7 +315,7 @@ class SelectiveActivationCheckpointedModelConfig(BaseModel):
         ac_freq: int
 
     class SelectiveOpACParams(BaseModel):
-        pass
+        save_ops_keys: list[str]
 
     sac_variant: SelectiveActivationCheckpointingVariants
     layers_fqn: str

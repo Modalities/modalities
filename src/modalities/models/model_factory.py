@@ -309,12 +309,22 @@ class ModelFactory:
         """
 
         def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> tuple[nn.Module, str]:
+            selected_parent_candidate, selected_child_name = None, None
+            num_candidates = 0
             for _, parent_candidate in model.named_modules():
                 for child_name, child_candidate in parent_candidate.named_children():
                     if child_candidate is child_module:
-                        return parent_candidate, child_name
-            raise ModelStateError("No valid parent candidate")
+                        selected_parent_candidate = parent_candidate
+                        selected_child_name = child_name
+                        num_candidates += 1
+            if num_candidates == 0:
+                raise ModelStateError("No valid parent candidate")
+            elif num_candidates > 1:
+                raise ModelStateError("Multiple valid parent candidates")
+            else:
+                return selected_parent_candidate, selected_child_name
 
+        # get all block types that we want to compile individually
         block_types = []
         for name in block_names:
             module_class = get_module_class_from_name(model, name)

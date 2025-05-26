@@ -111,6 +111,7 @@ from modalities.utils.number_conversion import (
     NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
+from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
 
 
 @dataclass
@@ -226,6 +227,10 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    # dataset batch generator
+    ComponentEntity(
+        "dataset_batch_generator", "random", RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
