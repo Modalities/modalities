@@ -43,12 +43,23 @@ class OptimizerFactory:
         return optimizer
 
     @staticmethod
-    def get_checkpointed_optimizer_(
+    def get_fsdp1_checkpointed_optimizer_(
         checkpoint_loading: FSDP1CheckpointLoadingIF,
         checkpoint_path: Path,
-        wrapped_model: nn.Module,
+        wrapped_model: FSDP1,
         optimizer: Optimizer,
     ) -> Optimizer:
+        """Loads an FSDP1-checkpointed optimizer from a checkpoint file.
+
+        Args:
+            checkpoint_loading (FSDP1CheckpointLoadingIF): The FDSP1 checkpoint loading strategy.
+            checkpoint_path (Path): The path to the checkpoint file.
+            wrapped_model (FSDP1): The FSDP1 model associated with the optimizer.
+            optimizer (Optimizer): The optimizer to load the checkpoint into.
+
+        Returns:
+            Optimizer: The optimizer loaded from the checkpoint.
+        """
         checkpoint_loading.load_optimizer_checkpoint_(
             file_path=checkpoint_path, optimizer=optimizer, model=wrapped_model
         )

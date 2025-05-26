@@ -24,11 +24,11 @@ model_raw -> initialized_model -> wrapped_model
 - lr_scheduler
 
 ## FSDP2
-In the case of FSDP2, we first instantiate the model, wrap it with FSDP2 and then initialize the weights following a pre-defined distribution. The model_raw can be instantiated on the a meta device. After sharding with FSDP2 (fsdp_model), the model is still on a meta device and only during the initialisation, the model is moved to the data device (see [here](https://github.com/Modalities/modalities/blob/a7f683a6202209dcf8e78cbff4ca68991e89e081/src/modalities/models/model_factory.py)).
+In the case of FSDP2, we first instantiate the model, wrap it with FSDP2 and then initialize the weights following a pre-defined distribution. The model_raw can be instantiated on a meta device. After sharding with FSDP2 (wrapped_model), the model is still on a meta device and only during the initialisation, the model is moved to the data device (see [here](https://github.com/Modalities/modalities/blob/a7f683a6202209dcf8e78cbff4ca68991e89e081/src/modalities/models/model_factory.py)).
 The initialisation happens in place on the DTensors, similar to how it is done in [torch titan](https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/models/llama/model.py).
 
 ```
-model_raw -> fsdp_model -> initialized_model
+model_raw -> wrapped_model -> initialized_model
 ```
 
 #### LR Scheduler requirements
@@ -54,7 +54,7 @@ See also the torch titan [documentation](https://github.com/pytorch/torchtitan/b
 # Instantiation dependencies (Warmstart)
 
 ## FSDP1
-Similar to before, we first instantiate the model (random weights), initialize the weights following a pre-defined distribution, and load the actual weights from the checkpoint and shard the model with FSDP1. Loading and sharding is one step in modalities. We first load the model into the CPU RAM on rank 0 and then wrap the model with FSDP1, sharding the model to the other ranks.
+Similar to before, we first instantiate the model (random weights), initialize the weights following a pre-defined distribution, and load the actual weights from the checkpoint and shard the model with FSDP1. Loading and sharding is one step in Modalities. We first load the model into the CPU RAM on rank 0 and then wrap the model with FSDP1, sharding the model to the other ranks.
     
 https://github.com/Modalities/modalities/blob/a7f683a6202209dcf8e78cbff4ca68991e89e081/src/modalities/checkpointing/fsdp/fsdp_checkpoint_loading.py#L58-L61.
 
@@ -90,7 +90,7 @@ Firstly, the model_raw is created on the meta_device, sharded with FSDP2 and the
 
 
 ```
-model_raw -> fsdp_model -> initialized_model
+model_raw -> wrapped_model -> initialized_model
 ```
 
 

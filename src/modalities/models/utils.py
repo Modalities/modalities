@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.pydantic_if_types import PydanticPytorchModuleType
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 

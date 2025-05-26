@@ -18,7 +18,7 @@ class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         self.message_list.append(message)
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         pass
 
 

@@ -20,7 +20,6 @@ from modalities.config.config import (
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
-    CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
@@ -35,6 +34,7 @@ from modalities.config.config import (
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     FSDP1CheckpointedModelConfig,
+    FSDP1CheckpointedOptimizerConfig,
     FSDP1CheckpointLoadingConfig,
     FSDP1CheckpointSavingConfig,
     FSDP2WrappedModelConfig,
@@ -145,12 +145,12 @@ COMPONENTS = [
     ComponentEntity("model", "fsdp1_wrapped", ModelFactory.get_fsdp1_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity("model", "fsdp2_wrapped", ModelFactory.get_fsdp2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+        "model", "model_initialized", ModelFactory.get_weight_initialized_model, WeightInitializedModelConfig
     ),
     ComponentEntity(
         "model",
-        "activation_checkpointed",
-        ModelFactory.get_activation_checkpointed_model,
+        "activation_checkpointed_fsdp1",
+        ModelFactory.get_activation_checkpointed_fsdp1_model,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity(
@@ -176,11 +176,14 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer_, CheckpointedOptimizerConfig
+        "optimizer",
+        "fsdp1_checkpointed",
+        OptimizerFactory.get_fsdp1_checkpointed_optimizer_,
+        FSDP1CheckpointedOptimizerConfig,
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),
-    ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state, DCPAppStateConfig),
+    ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state_, DCPAppStateConfig),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),

@@ -16,7 +16,7 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointL
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.config.pydanctic_if_types import PydanticAppStateType
+from modalities.config.pydantic_if_types import PydanticAppStateType
 from modalities.training.training_progress import TrainingProgress
 from tests.checkpointing.checkpointing_test_utils import CheckpointingTestUtils
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv

@@ -62,7 +62,7 @@ def test_get_compiled_model_compiles_blocks(gpt2_model):
     original_lm_head = gpt2_model.transformer.lm_head
 
     block_names = ["GPT2Block"]
-    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names)
+    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names, fullgraph=True)
 
     assert len(result_model.transformer.h) == 4, "Should still have four blocks"
     for i, (original_block, new_block) in enumerate(zip(original_blocks, result_model.transformer.h)):
@@ -78,12 +78,12 @@ def test_get_compiled_model_no_matching_blocks(gpt2_model):
     Test that get_compiled_model raises a ValueError if no blocks match the specified types.
     """
     with pytest.raises(ValueError, match="None of the provided block_names match any modules in the model"):
-        ModelFactory.get_compiled_model(gpt2_model, block_names=["Conv2d"])
+        ModelFactory.get_compiled_model(gpt2_model, block_names=["Conv2d"], fullgraph=True)
 
 
 def test_get_compiled_model_empty_block_names(gpt2_model):
     original_model_dict = dict(gpt2_model.named_modules())
-    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names=[])
+    result_model = ModelFactory.get_compiled_model(gpt2_model, block_names=[], fullgraph=True)
 
     new_model_dict = dict(result_model.named_modules())
     assert new_model_dict == original_model_dict, "Model should remain unchanged with empty block_names"

@@ -40,6 +40,7 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
         self.mixed_precision_settings = mixed_precision_settings
         self.sharding_strategy = sharding_strategy
 
+    # Ensures reduced memory footprint and avoids side-effects
     @torch.no_grad()
     def load_model_checkpoint(self, model: nn.Module, file_path: Path) -> nn.Module:
         """

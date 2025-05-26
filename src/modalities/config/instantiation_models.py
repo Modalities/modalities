@@ -4,7 +4,7 @@ from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,

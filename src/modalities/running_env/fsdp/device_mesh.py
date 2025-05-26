@@ -6,13 +6,17 @@ from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
 from modalities.exceptions import ConfigError
 from modalities.util import print_rank_0
+from modalities.utils.logging import get_logger
+
+logger = get_logger("model_factory")
 
 
 class DeviceMeshConfig(BaseModel):
     # inspired by ParallelDims class in
     # https://github.com/pytorch/torchtitan/blob/cfc0f4e08dc71685cdcb394464187d2eeedd1a5f/torchtitan/parallelisms/parallel_dims.py#L15
     device_type: str = "cuda"
-    data_parallel_replicate_degree: Annotated[int, Field(strict=True, ge=-1)]
+    data_parallel_replicate_degree: Annotated[int, Field(strict=True, gt=0)]
+    # if -1, we will calculate the shard degree based on the world size and other parallel degrees
     data_parallel_shard_degree: Annotated[int, Field(strict=True, ge=-1)]
     tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
@@ -28,7 +32,10 @@ class DeviceMeshConfig(BaseModel):
             or self.context_parallel_degree != 1
             or self.enable_loss_parallel
         ):
-            raise ConfigError("Only tensor parallelism, data parallelism and loss parallelism are not supported, yet.")
+            logger.warning(
+                "Tensor parallelism, pipeline parallelism, context parallelism and "
+                "loss parallelism are not supported, yet."
+            )
 
         for d in (
             self.data_parallel_replicate_degree,

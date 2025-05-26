@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTokenizerIFType,

@@ -14,7 +14,7 @@ class DummyProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
     def consume_message(self, message: Message[ProgressUpdate]):
         pass
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         pass
 
 
@@ -96,5 +96,5 @@ class RichProgressSubscriber(MessageSubscriberIF[ProgressUpdate]):
                 completed=batch_progress.num_steps_done,
             )
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         raise NotImplementedError

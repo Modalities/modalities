@@ -1,35 +1,31 @@
-tested_model: 
+test_model:
+  component_key: model
+  variant_key: fsdp1_wrapped
+  config:
+    model:
+      instance_key: model_initialized
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
+model_initialized:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: fsdp_model
+      instance_key: model_raw
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
       variant_key: composed
       config:
         model_type: gpt2
-        weight_init_type: WILL_BE_REPLACED
+        weight_init_type: scaled
         mean: 0.0
-        std:  WILL_BE_REPLACED
-        hidden_dim: ${model_raw.config.n_embd}
+        std: 0.02
         num_layers: ${model_raw.config.n_layer}
-
-fsdp_model:
-  component_key: model
-  variant_key: fsdp2_wrapped
-  config:
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    device_mesh:
-      instance_key: device_mesh
-      pass_type: BY_REFERENCE
-    mixed_precision_settings:
-      param_dtype: BF_16
-      reduce_dtype: BF_16
-    block_names: [GPT2Block]
 
 model_raw:
   component_key: model
@@ -43,10 +39,10 @@ model_raw:
     n_layer: 12
     n_head_q: 12
     n_head_kv: 12
-    ffn_hidden: 2048
+    ffn_hidden: 3072
     n_embd: 768
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     attention_config:
       qkv_transforms: []
     attention_implementation: manual
@@ -55,28 +51,31 @@ model_raw:
       norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
     ffn_norm_config:
       norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
     lm_head_norm_config:
       norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
-        bias: true
+        bias: false
         epsilon: 1e-5
-    use_weight_tying: WILL_BE_REPLACED
+    use_weight_tying: true
     use_meta_device: false
 
-device_mesh:
-  component_key: device_mesh
-  variant_key: default
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
   config:
-    device_type: cuda
-    data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${cuda_env:WORLD_SIZE}
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${model_raw.config.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
     world_size: ${cuda_env:WORLD_SIZE}
+    wrapped_model:
+      instance_key: test_model
+      pass_type: BY_REFERENCE

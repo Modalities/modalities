@@ -26,7 +26,7 @@ class GradientClippingMode(LookupEnum):
 
 class FSDP1GradientClipper(GradientClipperIF):
     """The FSDP1GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP.
-    Follows the documeentation from
+    Follows the documentation from
     https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.clip_grad_norm_
     """
 
@@ -164,6 +164,7 @@ class FSDP2GradientClipper(GradientClipperIF):
             tensors=grads, norm_type=norm_type, error_if_nonfinite=error_if_nonfinite, foreach=foreach
         )
 
+        # Inspired by torch titan
         # If total_norm is a DTensor, the placements must be `torch.distributed._tensor.ops.math_ops._NormPartial`.
         # We can simply reduce the DTensor to get the total norm in this tensor's process group
         # and then convert it to a local tensor.

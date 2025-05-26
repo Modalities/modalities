@@ -28,7 +28,7 @@ class AppState(Stateful):
     Since this object is compliant with the Stateful protocol, DCP will automatically call
     state_dict/load_stat_dict as needed in the dcp.save/load APIs.
 
-    Note: We take advantage of this wrapper to handle calling distributed state dict methods on the model
+    Note: We take advantage of this wrapper to call distributed state dict methods on the model
     and optimizer.
     Note: this class has been copied and adapted from
     https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html

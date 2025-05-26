@@ -183,7 +183,8 @@ class MemMapDataset(Dataset):
         Raises:
             IndexError: If the index is out of bounds.
         """
-        self._check_if_inbounds(idx)
+        if idx >= len(self.reader):
+            raise IndexError("Index out of bounds")
         return self.tokenizer.tokenize(text=self.jq_filter.input_text(self.reader[idx]).first())
 
 

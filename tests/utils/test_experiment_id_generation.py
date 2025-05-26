@@ -48,7 +48,7 @@ class TestExperimentIdGeneration:
             experiment_id = get_experiment_id_of_run(
                 config_file_path=config_file_path,
                 hash_length=8,
-                max_experment_id_byte_length=1024,
+                max_experiment_id_byte_length=1024,
             )
             # write experiment_id to file
             experiment_id_file_path = temporary_folder_path / f"{process_id}.txt"
