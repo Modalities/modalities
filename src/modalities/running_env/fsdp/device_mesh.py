@@ -6,7 +6,7 @@ from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
 from modalities.exceptions import ConfigError
 from modalities.util import print_rank_0
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 logger = get_logger("model_factory")
 

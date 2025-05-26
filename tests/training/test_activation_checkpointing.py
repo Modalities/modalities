@@ -8,7 +8,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import Checkpoi
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.pydantic_if_types import PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2Block
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
