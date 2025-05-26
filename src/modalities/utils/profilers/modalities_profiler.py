@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
     PydanticDatasetBatchGeneratorIFType,
     PydanticFSDP2ModuleType,
     PydanticLossIFType,
