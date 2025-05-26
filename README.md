@@ -34,9 +34,15 @@ There are two ways to install Modalities. If you want to use the latest nightly 
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
+In any case, you need to install pytorch, ninja and flash-attention **beforehand**. This is because the build and installation process of flash attention requires PyTorch to be installed beforehand and flash attention to be installed with no build isolation. Until they improve this, we therefore have to run the following commands **before** installing Modalities:
+
+```sh
+pip install torch==2.6.0
+pip install ninja     # Lowers compilation time of flash attention significantly 
+pip install flash-attn --no-build-isolation
+```
 
 ### Option 1: Installation from source
-
 
 Create a conda environment and activate it via 
 
@@ -54,15 +60,6 @@ wget https://github.com/Modalities/modalities/archive/refs/heads/main.zip
 unzip main.zip
 ```
 
-
-Currently, the flash attention dependency cannot be installed without torch being installed beforehand.
-Until the flash attention developers fix this, we have to run
-
-```sh
-pip install torch==2.6.0
-```
-beforehand.
-
 Afterwards, Modalities can be installed via
 
 ```sh
@@ -75,11 +72,8 @@ pip install -e .
 To install Modalities via pip, run
 
 ```sh
-pip install torch==2.6.0
 pip install modalities
 ```
-
-Note, that also here, torch has to be installed before installing Modalities due to flash attention's dependency management.
 
 ## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
