@@ -290,7 +290,7 @@ class ModelFactory:
             if module_class is not None:
                 block_types.append(module_class)
             else:
-                raise ValueError("None of the provided block_names match any modules in the model")
+                raise ValueError(f"The block name {name} does not match any modules in the model")
 
         block_types = tuple(block_types)
 
