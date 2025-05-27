@@ -537,7 +537,14 @@ def CMD_entry_point_run_train_step_profiler(
     num_warmup_steps: int,
     num_measurement_steps: int,
 ):
-    """Run train step profiler and write result to JSON if RANK=0."""
+    """Run train step profiler and write result to JSON if global rank=0.
+
+    Args:
+        config_file_path (Path): Path to the YAML training config file.
+        experiment_folder_path (Path): Path to the experiment output directory.
+        num_warmup_steps (int): Number of warmup steps to skip in profiling.
+        num_measurement_steps (int): Number of steps to measure during profiling.
+    """
     ModalitiesProfiler.get_train_step_statistics(
         config_file_path=config_file_path,
         experiment_folder_path=experiment_folder_path,

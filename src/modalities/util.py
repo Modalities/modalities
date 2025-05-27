@@ -2,6 +2,7 @@ import hashlib
 import os
 import time
 import warnings
+from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -323,3 +324,19 @@ def is_launched_via_torchrun() -> bool:
         bool: True if launched via `torchrun`, False otherwise.
     """
     return all(env_var in os.environ for env_var in ["RANK", "LOCAL_RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"])
+
+
+@contextmanager
+def temporary_env(env_vars: dict):
+    old_values = {key: os.environ.get(key) for key in env_vars.keys()}
+
+    os.environ.update(env_vars)
+
+    try:
+        yield
+    finally:
+        for key, old_value in old_values.items():
+            if old_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
