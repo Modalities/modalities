@@ -37,6 +37,11 @@ If you want to use Modalities as a library and register your custom components w
 In any case, you need to install pytorch, ninja and flash-attention **beforehand**. This is because the build and installation process of flash attention requires PyTorch to be installed beforehand and flash attention to be installed with no build isolation. Until they improve this, we therefore have to run the following commands **before** installing Modalities:
 
 ```sh
+# create and activate a conda environment (optional, but good practice)
+conda create -n modalities python=3.11
+conda activate modalities
+
+# install PyTorch, Ninja and Flash Attention (mandatory)
 pip install torch==2.6.0
 pip install ninja     # Lowers compilation time of flash attention significantly 
 pip install flash-attn --no-build-isolation
@@ -44,12 +49,6 @@ pip install flash-attn --no-build-isolation
 
 ### Option 1: Installation from source
 
-Create a conda environment and activate it via 
-
-```sh
-conda create -n modalities python=3.10
-conda activate modalities
-```
 Either clone the repository via
 ```sh
 git clone git@github.com:Modalities/modalities.git
