@@ -33,6 +33,7 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    FSDP1ActivationCheckpointedModelConfig,
     FSDP1CheckpointedModelConfig,
     FSDP1CheckpointedOptimizerConfig,
     FSDP1CheckpointLoadingConfig,
@@ -110,6 +111,7 @@ from modalities.utils.number_conversion import (
     NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
+from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
 
 
 @dataclass
@@ -149,7 +151,13 @@ COMPONENTS = [
     ComponentEntity(
         "model",
         "activation_checkpointed_fsdp1",
-        ModelFactory.get_activation_checkpointed_fsdp1_model,
+        ModelFactory.get_activation_checkpointed_fsdp1_model_,
+        FSDP1ActivationCheckpointedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_model_,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
@@ -219,6 +227,10 @@ COMPONENTS = [
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    # dataset batch generator
+    ComponentEntity(
+        "dataset_batch_generator", "random", RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies

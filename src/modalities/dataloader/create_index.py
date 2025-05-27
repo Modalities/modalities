@@ -6,7 +6,7 @@ import threading
 import warnings
 from pathlib import Path
 
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 
 class IndexGenerator:

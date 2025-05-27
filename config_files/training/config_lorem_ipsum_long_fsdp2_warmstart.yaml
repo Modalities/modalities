@@ -68,7 +68,7 @@ settings:
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
   warmstart_checkpoint_paths: # ${warmstart_env:checkpoint_paths}
-    checkpoint_folder_path: /raid/fromm/modalities/data/checkpoints/2025-04-16__12-40-51_6dcbb1a0/eid_2025-04-16__12-40-51_6dcbb1a0-seen_steps_32-seen_tokens_65536-target_steps_162-target_tokens_331776
+    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-14__15-25-59_970fedec/eid_2025-03-14__15-25-59_970fedec-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
 
 collate_fn:
   component_key: collate_fn

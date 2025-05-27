@@ -77,8 +77,9 @@ def test_get_compiled_model_no_matching_blocks(gpt2_model):
     """
     Test that get_compiled_model raises a ValueError if no blocks match the specified types.
     """
-    with pytest.raises(ValueError, match="None of the provided block_names match any modules in the model"):
-        ModelFactory.get_compiled_model(gpt2_model, block_names=["Conv2d"], fullgraph=True)
+    block_name = "Conv2d"
+    with pytest.raises(ValueError, match=f"The block name {block_name} does not match any modules in the model"):
+        ModelFactory.get_compiled_model(gpt2_model, block_names=[block_name], fullgraph=True)
 
 
 def test_get_compiled_model_empty_block_names(gpt2_model):

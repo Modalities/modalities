@@ -8,7 +8,7 @@ from modalities.config.config import PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
-from modalities.utils.typing import FSDPX
+from modalities.utils.typing_utils import FSDPX
 
 
 class CheckpointingTestUtils:
