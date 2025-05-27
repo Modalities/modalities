@@ -40,7 +40,7 @@ from modalities.running_env.env_utils import (
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
-    SelectiveActivationCheckpointingVariants,
+    ActivationCheckpointingVariants,
 )
 from modalities.util import parse_enum_by_name
 
@@ -302,12 +302,12 @@ class WeightInitializedModelConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class ActivationCheckpointedModelConfig(BaseModel):
+class FSDP1ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
 
 
-class SelectiveActivationCheckpointedModelConfig(BaseModel):
+class ActivationCheckpointedModelConfig(BaseModel):
     class FullACParams(BaseModel):
         pass
 
@@ -317,7 +317,7 @@ class SelectiveActivationCheckpointedModelConfig(BaseModel):
     class SelectiveOpACParams(BaseModel):
         save_ops_keys: list[str]
 
-    sac_variant: SelectiveActivationCheckpointingVariants
+    ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
     model: PydanticPytorchModuleType | PydanticFSDP1ModuleType
     sac_fun_params: Optional[FullACParams | SelectiveLayerACParams | SelectiveOpACParams] = None

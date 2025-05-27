@@ -37,16 +37,17 @@ class SelectiveOpActivationCheckpointingInstantiationModel(BaseModel):
         (22310, 2, "config_activation_checkpointing_fsdp1_legacy.yaml"),
     ],
 )
-def test_selective_activation_checkpointing_FSDP1_legacy(world_size: int, rdvz_port: int, relative_config_path: str):
+def test_full_activation_checkpointing_FSDP1_legacy(world_size: int, rdvz_port: int, relative_config_path: str):
+    # this test is for full activation checkpointing using the legacy FSDP1 implementation
     mp.spawn(
-        _test_selective_activation_checkpointing_FSDP1_legacy_thread,
+        _test_full_activation_checkpointing_FSDP1_legacy_thread,
         args=(rdvz_port, world_size, relative_config_path),
         nprocs=world_size,
         join=True,
     )
 
 
-def _test_selective_activation_checkpointing_FSDP1_legacy_thread(
+def _test_full_activation_checkpointing_FSDP1_legacy_thread(
     process_id: int, rdvz_port: int, world_size: int, relative_config_path: str
 ):
     working_dir = Path(os.path.dirname(__file__))
@@ -83,16 +84,16 @@ def _test_selective_activation_checkpointing_FSDP1_legacy_thread(
         (22312, 2, "config_activation_checkpointing_fsdp2.yaml"),
     ],
 )
-def test_selective_activation_checkpointing_FSDPX(world_size: int, rdvz_port: int, relative_config_path: str):
+def test_full_activation_checkpointing_FSDPX(world_size: int, rdvz_port: int, relative_config_path: str):
     mp.spawn(
-        _test_selective_activation_checkpointing_FSDPX_thread,
+        _test_full_activation_checkpointing_FSDPX_thread,
         args=(rdvz_port, world_size, relative_config_path),
         nprocs=world_size,
         join=True,
     )
 
 
-def _test_selective_activation_checkpointing_FSDPX_thread(
+def _test_full_activation_checkpointing_FSDPX_thread(
     process_id: int, rdvz_port: int, world_size: int, relative_config_path: str
 ):
     working_dir = Path(os.path.dirname(__file__))

@@ -10,9 +10,9 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoi
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP1
 from torch.utils.checkpoint import CheckpointPolicy, create_selective_checkpoint_contexts
 
-from modalities.config.config import SelectiveActivationCheckpointedModelConfig
+from modalities.config.config import ActivationCheckpointedModelConfig
 from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
-    SelectiveActivationCheckpointingVariants,
+    ActivationCheckpointingVariants,
 )
 from modalities.util import get_module_class_from_name, print_rank_0
 
@@ -40,7 +40,7 @@ def apply_activation_checkpointing_inplace(model: nn.Module, activation_checkpoi
     )
 
 
-class SelectiveActivationCheckpointing:
+class ActivationCheckpointing:
     """In eager / normal mode, every module stores ALL activations in the forward pass and
     reuses the activations for gradient computation in the backward pass. Thus, the overall memory
     footprint of the activations accumulates during the forward pass and peaks before running the backward pass.
@@ -80,14 +80,14 @@ class SelectiveActivationCheckpointing:
     }
 
     @staticmethod
-    def apply_selective_activation_checkpointing_(
-        sac_variant: SelectiveActivationCheckpointingVariants,
+    def apply_activation_checkpointing_(
+        ac_variant: ActivationCheckpointingVariants,
         layers_fqn: str,
         model: nn.Module,
         sac_fun_params: (
-            SelectiveActivationCheckpointedModelConfig.FullACParams
-            | SelectiveActivationCheckpointedModelConfig.SelectiveLayerACParams
-            | SelectiveActivationCheckpointedModelConfig.SelectiveOpACParams
+            ActivationCheckpointedModelConfig.FullACParams
+            | ActivationCheckpointedModelConfig.SelectiveLayerACParams
+            | ActivationCheckpointedModelConfig.SelectiveOpACParams
         ),
     ):
         """Applies activation checkpointing to a given model. There are three variants of activation checkpointing:
@@ -113,25 +113,23 @@ class SelectiveActivationCheckpointing:
                 reference a ModuleList.
         """
 
-        if sac_variant == SelectiveActivationCheckpointingVariants.FULL_ACTIVATION_CHECKPOINTING:
-            apply_ac_fun = SelectiveActivationCheckpointing._apply_full_ac
-        elif sac_variant == SelectiveActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING:
+        if ac_variant == ActivationCheckpointingVariants.FULL_ACTIVATION_CHECKPOINTING:
+            apply_ac_fun = ActivationCheckpointing._apply_full_ac
+        elif ac_variant == ActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING:
             apply_ac_fun = partial(
-                SelectiveActivationCheckpointing._apply_selective_layer_ac,
+                ActivationCheckpointing._apply_selective_layer_ac,
                 ac_freq=sac_fun_params.ac_freq,
             )
-        elif sac_variant == SelectiveActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING:
+        elif ac_variant == ActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING:
             if len(sac_fun_params.save_ops_keys) > 0:
                 apply_ac_fun = partial(
-                    SelectiveActivationCheckpointing._apply_selective_op_ac, save_ops_keys=sac_fun_params.save_ops_keys
+                    ActivationCheckpointing._apply_selective_op_ac, save_ops_keys=sac_fun_params.save_ops_keys
                 )
             else:
-
-                def apply_ac_fun(model):
-                    return model
+                raise ValueError("No save_ops_keys provided for selective op activation checkpointing.")
 
         else:
-            raise ValueError(f"Unknown activation checkpointing variant: {sac_variant}")
+            raise ValueError(f"Unknown activation checkpointing variant: {ac_variant}")
 
         layers = model.get_submodule(layers_fqn)
         if not isinstance(layers, nn.ModuleList):
@@ -141,11 +139,11 @@ class SelectiveActivationCheckpointing:
 
         for layer_id, transformer_block in layers.named_children():
             print_rank_0(f"Applying activation checkpointing to {layer_id}...")
-            module_saced = apply_ac_fun(transformer_block)
-            # the module_saced wraps the transformer_block as a CheckpointWrapper object.
-            # module_saced._checkpoint_wrapped_module references the original transformer_block
+            module_aced = apply_ac_fun(transformer_block)
+            # the module_aced wraps the transformer_block as a CheckpointWrapper object.
+            # module_aced._checkpoint_wrapped_module references the original transformer_block
             # we need to replace the original transformer_block with the wrapped one
-            layers.register_module(layer_id, module_saced)
+            layers.register_module(layer_id, module_aced)
 
     @staticmethod
     def _apply_full_ac(module: nn.Module) -> nn.Module:
@@ -160,7 +158,7 @@ class SelectiveActivationCheckpointing:
                 mm_count_key = f"{mode}_mm_count"
                 if func == torch.ops.aten.mm.default:
                     meta[mm_count_key] += 1
-                # Saves output of all compute ops, except every second mm
+                # Saves output of all compute ops in save_ops_set, except every second mm
                 # NOTE: we should make this configurable and not hide it in the code
                 to_save = func in save_ops_set and not (
                     func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0
@@ -171,7 +169,7 @@ class SelectiveActivationCheckpointing:
 
         def _selective_checkpointing_context_fn():
             meta = defaultdict(int)
-            save_ops_set = {SelectiveActivationCheckpointing.SAVE_DICT[key] for key in save_ops_keys}
+            save_ops_set = {ActivationCheckpointing.SAVE_DICT[key] for key in save_ops_keys}
 
             policy = _get_custom_policy(meta=meta, save_ops_set=save_ops_set)
             return create_selective_checkpoint_contexts(policy_fn_or_list=policy)

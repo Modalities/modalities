@@ -113,7 +113,6 @@ def get_synced_experiment_id_of_run(
     Returns:
         str: The experiment ID.
     """
-    rank = dist.get_rank()
     experimenet_id = get_experiment_id_from_config(config_file_path, hash_length)
     experiment_id_synced = get_synced_string(
         string_to_be_synced=experimenet_id,
@@ -121,7 +120,7 @@ def get_synced_experiment_id_of_run(
         max_string_byte_length=max_experiment_id_byte_length,
     )
     # Decode on all ranks
-    print(f"Rank {rank} received experiment_id: {experiment_id_synced}")
+    print(f"Rank {dist.get_rank()} received experiment_id: {experiment_id_synced}")
     return experiment_id_synced
 
 
@@ -317,4 +316,10 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
 
 
 def is_launched_via_torchrun() -> bool:
+    """Check if the current process is launched via `torchrun` by checking for
+    the presence of specific environment variables.
+
+    Returns:
+        bool: True if launched via `torchrun`, False otherwise.
+    """
     return all(env_var in os.environ for env_var in ["RANK", "LOCAL_RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"])

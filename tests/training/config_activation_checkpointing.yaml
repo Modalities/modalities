@@ -1,8 +1,8 @@
 full_activation_checkpointed_model: 
   component_key: model
-  variant_key: selective_activation_checkpointed
+  variant_key: activation_checkpointed
   config:
-    sac_variant: full_activation_checkpointing
+    ac_variant: full_activation_checkpointing
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
@@ -10,9 +10,9 @@ full_activation_checkpointed_model:
 
 selective_layer_activation_checkpointed_model: 
   component_key: model
-  variant_key: selective_activation_checkpointed
+  variant_key: activation_checkpointed
   config:
-    sac_variant: selective_layer_activation_checkpointing
+    ac_variant: selective_layer_activation_checkpointing
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
@@ -22,9 +22,9 @@ selective_layer_activation_checkpointed_model:
 
 selective_op_activation_checkpointed_model: 
   component_key: model
-  variant_key: selective_activation_checkpointed
+  variant_key: activation_checkpointed
   config:
-    sac_variant: selective_op_activation_checkpointing
+    ac_variant: selective_op_activation_checkpointing
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE

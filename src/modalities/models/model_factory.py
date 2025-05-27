@@ -13,7 +13,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
-from modalities.config.config import SelectiveActivationCheckpointedModelConfig
+from modalities.config.config import ActivationCheckpointedModelConfig
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -28,11 +28,11 @@ from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedP
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
-    SelectiveActivationCheckpointing,
+    ActivationCheckpointing,
     apply_activation_checkpointing_inplace,
 )
 from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
-    SelectiveActivationCheckpointingVariants,
+    ActivationCheckpointingVariants,
 )
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
 from modalities.utils.logger_utils import get_logger
@@ -237,8 +237,8 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_fsdp1_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
-        """Apply activation checkpointing to the given model (in-place operation).
+    def get_activation_checkpointed_fsdp1_model_(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
+        """Apply activation checkpointing to the given FSDP1-wrapped model (in-place operation).
 
         Args:
             model (FSDP1): The FSDP1-wrapped model to apply activation checkpointing to.
@@ -264,25 +264,42 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_selective_activation_checkpointed_model(
-        sac_variant: SelectiveActivationCheckpointingVariants,
+    def get_activation_checkpointed_model_(
+        ac_variant: ActivationCheckpointingVariants,
         layers_fqn: str,
         model: nn.Module,
         sac_fun_params: (
-            SelectiveActivationCheckpointedModelConfig.FullACParams
-            | SelectiveActivationCheckpointedModelConfig.SelectiveLayerACParams
-            | SelectiveActivationCheckpointedModelConfig.SelectiveOpACParams
+            ActivationCheckpointedModelConfig.FullACParams
+            | ActivationCheckpointedModelConfig.SelectiveLayerACParams
+            | ActivationCheckpointedModelConfig.SelectiveOpACParams
         ),
     ) -> nn.Module:
-        if not isinstance(model, (nn.Module, FSDP1)):
+        """FSDP2 variant for applying activation checkpointing to the given model (in-place operation).
+        When using FSDP2, we always first apply activation checkpointing to the model and then wrap it with FSDP2.
+
+        Args:
+            ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
+            layers_fqn (str): Fully qualified name (FQN) of the layers to apply activation checkpointing to.
+            model (nn.Module): The (unwrapped) model to apply activation checkpointing to.
+            sac_fun_params (ACM.FullACParams  |  ACM.SelectiveLayerACParams  |  ACM.SelectiveOpACParams):
+                The parameters for the activation checkpointing function, depending on the variant.
+
+        Raises:
+            ValueError: Activation checkpointing can only be applied to unwrapped nn.Module models
+
+        Returns:
+            nn.Module: The model with activation checkpointing applied.
+        """
+        if not isinstance(model, nn.Module):
             raise ValueError(
-                "Selective activation checkpointing can only be applied to FSDP1-wrapped or nn.Module models! "
+                "Activation checkpointing can only be applied to unwrapped nn.Module model! "
                 f"Current model type: {type(model)}"
             )
-        SelectiveActivationCheckpointing.apply_selective_activation_checkpointing_(
+
+        ActivationCheckpointing.apply_activation_checkpointing_(
             model=model,
             layers_fqn=layers_fqn,
-            sac_variant=sac_variant,
+            ac_variant=ac_variant,
             sac_fun_params=sac_fun_params,
         )
         return model
@@ -309,6 +326,7 @@ class ModelFactory:
         """
 
         def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> tuple[nn.Module, str]:
+            # returns the parent module and the child name of the given child module
             selected_parent_candidate, selected_child_name = None, None
             num_candidates = 0
             for _, parent_candidate in model.named_modules():

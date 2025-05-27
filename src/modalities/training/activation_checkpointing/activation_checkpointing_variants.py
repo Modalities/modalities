@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class SelectiveActivationCheckpointingVariants(Enum):
+class ActivationCheckpointingVariants(Enum):
     """Enum for the different activation checkpointing variants."""
 
     FULL_ACTIVATION_CHECKPOINTING = "full_activation_checkpointing"

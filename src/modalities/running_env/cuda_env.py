@@ -14,6 +14,7 @@ class CudaEnv:
     def __init__(
         self,
         process_group_backend: ProcessGroupBackendType,
+        timeout_s: int = 10,
     ) -> None:
         """Initializes the CudaEnv context manager with the process group backend.
 
@@ -21,6 +22,7 @@ class CudaEnv:
             process_group_backend (ProcessGroupBackendType): Process group backend to be used for distributed training.
         """
         self.process_group_backend = process_group_backend
+        self._timeout_s = timeout_s
 
     def __enter__(self) -> "CudaEnv":
         """Sets the CUDA environment for distributed training.
@@ -28,7 +30,7 @@ class CudaEnv:
         Returns:
             CudaEnv: Instance of the CudaEnv context manager.
         """
-        dist.init_process_group(self.process_group_backend.value, timeout=timedelta(seconds=10))
+        dist.init_process_group(self.process_group_backend.value, timeout=timedelta(seconds=self._timeout_s))
         local_rank = int(os.getenv("LOCAL_RANK", "-1"))
         if local_rank == -1:
             raise ValueError("LOCAL_RANK environment variable is not set. Please set it before using CudaEnv.")
