@@ -9,7 +9,8 @@ def run_torchrun_with_cleanup(torch_run_args: list[str], script_args: list[str])
     While for training, it is advised to run torchrun directly in the command line,
     this function is useful for profiling a set of configs with torchrun, as it
     allows to run each config of a grid search in a separate torchrun environment
-    with a subsequent cleanup of the process group.
+    with a subsequent cleanup of the process group. This is important as the environment
+    is in an undefined state in case of errors such as OOMs.
 
     Note that the process group is killed regardless of the exit code of the script to
     enforce that all processes are stopped, no zombies are left behind and all GPU memory
@@ -44,7 +45,7 @@ def run_torchrun_with_cleanup(torch_run_args: list[str], script_args: list[str])
         try:
             # more graceful, allowing process to cleanup cleanup
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            time.sleep(2)
+            time.sleep(10)
             # immediate, forceful killing the process without cleanup
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except ProcessLookupError:
@@ -55,7 +56,7 @@ def run_torchrun_with_cleanup(torch_run_args: list[str], script_args: list[str])
         print("[Launcher] Interrupted. Killing process group...")
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            time.sleep(2)
+            time.sleep(10)
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except Exception as e:
             print(f"[Launcher] Error while handling KeyboardInterrupt: {e}")

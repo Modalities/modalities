@@ -2,9 +2,9 @@
 
 ## Activation Checkpointing
 
-### Selective Activation Checkpointing
+# Example 1:  Selective Activation Checkpointing
 
-With **selective activation checkpointing (SAC)**, we reduce the memory footprint at the expense of increased compute by saving **only the activations of selected ATen ops**.  
+With **selective OP activation checkpointing (SAC)**, we reduce the memory footprint at the expense of increased compute by saving **only the activations of selected ATen ops**.  
 To make SAC effective, we focus on ATen ops that are **memory-intensive yet fast to recompute**.
 
 In Modalities, we follow an iterative process to determine which ops to save:

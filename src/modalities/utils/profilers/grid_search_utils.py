@@ -21,6 +21,17 @@ class GridSearchUtils:
     def get_configs_from_grid_search(
         config_dict: dict[str, Any], grid_search: list[GridSearchItem]
     ) -> list[dict[str, ConfigValue]]:
+        """Generates a list of configurations based on the provided grid search items.
+
+        Args:
+            config_dict (dict[str, Any]): The base configuration dictionary to be updated.
+            grid_search (list[GridSearchItem]): A list of grid search items, where each
+                item contains a name and a list of values.
+
+        Returns:
+            list[dict[str, ConfigValue]]: A list of dictionaries, each representing a configuration
+        """
+
         def _get_cartesian_product(grid_search: list[GridSearchItem]) -> list[dict[str, ConfigValue]]:
             # Extract all names, values, and config_path flags
             names = [item.name for item in grid_search]

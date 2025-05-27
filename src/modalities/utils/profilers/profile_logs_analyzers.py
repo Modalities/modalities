@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from modalities.utils.profilers.modalities_profiler import Result
+from modalities.utils.profilers.modalities_profiler import ProfilingResult
 
 
 class ProfileLogsAnalyzer:
     @staticmethod
-    def load_profiling_logs(log_dir_path: Path) -> list[Result]:
+    def load_profiling_logs(log_dir_path: Path) -> list[ProfilingResult]:
         """
         Loads the profiling logs from the specified directory.
 
@@ -23,17 +23,17 @@ class ProfileLogsAnalyzer:
         for file in log_dir_path.glob("*.json"):
             with open(file, "r") as f:
                 data = json.load(f)
-            result = Result(
+            result = ProfilingResult(
                 grid_search_config=data["grid_search_config"],
                 env_info=data["env_info"],
-                measurement=Result.Measurement(**data["measurement"]),
+                measurement=ProfilingResult.Measurement(**data["measurement"]),
                 error=data.get("error", ""),
             )
             results.append(result)
         return results
 
     @staticmethod
-    def to_pandas_df(results: list[Result]) -> pd.DataFrame:
+    def to_pandas_df(results: list[ProfilingResult]) -> pd.DataFrame:
         """
         Converts the profiling results to a pandas DataFrame.
 

@@ -6,7 +6,7 @@ import yaml
 from torch.profiler import ProfilerActivity, profile, schedule
 
 from modalities import __main__
-from modalities.util import is_launched_via_torchrun
+from modalities.util import is_launched_via_torchrun, temporary_env
 from modalities.utils.profilers.grid_search_utils import GridSearchItem, GridSearchUtils
 from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
 from modalities.utils.run_torchrun_script import run_torchrun_with_cleanup
@@ -24,6 +24,7 @@ class ModalitiesProfilerStarter:
         num_nodes: int = 1,
         node_rank: int = 0,
         rdzv_endpoint: str = "localhost:0",
+        local_rank_ids: list[int] = None,
     ):
         """Applies memory and runtime profiling to the training step of a model training.
         By specifying a grid search, the profiler can be run for multiple configurations.
@@ -54,6 +55,7 @@ class ModalitiesProfilerStarter:
             node_rank (int, optional): The rank of the current node. Defaults to 0.
             rdzv_endpoint: str, optional): The rendezvous endpoint to be used. Defaults to "localhost:0",
                 in which case torchrun selects a free empty port on localhost itself.
+            local_rank_ids (list[int], optional): The local rank IDs to be used. Defaults to None.
 
         Raises:
             RuntimeError: If the profiler is called from a torchrun process with multiple configs.
@@ -73,14 +75,14 @@ class ModalitiesProfilerStarter:
         if len(config_dicts) > 1 and is_launched_via_torchrun():
             raise RuntimeError(
                 "TrainStepProfilerStarter.run_train_step_profiler() must not be called via torchrun "
-                "with multiple configs. The reason is that recovering from OOM errors is not possible "
-                "and the processes need to be killed and restarted."
+                "with multiple configs (i.e., a grid search). The reason is that recovering from OOM errors "
+                "is not possible and the processes need to be killed and restarted. Instead, run this script "
+                "without torchrun and modalities will interally start the torchrun processes itself."
             )
         for config_dict in tqdm.tqdm(config_dicts):
             with tempfile.NamedTemporaryFile("w+") as temp_file:
                 yaml.dump(config_dict, temp_file)
                 temp_file_path = temp_file.name
-                # TODO call subprocdess here with torchrun command
                 if not is_launched_via_torchrun():
                     full_main_path = Path(__main__.__file__).resolve()
                     torch_run_args = [
@@ -108,17 +110,18 @@ class ModalitiesProfilerStarter:
                         "--num_warmup_steps",
                         str(num_warmup_steps),
                     ]
-                    run_torchrun_with_cleanup(torch_run_args=torch_run_args, script_args=modalities_args)
-                elif is_launched_via_torchrun():
+                    if local_rank_ids is not None:
+                        env_vars = {"CUDA_VISIBLE_DEVICES": ",".join(map(str, local_rank_ids))}
+                    else:
+                        env_vars = {}
+                    with temporary_env(env_vars):
+                        run_torchrun_with_cleanup(torch_run_args=torch_run_args, script_args=modalities_args)
+                else:
                     ModalitiesProfiler.get_train_step_statistics(
                         config_file_path=temp_file_path,
                         num_warmup_steps=num_warmup_steps,
                         num_measurement_steps=num_measurement_steps,
                         experiment_folder_path=experiment_folder_path,
-                    )
-                else:
-                    raise RuntimeError(
-                        "TrainStepProfilerStarter.run_train_step_profiler() must not be called from a torchrun process."
                     )
 
     @staticmethod

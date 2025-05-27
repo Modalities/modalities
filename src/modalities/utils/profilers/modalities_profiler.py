@@ -82,7 +82,7 @@ class TrainStepStatistics:
 
 
 @dataclass
-class Result:
+class ProfilingResult:
     @dataclass
     class Measurement:
         peak_memory: float
@@ -98,12 +98,12 @@ class Result:
         hostname: str
 
         @staticmethod
-        def from_env() -> "Result.EnvInfo":
+        def from_env() -> "ProfilingResult.EnvInfo":
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
             global_rank = int(os.environ.get("RANK", 0))  # torchrun uses RANK for global rank
             num_ranks = int(os.environ.get("WORLD_SIZE", 0))
             hostname = socket.gethostname()
-            return Result.EnvInfo(
+            return ProfilingResult.EnvInfo(
                 local_rank=local_rank, global_rank=global_rank, num_ranks=num_ranks, hostname=hostname
             )
 
@@ -120,7 +120,7 @@ class ModalitiesProfiler:
         experiment_folder_path: Path,
         num_warmup_steps: int,
         num_measurement_steps: int,
-    ) -> Result:
+    ) -> ProfilingResult:
         """Profiles the training step of a model using the given config file and experiment folder path
         w.r.t. peak memory, as well as, forward, backward and step time.
 
@@ -132,9 +132,11 @@ class ModalitiesProfiler:
             num_measurement_steps (int): Number of measurement steps to be used for the profiler.
 
         Returns:
-            Result: A dataclass containing the profiling results, including peak memory, forward time,
+            ProfilingResult: A dataclass containing the profiling results, including peak memory, forward time,
                 backward time, step time, and any error messages.
         """
+
+        # run profiling
         error = ""
         try:
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -155,15 +157,15 @@ class ModalitiesProfiler:
         with open(config_file_path, "r") as f:
             config_dict = yaml.safe_load(f)
 
-        result = Result(
+        result = ProfilingResult(
             grid_search_config=config_dict["settings"]["benchmark"],
-            measurement=Result.Measurement(
+            measurement=ProfilingResult.Measurement(
                 peak_memory=mean_statistics[TrainStepMetrics.PEAK_MEMORY_MB],
                 forward_time=mean_statistics[TrainStepMetrics.FORWARD_PASS_TIME_s],
                 backward_time=mean_statistics[TrainStepMetrics.BACKWARD_PASS_TIME_s],
                 step_time=mean_statistics[TrainStepMetrics.OPTIMIZER_STEP_TIME_s],
             ),
-            env_info=Result.EnvInfo.from_env(),
+            env_info=ProfilingResult.EnvInfo.from_env(),
             error=error,
         )
         # write results to json on all ranks
@@ -217,38 +219,13 @@ class ModalitiesProfiler:
         return statistics
 
     @staticmethod
-    def get_forward_pass_profiling(
-        config_file_path: Path,
-        num_measurement_steps: int,
-        profile_context_manager: torch.profiler.profile,
-    ) -> TrainStepStatistics:
-        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            main_obj = Main(config_file_path)
-            components = main_obj.build_components(components_model_type=InstantiationModel)
-            model = components.initialized_model
-            loss_fun: Loss = components.loss_fn
-            dataset_batch_generator: DatasetBatchGeneratorIF = components.dataset_batch_generator
-            device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
-            with profile_context_manager as profiler:
-                for _ in range(num_measurement_steps):
-                    batch = dataset_batch_generator.get_dataset_batch()
-                    batch.to(device=device)
-                    torch.distributed.barrier()
-                    ModalitiesProfiler._run_forward_pass(
-                        model=model,
-                        batch=batch,
-                        loss_fun=loss_fun,
-                    )
-                    profiler.step()
-
-    @staticmethod
     def _run_train_step(
         model: FSDPX,
         batch_generator: DatasetBatchGeneratorIF,
         loss_fun: Callable,
         optimizer: Optional[torch.optim.Optimizer] = None,
     ) -> dict[TrainStepMetrics, float]:
-        device = torch.device(f"cuda:{int(os.environ['RANK'])}")
+        device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
         # generate batch
         batch = batch_generator.get_dataset_batch()
         batch.to(device=device)
@@ -275,18 +252,53 @@ class ModalitiesProfiler:
             step_time = time.time() - start_step
 
         # calculate the peak memory
-        peak_memory = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
-        batch_size = batch.samples["input_ids"].shape[0]
+        peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+        # batch_size = batch.samples["input_ids"].shape[0]
         return {
-            TrainStepMetrics.FORWARD_PASS_TIME_s: forward_time / batch_size,  # per sample
-            TrainStepMetrics.BACKWARD_PASS_TIME_s: backward_time / batch_size,
-            TrainStepMetrics.OPTIMIZER_STEP_TIME_s: step_time / batch_size,
-            TrainStepMetrics.PEAK_MEMORY_MB: peak_memory,
+            TrainStepMetrics.FORWARD_PASS_TIME_s: forward_time,
+            TrainStepMetrics.BACKWARD_PASS_TIME_s: backward_time,
+            TrainStepMetrics.OPTIMIZER_STEP_TIME_s: step_time,
+            TrainStepMetrics.PEAK_MEMORY_MB: peak_memory_MB,
         }
 
     @staticmethod
-    def _run_forward_pass(model: FSDPX, batch: DatasetBatch, loss_fun: Optional[Callable] = None) -> None:
-        predictions = model(batch.samples)
-        result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
-        if loss_fun is not None:
-            loss_fun(result_batch)
+    def get_forward_pass_profiling(
+        config_file_path: Path,
+        num_measurement_steps: int,
+        profile_context_manager: torch.profiler.profile,
+    ):
+        """Profiles the forward pass of a model. This can be used e.g., to profile memory and runtime foot print
+        of the ATEN ops of a model during the forward pass.
+        In return, this information can be used for example for optimizing the set of ATEN ops
+        used in selective activation.
+
+        Args:
+            config_file_path (Path): Path to the config file.
+            num_measurement_steps (int): Number of measurement steps to be used for the profiler.
+            profile_context_manager (torch.profiler.profile): The context manager to use for profiling.
+        """
+
+        def run_forward_pass(model: FSDPX, batch: DatasetBatch, loss_fun: Optional[Callable] = None) -> None:
+            predictions = model(batch.samples)
+            result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
+            if loss_fun is not None:
+                loss_fun(result_batch)
+
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj = Main(config_file_path)
+            components = main_obj.build_components(components_model_type=InstantiationModel)
+            model = components.initialized_model
+            loss_fun: Loss = components.loss_fn
+            dataset_batch_generator: DatasetBatchGeneratorIF = components.dataset_batch_generator
+            device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
+            with profile_context_manager as profiler:
+                for _ in range(num_measurement_steps):
+                    batch = dataset_batch_generator.get_dataset_batch()
+                    batch.to(device=device)
+                    torch.distributed.barrier()
+                    run_forward_pass(
+                        model=model,
+                        batch=batch,
+                        loss_fun=loss_fun,
+                    )
+                    profiler.step()
