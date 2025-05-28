@@ -26,17 +26,6 @@ class DeviceMeshConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate(self):
-        if (
-            self.tensor_parallel_degree != 1
-            or self.pipeline_parallel_degree != 1
-            or self.context_parallel_degree != 1
-            or self.enable_loss_parallel
-        ):
-            logger.warning(
-                "Tensor parallelism, pipeline parallelism, context parallelism and "
-                "loss parallelism are not supported, yet."
-            )
-
         for d in (
             self.data_parallel_replicate_degree,
             self.context_parallel_degree,

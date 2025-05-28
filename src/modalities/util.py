@@ -18,6 +18,7 @@ from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.utils.logging import get_logger
 from modalities.utils.typing import FSDPX
 
 
@@ -88,7 +89,7 @@ def get_experiment_id_of_run(
                 f"Experiment ID is too long: {len(experiment_id_bytes)} bytes, "
                 f"max length is {max_experiment_id_byte_length} bytes"
             )
-        print(f"Rank 0 generated experiment_id: {experimenet_id}")
+        get_logger("util").info(f"Rank 0 generated experiment_id: {experimenet_id}")
     else:
         experiment_id_bytes = bytearray(max_experiment_id_byte_length)  # Preallocate buffer for receiving
 
@@ -100,7 +101,6 @@ def get_experiment_id_of_run(
 
     # Decode on all ranks
     experiment_id = experiment_id_tensor.cpu().numpy().tobytes().decode("utf-8").rstrip("\x00")
-    print(f"Rank {rank} received experiment_id: {experiment_id}")
     return experiment_id
 
 
