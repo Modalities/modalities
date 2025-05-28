@@ -8,9 +8,7 @@ def test_run_cpu_only(
     monkeypatch,
     checkpoint_saving_mock,
     evaluator_mock,
-    nn_model_mock,
-    optimizer_mock,
-    scheduler_mock,
+    app_state_mock,
     loss_mock,
     llm_data_loader_mock,
     set_env_cpu,
@@ -30,9 +28,7 @@ def test_run_cpu_only(
 
     gym = Gym(trainer=trainer, evaluator=evaluator_mock, loss_fun=loss_mock, num_ranks=num_ranks)
     gym.run(
-        model=nn_model_mock,
-        optimizer=optimizer_mock,
-        scheduler=scheduler_mock,
+        app_state=app_state_mock,
         training_log_interval_in_steps=1,
         checkpointing_interval_in_steps=1,
         evaluation_interval_in_steps=1,
@@ -40,5 +36,5 @@ def test_run_cpu_only(
         evaluation_data_loaders=[],
         checkpoint_saving=checkpoint_saving_mock,
     )
-    nn_model_mock.assert_has_calls([call(b.samples) for b in batches])
-    optimizer_mock.step.assert_called()
+    app_state_mock.model.assert_has_calls([call(b.samples) for b in batches])
+    app_state_mock.optimizer.step.assert_called()

@@ -24,23 +24,20 @@ model:
           base_freq: 500000
     attention_implementation: pytorch_flash # manual
     activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: layer_norm
+    attention_norm_config:
+      norm_type: layer_norm
       config:
         normalized_shape: ${model.config.n_embd}
         eps: 1e-5
         bias: true
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: layer_norm
+    ffn_norm_config:
+      norm_type: layer_norm
       config:
         normalized_shape: ${model.config.n_embd}
         eps: 1e-5
         bias: true
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: layer_norm
+    lm_head_norm_config:
+      norm_type: layer_norm
       config:
         normalized_shape: ${model.config.n_embd}
         eps: 1e-5
@@ -49,7 +46,7 @@ model:
 
 checkpointed_model:
   component_key: model
-  variant_key: checkpointed
+  variant_key: fsdp1_checkpointed
   config:
     checkpoint_loading:
       component_key: checkpoint_loading

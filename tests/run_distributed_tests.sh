@@ -33,27 +33,18 @@ COVERAGE=$3
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 cd "$SCRIPT_DIR/.."
 
-# test_fsdp_to_disc_checkpointing
-COVERAGE_FILE=.coverage_reports/.coverage.part1 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/checkpointing/test_fsdp_to_disc_checkpointing.py $COVERAGE
+# test_fsdp_warmstart
+COVERAGE_FILE=.coverage_reports/.coverage.part1 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/end2end_tests/test_fsdp_warmstart.py -k "test_warm_start" $COVERAGE
+COVERAGE_FILE=.coverage_reports/.coverage.part2 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/end2end_tests/test_fsdp_warmstart.py -k "test_warmstart_dataloader" $COVERAGE
 
-# # test_fsdp_warmstart
-COVERAGE_FILE=.coverage_reports/.coverage.part2 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/end2end_tests/test_fsdp_warmstart.py -k "test_warm_start" $COVERAGE
-COVERAGE_FILE=.coverage_reports/.coverage.part3 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/end2end_tests/test_fsdp_warmstart.py -k "test_warmstart_dataloader" $COVERAGE
+# test_distributed_dataloader
+COVERAGE_FILE=.coverage_reports/.coverage.part3 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_without_shuffling" $COVERAGE
+COVERAGE_FILE=.coverage_reports/.coverage.part4 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_with_shuffling_without_skipping" $COVERAGE
+COVERAGE_FILE=.coverage_reports/.coverage.part5 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_with_shuffling_and_skipped_batches" $COVERAGE
 
-# # test_distributed_dataloader
-COVERAGE_FILE=.coverage_reports/.coverage.part5 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_without_shuffling" $COVERAGE
-COVERAGE_FILE=.coverage_reports/.coverage.part6 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_with_shuffling_without_skipping" $COVERAGE
-COVERAGE_FILE=.coverage_reports/.coverage.part7 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/dataloader/distributed/test_distributed_dataloader.py -k "test_dataloader_with_shuffling_and_skipped_batches" $COVERAGE
+# test optimizer
+COVERAGE_FILE=.coverage_reports/.coverage.part6 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_optimizer_factory.py $COVERAGE
 
-# # test optimizer
-COVERAGE_FILE=.coverage_reports/.coverage.part8 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_optimizer_factory.py $COVERAGE
-
-# # test model initialization
-COVERAGE_FILE=.coverage_reports/.coverage.part9 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_initialization.py $COVERAGE
-
-# # test mfu
-COVERAGE_FILE=.coverage_reports/.coverage.part10 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/utils/test_mfu.py $COVERAGE
-
-# test activation checkpointing
-COVERAGE_FILE=.coverage_reports/.coverage.part11 CUDA_VISIBLE_DEVICES=$DEV0,$DEV1 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 $(which pytest) tests/training/test_activation_checkpointing.py $COVERAGE
-
+# test model initialization
+# note some of the tests are already implemented in tests/test_initialization_fsdpx.py and can be run without a torchrun env
+COVERAGE_FILE=.coverage_reports/.coverage.part9 CUDA_VISIBLE_DEVICES=$DEV0 coverage run --rcfile=.coveragerc --parallel $(which torchrun) --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 1 $(which pytest) tests/test_initialization_fsdp1.py $COVERAGE

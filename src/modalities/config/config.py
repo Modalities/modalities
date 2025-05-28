@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Callable, Literal, Optional
+from typing import Annotated, Any, Callable, Literal, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -9,16 +9,21 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.config.pydanctic_if_types import (
-    PydanticCheckpointLoadingIFType,
+from modalities.config.pydantic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
     PydanticCollateFnIFType,
     PydanticDatasetIFType,
-    PydanticFSDPModuleType,
+    PydanticDeviceMeshIFType,
+    PydanticFSDP1CheckpointLoadingIFType,
+    PydanticFSDP1ModuleType,
+    PydanticFSDP2ModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
@@ -27,8 +32,14 @@ from modalities.config.pydanctic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
-from modalities.running_env.env_utils import MixedPrecisionSettings, has_bfloat_support
-from modalities.util import get_experiment_id_of_run, parse_enum_by_name
+from modalities.running_env.env_utils import (
+    FSDP2MixedPrecisionSettings,
+    MixedPrecisionSettings,
+    PyTorchDtypes,
+    has_bfloat_support,
+)
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.util import parse_enum_by_name
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -85,7 +96,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
         return parse_torch_device(device)
 
 
-class FSDPCheckpointLoadingConfig(BaseModel):
+class FSDP1CheckpointLoadingConfig(BaseModel):
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     block_names: list[str]
     mixed_precision_settings: MixedPrecisionSettings
@@ -108,7 +119,17 @@ class FSDPCheckpointLoadingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-class FSDPCheckpointSavingConfig(BaseModel):
+class DCPCheckpointLoadingConfig(BaseModel):
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+
+
+class FSDP1CheckpointSavingConfig(BaseModel):
+    checkpoint_path: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    experiment_id: str
+
+
+class DCPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
@@ -146,7 +167,6 @@ class StepLRSchedulerConfig(BaseModel):
     step_size: Annotated[int, Field(strict=True, gt=0)]
     gamma: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class OneCycleLRSchedulerConfig(BaseModel):
@@ -168,7 +188,6 @@ class OneCycleLRSchedulerConfig(BaseModel):
     final_div_factor: Annotated[float, Field(strict=True, gt=0.0)]
     three_phase: bool = False
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
     @model_validator(mode="after")
     def check_totals_steps_and_epchs(self) -> "OneCycleLRSchedulerConfig":
@@ -182,7 +201,6 @@ class ConstantLRSchedulerConfig(BaseModel):
     factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class LinearLRSchedulerConfig(BaseModel):
@@ -191,7 +209,6 @@ class LinearLRSchedulerConfig(BaseModel):
     end_factor: Annotated[float, Field(strict=True, ge=0.0, le=1.0)]
     total_iters: Annotated[int, Field(strict=True, gt=0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
 class CosineAnnealingLRSchedulerConfig(BaseModel):
@@ -199,22 +216,26 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     t_max: Annotated[int, Field(strict=True, gt=0)]
     eta_min: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
-    verbose: bool = False
 
 
-class CheckpointedOptimizerConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+class FSDP1CheckpointedOptimizerConfig(BaseModel):
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     wrapped_model: PydanticPytorchModuleType
     optimizer: PydanticOptimizerIFType
 
 
-class CheckpointedModelConfig(BaseModel):
-    checkpoint_loading: PydanticCheckpointLoadingIFType
+class FSDP1CheckpointedModelConfig(BaseModel):
+    checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
     model: PydanticPytorchModuleType
 
 
+@deprecated(
+    "With version 0.4, we upgraded FSDP to FSDP 2.0. Use get_fsdp_2_wrapped_model(...) "
+    "and FSDP2WrappedModelConfig instead.",
+    category=FutureWarning,
+)
 class FSDPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     sync_module_states: bool
@@ -239,6 +260,36 @@ class FSDPWrappedModelConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
+class FSDP2WrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
+    reshard_after_forward: bool = True
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_mixed_precision_settings(self):
+        if not has_bfloat_support() and (
+            self.mixed_precision_settings.reduce_dtype == PyTorchDtypes.BF_16
+            or self.mixed_precision_settings.param_dtype == PyTorchDtypes.BF_16
+        ):
+            raise ValueError("BF16 not supported in the current environment")
+        return self
+
+    @model_validator(mode="after")
+    def validate_dp_mesh_existence(self):
+        if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
+        return self
+
+
+class CompiledModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    block_names: list[str]
+    fullgraph: Optional[bool] = True
+    debug: Optional[bool] = False
+
+
 class WeightInitializedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     model_initializer: PydanticModelInitializationIFType
@@ -249,8 +300,19 @@ class WeightInitializedModelConfig(BaseModel):
 
 
 class ActivationCheckpointedModelConfig(BaseModel):
-    model: PydanticFSDPModuleType
+    model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class RawAppStateConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    optimizer: PydanticOptimizerIFType
+    lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
+
+
+class DCPAppStateConfig(BaseModel):
+    raw_app_state: PydanticAppStateType
+    checkpoint_dir_path: Path
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
@@ -363,8 +425,18 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
+class GPT2MFUCalculatorConfig(BaseModel):
+    n_layer: Annotated[int, Field(strict=True, gt=0)]
+    sequence_length: Annotated[int, Field(strict=True, gt=0)]
+    n_embd: Annotated[int, Field(strict=True, gt=0)]
+    world_size: Annotated[int, Field(strict=True, gt=0)]
+    wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+
+
 def load_app_config_dict(
-    config_file_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None
+    config_file_path: Path,
+    experiment_id: Optional[str] = None,
+    additional_resolver_funs: Optional[dict[str, Callable]] = None,
 ) -> dict:
     """Load the application configuration from the given YAML file.
     The function defines custom resolvers for the OmegaConf library to resolve environment variables and
@@ -372,6 +444,7 @@ def load_app_config_dict(
 
     Args:
         config_file_path (Path): YAML config file.
+        experiment_id (str, optional): The experiment_id of the current run. Defaults to None.
         additional_resolver_funs (dict[str, Callable], optional): Additional resolver functions. Defaults to None.
 
     Returns:
@@ -382,11 +455,9 @@ def load_app_config_dict(
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
-    def modalities_env_resolver_fun(var_name: str, config_file_path: Path) -> str | Path:
-        if var_name == "experiment_id":
-            return get_experiment_id_of_run(config_file_path=config_file_path)
-        elif var_name == "config_file_path":
-            return config_file_path
+    def modalities_env_resolver_fun(var_name: str, kwargs: dict[str, Any]) -> str | Path:
+        if var_name in kwargs:
+            return kwargs[var_name]
         else:
             raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
@@ -395,8 +466,11 @@ def load_app_config_dict(
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
+    modalities_env_kwargs = {"config_file_path": config_file_path}
+    if experiment_id is not None:
+        modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(
-        "modalities_env", partial(modalities_env_resolver_fun, config_file_path=config_file_path), replace=True
+        "modalities_env", partial(modalities_env_resolver_fun, kwargs=modalities_env_kwargs), replace=True
     )
     OmegaConf.register_new_resolver("node_env", node_env_resolver_fun, replace=True)
 

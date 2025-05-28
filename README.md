@@ -34,16 +34,21 @@ There are two ways to install Modalities. If you want to use the latest nightly 
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
+In any case, you need to install pytorch, ninja and flash-attention **beforehand**. This is because the build and installation process of flash attention requires PyTorch to be installed beforehand and flash attention to be installed with no build isolation. Until they improve this, we therefore have to run the following commands **before** installing Modalities:
+
+```sh
+# create and activate a conda environment (optional, but good practice)
+conda create -n modalities python=3.11
+conda activate modalities
+
+# install PyTorch, Ninja and Flash Attention (mandatory)
+pip install torch==2.6.0
+pip install ninja     # Lowers compilation time of flash attention significantly 
+pip install flash-attn --no-build-isolation
+```
 
 ### Option 1: Installation from source
 
-
-Create a conda environment and activate it via 
-
-```sh
-conda create -n modalities python=3.10
-conda activate modalities
-```
 Either clone the repository via
 ```sh
 git clone git@github.com:Modalities/modalities.git
@@ -53,15 +58,6 @@ or download the repository as a zip file and extract it.
 wget https://github.com/Modalities/modalities/archive/refs/heads/main.zip
 unzip main.zip
 ```
-
-
-Currently, the flash attention dependency cannot be installed without torch being installed beforehand.
-Until the flash attention developers fix this, we have to run
-
-```sh
-pip install torch==2.6.0
-```
-beforehand.
 
 Afterwards, Modalities can be installed via
 
@@ -75,11 +71,8 @@ pip install -e .
 To install Modalities via pip, run
 
 ```sh
-pip install torch==2.6.0
 pip install modalities
 ```
-
-Note, that also here, torch has to be installed before installing Modalities due to flash attention's dependency management.
 
 ## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
@@ -94,7 +87,7 @@ Example:
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --rdzv-endpoint localhost:29515 \
                                         --nnodes 1 \
                                         --nproc_per_node 4 \
-                                        $(which modalities) run --config_file_path configs/pretraining_config.yaml
+                                        $(which modalities) run --config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml
 ```
 
 Explanation:
@@ -111,7 +104,7 @@ Explanation:
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path configs/pretraining_config.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `configs/pretraining_config.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+* `--config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
 
 If you are a VSCode user, you may want to add this to your `launch.json`:
 ```json

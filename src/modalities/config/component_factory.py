@@ -30,13 +30,32 @@ class ComponentFactory:
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.
         """
-        component_names = list(components_model_type.model_fields.keys())
-        component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
+        # the components instantiaton model allows for the definition of required and optional top-level components
+        # for example the mfu_calculator might not always be required.
+        component_names_required = [
+            name for name, field in components_model_type.model_fields.items() if field.is_required()
+        ]
+        component_names_optional = [
+            name for name, field in components_model_type.model_fields.items() if not field.is_required()
+        ]
+
+        component_dict = self._build_config(
+            config_dict=config_dict,
+            component_names_required=component_names_required,
+            component_names_optional=component_names_optional,
+        )
         components = components_model_type(**component_dict)
         return components
 
-    def _build_config(self, config_dict: dict, component_names: list[str]) -> dict[str, Any]:
-        component_dict_filtered = {name: config_dict[name] for name in component_names}
+    def _build_config(
+        self, config_dict: dict, component_names_required: list[str], component_names_optional: list[str]
+    ) -> dict[str, Any]:
+        component_dict_filtered = {name: config_dict[name] for name in component_names_required}
+        # we only add the optional components if they are present in the config_dict
+        for name in component_names_optional:
+            if name in config_dict:
+                component_dict_filtered[name] = config_dict[name]
+
         components, _ = self._build_component(
             current_component_config=component_dict_filtered,
             component_config=config_dict,
@@ -52,14 +71,12 @@ class ComponentFactory:
         top_level_components: dict[str, Any],
         traversal_path: list,
     ) -> Any:
+        if len(traversal_path) == 1 and traversal_path[0] in top_level_components:
+            # if the top level component is already built due to a referencing config,
+            # we just return this component instead of building it again
+            return top_level_components[traversal_path[0]], top_level_components
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
-            # if the entities are top level components, we return the component,
-            # as it must have been built already via a referencing component
-            if len(traversal_path) > 0 and traversal_path[-1] in top_level_components:
-                entity_key = traversal_path[-1]
-                return top_level_components[entity_key], top_level_components
-            # if it is not a component that has been built already, we need to build it.
             # We first traverse the config for possible sub components that need to build beforehand.
             materialized_component_config = {}
             for sub_entity_key, sub_component_config_dict in current_component_config.items():

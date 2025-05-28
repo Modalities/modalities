@@ -99,7 +99,7 @@ def hf_model_from_checkpoint(
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
-        torch_dtype=pytorch_model.lm_head.weight.dtype,
+        torch_dtype=pytorch_model.transformer.lm_head.weight.dtype,
         prediction_key=prediction_key,
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)

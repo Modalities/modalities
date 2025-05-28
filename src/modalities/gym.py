@@ -3,10 +3,9 @@ from functools import partial
 from typing import Callable
 
 import torch.nn as nn
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
@@ -34,9 +33,7 @@ class Gym:
 
     def run(
         self,
-        model: nn.Module,
-        optimizer: Optimizer,
-        scheduler: LRScheduler,
+        app_state: AppState,
         training_log_interval_in_steps: int,
         checkpointing_interval_in_steps: int,
         evaluation_interval_in_steps: int,
@@ -47,9 +44,7 @@ class Gym:
         """Runs the model training, including evaluation and checkpointing.
 
         Args:
-            model (nn.Module): Model to be trained.
-            optimizer (Optimizer): Optimizer used for training.
-            scheduler (LRScheduler): Scheduler used for training.
+            app_state (AppState): Application state containing the model, optimizer and lr scheduler.
             training_log_interval_in_steps (int): Interval in steps to log training progress.
             checkpointing_interval_in_steps (int): Interval in steps to save checkpoints.
             evaluation_interval_in_steps (int): Interval in steps to perform evaluation.
@@ -59,26 +54,23 @@ class Gym:
         """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
-            model=model,
+            model=app_state.model,
             evaluation_data_loaders=evaluation_data_loaders,
             evaluation_interval_in_steps=evaluation_interval_in_steps,
         )
 
         checkpointing_callback: Callable[[TrainingProgress], None] = partial(
             self._run_checkpointing,
-            model=model,
-            optimizer=optimizer,
+            app_state=app_state,
             checkpoint_saving=checkpoint_saving,
             checkpointing_interval_in_steps=checkpointing_interval_in_steps,
         )
 
         print_rank_0(f"Start model training at {datetime.now()}.")
         self.trainer.train(
-            model=model,
+            app_state=app_state,
             train_loader=train_data_loader,
             loss_fun=self.loss_fun,
-            optimizer=optimizer,
-            scheduler=scheduler,
             evaluation_callback=evaluation_callback,
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
@@ -87,8 +79,7 @@ class Gym:
 
     def _run_checkpointing(
         self,
-        model: nn.Module,
-        optimizer: Optimizer,
+        app_state: AppState,
         training_progress: TrainingProgress,
         checkpoint_saving: CheckpointSaving,
         checkpointing_interval_in_steps: int,
@@ -100,8 +91,7 @@ class Gym:
             checkpoint_saving.save_checkpoint(
                 training_progress=training_progress,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
-                model=model,
-                optimizer=optimizer,
+                app_state=app_state,
                 early_stoppping_criterion_fulfilled=False,  # TODO: implement early stopping
             )
 

@@ -14,7 +14,7 @@ def check_same_weight_model(converted_model: GPT2ForCausalLM, modalities_model: 
         check_same_weight_attention(llama_layer, modalities_layer)
         check_same_weight_mlp(llama_layer, modalities_layer)
         check_same_weight_layer_norms(llama_layer, modalities_layer)
-    check_same_weight_base_modules(converted_model.lm_head, modalities_model.lm_head)
+    check_same_weight_base_modules(converted_model.lm_head, modalities_model.transformer.lm_head)
     check_same_weight_base_modules(converted_model.model.norm, modalities_model.transformer.lm_head_norm)
 
 

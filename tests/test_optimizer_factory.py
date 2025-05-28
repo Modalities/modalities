@@ -44,7 +44,7 @@ def _load_gpt2() -> FSDP:
     config_file_path = _ROOT_DIR / Path("tests/test_yaml_configs/gpt2_config_optimizer.yaml")
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     gpt2_model = get_gpt2_model_from_config(config_dict)
-    gpt2_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    gpt2_wrapped_model = ModelFactory.get_fsdp1_wrapped_model(
         gpt2_model,
         sync_module_states=True,
         block_names=["GPT2Block"],
@@ -59,7 +59,7 @@ def _load_coca() -> FSDP:
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     coca_config = CoCaConfig.model_validate(config_dict)
     coca_model = CoCa(**dict(coca_config))
-    coca_wrapped_model = ModelFactory.get_fsdp_wrapped_model(
+    coca_wrapped_model = ModelFactory.get_fsdp1_wrapped_model(
         coca_model,
         sync_module_states=True,
         block_names=["TransformerBlock", "VisionTransformerBlock"],

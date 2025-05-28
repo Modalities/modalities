@@ -11,29 +11,36 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDPCheckpointLoading
-from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import FSDPCheckpointSaving
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointLoading, FSDP1CheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
+from modalities.checkpointing.stateful.app_state_factory import AppStateFactory
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
 from modalities.config.config import (
     ActivationCheckpointedModelConfig,
     AdamOptimizerConfig,
     AdamWOptimizerConfig,
     BatchSamplerConfig,
-    CheckpointedModelConfig,
-    CheckpointedOptimizerConfig,
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
+    CompiledModelConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
+    DCPAppStateConfig,
+    DCPCheckpointLoadingConfig,
+    DCPCheckpointSavingConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
-    FSDPCheckpointLoadingConfig,
-    FSDPCheckpointSavingConfig,
+    FSDP1CheckpointedModelConfig,
+    FSDP1CheckpointedOptimizerConfig,
+    FSDP1CheckpointLoadingConfig,
+    FSDP1CheckpointSavingConfig,
+    FSDP2WrappedModelConfig,
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
+    GPT2MFUCalculatorConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -42,6 +49,7 @@ from modalities.config.config import (
     PackedMemMapDatasetMegatronConfig,
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
+    RawAppStateConfig,
     ResumableDistributedSamplerConfig,
     RichProgressSubscriberConfig,
     RichResultSubscriberConfig,
@@ -66,26 +74,30 @@ from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
-from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
+from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
-from modalities.models.model_factory import ModelFactory
+from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     DummyGradientClipper,
-    FSDPGradientClipper,
-    FSDPLoggingOnlyGradientClipper,
+    FSDP1GradientClipper,
+    FSDP1LoggingOnlyGradientClipper,
+    FSDP2GradientClipper,
+    FSDP2LoggingOnlyGradientClipper,
 )
 from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     DummyGradientClipperConfig,
     FSDPDummyGradientClipperConfig,
     FSDPGradientClipperConfig,
 )
+from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
@@ -122,22 +134,28 @@ class ComponentEntity:
 
 COMPONENTS = [
     # models
-    ComponentEntity("model", "gpt2", GPT2LLM, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
-    ComponentEntity("model", "checkpointed", ModelFactory.get_checkpointed_model, CheckpointedModelConfig),
-    ComponentEntity("model", "fsdp_wrapped", ModelFactory.get_fsdp_wrapped_model, FSDPWrappedModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initalized_model, WeightInitializedModelConfig
+        "model", "fsdp1_checkpointed", ModelFactory.get_fsdp1_checkpointed_model, FSDP1CheckpointedModelConfig
+    ),
+    ComponentEntity("model", "fsdp1_wrapped", ModelFactory.get_fsdp1_wrapped_model, FSDPWrappedModelConfig),
+    ComponentEntity("model", "fsdp2_wrapped", ModelFactory.get_fsdp2_wrapped_model, FSDP2WrappedModelConfig),
+    ComponentEntity(
+        "model", "model_initialized", ModelFactory.get_weight_initialized_model, WeightInitializedModelConfig
     ),
     ComponentEntity(
         "model",
-        "activation_checkpointed",
-        ModelFactory.get_activation_checkpointed_model,
+        "activation_checkpointed_fsdp1",
+        ModelFactory.get_activation_checkpointed_fsdp1_model,
         ActivationCheckpointedModelConfig,
     ),
+    ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # Device mesh
+    ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
@@ -151,8 +169,14 @@ COMPONENTS = [
     ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
     ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
     ComponentEntity(
-        "optimizer", "checkpointed", OptimizerFactory.get_checkpointed_optimizer, CheckpointedOptimizerConfig
+        "optimizer",
+        "fsdp1_checkpointed",
+        OptimizerFactory.get_fsdp1_checkpointed_optimizer_,
+        FSDP1CheckpointedOptimizerConfig,
     ),
+    # App state
+    ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),
+    ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state_, DCPAppStateConfig),
     # schedulers
     ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
     ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
@@ -211,9 +235,11 @@ COMPONENTS = [
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
     # checkpoint saving execution
-    ComponentEntity("checkpoint_saving_execution", "fsdp", FSDPCheckpointSaving, FSDPCheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "fsdp1", FSDP1CheckpointSaving, FSDP1CheckpointSavingConfig),
+    ComponentEntity("checkpoint_saving_execution", "dcp", DCPCheckpointSaving, DCPCheckpointSavingConfig),
     # checkpoint loading
-    ComponentEntity("checkpoint_loading", "fsdp", FSDPCheckpointLoading, FSDPCheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "fsdp1", FSDP1CheckpointLoading, FSDP1CheckpointLoadingConfig),
+    ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(
@@ -245,11 +271,17 @@ COMPONENTS = [
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
     # gradient clippers
-    ComponentEntity("gradient_clipper", "fsdp", FSDPGradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDPGradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp_logging_only", FSDPLoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+        "gradient_clipper", "fsdp1_logging_only", FSDP1LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+    ),
+    ComponentEntity("gradient_clipper", "fsdp2", FSDP2GradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity(
+        "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
+    # MFU calculators
+    ComponentEntity("mfu_calculator", "gpt2", GPT2MFUCalculator, GPT2MFUCalculatorConfig),
     # Number conversion
     ComponentEntity(
         "number_conversion",

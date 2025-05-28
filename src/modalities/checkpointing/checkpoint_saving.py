@@ -1,24 +1,8 @@
-from enum import Enum
-
-import torch.nn as nn
-from torch.optim import Optimizer
-
 from modalities.batch import EvaluationResultBatch
 from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.training.training_progress import TrainingProgress
-
-
-class CheckpointEntityType(Enum):
-    """
-    Enum class representing the types of entities that can be saved in a checkpoint.
-    Attributes:
-        MODEL (str): Represents the model entity.
-        OPTIMIZER (str): Represents the optimizer entity.
-    """
-
-    MODEL = "model"
-    OPTIMIZER = "optimizer"
 
 
 class CheckpointSaving:
@@ -43,8 +27,7 @@ class CheckpointSaving:
         self,
         training_progress: TrainingProgress,
         evaluation_result: dict[str, EvaluationResultBatch],
-        model: nn.Module,
-        optimizer: Optimizer,
+        app_state: AppState,
         early_stoppping_criterion_fulfilled: bool = False,
     ):
         """
@@ -53,8 +36,7 @@ class CheckpointSaving:
         Args:
             training_progress (TrainingProgress): The training progress.
             evaluation_result (dict[str, EvaluationResultBatch]): The evaluation result.
-            model (nn.Module): The model to be saved.
-            optimizer (Optimizer): The optimizer to be saved.
+            app_state (AppState): The application state to be checkpointed.
             early_stoppping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.
         """
@@ -67,6 +49,5 @@ class CheckpointSaving:
         self.checkpoint_saving_execution.run_checkpoint_instruction(
             checkpointing_instruction=checkpointing_instruction,
             training_progress=training_progress,
-            model=model,
-            optimizer=optimizer,
+            app_state=app_state,
         )

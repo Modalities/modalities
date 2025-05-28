@@ -33,12 +33,12 @@ settings:
       component_key: number_conversion
       variant_key: global_num_seen_tokens_from_checkpoint_path
       config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
     num_seen_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_seen_steps_from_checkpoint_path
       config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
     num_seen_samples:
       component_key: number_conversion
       variant_key: num_samples_from_num_tokens
@@ -49,7 +49,7 @@ settings:
       component_key: number_conversion
       variant_key: last_step_from_checkpoint_path
       config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+        checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
   warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}
 
 collate_fn:
@@ -104,12 +104,9 @@ eval_dataloaders: []
 
 checkpoint_loading:
   component_key: checkpoint_loading
-  variant_key: fsdp
+  variant_key: dcp
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    block_names: [GPT2Block]
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
 
 checkpoint_saving:
   component_key: checkpoint_saving
@@ -122,7 +119,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -135,24 +132,44 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
-wrapped_model:
-  component_key: model
-  variant_key: checkpointed
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size}
+    world_size: ${settings.cuda_env.world_size}
+
+app_state:
+  component_key: app_state
+  variant_key: dcp
+  config:
+    raw_app_state:
+      instance_key: app_state_raw
+      pass_type: BY_REFERENCE
+    checkpoint_dir_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
+
+app_state_raw:
+  component_key: app_state
+  variant_key: raw
   config:
     model:
-      instance_key: model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
+    optimizer:
+      instance_key: optimizer
       pass_type: BY_REFERENCE
-    checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
 
-model:
+initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: model_raw
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
@@ -164,10 +181,27 @@ model:
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
 model_raw:
   component_key: model
   variant_key: gpt2
   config:
+    use_meta_device: false
+    use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -182,37 +216,34 @@ model_raw:
     bias: false
     attention_config:
       qkv_transforms:
-      - type_hint: RotaryTransform
-        config:
-          n_embd: ${model_raw.config.n_embd}
-          n_head: ${model_raw.config.n_head_q}
-          seq_length_dim: -2
-          base_freq: 100000
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q}
+            seq_length_dim: -2
+            base_freq: 100000
     attention_implementation: pytorch_flash
     activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
@@ -225,24 +256,9 @@ scheduler:
     total_steps: ${settings.training_target.num_target_steps}
     pct_start: 0.01
     anneal_strategy: cos
-    last_epoch: ${settings.training_progress.last_step}
+    # last_epoch: ${settings.training_progress.last_step}
 
 optimizer:
-  component_key: optimizer
-  variant_key: checkpointed
-  config:
-    optimizer:
-      instance_key: optimizer_original
-      pass_type: BY_REFERENCE
-    wrapped_model:
-      instance_key: wrapped_model
-      pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
-      pass_type: BY_REFERENCE
-    checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
-
-optimizer_original:  
   component_key: optimizer
   variant_key: adam_w
   config:
@@ -252,15 +268,15 @@ optimizer_original:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0

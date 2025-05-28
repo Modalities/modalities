@@ -37,14 +37,14 @@ NAMED_PARAMETER_INIT_GROUPS = {
                 r"transformer\.wte\.weight",
                 r"transformer\.wpe\.weight",
                 # lm_head weights (although usually tied with transformer.wte.weight)
-                r"lm_head\.weight",
+                r"transformer\.lm_head\.weight",
             ],
             biases=[
                 # NOTE: some bias terms might not be present due to user configuration
                 r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.bias",
                 r"transformer\.h\.\w+\.mlp\.(W|V|W_2)\.bias",  # SwiGLU
                 r"transformer\.h\.\w+\.mlp\.(c_fc|c_proj)\.bias",  # gelu
-                r"lm_head\.bias",
+                r"transformer\.lm_head\.bias",  # typically not present
             ],
         ),
         # scaled: In the attention block, we scale the final projection in the FFN (W_2)
@@ -62,6 +62,7 @@ NAMED_PARAMETER_INIT_GROUPS = {
                 # embedding weights
                 r"transformer\.wte\.weight",
                 r"transformer\.wpe\.weight",
+                r"transformer\.lm_head\.weight",
             ]
         ),
     },

@@ -163,3 +163,5 @@ tests/tmp/*
 *wandb_storage*
 .coverage/*
 *.pbin
+
+tutorials/profiling/experiments

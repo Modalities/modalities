@@ -69,7 +69,7 @@ class InitializationRoutines:
             mean (float): mean of the normal distribution
             std (float): standard deviation of the normal distribution. If set to "auto", appropiate
                 value selected as per plain initialization described in https://arxiv.org/abs/2312.16903
-            hidden_dim (Optional[int], optional): hidden dimension of the attention layer. Defaults to None.
+            hidden_dim (Optional[int]): hidden dimension of the attention layer. Defaults to None.
         """
 
         # auto: choose std automatically

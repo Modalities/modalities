@@ -3,7 +3,6 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 import torch
@@ -16,8 +15,8 @@ from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoa
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
-from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
+from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
 
 
 def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
@@ -35,22 +34,6 @@ def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
 
 
 working_dir = Path(os.path.dirname(__file__))
-
-
-class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
-    def __init__(self):
-        self.message_list: list[Message[EvaluationResultBatch]] = []
-
-    def consume_message(self, message: Message[EvaluationResultBatch]):
-        """Consumes a message from a message broker."""
-        self.message_list.append(message)
-
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
-        pass
-
-
-class SaveAllResultSubscriberConfig(BaseModel):
-    pass
 
 
 class TrainDataloaderInstantiationModel(BaseModel):
@@ -78,27 +61,23 @@ class TestWarmstart:
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
             gpt2_8_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path)
+            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path, experiment_id="0")
 
             # adopt the checkpoint path
             checkpoint_path = temp_dir
-            experiment_id_0 = "0"
             gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-                "experiment_id"
-            ] = experiment_id_0
             gpt2_8_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_8_steps_config_dict["settings"]["experiment_id"] = experiment_id_0
             loss_values_experiment_0_path = checkpoint_path + "/experiment_0_loss_scores.txt"
 
             # config for one step model
             gpt2_warm_start_after_4_steps_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(gpt2_warm_start_after_4_steps_config_file_path)
+            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(
+                gpt2_warm_start_after_4_steps_config_file_path, experiment_id="1"
+            )
 
             # adopt the checkpoint path
-            experiment_id_1 = "1"
             gpt2_warm_start_after_4_steps_dict["wrapped_model"]["config"]["checkpoint_path"] = (
                 checkpoint_path + "/0/eid_0-model-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin"
             )
@@ -109,11 +88,7 @@ class TestWarmstart:
             gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-                "experiment_id"
-            ] = experiment_id_1
             gpt2_warm_start_after_4_steps_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_warm_start_after_4_steps_dict["settings"]["experiment_id"] = experiment_id_1
             loss_values_experiment_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
 
             # # adopt dataset path
@@ -121,10 +96,9 @@ class TestWarmstart:
             #     working_dir / "lorem_ipsum.pbin"
             # )
 
-            main_obj_0 = Main(gpt2_8_steps_config_file_path)
-            main_obj_0.config_dict = gpt2_8_steps_config_dict
-
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+                main_obj_0 = Main(gpt2_8_steps_config_file_path)
+                main_obj_0.config_dict = gpt2_8_steps_config_dict
                 main_obj_0.add_custom_component(
                     component_key="results_subscriber",
                     variant_key="save_all",
@@ -203,9 +177,9 @@ class TestWarmstart:
                 components_1 = main_obj_1.build_components(components_model_type=TrainingComponentsInstantiationModel)
 
                 assert (
-                    components_0.scheduler.base_lrs == components_1.scheduler.base_lrs
+                    components_0.app_state.lr_scheduler.base_lrs == components_1.app_state.lr_scheduler.base_lrs
                 )  # make sure that the initial learning rates are the same
-                assert components_1.scheduler.last_epoch == 4  # we start from step 4
+                assert components_1.app_state.lr_scheduler.last_epoch == 4  # we start from step 4
 
                 main_obj_1.run(components_1)
 
@@ -231,25 +205,30 @@ class TestWarmstart:
                     assert loaded_loss_values_0[4:] == pytest.approx(loaded_loss_values_1, abs=1e-16)
 
                 # assert that the scheduler state is the same for both models
-                assert components_1.scheduler.last_epoch == components_0.scheduler.last_epoch
-                assert components_0.scheduler.get_last_lr() == components_1.scheduler.get_last_lr()
+                assert components_1.app_state.lr_scheduler.last_epoch == components_0.app_state.lr_scheduler.last_epoch
+                assert (
+                    components_0.app_state.lr_scheduler.get_last_lr()
+                    == components_1.app_state.lr_scheduler.get_last_lr()
+                )
 
     def test_warmstart_dataloader(self):
         # non-skipped config
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path, experiment_id="0")
 
         # skipped config
         gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
-
-        main_obj_1 = Main(gpt2_two_steps_config_file_path)
-        main_obj_1.config_dict = gpt2_two_steps_config_dict
-
-        main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
-        main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
+        gpt2_warm_start_from_step_1_dict = load_app_config_dict(
+            gpt2_warm_start_from_step_1_config_file_path, experiment_id="1"
+        )
 
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj_1 = Main(gpt2_two_steps_config_file_path)
+            main_obj_1.config_dict = gpt2_two_steps_config_dict
+
+            main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
+            main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
+
             main_obj_1.add_custom_component(
                 component_key="results_subscriber",
                 variant_key="save_all",

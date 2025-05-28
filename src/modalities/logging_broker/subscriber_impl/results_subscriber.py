@@ -18,7 +18,7 @@ class DummyResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         """Consumes a message from a message broker."""
         pass
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         pass
 
 
@@ -50,7 +50,7 @@ class RichResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
         if losses or metrics:
             rich.print(Panel(Group(*group_content)))
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         raise NotImplementedError
 
 
@@ -75,8 +75,8 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
 
-    def consume_dict(self, mesasge_dict: dict[str, Any]):
-        for k, v in mesasge_dict.items():
+    def consume_dict(self, message_dict: dict[str, Any]):
+        for k, v in message_dict.items():
             self.run.config[k] = v
 
     def consume_message(self, message: Message[EvaluationResultBatch]):

@@ -42,7 +42,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
-from modalities.util import get_total_number_of_trainable_parameters, print_rank_0
+from modalities.util import get_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 
 
 @click.group()
@@ -63,8 +63,8 @@ def CMD_entry_point_run_modalities(config_file_path: Path):
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
-    main_obj = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -103,8 +103,8 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -515,8 +515,9 @@ class Main:
     """Main class that orchestrates the training process."""
 
     def __init__(self, config_path: Path, additional_resolver_funs: Optional[dict[str, Callable]] = None) -> None:
+        experiment_id = get_experiment_id_of_run(config_path)
         self.config_dict = load_app_config_dict(
-            config_file_path=config_path, additional_resolver_funs=additional_resolver_funs
+            config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
         )
         self.config_path = config_path
 
@@ -572,7 +573,6 @@ class Main:
         Args:
             components (TrainingComponentsInstantiationModel): The components needed for the training process.
         """
-        print_rank_0(f"Initialize Model at {datetime.now()}.")
         # save the config file to the checkpointing path
         if components.settings.cuda_env.global_rank == 0:
             experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
@@ -607,6 +607,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
+            mfu_calculator=components.mfu_calculator,
         )
 
         # Evaluator
@@ -622,9 +623,8 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        wrapped_model = components.wrapped_model
-        num_params = get_total_number_of_trainable_parameters(wrapped_model)
-        components.evaluation_subscriber.consume_dict({"No. Parameters": num_params})
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model)
+        components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
         logging.info(f"Training model with {num_params} parameters.")
 
         print_rank_0(f"Model initialized at {datetime.now()}.")
@@ -645,9 +645,7 @@ class Main:
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
             checkpoint_saving=components.checkpoint_saving,
-            model=wrapped_model,
-            optimizer=components.optimizer,
-            scheduler=components.scheduler,
+            app_state=components.app_state,
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,

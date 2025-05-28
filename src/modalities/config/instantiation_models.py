@@ -4,15 +4,15 @@ from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
-    PydanticLRSchedulerIFType,
     PydanticMessageSubscriberIFType,
-    PydanticOptimizerIFType,
+    PydanticMFUCalculatorABCType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
@@ -81,6 +81,9 @@ class TrainingComponentsInstantiationModel(BaseModel):
             model_checkpoint_path: Path
             optimizer_checkpoint_path: Optional[Path] = None
 
+        class DCPWarmstartCheckpointPaths(BaseModel):
+            checkpoint_folder_path: Path
+
         experiment_id: str
         config_file_path: FilePath
         referencing_keys: dict[str, str]
@@ -91,7 +94,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         step_profile: StepProfile
         training_target: TrainingTarget
         training_progress: TrainingProgress
-        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths] = None
+        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
@@ -165,9 +168,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             return self
 
     settings: Settings
-    wrapped_model: PydanticPytorchModuleType
-    optimizer: PydanticOptimizerIFType
-    scheduler: PydanticLRSchedulerIFType
+    app_state: PydanticAppStateType
     loss_fn: PydanticLossIFType
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticLLMDataLoaderIFType
@@ -176,6 +177,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
+    mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
+    model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")
     def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel.Settings":
