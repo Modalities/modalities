@@ -18,7 +18,6 @@ def main():
     parser.add_argument(
         "--rdzv_endpoint", type=str, default="localhost:0", help="Rendezvous endpoint for distributed training."
     )
-    parser.add_argument("--rdzv_timeout", type=int, default=16, help="Rendezvous timeout in seconds.")
     parser.add_argument(
         "--experiment_folder",
         type=str,
@@ -60,7 +59,6 @@ def main():
         num_measurement_steps=args.num_measurement_steps,
         num_nodes=args.num_nodes,
         rdzv_endpoint=args.rdzv_endpoint,
-        rdzv_timeout=args.rdzv_timeout,
         local_rank_ids=local_rank_ids,
     )
 

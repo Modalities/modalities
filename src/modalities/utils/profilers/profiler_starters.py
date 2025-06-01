@@ -23,7 +23,6 @@ class ModalitiesProfilerStarter:
         num_nodes: int = 1,
         node_rank: int = 0,
         rdzv_endpoint: str = "localhost:0",
-        rdzv_timeout: int = 30,
         local_rank_ids: list[int] = None,
     ):
         """Applies memory and runtime profiling to the training step of a model training.
@@ -54,7 +53,6 @@ class ModalitiesProfilerStarter:
             node_rank (int, optional): The rank of the current node. Defaults to 0.
             rdzv_endpoint: (str, optional): The rendezvous endpoint to be used. Defaults to "localhost:0",
                 in which case torchrun selects a free empty port on localhost itself.
-            rdzv_timeout: (int, optional): The rendezvous timeout in secons.
             local_rank_ids (list[int], optional): The local rank IDs to be used. Defaults to None.
 
         Raises:
@@ -96,8 +94,6 @@ class ModalitiesProfilerStarter:
                         "c10d",
                         "--rdzv_endpoint",
                         rdzv_endpoint,
-                        "--rdzv_timeout",
-                        rdzv_timeout,
                     ]
                     modalities_args = [
                         str(full_main_path),

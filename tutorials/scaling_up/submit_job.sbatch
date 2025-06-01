@@ -49,7 +49,6 @@ srun python scaling_grid_search.py \
     --num_warmup_steps 16 \
     --num_measurement_steps 16 \
     --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-    --rdzv_timeout 120 \
     --experiment_folder $EXPERIMENT_FOLDER_PATH
 
 echo "END TIME: $(date)"
