@@ -20,10 +20,10 @@ class ModalitiesProfilerStarter:
         grid_search: list[GridSearchItem],
         num_warmup_steps: int,
         num_measurement_steps: int,
-        nproc_per_node: int = 1,
         num_nodes: int = 1,
         node_rank: int = 0,
         rdzv_endpoint: str = "localhost:0",
+        rdzv_timeout: int = 30,
         local_rank_ids: list[int] = None,
     ):
         """Applies memory and runtime profiling to the training step of a model training.
@@ -50,11 +50,11 @@ class ModalitiesProfilerStarter:
                 During the warmup steps, the profiler is not measuring the memory and runtime.
             num_measurement_steps (int): The number of measurement steps to be used for the profiler.
                 During the measurement steps, the profiler collects the memory and runtime statistics.
-            nproc_per_node (int, optional): The number of processes (ranks) to be used per node. Defaults to 1.
             num_nodes (int, optional): The number of nodes to be used. Defaults to 1.
             node_rank (int, optional): The rank of the current node. Defaults to 0.
-            rdzv_endpoint: str, optional): The rendezvous endpoint to be used. Defaults to "localhost:0",
+            rdzv_endpoint: (str, optional): The rendezvous endpoint to be used. Defaults to "localhost:0",
                 in which case torchrun selects a free empty port on localhost itself.
+            rdzv_timeout: (int, optional): The rendezvous timeout in secons.
             local_rank_ids (list[int], optional): The local rank IDs to be used. Defaults to None.
 
         Raises:
@@ -87,7 +87,7 @@ class ModalitiesProfilerStarter:
                     full_main_path = Path(__main__.__file__).resolve()
                     torch_run_args = [
                         "--nproc_per_node",
-                        str(nproc_per_node),
+                        str(len(local_rank_ids)),
                         "--nnodes",
                         str(num_nodes),
                         "--node_rank",
@@ -96,6 +96,8 @@ class ModalitiesProfilerStarter:
                         "c10d",
                         "--rdzv_endpoint",
                         rdzv_endpoint,
+                        "--rdzv_timeout",
+                        rdzv_timeout,
                     ]
                     modalities_args = [
                         str(full_main_path),

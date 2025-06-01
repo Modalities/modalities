@@ -66,7 +66,7 @@ model_raw:
           n_head: ${model_raw.config.n_head_q}
           seq_length_dim: -2
           base_freq: 500000
-    attention_implementation: manual
+    attention_implementation: dao_flash
     activation_type: swiglu
     attention_norm_config:
       norm_type: layer_norm

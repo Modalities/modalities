@@ -4,7 +4,7 @@
 #
 # Submits separate Slurm jobs for each desired node count.
 
-NODE_COUNTS="64" # "1 2 4 8 16 32 64"
+NODE_COUNTS="1 2" #  4 8 16 32 64"
 DATE_OF_RUN=$(date +"%Y-%m-%d__%H-%M-%S")
 
 for NUM_NODES in $NODE_COUNTS

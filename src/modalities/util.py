@@ -323,7 +323,10 @@ def is_launched_via_torchrun() -> bool:
     Returns:
         bool: True if launched via `torchrun`, False otherwise.
     """
-    return all(env_var in os.environ for env_var in ["RANK", "LOCAL_RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"])
+    launched_via_torchrun = all(
+        env_var in os.environ for env_var in ["RANK", "LOCAL_RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"]
+    )
+    return launched_via_torchrun
 
 
 @contextmanager
