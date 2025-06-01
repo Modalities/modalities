@@ -164,3 +164,4 @@ tests/tmp/*
 .coverage/*
 *.pbin
 tutorials/profiling/experiments
+tutorials/scaling_up/experiments
