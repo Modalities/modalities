@@ -22,7 +22,10 @@ class ProfileLogsAnalyzer:
         results = []
         for file in log_dir_path.glob("*.json"):
             with open(file, "r") as f:
-                data = json.load(f)
+                try:
+                    data = json.load(f)
+                except Exception as e:
+                    raise Exception(f"Could not load json file {file}") from e
             result = ProfilingResult(
                 grid_search_config=data["grid_search_config"],
                 env_info=data["env_info"],
