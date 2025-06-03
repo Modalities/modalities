@@ -4,7 +4,13 @@
 #
 # Submits separate Slurm jobs for each desired node count.
 
-NODE_COUNTS="1 2" #  4 8 16 32 64"
+# Accept node counts as arguments, otherwise use default.
+if [ "$#" -gt 0 ]; then
+    NODE_COUNTS="$@"
+else
+    NODE_COUNTS="1"  # Default values
+fi
+
 DATE_OF_RUN=$(date +"%Y-%m-%d__%H-%M-%S")
 
 for NUM_NODES in $NODE_COUNTS
