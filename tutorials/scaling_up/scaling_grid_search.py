@@ -2,7 +2,6 @@ import argparse
 import os
 from pathlib import Path
 
-from modalities.utils.profilers.grid_search_utils import GridSearchItem
 from modalities.utils.profilers.profiler_starters import ModalitiesProfilerStarter
 
 
@@ -36,8 +35,7 @@ def main():
     else:
         raise ValueError("CUDA_VISIBLE_DEVICES must be set.")
 
-    print(f"Running script on {args.num_nodes} nodes with the following arguments:")
-    print(args)
+    print(f"Running script on {args.num_nodes} nodes with the following arguments:\n {args}")
 
     config_file_path = Path(args.config_file).resolve()
 
@@ -45,16 +43,9 @@ def main():
     experiment_folder_path = experiment_folder_path / f"num_ranks_{len(local_rank_ids)*args.num_nodes}"
     experiment_folder_path.mkdir(exist_ok=True)
 
-    grid_search = [
-        GridSearchItem(name="settings.benchmark.batch_size", values=list(range(1, 4))),
-        GridSearchItem(name="settings.benchmark.sequence_length", values=[2048, 4096, 8192]),
-        GridSearchItem(name="settings.benchmark.vocab_size", values=[50304]),
-    ]
-
     ModalitiesProfilerStarter.run_train_step_profiler(
         config_file_path=config_file_path,
         experiment_folder_path=experiment_folder_path,
-        grid_search=grid_search,
         num_warmup_steps=args.num_warmup_steps,
         num_measurement_steps=args.num_measurement_steps,
         num_nodes=args.num_nodes,

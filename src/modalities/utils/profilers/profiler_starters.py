@@ -7,7 +7,7 @@ from torch.profiler import ProfilerActivity, profile, schedule
 
 from modalities import __main__
 from modalities.util import is_launched_via_torchrun, temporary_env
-from modalities.utils.profilers.grid_search_utils import GridSearchItem, GridSearchUtils
+from modalities.utils.profilers.grid_search_utils import GridSearchUtils
 from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
 from modalities.utils.run_torchrun_script import run_torchrun_with_cleanup
 
@@ -17,7 +17,6 @@ class ModalitiesProfilerStarter:
     def run_train_step_profiler(
         config_file_path: Path,
         experiment_folder_path: Path,
-        grid_search: list[GridSearchItem],
         num_warmup_steps: int,
         num_measurement_steps: int,
         num_nodes: int = 1,
@@ -26,7 +25,7 @@ class ModalitiesProfilerStarter:
         local_rank_ids: list[int] = None,
     ):
         """Applies memory and runtime profiling to the training step of a model training.
-        By specifying a grid search, the profiler can be run for multiple configurations.
+        By specifying a grid search in the config, the profiler can be run for multiple configurations.
         Internally, the grid search (i.e., the cartesian product of all settings) is applied
         to the config file and a new temporary config file is created for each grid search item.
         The profiler is then run sequentially for each config file.
@@ -44,7 +43,6 @@ class ModalitiesProfilerStarter:
         Args:
             config_file_path (Path): The path to the config file.
             experiment_folder_path (Path): The path to the experiment folder.
-            grid_search (list[GridSearchItem]): The grid search items to be used for the profiler.
             num_warmup_steps (int): The number of warmup steps to be used for the profiler.
                 During the warmup steps, the profiler is not measuring the memory and runtime.
             num_measurement_steps (int): The number of measurement steps to be used for the profiler.
@@ -65,10 +63,7 @@ class ModalitiesProfilerStarter:
             config_string = f.read()
         config_dict = yaml.safe_load(config_string)
         # get one config for each grid search item
-        config_dicts = GridSearchUtils.get_configs_from_grid_search(
-            config_dict=config_dict,
-            grid_search=grid_search,
-        )
+        config_dicts = GridSearchUtils.get_configs_from_grid_search(config_dict=config_dict)
         # run the profiler for each config
         if len(config_dicts) > 1 and is_launched_via_torchrun():
             raise RuntimeError(

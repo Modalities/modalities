@@ -3,10 +3,10 @@ settings:
     sample_key: input_ids
     target_key: target_ids
     prediction_key: logits
-  benchmark:
-    sequence_length: 4096
-    vocab_size: 50304
-    batch_size: 1
+  grid_search:
+    sequence_length: [4096, 8192]
+    vocab_size: [50304]
+    batch_size: [1, 2, 3, 4]
 
 initialized_model:
   component_key: model
@@ -48,9 +48,9 @@ model_raw:
     use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
-    sequence_length: ${settings.benchmark.sequence_length}
+    sequence_length: ${settings.grid_search.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
-    vocab_size: ${settings.benchmark.vocab_size}
+    vocab_size: ${settings.grid_search.vocab_size}
     n_layer: 32
     n_head_q: 32
     n_head_kv: 8
@@ -118,6 +118,6 @@ dataset_batch_generator:
   component_key: dataset_batch_generator
   variant_key: random
   config:
-    vocab_size: ${settings.benchmark.vocab_size}
-    sequence_length: ${settings.benchmark.sequence_length}
-    batch_size: ${settings.benchmark.batch_size}
+    vocab_size: ${settings.grid_search.vocab_size}
+    sequence_length: ${settings.grid_search.sequence_length}
+    batch_size: ${settings.grid_search.batch_size}

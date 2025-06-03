@@ -157,8 +157,12 @@ class ModalitiesProfiler:
         with open(config_file_path, "r") as f:
             config_dict = yaml.safe_load(f)
 
+        if "settings" not in config_dict or "grid_search" not in config_dict["settings"]:
+            raise ValueError("The config file must contain a 'settings' section with a 'grid_search' subsection.")
+        grid_search_config = config_dict["settings"]["grid_search"]
+
         result = ProfilingResult(
-            grid_search_config=config_dict["settings"]["benchmark"],
+            grid_search_config=grid_search_config,
             measurement=ProfilingResult.Measurement(
                 peak_memory=mean_statistics[TrainStepMetrics.PEAK_MEMORY_MB],
                 forward_time=mean_statistics[TrainStepMetrics.FORWARD_PASS_TIME_s],
