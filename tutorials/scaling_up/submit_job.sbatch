@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=EUHPC_D21_101
-#SBATCH --qos=normal
-#SBATCH --job-name=15B_FSDP2_compiled
-#SBATCH --output=/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/logs/logs_%j.out
-#SBATCH --error=/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/logs/logs_%j.err
+#SBATCH --qos=normal            # boost_qos_dbg # normal
+#SBATCH --job-name=8B_scaling
+#SBATCH --output=logs/logs_%j.out
+#SBATCH --error=logs/logs_%j.err
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0  # Use all available memory on the node
@@ -31,6 +31,7 @@ set -x
 
 module load cuda/12.3
 
+# needs to be adapted to the user's python environment 
 source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate
 
 MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
