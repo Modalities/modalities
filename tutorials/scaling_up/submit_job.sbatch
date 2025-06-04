@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=EUHPC_D21_101
-#SBATCH --qos=normal            # boost_qos_dbg # normal
+#SBATCH --qos=normal # boost_qos_dbg or normal
 #SBATCH --job-name=8B_scaling
 #SBATCH --output=logs/logs_%j.out
 #SBATCH --error=logs/logs_%j.err
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=0  # Use all available memory on the node
+#SBATCH --mem=0
 #SBATCH --gres=gpu:4
 #SBATCH --time=00:20:00
 
@@ -15,7 +15,6 @@
 export CXX=g++
 export CC=gcc
 
-# force crashing on nccl issues like hanging broadcast
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export NCCL_IB_TIMEOUT=50
 export UCX_RC_TIMEOUT=4s
@@ -25,14 +24,10 @@ export NCCL_IB_RETRY_CNT=10
 export DEVICES_PER_NODE=4
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-# Enable logging
 set -euo pipefail
 set -x
 
 module load cuda/12.3
-
-# needs to be adapted to the user's python environment 
-source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate
 
 MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=6003
@@ -40,17 +35,25 @@ MASTER_PORT=6003
 echo "START TIME: $(date)"
 echo "Running on $SLURM_JOB_NUM_NODES nodes."
 
-CONFIG_FILE_PATH="config_8B_scaling.yaml"
-EXPERIMENT_FOLDER_PATH="experiments/$DATE_OF_RUN"
+# Check required environment variables
+: "${CONFIG_FILE_PATH:?Missing CONFIG_FILE_PATH}"
+: "${EXPERIMENT_FOLDER_PATH:?Missing EXPERIMENT_FOLDER_PATH}"
+: "${PYTHON_ENV_PATH:?Missing PYTHON_ENV_PATH}"
+: "${NUM_WARMUP_STEPS:?Missing NUM_WARMUP_STEPS}"
+: "${NUM_MEASUREMENT_STEPS:?Missing NUM_MEASUREMENT_STEPS}"
+
+# Activate the Python environment
+source "$PYTHON_ENV_PATH"
+
 mkdir -p "$EXPERIMENT_FOLDER_PATH"
 
 srun python scaling_grid_search.py \
-    --config_file $CONFIG_FILE_PATH \
-    --num_nodes $SLURM_JOB_NUM_NODES \
-    --num_warmup_steps 16 \
-    --num_measurement_steps 16 \
-    --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-    --experiment_folder $EXPERIMENT_FOLDER_PATH
+    --config_file "$CONFIG_FILE_PATH" \
+    --num_nodes "$SLURM_JOB_NUM_NODES" \
+    --num_warmup_steps "$NUM_WARMUP_STEPS" \
+    --num_measurement_steps "$NUM_MEASUREMENT_STEPS" \
+    --rdzv_endpoint="$MASTER_ADDR:$MASTER_PORT" \
+    --experiment_folder "$EXPERIMENT_FOLDER_PATH"
 
 echo "END TIME: $(date)"
 echo "=== FINISHED ==="
