@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import time
+import traceback
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -151,7 +152,8 @@ class ModalitiesProfiler:
                 )
                 mean_statistics = step_statistics.get_mean_measurements_dict()
         except Exception as e:
-            error = str(e)
+            traceback.print_exc()
+            error = f"{type(e)}: {str(e)}"
             mean_statistics = defaultdict(lambda: -1)
 
         with open(config_file_path, "r") as f:
