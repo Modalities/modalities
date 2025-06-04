@@ -320,7 +320,7 @@ class ActivationCheckpointedModelConfig(BaseModel):
     ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
     model: PydanticPytorchModuleType | PydanticFSDP1ModuleType
-    sac_fun_params: Optional[FullACParams | SelectiveLayerACParams | SelectiveOpACParams] = None
+    ac_fun_params: Optional[FullACParams | SelectiveLayerACParams | SelectiveOpACParams] = None
 
 
 class RawAppStateConfig(BaseModel):

@@ -268,7 +268,7 @@ class ModelFactory:
         ac_variant: ActivationCheckpointingVariants,
         layers_fqn: str,
         model: nn.Module,
-        sac_fun_params: (
+        ac_fun_params: (
             ActivationCheckpointedModelConfig.FullACParams
             | ActivationCheckpointedModelConfig.SelectiveLayerACParams
             | ActivationCheckpointedModelConfig.SelectiveOpACParams
@@ -281,7 +281,7 @@ class ModelFactory:
             ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
             layers_fqn (str): Fully qualified name (FQN) of the layers to apply activation checkpointing to.
             model (nn.Module): The (unwrapped) model to apply activation checkpointing to.
-            sac_fun_params (ACM.FullACParams  |  ACM.SelectiveLayerACParams  |  ACM.SelectiveOpACParams):
+            ac_fun_params (ACM.FullACParams  |  ACM.SelectiveLayerACParams  |  ACM.SelectiveOpACParams):
                 The parameters for the activation checkpointing function, depending on the variant.
 
         Raises:
@@ -300,7 +300,7 @@ class ModelFactory:
             model=model,
             layers_fqn=layers_fqn,
             ac_variant=ac_variant,
-            sac_fun_params=sac_fun_params,
+            ac_fun_params=ac_fun_params,
         )
         return model
 

@@ -84,7 +84,7 @@ class ActivationCheckpointing:
         ac_variant: ActivationCheckpointingVariants,
         layers_fqn: str,
         model: nn.Module,
-        sac_fun_params: (
+        ac_fun_params: (
             ActivationCheckpointedModelConfig.FullACParams
             | ActivationCheckpointedModelConfig.SelectiveLayerACParams
             | ActivationCheckpointedModelConfig.SelectiveOpACParams
@@ -105,7 +105,7 @@ class ActivationCheckpointing:
             sac_variant (SelectiveActivationCheckpointingVariants): The activation checkpointing variant to use.
             layers_fqn (str): The fully qualified name (FQN) of the layers to apply activation checkpointing to.
             model (nn.Module): The model to apply activation checkpointing to (in place).
-            sac_fun_params (SelectiveActivationCheckpointedModelConfig.*Params): The parameters for the activation
+            ac_fun_params (ActivationCheckpointedModelConfig.*Params): The parameters for the activation
                  checkpointing function.
 
         Raises:
@@ -118,12 +118,12 @@ class ActivationCheckpointing:
         elif ac_variant == ActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING:
             apply_ac_fun = partial(
                 ActivationCheckpointing._apply_selective_layer_ac,
-                ac_freq=sac_fun_params.ac_freq,
+                ac_freq=ac_fun_params.ac_freq,
             )
         elif ac_variant == ActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING:
-            if len(sac_fun_params.save_ops_keys) > 0:
+            if len(ac_fun_params.save_ops_keys) > 0:
                 apply_ac_fun = partial(
-                    ActivationCheckpointing._apply_selective_op_ac, save_ops_keys=sac_fun_params.save_ops_keys
+                    ActivationCheckpointing._apply_selective_op_ac, save_ops_keys=ac_fun_params.save_ops_keys
                 )
             else:
                 raise ValueError("No save_ops_keys provided for selective op activation checkpointing.")
