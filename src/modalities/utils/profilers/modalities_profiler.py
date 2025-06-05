@@ -231,6 +231,7 @@ class ModalitiesProfiler:
         loss_fun: Callable,
         optimizer: Optional[torch.optim.Optimizer] = None,
     ) -> dict[TrainStepMetrics, float]:
+        start_forward = time.perf_counter()
         device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
         # generate batch
         batch = batch_generator.get_dataset_batch()
@@ -238,24 +239,22 @@ class ModalitiesProfiler:
 
         # forward pass
         torch.cuda.reset_peak_memory_stats(device)
-        start_forward = time.time()
         predictions = model(batch.samples)
-        forward_time = time.time() - start_forward
-
         result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
         loss = loss_fun(result_batch)
+        forward_time = time.perf_counter() - start_forward
 
         # backward pass
-        start_backward = time.time()
+        start_backward = time.perf_counter()
         loss.backward()
-        backward_time = time.time() - start_backward
+        backward_time = time.perf_counter() - start_backward
 
         # optimizer step
         if optimizer is not None:
-            start_step = time.time()
+            start_step = time.perf_counter()
             optimizer.step()
             optimizer.zero_grad()
-            step_time = time.time() - start_step
+            step_time = time.perf_counter() - start_step
 
         # calculate the peak memory
         peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB

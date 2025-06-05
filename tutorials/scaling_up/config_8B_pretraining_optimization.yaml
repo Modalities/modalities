@@ -6,9 +6,9 @@ settings:
   grid_search:
     sequence_length: [4096]
     vocab_size: [50304]
-    batch_size: [1,2,3,4,5,6,7,8,9,10]
-    fsdp2_input_model: [model_raw, compiled_model, selective_op_activation_checkpointed_model, full_activation_checkpointed_model]
-    attention_implementation: [manual, pytorch_flash, dao_flash]
+    batch_size: [1]                 # [1,2,3,4,5,6]
+    fsdp2_input_model: [model_raw]  # [model_raw, compiled_model, selective_op_activation_checkpointed_model, full_activation_checkpointed_model]
+    attention_implementation: [dao_flash]       # [manual, pytorch_flash, dao_flash]
 
 initialized_model:
   component_key: model
