@@ -232,10 +232,8 @@ class Trainer:
             if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
-                peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
-                torch.cuda.reset_peak_memory_stats(device)
-
-                torch.cuda.reset_peak_memory_stats(device)
+                peak_memory_MB = -1  # torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                # torch.cuda.reset_peak_memory_stats(device)
 
                 thoughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time

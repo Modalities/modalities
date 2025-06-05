@@ -231,10 +231,10 @@ class ModalitiesProfiler:
         loss_fun: Callable,
         optimizer: Optional[torch.optim.Optimizer] = None,
     ) -> dict[TrainStepMetrics, float]:
-        start_forward = time.perf_counter()
         device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
         # generate batch
         batch = batch_generator.get_dataset_batch()
+        start_forward = time.perf_counter()
         batch.to(device=device)
 
         # forward pass

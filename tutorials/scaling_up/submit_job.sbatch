@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
 #SBATCH --gres=gpu:4
-#SBATCH --time=00:20:00
+#SBATCH --time=5:00:00
 
 #### Environment variables ####
 export CXX=g++
