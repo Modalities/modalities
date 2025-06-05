@@ -1,7 +1,10 @@
+import json
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
 import rich
+import torch
 import wandb
 import yaml
 from rich.console import Group
@@ -108,3 +111,48 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
         # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
         # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
+
+
+class EvaluationResultToDiscSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
+    """A subscriber that writes EvaluationResultBatch messages to a JSONL file."""
+
+    def __init__(self, output_file_path: Path) -> None:
+        super().__init__()
+        self.output_file_path = output_file_path
+
+    def consume_dict(self, message_dict: dict[str, Any]):
+        """Optional: log config data if needed (here: no-op)."""
+        pass
+
+    @staticmethod
+    def _convert_evaluation_result_batch(eval_result_batch: EvaluationResultBatch) -> dict[str, Any]:
+        """
+        Recursively convert EvaluationResultBatch structure to JSON-serializable format.
+        Handles dataclasses and torch.Tensor.
+        """
+        if is_dataclass(eval_result_batch):
+            result_dict = {}
+            for k, v in asdict(eval_result_batch).items():
+                result_dict[k] = EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v)
+            return result_dict
+
+        elif isinstance(eval_result_batch, dict):
+            return {
+                k: EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v)
+                for k, v in eval_result_batch.items()
+            }
+        elif isinstance(eval_result_batch, list):
+            return [EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v) for v in eval_result_batch]
+        elif isinstance(eval_result_batch, torch.Tensor):
+            return eval_result_batch.item() if eval_result_batch.ndim == 0 else eval_result_batch.tolist()
+        else:
+            return eval_result_batch
+
+    def consume_message(self, message: Message[EvaluationResultBatch]):
+        """Writes the evaluation result to the JSONL file if rank 0."""
+        if torch.distributed.get_rank() == 0:
+            eval_result = message.payload
+            # Convert the dataclass (including nested dataclasses) to a dictionary
+            record_converted = EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(eval_result)
+            with self.output_file_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record_converted) + "\n")

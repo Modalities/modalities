@@ -430,6 +430,11 @@ class DummyResultSubscriberConfig(BaseModel):
     pass
 
 
+class EvaluationResultToDiscSubscriberConfig(BaseModel):
+    output_folder_path: Path
+    experiment_id: str
+
+
 class WandBEvaluationResultSubscriberConfig(BaseModel):
     global_rank: int
     project: str

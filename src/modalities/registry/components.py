@@ -33,6 +33,7 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    EvaluationResultToDiscSubscriberConfig,
     FSDP1ActivationCheckpointedModelConfig,
     FSDP1CheckpointedModelConfig,
     FSDP1CheckpointedOptimizerConfig,
@@ -269,6 +270,12 @@ COMPONENTS = [
     # Results subscriber
     ComponentEntity(
         "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
+    ),
+    ComponentEntity(
+        "results_subscriber",
+        "to_disc",
+        ResultsSubscriberFactory.get_evaluation_result_to_disc_subscriber,
+        EvaluationResultToDiscSubscriberConfig,
     ),
     ComponentEntity(
         "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig
