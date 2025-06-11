@@ -43,6 +43,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
+    GPT2ModelTPConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -138,6 +139,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2_tp", GPT2ModelFactory.get_gpt2_tensor_parallelized_model, GPT2ModelTPConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),

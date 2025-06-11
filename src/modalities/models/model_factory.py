@@ -10,6 +10,8 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.tensor.parallel import RowwiseParallel, parallelize_module
+from torch.distributed.tensor.placement_types import Replicate
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
@@ -420,4 +422,21 @@ class GPT2ModelFactory:
                 model = GPT2LLM(**config)
         else:
             model = GPT2LLM(**config)
+        return model
+
+    @staticmethod
+    def get_gpt2_tensor_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
+        tp_mesh = device_mesh[ParallelismDegrees.TP.value]
+        model_tp_plan = {
+            "transformer.wte": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Replicate(),
+            ),
+        }
+        parallelize_module(
+            module=model,
+            device_mesh=tp_mesh,
+            parallelize_plan=model_tp_plan,
+        )
+
         return model

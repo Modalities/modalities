@@ -286,6 +286,19 @@ class FSDP2WrappedModelConfig(BaseModel):
         return self
 
 
+class GPT2ModelTPConfig(BaseModel):
+    model: PydanticPytorchModuleType  # TODO set proper type
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_tp_mesh_existence(self):
+        if ParallelismDegrees.TP.value not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
+        if ParallelismDegrees.DP_REPLICATE.value in self.device_mesh.mesh_dim_names:
+            raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism. ")
+        return self
+
+
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     block_names: list[str]
