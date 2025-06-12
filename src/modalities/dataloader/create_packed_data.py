@@ -258,7 +258,7 @@ class PackedDataGenerator:
                 # write index
                 f.write(pickle.dumps(index_list))
 
-            _update_data_length_in_pre_allocated_header(dst_path, index_list)
+            update_data_length_in_pre_allocated_header(dst_path, index_list)
 
         return writer
 
@@ -324,10 +324,10 @@ class PackedDataGenerator:
         return token_byte_string
 
 
-def _update_data_length_in_pre_allocated_header(dst_path: Path, index_list: list[tuple[int, int]]):
+def update_data_length_in_pre_allocated_header(dst_path: Path, index_list: list[tuple[int, int]]):
     # Update the length of the data section in the pre-allocated header of the destination file.
     # The data segment length is sum of the starting position and the length of the last document.
-    length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
+    length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1] if len(index_list) > 0 else 0
     data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
         EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
     )

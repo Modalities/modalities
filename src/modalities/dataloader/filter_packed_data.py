@@ -6,13 +6,13 @@ import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
 
-from modalities.dataloader.create_packed_data import EmbeddedStreamData, _update_data_length_in_pre_allocated_header
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, update_data_length_in_pre_allocated_header
 from modalities.dataloader.dataset import PackedMemMapDatasetBase
 
 
 def filter_dataset(
-    dst_path: Path,
     src_path: Path,
+    dst_path: Path,
     filter_func: Callable[[tuple[int, dict[str, NDArray[np.int_]]]], bool],
     sample_key: str = "input_ids",
 ) -> None:
@@ -41,6 +41,7 @@ def filter_dataset(
         # When we load the file, we add the header size to the offset
         curr_offset = 0
 
+        # Provide sample and its index (via enumerate) to the filter function.
         for _, entry in filter(filter_func, enumerate(tqdm(source_data, desc="Filtering samples"))):
             tokens: NDArray[np.int_] = entry[sample_key].astype(tok_type)
             tokens = tokens.astype(tokens.dtype.newbyteorder("<"))
@@ -49,7 +50,7 @@ def filter_dataset(
             segment_length = len(tokens_as_bytes)
             index_list.append((curr_offset, segment_length))
             curr_offset += segment_length
-        # write index
+        # Write index at end of the file.
         f_out.write(pickle.dumps(index_list))
 
-    _update_data_length_in_pre_allocated_header(dst_path, index_list)
+    update_data_length_in_pre_allocated_header(dst_path, index_list)
