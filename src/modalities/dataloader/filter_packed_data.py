@@ -42,7 +42,7 @@ def filter_dataset(
         curr_offset = 0
 
         for _, entry in filter(filter_func, enumerate(tqdm(source_data, desc="Filtering samples"))):
-            tokens: NDArray[np.int_] = entry["input_ids"].astype(tok_type)
+            tokens: NDArray[np.int_] = entry[sample_key].astype(tok_type)
             tokens = tokens.astype(tokens.dtype.newbyteorder("<"))
             tokens_as_bytes = tokens.tobytes()
             f_out.write(tokens_as_bytes)
