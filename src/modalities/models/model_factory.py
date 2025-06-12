@@ -10,7 +10,7 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
-from torch.distributed.tensor.parallel import RowwiseParallel, parallelize_module
+from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, parallelize_module
 from torch.distributed.tensor.placement_types import Replicate
 from typing_extensions import deprecated
 
@@ -430,13 +430,40 @@ class GPT2ModelFactory:
         model_tp_plan = {
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
+                output_layouts=Replicate(),  # default
+            ),
+            # TODO this is either identity or nn.Embedding. RowwiseParallel is not supported for Identity(.)
+            # "transformer.wpe": RowwiseParallel(
+            #     input_layouts=Replicate(),
+            #     output_layouts=Replicate(),
+            # ),
+            "transformer.lm_head": RowwiseParallel(  # TODO must be ColwiseParallel later
+                input_layouts=Replicate(),
                 output_layouts=Replicate(),
             ),
         }
+
         parallelize_module(
             module=model,
             device_mesh=tp_mesh,
             parallelize_plan=model_tp_plan,
         )
+
+        transformer_block_tp_plan = {
+            "transformer.h.attn.q_attn": ColwiseParallel(),
+            "transformer.h.attn.k_attn": ColwiseParallel(),
+            "transformer.h.attn.v_attn": ColwiseParallel(),
+            "transformer.h.attn.c_proj": RowwiseParallel(),
+            "transformer.h.mlp.W": ColwiseParallel(),
+            "transformer.h.mlp.W_2": RowwiseParallel(),
+            "transformer.h.mlp.V": ColwiseParallel(),
+        }
+
+        for transformer_block in model.transformer.h:
+            parallelize_module(
+                module=transformer_block,
+                device_mesh=tp_mesh,
+                parallelize_plan=transformer_block_tp_plan,
+            )
 
         return model
