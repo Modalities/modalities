@@ -434,9 +434,20 @@ class GPT2ModelFactory:
     def get_gpt2_tensor_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
         tp_mesh = device_mesh[ParallelismDegrees.TP.value]
         model_tp_plan = {
+            # Row-wise parallelism might seem counterintuitive here,
+            # but the embedding layer has weight shape (vocab_size, n_embd).
+            # Row-wise sharding allows each rank to store a slice of the vocabulary
+            # and perform lookups only for the tokens it owns.
+            # The input token IDs are replicated across all ranks so that each rank
+            # can identify which tokens it is responsible for.
+            # Each rank produces a partial embedding output, and an all-reduce is performed
+            # in the background to obtain the full embedding vectors of shape
+            # (batch_size, sequence_length, n_embd).
+            # Finally, we shard the output on the sequence dimension to enable sequence parallelism
+            # in the downstream transformer blocks.
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
-                output_layouts=Shard(1),  # we shard on the sequence dimension
+                output_layouts=Shard(1),
             ),
             # TODO this is either identity or nn.Embedding. RowwiseParallel is not supported for Identity(.)
             # "transformer.wpe": RowwiseParallel(
