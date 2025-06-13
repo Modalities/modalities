@@ -10,8 +10,14 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
-from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, parallelize_module
-from torch.distributed.tensor.placement_types import Replicate
+from torch.distributed.tensor.parallel import (
+    ColwiseParallel,
+    PrepareModuleInput,
+    RowwiseParallel,
+    SequenceParallel,
+    parallelize_module,
+)
+from torch.distributed.tensor.placement_types import Replicate, Shard
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
@@ -430,15 +436,18 @@ class GPT2ModelFactory:
         model_tp_plan = {
             "transformer.wte": RowwiseParallel(
                 input_layouts=Replicate(),
-                output_layouts=Replicate(),  # default
+                output_layouts=Shard(1),  # we shard on the sequence dimension
             ),
             # TODO this is either identity or nn.Embedding. RowwiseParallel is not supported for Identity(.)
             # "transformer.wpe": RowwiseParallel(
             #     input_layouts=Replicate(),
             #     output_layouts=Replicate(),
             # ),
+            "transformer.lm_head_norm": SequenceParallel(),
             "transformer.lm_head": ColwiseParallel(
+                input_layouts=Shard(1),
                 output_layouts=Replicate(),
+                use_local_output=True,  # default
             ),
         }
 
@@ -449,12 +458,22 @@ class GPT2ModelFactory:
         )
 
         transformer_block_tp_plan = {
+            "transformer.h.attention_norm": SequenceParallel(),
+            "transformer.h.ffn_norm": SequenceParallel(),
+            "transformer.h.attn": PrepareModuleInput(
+                input_layouts=(Shard(1),),  # (Shard(1), None),
+                desired_input_layouts=(Replicate(),),  # (Replicate(), None),
+            ),
             "transformer.h.attn.q_attn": ColwiseParallel(),
             "transformer.h.attn.k_attn": ColwiseParallel(),
             "transformer.h.attn.v_attn": ColwiseParallel(),
-            "transformer.h.attn.c_proj": RowwiseParallel(),
+            "transformer.h.attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),
+            "transformer.h.mlp": PrepareModuleInput(
+                input_layouts=(Shard(1),),
+                desired_input_layouts=(Replicate(),),
+            ),
             "transformer.h.mlp.W": ColwiseParallel(),
-            "transformer.h.mlp.W_2": RowwiseParallel(),
+            "transformer.h.mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
             "transformer.h.mlp.V": ColwiseParallel(),
         }
 

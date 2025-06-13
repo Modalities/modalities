@@ -749,8 +749,10 @@ class GPT2Block(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        x = x + self.attn(self.attention_norm(x))
-        x = x + self.mlp(self.ffn_norm(x))
+        x_attn_normed = self.attention_norm(x)
+        x = x + self.attn(x_attn_normed)
+        x_ffn_normed = self.ffn_norm(x)
+        x = x + self.mlp(x_ffn_normed)
         return x
 
 
