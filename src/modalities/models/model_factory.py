@@ -460,6 +460,19 @@ class GPT2ModelFactory:
         }
 
         for transformer_block in model.transformer.h:
+            # override the number of q and kv heads
+            if transformer_block.attn.n_head_q % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of query heads {transformer_block.attn.n_head_q} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            if transformer_block.attn.n_head_kv % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of key-value heads {transformer_block.attn.n_head_kv} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            transformer_block.attn.n_head_q = transformer_block.attn.n_head_q // tp_mesh.size()
+            transformer_block.attn.n_head_kv = transformer_block.attn.n_head_kv // tp_mesh.size()
             parallelize_module(
                 module=transformer_block,
                 device_mesh=tp_mesh,
