@@ -437,8 +437,7 @@ class GPT2ModelFactory:
             #     input_layouts=Replicate(),
             #     output_layouts=Replicate(),
             # ),
-            "transformer.lm_head": RowwiseParallel(  # TODO must be ColwiseParallel later
-                input_layouts=Replicate(),
+            "transformer.lm_head": ColwiseParallel(
                 output_layouts=Replicate(),
             ),
         }
