@@ -1,6 +1,6 @@
 import itertools
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import torch
 import torch.distributed as dist
@@ -367,6 +367,75 @@ class ModelFactory:
                 compiled_module = torch.compile(module, fullgraph=fullgraph, options=options)
                 parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
                 parent_module.register_module(name=child_name, module=compiled_module)
+        return model
+
+    @staticmethod
+    def get_debugging_enriched_model(model: nn.Module, tracked_ranks: Optional[Set[int]] = None) -> nn.Module:
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        if tracked_ranks is not None and rank not in tracked_ranks:
+            return model
+
+        world_size = dist.get_world_size() if dist.is_initialized() else 1
+
+        def forward_hook(module: nn.Module, input, output):
+            name = module._debug_name
+            if isinstance(output, tuple):
+                outputs = output
+            else:
+                outputs = (output,)
+
+            for i, out in enumerate(outputs):
+                if isinstance(out, torch.Tensor):
+                    is_dtensor = isinstance(out, dist.tensor.DTensor)
+                    if is_dtensor:
+                        out = out.to_local()
+                    local_string = "local" if is_dtensor else ""
+                    if torch.isnan(out).any():
+                        print(
+                            f"[Rank {rank}/{world_size}] NaN detected in forward {local_string} output "
+                            f"of {name}[{i}] {out.shape}"
+                        )
+                    else:
+                        print(
+                            f"[Rank {rank}/{world_size}] Forward Outputs {name}[{i}] shape={out.shape}, {local_string} "
+                            f"mean={out.mean().item():.4g},  {local_string} std={out.std().item():.4g}"
+                        )
+                else:
+                    print(f"[Rank {rank}/{world_size}] Forward {name}[{i}] output is not a tensor: {type(out)}")
+
+        def backward_hook(module, grad_input, grad_output):
+            name = module._debug_name
+            for i, grad_out in enumerate(grad_output):
+                if isinstance(grad_out, torch.Tensor):
+                    is_dtensor = isinstance(grad_out, dist.tensor.DTensor)
+                    if is_dtensor:
+                        grad_out = grad_out.to_local()  # we only consider the local shard
+                    if torch.isnan(grad_out).any():
+                        print(
+                            f"[Rank {rank}/{world_size}] NaN detected in backward grad of {name}[{i}] {grad_out.shape}"
+                        )
+                    else:
+                        local_string = "local" if is_dtensor else ""
+                        print(
+                            f"[Rank {rank}/{world_size}] Backward Grad outpout {name}[{i}] "
+                            f"shape={grad_out.shape}, {local_string} "
+                            f"mean={grad_out.mean().item():.4g},  {local_string} std={grad_out.std().item():.4g}"
+                        )
+                else:
+                    print(
+                        f"[Rank {rank}/{world_size}] Forward {name}[{i}] grad_output is not a tensor: {type(grad_out)}"
+                    )
+
+        def register_hooks_recursively(module: nn.Module, prefix: str = ""):
+            for name, child in module.named_children():
+                full_name = f"{prefix}.{name}" if prefix else name
+                child._debug_name = full_name
+                child.register_forward_hook(forward_hook)
+                child.register_full_backward_hook(backward_hook)
+                register_hooks_recursively(child, full_name)
+
+        register_hooks_recursively(model)
+
         return model
 
 

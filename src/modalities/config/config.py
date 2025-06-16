@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Callable, Literal, Optional
+from typing import Annotated, Any, Callable, Literal, Optional, Set
 
 import torch
 from omegaconf import OmegaConf
@@ -284,6 +284,17 @@ class FSDP2WrappedModelConfig(BaseModel):
         if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
             raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
         return self
+
+
+class DebuggingEnrichedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    tracked_ranks: Optional[Set[int]] = None
+
+    @field_validator("tracked_ranks", mode="before")
+    def convert_list_to_set(cls, v):
+        if v is None:
+            return v
+        return set(v)
 
 
 class GPT2ModelTPConfig(BaseModel):

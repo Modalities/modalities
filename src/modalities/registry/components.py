@@ -29,6 +29,7 @@ from modalities.config.config import (
     DCPAppStateConfig,
     DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
+    DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -165,6 +166,9 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity(
+        "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
