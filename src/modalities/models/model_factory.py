@@ -457,8 +457,8 @@ class GPT2ModelFactory:
             "transformer.lm_head_norm": SequenceParallel(),
             "transformer.lm_head": ColwiseParallel(
                 input_layouts=Shard(1),
-                output_layouts=Replicate(),
-                use_local_output=True,  # default
+                output_layouts=Replicate(),  # Shard(-1) if loss parallelism is used
+                use_local_output=True,  # default, should be not loss_parallel if loss parallelism is used
             ),
         }
 
@@ -472,8 +472,17 @@ class GPT2ModelFactory:
             "transformer.h.attention_norm": SequenceParallel(),
             "transformer.h.ffn_norm": SequenceParallel(),
             "transformer.h.attn": PrepareModuleInput(
-                input_layouts=(Shard(1),),  # (Shard(1), None),
-                desired_input_layouts=(Replicate(),),  # (Replicate(), None),
+                # here we prepare the actual input of the attention module
+                # (i.e., the arguements to the forward method)
+                # The incomming inputs are sharded on the sequence dimension
+                # due to the pre-layer attention norm running sequence parallelism.
+                # The inputs are transformed into the desired format by replicating
+                # them across all ranks.
+                # In the pytorch tutorial and torch titan we pass in an additional None argument
+                # for freqs_cis (i.e., precomputed cosine and sine frequencies.), which is not
+                # needed here due to implementation differences.
+                input_layouts=(Shard(1),),
+                desired_input_layouts=(Replicate(),),
             ),
             "transformer.h.attn.q_attn": ColwiseParallel(),
             "transformer.h.attn.k_attn": ColwiseParallel(),
