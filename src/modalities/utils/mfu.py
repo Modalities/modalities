@@ -17,7 +17,7 @@ from modalities.utils.typing import FSDPX
 PEAK_PERFORMANCE = {
     "A100": 312e12,
     "H100": 989e12,
-}
+    "GH200": 989e12}
 
 
 class MFUCalculatorABC:
@@ -127,6 +127,10 @@ class MFUCalculatorABC:
         elif device_name.startswith("NVIDIA H100"):
             single_gpu_peak_performance = MFUCalculatorABC._get_theoretical_gpu_peak_performance_single(
                 precision, "H100"
+            )
+        elif device_name.startswith("NVIDIA GH200"):
+            single_gpu_peak_performance = MFUCalculatorABC._get_theoretical_gpu_peak_performance_single(
+                precision, "GH200"
             )
         else:
             warnings.warn(f"Could not get theoretical GPU peak performance for unknown device = {device_name}.")
