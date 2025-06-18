@@ -9,20 +9,20 @@ from modalities.dataloader.dataset import PackedMemMapDatasetBase
 from modalities.dataloader.filter_packed_data import filter_dataset
 
 
-def test_creates_output_file(tmp_path: Path, packed_data_paths: Path):
+def test_creates_output_file(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
     filter_dataset(
-        src_path=packed_data_paths, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
+        src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
     )
     assert output_path.exists()
 
 
-def test_filtered_data_has_expected_length(tmp_path: Path, packed_data_paths: Path):
+def test_filtered_data_has_expected_length(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
     filter_dataset(
-        src_path=packed_data_paths, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
+        src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
     )
-    original_data = PackedMemMapDatasetBase(packed_data_paths, sample_key="input_ids")
+    original_data = PackedMemMapDatasetBase(packed_data_path, sample_key="input_ids")
     filtered_data = PackedMemMapDatasetBase(output_path, sample_key="input_ids")
     assert (
         len(filtered_data) == len(original_data) // 2 + len(original_data) % 2
@@ -39,10 +39,10 @@ def test_filtered_data_has_expected_content(tmp_path: Path, dummy_packed_data_pa
     assert filtered_data[1]["input_ids"].tolist() == list(range(64 // 4, (64 + 12) // 4))
 
 
-def test_always_true_filtered_data_has_identical_file_hash(tmp_path: Path, packed_data_paths: Path):
+def test_always_true_filtered_data_has_identical_file_hash(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(src_path=packed_data_paths, dst_path=output_path, filter_func=lambda x: True, sample_key="input_ids")
-    with open(packed_data_paths, "rb") as f_in, open(output_path, "rb") as f_out:
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: True, sample_key="input_ids")
+    with open(packed_data_path, "rb") as f_in, open(output_path, "rb") as f_out:
         original_hash = hashlib.sha256(f_in.read()).hexdigest()
         filtered_hash = hashlib.sha256(f_out.read()).hexdigest()
     assert (
@@ -50,11 +50,9 @@ def test_always_true_filtered_data_has_identical_file_hash(tmp_path: Path, packe
     ), "Filtered data should have the same hash as the original data when no filtering is applied."
 
 
-def test_always_false_filtered_data_produces_valid_file(tmp_path: Path, packed_data_paths: Path):
+def test_always_false_filtered_data_produces_valid_file(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(
-        src_path=packed_data_paths, dst_path=output_path, filter_func=lambda x: False, sample_key="input_ids"
-    )
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: False, sample_key="input_ids")
     filtered_data = PackedMemMapDatasetBase(output_path, sample_key="input_ids")
     assert len(filtered_data) == 0, "Filtered data should be empty when all samples are filtered out."
     assert output_path.stat().st_size > 0, "Output file should not be empty even if no samples are included."
@@ -74,6 +72,6 @@ def accept_even_indices(idx_content: tuple[int, dict[str, NDArray[np.int_]]]) ->
 
 
 @pytest.fixture(params=[0, 1])
-def packed_data_paths(dummy_packed_data_path: Path, request: pytest.FixtureRequest) -> Path:
-    path_options = [dummy_packed_data_path, Path("tests", "data", "datasets", "lorem_ipsum_long.pbin")]
+def packed_data_path(dummy_packed_data_path: Path, request: pytest.FixtureRequest) -> Path:
+    path_options = [dummy_packed_data_path, Path("tests/data/datasets/lorem_ipsum_long.pbin")]
     return path_options[request.param]

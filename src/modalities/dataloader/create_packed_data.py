@@ -327,7 +327,14 @@ class PackedDataGenerator:
 def update_data_length_in_pre_allocated_header(dst_path: Path, index_list: list[tuple[int, int]]):
     # Update the length of the data section in the pre-allocated header of the destination file.
     # The data segment length is sum of the starting position and the length of the last document.
-    length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1] if len(index_list) > 0 else 0
+    if len(index_list) > 0:
+        length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
+    else:
+        length_of_byte_encoded_data_section = 0
+        logger.warning(
+            f'No data was written to the file "{dst_path}". '
+            "This can happen if the input file is empty or all samples were filtered out."
+        )
     data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
         EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
     )
