@@ -14,10 +14,7 @@ from modalities.utils.typing import FSDPX
 #       https://www.nvidia.com/en-us/data-center/h100/
 #
 # NOTE: These values are valid for fp16 and bf16 only
-PEAK_PERFORMANCE = {
-    "A100": 312e12,
-    "H100": 989e12,
-    "GH200": 989e12}
+PEAK_PERFORMANCE = {"A100": 312e12, "H100": 989e12, "GH200": 989e12}
 
 
 class MFUCalculatorABC:
