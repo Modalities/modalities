@@ -518,11 +518,6 @@ class GPT2ModelFactory:
                 input_layouts=Replicate(),
                 output_layouts=Shard(1),
             ),
-            # TODO this is either identity or nn.Embedding. RowwiseParallel is not supported for Identity(.)
-            # "transformer.wpe": RowwiseParallel(
-            #     input_layouts=Replicate(),
-            #     output_layouts=Replicate(),
-            # ),
             "transformer.lm_head_norm": SequenceParallel(),
             "transformer.lm_head": ColwiseParallel(
                 input_layouts=Shard(1),
@@ -530,6 +525,15 @@ class GPT2ModelFactory:
                 use_local_output=True,  # default, should be not loss_parallel if loss parallelism is used
             ),
         }
+
+        if isinstance(model.transformer.wpe, nn.Embedding):
+            # If the position embedding is an nn.Embedding, we can shard it on the sequence dimension
+            # to enable sequence parallelism in the downstream transformer blocks.
+            # Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.
+            model_tp_plan["transformer.wpe"] = RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(0),
+            )
 
         parallelize_module(
             module=model,
