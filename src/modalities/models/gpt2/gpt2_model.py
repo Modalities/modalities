@@ -626,7 +626,7 @@ class CausalSelfAttention(nn.Module):
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
-        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
+        y = y.view(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
@@ -749,8 +749,10 @@ class GPT2Block(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        x = x + self.attn(self.attention_norm(x))
-        x = x + self.mlp(self.ffn_norm(x))
+        x_attn_normed = self.attention_norm(x)
+        x = x + self.attn(x_attn_normed)
+        x_ffn_normed = self.ffn_norm(x)
+        x = x + self.mlp(x_ffn_normed)
         return x
 
 

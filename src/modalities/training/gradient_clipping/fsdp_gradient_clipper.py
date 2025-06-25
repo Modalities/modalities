@@ -115,6 +115,11 @@ class FSDP2GradientClipper(GradientClipperIF):
         Returns:
             torch.Tensor: The gradient norm after clipping.
         """
+
+        # for name, p in self.wrapped_model.named_parameters():
+        #     if hasattr(p, '_spec') and hasattr(p._spec, 'mesh'):
+        #         print(f"{name} mesh: {p._spec.mesh}")
+
         gradient_norm_score = FSDP2GradientClipper.clip_grad_norm_(
             parameters=self.wrapped_model.parameters(),
             max_norm=self.max_norm,

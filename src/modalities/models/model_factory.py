@@ -1,6 +1,9 @@
 import itertools
+import json
+from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import torch
 import torch.distributed as dist
@@ -10,6 +13,14 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.tensor.parallel import (
+    ColwiseParallel,
+    PrepareModuleInput,
+    RowwiseParallel,
+    SequenceParallel,
+    parallelize_module,
+)
+from torch.distributed.tensor.placement_types import Replicate, Shard
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
@@ -361,6 +372,111 @@ class ModelFactory:
                 parent_module.register_module(name=child_name, module=compiled_module)
         return model
 
+    @staticmethod
+    def get_debugging_enriched_model(
+        model: nn.Module, logging_dir_path: Path, tracked_ranks: Optional[Set[int]] = None
+    ) -> nn.Module:
+        @dataclass
+        class TensorStats:
+            """Dataclass to hold tensor statistics."""
+
+            global_shape: list[int]
+            mean: float
+            std: float
+            min: float
+            max: float
+            nan_count: int
+            inf_count: int
+            local_shape: list[int]
+
+        @dataclass
+        class CounterRef:
+            value: int = 0
+
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        dist.get_world_size() if dist.is_initialized() else 1
+
+        if tracked_ranks is not None and rank not in tracked_ranks:
+            return model
+        if rank == 0:
+            logging_dir_path.mkdir(parents=True, exist_ok=True)
+        logging_file_path = logging_dir_path / f"tensor_stats_rank_{rank}.jsonl"
+
+        def get_tensor_stats(tensor: torch.Tensor) -> TensorStats:
+            """Get statistics of a tensor."""
+            tensor_stats = TensorStats(
+                global_shape=list(tensor.shape),
+                mean=tensor.mean().item(),
+                std=tensor.to_local().std().item() if isinstance(tensor, dist.tensor.DTensor) else tensor.std().item(),
+                min=tensor.min().item(),
+                max=tensor.max().item(),
+                nan_count=torch.isnan(tensor).sum().item(),
+                inf_count=torch.isinf(tensor).sum().item(),
+                local_shape=list(tensor.to_local().shape)
+                if isinstance(tensor, dist.tensor.DTensor)
+                else list(tensor.shape),
+            )
+            return tensor_stats
+
+        def write_out_tensor_stats(tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int):
+            """Write out tensor statistics to a file."""
+            with open(logging_file_path, "a") as f:
+                tensor_stats_dict = asdict(tensor_stats)
+                tensor_stats_dict.update(
+                    {
+                        "counter": counter,
+                        "hook_type": hook_type,
+                        "tensor_tag": tensor_tag,
+                        "rank": rank,
+                    }
+                )
+                f.write(json.dumps(tensor_stats_dict) + "\n")
+
+        def pre_forward_hook(module: nn.Module, input, counter: CounterRef):
+            # Retrieves statistics of the module's parameters before forward pass.
+            for name, param in module.named_parameters(recurse=False):
+                tensor_stats = get_tensor_stats(param)
+                full_name = f"{module._debug_name}.{name}"
+                write_out_tensor_stats(
+                    tensor_stats=tensor_stats,
+                    counter=counter.value,
+                    hook_type="pre_forward",
+                    tensor_tag=full_name,
+                    rank=rank,
+                )
+            counter.value += 1
+
+        def forward_hook(module: nn.Module, input, output, counter: CounterRef):
+            if isinstance(output, tuple):
+                outputs = output
+            else:
+                outputs = (output,)
+
+            for i, out in enumerate(outputs):
+                tensor_stats = get_tensor_stats(out)
+                write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
+            counter.value += 1
+
+        def backward_hook(module, grad_input, grad_output, counter: CounterRef):
+            for i, grad_out in enumerate(grad_output):
+                tensor_stats = get_tensor_stats(grad_out)
+                write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
+            counter.value += 1
+
+        def register_hooks_recursively(module: nn.Module, prefix: str = ""):
+            for name, child in module.named_children():
+                full_name = f"{prefix}.{name}" if prefix else name
+                child._debug_name = full_name
+
+                child.register_forward_pre_hook(partial(pre_forward_hook, counter=CounterRef()))
+                child.register_forward_hook(partial(forward_hook, counter=CounterRef()))
+                child.register_full_backward_hook(partial(backward_hook, counter=CounterRef()))
+                register_hooks_recursively(child, full_name)
+
+        register_hooks_recursively(model)
+
+        return model
+
 
 class GPT2ModelFactory:
     @staticmethod
@@ -420,4 +536,97 @@ class GPT2ModelFactory:
                 model = GPT2LLM(**config)
         else:
             model = GPT2LLM(**config)
+        return model
+
+    @staticmethod
+    def get_gpt2_tensor_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
+        tp_mesh = device_mesh[ParallelismDegrees.TP.value]
+        model_tp_plan = {
+            # Row-wise parallelism might seem counterintuitive here,
+            # but the embedding layer has weight shape (vocab_size, n_embd).
+            # Row-wise sharding allows each rank to store a slice of the vocabulary
+            # and perform lookups only for the tokens it owns.
+            # The input token IDs are replicated across all ranks so that each rank
+            # can identify which tokens it is responsible for.
+            # Each rank produces a partial embedding output, and an all-reduce is performed
+            # in the background to obtain the full embedding vectors of shape
+            # (batch_size, sequence_length, n_embd).
+            # Finally, we shard the output on the sequence dimension to enable sequence parallelism
+            # in the downstream transformer blocks.
+            "transformer.wte": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(1),
+            ),
+            "transformer.lm_head_norm": SequenceParallel(),
+            "transformer.lm_head": ColwiseParallel(
+                input_layouts=Shard(1),
+                output_layouts=Replicate(),  # Shard(-1) if loss parallelism is used
+                use_local_output=True,  # default, should be not loss_parallel if loss parallelism is used
+            ),
+        }
+
+        if isinstance(model.transformer.wpe, nn.Embedding):
+            # If the position embedding is an nn.Embedding, we can shard it on the sequence dimension
+            # to enable sequence parallelism in the downstream transformer blocks.
+            # Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.
+            model_tp_plan["transformer.wpe"] = RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(0),
+            )
+
+        parallelize_module(
+            module=model,
+            device_mesh=tp_mesh,
+            parallelize_plan=model_tp_plan,
+        )
+
+        transformer_block_tp_plan = {
+            "transformer.h.attention_norm": SequenceParallel(),
+            "transformer.h.ffn_norm": SequenceParallel(),
+            "transformer.h.attn": PrepareModuleInput(
+                # here we prepare the actual input of the attention module
+                # (i.e., the arguements to the forward method)
+                # The incomming inputs are sharded on the sequence dimension
+                # due to the pre-layer attention norm running sequence parallelism.
+                # The inputs are transformed into the desired format by replicating
+                # them across all ranks.
+                # In the pytorch tutorial and torch titan we pass in an additional None argument
+                # for freqs_cis (i.e., precomputed cosine and sine frequencies.), which is not
+                # needed here due to implementation differences.
+                input_layouts=(Shard(1),),
+                desired_input_layouts=(Replicate(),),
+            ),
+            "transformer.h.attn.q_attn": ColwiseParallel(),
+            "transformer.h.attn.k_attn": ColwiseParallel(),
+            "transformer.h.attn.v_attn": ColwiseParallel(),
+            "transformer.h.attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),
+            "transformer.h.mlp": PrepareModuleInput(
+                input_layouts=(Shard(1),),
+                desired_input_layouts=(Replicate(),),
+            ),
+            "transformer.h.mlp.W": ColwiseParallel(),
+            "transformer.h.mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
+            "transformer.h.mlp.V": ColwiseParallel(),
+        }
+
+        for transformer_block in model.transformer.h:
+            # override the number of q and kv heads
+            if transformer_block.attn.n_head_q % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of query heads {transformer_block.attn.n_head_q} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            if transformer_block.attn.n_head_kv % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of key-value heads {transformer_block.attn.n_head_kv} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            transformer_block.attn.n_head_q = transformer_block.attn.n_head_q // tp_mesh.size()
+            transformer_block.attn.n_head_kv = transformer_block.attn.n_head_kv // tp_mesh.size()
+            parallelize_module(
+                module=transformer_block,
+                device_mesh=tp_mesh,
+                parallelize_plan=transformer_block_tp_plan,
+            )
+
         return model

@@ -29,6 +29,7 @@ from modalities.config.config import (
     DCPAppStateConfig,
     DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
+    DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -43,6 +44,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
+    GPT2ModelTPConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -138,6 +140,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2_tp", GPT2ModelFactory.get_gpt2_tensor_parallelized_model, GPT2ModelTPConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -163,6 +166,9 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity(
+        "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
