@@ -288,6 +288,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 
 class DebuggingEnrichedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
+    logging_dir_path: Path
     tracked_ranks: Optional[Set[int]] = None
 
     @field_validator("tracked_ranks", mode="before")

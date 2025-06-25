@@ -1,4 +1,7 @@
 import itertools
+import json
+from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Optional, Set
 
@@ -370,68 +373,104 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_debugging_enriched_model(model: nn.Module, tracked_ranks: Optional[Set[int]] = None) -> nn.Module:
+    def get_debugging_enriched_model(
+        model: nn.Module, logging_dir_path: Path, tracked_ranks: Optional[Set[int]] = None
+    ) -> nn.Module:
+        @dataclass
+        class TensorStats:
+            """Dataclass to hold tensor statistics."""
+
+            global_shape: list[int]
+            mean: float
+            std: float
+            min: float
+            max: float
+            nan_count: int
+            inf_count: int
+            local_shape: list[int]
+
+        @dataclass
+        class CounterRef:
+            value: int = 0
+
         rank = dist.get_rank() if dist.is_initialized() else 0
+        dist.get_world_size() if dist.is_initialized() else 1
+
         if tracked_ranks is not None and rank not in tracked_ranks:
             return model
+        if rank == 0:
+            logging_dir_path.mkdir(parents=True, exist_ok=True)
+        logging_file_path = logging_dir_path / f"tensor_stats_rank_{rank}.jsonl"
 
-        world_size = dist.get_world_size() if dist.is_initialized() else 1
+        def get_tensor_stats(tensor: torch.Tensor) -> TensorStats:
+            """Get statistics of a tensor."""
+            tensor_stats = TensorStats(
+                global_shape=list(tensor.shape),
+                mean=tensor.mean().item(),
+                std=tensor.to_local().std().item() if isinstance(tensor, dist.tensor.DTensor) else tensor.std().item(),
+                min=tensor.min().item(),
+                max=tensor.max().item(),
+                nan_count=torch.isnan(tensor).sum().item(),
+                inf_count=torch.isinf(tensor).sum().item(),
+                local_shape=list(tensor.to_local().shape)
+                if isinstance(tensor, dist.tensor.DTensor)
+                else list(tensor.shape),
+            )
+            return tensor_stats
 
-        def forward_hook(module: nn.Module, input, output):
-            name = module._debug_name
+        def write_out_tensor_stats(tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int):
+            """Write out tensor statistics to a file."""
+            with open(logging_file_path, "a") as f:
+                tensor_stats_dict = asdict(tensor_stats)
+                tensor_stats_dict.update(
+                    {
+                        "counter": counter,
+                        "hook_type": hook_type,
+                        "tensor_tag": tensor_tag,
+                        "rank": rank,
+                    }
+                )
+                f.write(json.dumps(tensor_stats_dict) + "\n")
+
+        def pre_forward_hook(module: nn.Module, input, counter: CounterRef):
+            # Retrieves statistics of the module's parameters before forward pass.
+            for name, param in module.named_parameters(recurse=False):
+                tensor_stats = get_tensor_stats(param)
+                full_name = f"{module._debug_name}.{name}"
+                write_out_tensor_stats(
+                    tensor_stats=tensor_stats,
+                    counter=counter.value,
+                    hook_type="pre_forward",
+                    tensor_tag=full_name,
+                    rank=rank,
+                )
+            counter.value += 1
+
+        def forward_hook(module: nn.Module, input, output, counter: CounterRef):
             if isinstance(output, tuple):
                 outputs = output
             else:
                 outputs = (output,)
 
             for i, out in enumerate(outputs):
-                if isinstance(out, torch.Tensor):
-                    is_dtensor = isinstance(out, dist.tensor.DTensor)
-                    if is_dtensor:
-                        out = out.to_local()
-                    local_string = "local" if is_dtensor else ""
-                    if torch.isnan(out).any():
-                        print(
-                            f"[Rank {rank}/{world_size}] NaN detected in forward {local_string} output "
-                            f"of {name}[{i}] {out.shape}"
-                        )
-                    else:
-                        print(
-                            f"[Rank {rank}/{world_size}] Forward Outputs {name}[{i}] shape={out.shape}, {local_string} "
-                            f"mean={out.mean().item():.4g},  {local_string} std={out.std().item():.4g}"
-                        )
-                else:
-                    print(f"[Rank {rank}/{world_size}] Forward {name}[{i}] output is not a tensor: {type(out)}")
+                tensor_stats = get_tensor_stats(out)
+                write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
+            counter.value += 1
 
-        def backward_hook(module, grad_input, grad_output):
-            name = module._debug_name
+        def backward_hook(module, grad_input, grad_output, counter: CounterRef):
             for i, grad_out in enumerate(grad_output):
-                if isinstance(grad_out, torch.Tensor):
-                    is_dtensor = isinstance(grad_out, dist.tensor.DTensor)
-                    if is_dtensor:
-                        grad_out = grad_out.to_local()  # we only consider the local shard
-                    if torch.isnan(grad_out).any():
-                        print(
-                            f"[Rank {rank}/{world_size}] NaN detected in backward grad of {name}[{i}] {grad_out.shape}"
-                        )
-                    else:
-                        local_string = "local" if is_dtensor else ""
-                        print(
-                            f"[Rank {rank}/{world_size}] Backward Grad outpout {name}[{i}] "
-                            f"shape={grad_out.shape}, {local_string} "
-                            f"mean={grad_out.mean().item():.4g},  {local_string} std={grad_out.std().item():.4g}"
-                        )
-                else:
-                    print(
-                        f"[Rank {rank}/{world_size}] Forward {name}[{i}] grad_output is not a tensor: {type(grad_out)}"
-                    )
+                tensor_stats = get_tensor_stats(grad_out)
+                write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
+            counter.value += 1
 
         def register_hooks_recursively(module: nn.Module, prefix: str = ""):
             for name, child in module.named_children():
                 full_name = f"{prefix}.{name}" if prefix else name
                 child._debug_name = full_name
-                child.register_forward_hook(forward_hook)
-                child.register_full_backward_hook(backward_hook)
+
+                child.register_forward_pre_hook(partial(pre_forward_hook, counter=CounterRef()))
+                child.register_forward_hook(partial(forward_hook, counter=CounterRef()))
+                child.register_full_backward_hook(partial(backward_hook, counter=CounterRef()))
                 register_hooks_recursively(child, full_name)
 
         register_hooks_recursively(model)

@@ -14,7 +14,7 @@ class CudaEnv:
     def __init__(
         self,
         process_group_backend: ProcessGroupBackendType,
-        timeout_s: int = 10,
+        timeout_s: int = 60,
     ) -> None:
         """Initializes the CudaEnv context manager with the process group backend.
 

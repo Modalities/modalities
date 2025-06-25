@@ -117,7 +117,7 @@ class SwiGLU(nn.Module):
         # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
         # Besides, we ensure that hidden_dim is the smallest multiple of
         # 256 that is greater than or equal the provided hidden_dim
-        return 256 * ((int(2 * ffn_hidden / 3) + 256 - 1) // 256)
+        return 1024 * ((int(2 * ffn_hidden / 3) + 1024 - 1) // 1024)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
