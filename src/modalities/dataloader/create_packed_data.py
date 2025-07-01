@@ -9,14 +9,13 @@ from io import BufferedWriter
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
+import jq
+import numpy as np
 from pydantic import FilePath
+from tqdm import tqdm
 
-from modalities.config.component_factory import ComponentFactory
-from modalities.config.config import load_app_config_dict
-from modalities.config.instantiation_models import PackedDatasetComponentsInstantiationModel
-from modalities.dataloader.packed_data_generator import PackedDataGenerator
-from modalities.registry.components import COMPONENTS
-from modalities.registry.registry import Registry
+from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -399,7 +398,7 @@ class EmbeddedStreamData:
 
 def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file: Path, chunk_size: int = 2048):
     """
-    Utility to encode an indexed, large jsonl-file.
+    Joins the embedded stream data into a single file.
 
     Args:
         stream_data (list[EmbeddedStreamData]): A list of EmbeddedStreamData objects representing the stream data.
@@ -412,27 +411,14 @@ def join_embedded_stream_data(stream_data: list[EmbeddedStreamData], target_file
     Returns:
         None
     """
-    # TODO: if we want to use alternative entrypoints together with the ResolverRegistry,
-    #  we can currently not rely on the existing class resolver.
-    #  This is based on its connection to the overall `AppConfig`.
-    #  One would requires an object of it to instantiate the ResolverRegistry.
-    #  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing
-    #  ResolverRegistry to work dynamically with any type-hinted config object from config.py.
-    config = load_app_config_dict(config_file_path)
-
-    # copy the config file to the src_path parent and append the original hash
-    src_path = Path(config["settings"]["src_path"])
-    src_path_has_hash_suffix = len(src_path.suffixes) > 1 and len(src_path.suffixes[0]) == 7
-    if src_path_has_hash_suffix:
-        hash_suffix = src_path.suffixes[0]
-        config_file_name_with_hash = config_file_path.stem + hash_suffix + "".join(config_file_path.suffixes)
-        shutil.copyfile(config_file_path, src_path.parent / config_file_name_with_hash)
-
-    registry = Registry(COMPONENTS)
-    component_factory = ComponentFactory(registry=registry)
-    component_factory.build_components(
-        config_dict=config, components_model_type=PackedDatasetComponentsInstantiationModel
+    if target_file.exists():
+        raise FileExistsError(f'Target File at "{target_file}" exists!')
+    data_len = sum(d.data_len for d in stream_data)
+    assert len({d.token_size_in_bytes for d in stream_data}) == 1, (
+        "Found different token representation sizes. This could indicate the usage of different tokenizers. "
+        "Not supported!"
     )
+    token_size_in_bytes = stream_data[0].token_size_in_bytes
 
     num_data_chunks = sum(math.ceil(d.data_len / chunk_size) for d in stream_data)
     data_stream_generator = (d.data[i : i + chunk_size] for d in stream_data for i in range(0, d.data_len, chunk_size))
