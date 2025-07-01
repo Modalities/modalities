@@ -1,22 +1,22 @@
 import dataclasses
 import os
 import pickle
+import string
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
+from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.config import load_app_config_dict
 from modalities.dataloader.create_index import IndexGenerator
+from modalities.dataloader.create_packed_data import PackedDataGenerator
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
-from modalities.dataloader.samplers import ResumableBatchSampler
 from modalities.evaluator import Evaluator
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
@@ -47,15 +47,15 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 @pytest.fixture
 def dummy_config_path() -> Path:
-    return _ROOT_DIR / Path("tests/test_yaml_configs/config_lorem_ipsum.yaml")
+    return _ROOT_DIR / Path("tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml")
 
 
 @pytest.fixture
-def dummy_config(monkeypatch, dummy_config_path) -> Dict:
+def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("RANK", "0")
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("WORLD_SIZE", "1")
-    config_dict = load_app_config_dict(dummy_config_path)
+    config_dict = load_app_config_dict(dummy_config_path, experiment_id="0")
     return config_dict
 
 
@@ -151,9 +151,14 @@ def optimizer_with_param_groups_mock():
 
 @pytest.fixture(scope="function")
 def scheduler_mock():
-    mocked_lr_schdeduler = MagicMock(spec=LRScheduler)
-    mocked_lr_schdeduler.get_last_lr = lambda: [0.0]
-    return mocked_lr_schdeduler
+    mocked_lr_scheduler = MagicMock(spec=LRScheduler)
+    mocked_lr_scheduler.get_last_lr = lambda: [0.0]
+    return mocked_lr_scheduler
+
+
+@pytest.fixture(scope="function")
+def app_state_mock():
+    return MagicMock(spec=AppState)
 
 
 @pytest.fixture(scope="function")
@@ -228,11 +233,13 @@ def set_env_cpu(monkeypatch):
         torch.cuda._cached_device_count = None
 
 
-@pytest.fixture(scope="function")
-def resumable_batch_sampler() -> ResumableBatchSampler:
-    data_source = list(range(12))[::-1]  # torch.range(0,11)[::-1].reshape(3, 4)
-    seq_sampler = SequentialSampler(data_source=data_source)
+@pytest.fixture
+def encoding_set_up():
+    # Define the vocabulary
+    vocabulary = {char: idx for idx, char in enumerate(string.ascii_lowercase)}
 
-    seq_sampler = BatchSampler(sampler=seq_sampler, batch_size=3, drop_last=False)
-    sampler = ResumableBatchSampler(start_index=2, underlying_batch_sampler=seq_sampler)
-    return sampler
+    # Ensure num_bytes_per_token is valid
+    num_bytes_per_token = PackedDataGenerator._get_required_num_of_bytes_to_repr(len(vocabulary))
+    assert num_bytes_per_token == 1  # This assertion will fail within the test framework if incorrect
+
+    return vocabulary, num_bytes_per_token

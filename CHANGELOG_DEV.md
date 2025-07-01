@@ -65,7 +65,7 @@ This [PR](https://github.com/Modalities/modalities/pull/236) removes all code re
 
 **Breaking changes:** 
 * None
-* 
+ 
 
 ## PR #254 Warmstart infrastructure switch
 
@@ -85,3 +85,82 @@ This PR mainly addresses the warmstart of model training, e.g., after GPU crashe
 
 **Breaking Changes**
 * the settings part of the configs have been completely refactored
+
+
+
+## PR #261 Dataloader inefficiencies fix and combined dataset feature
+
+This PR addresses issue #258 (inefficiencies in the dataloader) and additionally introduces a combined dataset, where a dataset can now comprise a list of datasets and iterate over them.
+As part of fixing the dataloader inefficiencies, we now implement the sample skipping functionality not on the dataloader level  anymore but in an adapted version of the PyTorch `DistributedSampler`. I reran a warm start and the learning is equivalent to a full, non-warmstarted run. 
+
+<img width="1415" alt="Screenshot 2024-09-27 at 10 36 19" src="https://github.com/user-attachments/assets/65dfb1ed-e96b-4f50-a127-bc9d240ddff9">
+
+
+**General Changes**
+* Introduced `ResumableDistributedSampler` which is a copy of the PyTorch `DistributedSampler` added with the feature to skip samples. This is from now on used for warmstarts instead of the `skip_num_samples` in the Dataloader. In case of skipping samples, the dataloader had to instantiate a `ResumableBatchSampler` which was internally iterating over all the dataset indices. For small datasets this was fine, but for larger datasets (in the trillion token range) this became a bottleneck at instantiation time:
+https://github.com/Modalities/modalities/blob/b79d04d3e92d0845c5ec91f8dd41176fd543cb23/src/modalities/dataloader/samplers.py#L25-L28
+Skipping in the  `ResumableDistributedSampler` is skipping in O(1) now. The `ResumableBatchSampler` was removed from the codebase.
+* Replaced the packed index generation routine (inefficient due to for loop)
+https://github.com/Modalities/modalities/blob/b79d04d3e92d0845c5ec91f8dd41176fd543cb23/src/modalities/dataloader/dataset.py#L331-L334
+with a vectorized version.
+* added new `NumberConversion` routine `num_samples_from_num_tokens `
+
+**Breaking Changes**
+* Removed RepeatingDataloader, as a feature that was never actively used for running multiple epochs and had complex maintenance when refactoring the sampling. If needed we could reimpliment it. 
+*  In the settings, the `training_progress` section has now `num_seen_samples` instead of `local_num_seen_batches `, as skipping is now done on the Sampler level and not on the dataloader level anymore
+* `batch_size ` and `fast_forward_batch_id ` fields in the `LLMDataLoader ` are not neede anymore and were removed.
+
+
+## PR #269 Large file reader efficiency improvements and byte reading support
+
+This PR makes the LargeFileLinesReader about 50% faster by using mmap instead of file seek operations. 
+We can also now configure the encoding used for reading the documents. If encoding is specifically set to None (default is utf-8), we return the document as a byte string not enforcing any encoding. This is especially helpful when we e.g., sample from the data and want to create a subset of the dataset. In this case, we can just pass around the bytes representation. 
+
+
+**Breaking Changes**
+* None
+
+
+## PR #280 Bug fix: the number of bytes per token were wrongly calculated
+
+This PR fixes the bytes per token calculation.
+Generally, we estimate how many bytes are needed to encode the full range of the vocabulary. 
+E.g., for a vocab size > 65536, we need 3 bytes for each token in the pbin file. 
+
+The calculation was wrong but coincidentally correct for the GPT2 tokenizer. 
+
+
+
+## PR #281: Bug fix: The char-based index is not always consistent with the byte-based index.
+
+The first character of the string "ø This is..." is written on disc as two bytes, namely \xc3\xb8, when encoded as utf-8. 
+Therefore, the byte-based index has one more byte/char than the char-based index. 
+
+For consistency, we don't consider any char-based indexes anymore and always refer to byte-based indexes. 
+
+
+## PR #282: Bug fix: Enforce power of 2 number of bytes per token
+
+
+Previously, the number of bytes per token was calculated by `math.ceil(log_2(vocab_size)/8)`, leading to ranges between 1 and 4 bytes. 
+However, the dataset implementation only support 1, 2 and 4 bytes per token, as defined here
+
+https://github.com/Modalities/modalities/blob/0483362abac93e45850e56adaea7921e96836d59/src/modalities/dataloader/dataset.py#L202-L206
+
+and 
+
+https://github.com/Modalities/modalities/blob/0483362abac93e45850e56adaea7921e96836d59/src/modalities/dataloader/dataset.py#L233-L234
+
+I added a switch case that maps to the respective byte sizes, when packing the data.
+
+This adds some inefficiencies as a vobabulary size > 65536 already requires 4 bytes per token, effectively doubling the storage requirements. 
+
+
+## PR #283: Bug fix: Only append eod token once when packing / tokenizing
+
+Some HF tokenisers such as `xlm-roberta-large` add special tokens (e.g., eod token) automatically when encoding text, whereas others, such as `gpt2`, do not add special tokens. 
+
+This side-effect in the transformers library has lead to the eod token being appended twice when tokenizing / packing our data. We added a check for this and only append the eod token once now:
+https://github.com/Modalities/modalities/blob/1c1ccdc973283c45bc8c9fadf4d20f03e435cd04/src/modalities/dataloader/create_packed_data.py#L327-L330
+
+Additionally, I added a script that verifies the consistency of the indexation and tokenization of a given JSONL file. We run the indexation and tokenization routines in modalities and compare it to tokenized JSONL file to which we applied the HF tokenizer directly. 

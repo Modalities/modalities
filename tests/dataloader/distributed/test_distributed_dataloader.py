@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydanctic_if_types import PydanticLLMDataLoaderIFType
+from modalities.config.pydantic_if_types import PydanticLLMDataLoaderIFType
 from modalities.running_env.cuda_env import CudaEnv
 from tests.dataloader.dummy_sequential_dataset import TestDataset, TestDatasetConfig
 
@@ -25,14 +25,14 @@ class DataloaderInstantiationModel(BaseModel):
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
-def test_resumable_dataloader_without_shuffling():
+def test_dataloader_without_shuffling():
     # we test that the distributed sampler provides each process with the correct subset of the dataset
     # Given a sequence of [0, 1, 2, 3, 4, 5, 6, 7, 8] we want each of the two processes
     # to receive [[0, 2], [4, 6]] and [[1, 3], [5, 7]], respectively.
     config_file_path = working_dir / "dist_dataloader_config_without_shuffling.yaml"
 
-    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(config_file_path)
         main.add_custom_component(
             component_key="dataset",
             variant_key="test",
@@ -69,15 +69,15 @@ def test_resumable_dataloader_without_shuffling():
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
-def test_resumable_dataloader_with_shuffling_without_skipping():
+def test_dataloader_with_shuffling_without_skipping():
     # we test that the distributed sampler provides each process with the correct RANDOM subset of the dataset
     # Given a sequence of [0, 1, 2, 3, 4, 5, 6, 7, 8] we want each of the two processes
     # to receive two batches of size two without overlap, e.g., [[2, 0], [5, 6]] and [[7, 3], [4, 1]], respectively.
 
     config_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
 
-    main = Main(config_file_path)
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(config_file_path)
         main.add_custom_component(
             component_key="dataset",
             variant_key="test",
@@ -114,22 +114,21 @@ def test_resumable_dataloader_with_shuffling_without_skipping():
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
 )
-def test_resumable_dataloader_with_shuffling_and_skipped_batches():
+def test_dataloader_with_shuffling_and_skipped_batches():
     # we test that the distributed sampler provides each process with the correct RANDOM subset of the dataset
     # additionally we skip one batch
     # Given a sequence of [0, 1, 2, 3, 4, 5, 6, 7, 8] we want each of the two processes
     # to receive one batch of size two without overlap, e.g., [[5, 6]] and [[4, 1]], respectively.
 
     config_shuffled_file_path = working_dir / "dist_dataloader_config_with_shuffling.yaml"
-    main_shuffled = Main(config_shuffled_file_path)
 
     config_shuffled_and_skipped_file_path = (
         working_dir / "dist_dataloader_config_with_shuffling_and_skipped_batches.yaml"
     )
 
-    main_shuffled_and_skipped = Main(config_shuffled_and_skipped_file_path)
-
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main_shuffled = Main(config_shuffled_file_path)
+        main_shuffled_and_skipped = Main(config_shuffled_and_skipped_file_path)
         main_shuffled.add_custom_component(
             component_key="dataset",
             variant_key="test",

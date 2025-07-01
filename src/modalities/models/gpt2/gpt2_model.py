@@ -1,24 +1,47 @@
+import logging
 import math
-from copy import deepcopy
+from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Dict, List, Tuple
+from typing import Annotated, Optional
 
 import torch
 import torch.nn as nn
+from pydantic import BaseModel, Field, model_validator, validator
+
+from modalities.config.lookup_enum import LookupEnum
+from modalities.config.utils import convert_base_model_config_to_dict
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
+from modalities.models.model import ActivationType, NNModel, SwiGLU
+from modalities.util import parse_enum_by_name
 
 try:
     from flash_attn import flash_attn_func
 except ModuleNotFoundError:
     flash_attn_func = None
 
-from pydantic import BaseModel, Field, model_validator, validator
-
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
-from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.model import ActivationType, NNModel, SwiGLU
-from modalities.util import parse_enum_by_name
+# Logger configuration
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+class LayerNorms(LookupEnum):
+    """
+    Enum lookup class for LayerNorms.
+
+    Attributes:
+        RMSNorm: RMSLayerNorm class.
+        LayerNorm: nn.LayerNorm class.
+    """
+
+    rms_norm = RMSLayerNorm
+    layer_norm = nn.LayerNorm
+
+
+class LayerNormWrapperConfig(BaseModel):
+    norm_type: LayerNorms
+    config: LayerNormConfig | RMSLayerNormConfig
 
 
 class PositionTypes(str, Enum):
@@ -37,12 +60,13 @@ class PositionTypes(str, Enum):
 class QueryKeyValueTransform(nn.Module):
     """Query Key Value Transform base class."""
 
+    @abstractmethod
     def forward(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Perform forward pass for transforming queries/keys/values.
 
@@ -52,9 +76,9 @@ class QueryKeyValueTransform(nn.Module):
             v (torch.Tensor): The value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.
         """
-        pass
+        raise NotImplementedError
 
 
 class IdentityTransform(QueryKeyValueTransform):
@@ -65,7 +89,7 @@ class IdentityTransform(QueryKeyValueTransform):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass of the IdentityTransform which does not apply any transform.
 
@@ -75,7 +99,7 @@ class IdentityTransform(QueryKeyValueTransform):
             v (torch.Tensor): The value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.
         """
         return q, k, v
 
@@ -89,7 +113,7 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2):
+    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
         """
         Initializes the RotaryTransform object.
 
@@ -97,11 +121,12 @@ class RotaryTransform(QueryKeyValueTransform):
             n_embd (int): The size of the embedding dimension.
             n_head (int): The number of attention heads.
             seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
+            base_freq (int): Base frequency for RoPE. Defaults to 10000.
         """
         super().__init__()
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -160,7 +185,7 @@ class RotaryTransform(QueryKeyValueTransform):
 
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass of the RotaryTransform module.
 
@@ -170,7 +195,7 @@ class RotaryTransform(QueryKeyValueTransform):
             v (torch.Tensor): Value tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             Tuple containing the modified query tensor, key tensor, and value tensor.
         """
         self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
@@ -213,7 +238,7 @@ class AttentionConfig(BaseModel):
     Configuration class for attention mechanism.
 
     Attributes:
-        qkv_transforms (List[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.
+        qkv_transforms (list[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.
     """
 
     class QueryKeyValueTransformConfig(BaseModel):
@@ -222,7 +247,7 @@ class AttentionConfig(BaseModel):
 
         Attributes:
             type_hint (QueryKeyValueTransformType): The type hint for the transform.
-            config (Union[RotaryTransformConfig, IdentityTransformConfig]): The configuration for the transform.
+            config (RotaryTransformConfig | IdentityTransformConfig): The configuration for the transform.
         """
 
         class IdentityTransformConfig(BaseModel):
@@ -238,12 +263,14 @@ class AttentionConfig(BaseModel):
                 n_embd (int): Number of embeddings.
                 n_head (int): Number of attention heads.
                 seq_length_dim (int): Dimension of the sequence length.
+                base_freq (int): Base frequency for RoPE.
 
             """
 
             n_embd: Annotated[int, Field(strict=True, ge=0)]
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
+            base_freq: Annotated[int, Field(strict=True, ge=10000)]
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
@@ -262,7 +289,7 @@ class AttentionConfig(BaseModel):
         type_hint: QueryKeyValueTransformType
         config: RotaryTransformConfig | IdentityTransformConfig
 
-    qkv_transforms: List[QueryKeyValueTransformConfig]
+    qkv_transforms: list[QueryKeyValueTransformConfig]
 
 
 class GPT2LLMConfig(BaseModel):
@@ -272,6 +299,7 @@ class GPT2LLMConfig(BaseModel):
     Args:
         sample_key (str): The key for the samples.
         prediction_key (str): The key for the predictions.
+        use_meta_device (bool, optional): Whether to use meta device. Defaults to False.
         poe_type (PositionTypes): The type of position encoding.
         sequence_length (int): The length of the sequence.
         vocab_size (int): The size of the vocabulary.
@@ -285,13 +313,16 @@ class GPT2LLMConfig(BaseModel):
         attention_config (AttentionConfig): The attention configuration.
         attention_implementation (AttentionImplementation): The attention implementation.
         activation_type (ActivationType): The activation type.
-        attention_norm (PydanticPytorchModuleType): The normalization type for attention.
-        ffn_norm (PydanticPytorchModuleType): The normalization type for feed-forward network.
-        lm_head_norm (PydanticPytorchModuleType): The normalization type for the language model head.
+        attention_norm_config (LayerNormWrapperConfig): Config for normalization of the attention.
+        ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
+        lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
+        use_weight_tying (bool): Whether to use weight tying.
+
     """
 
     sample_key: str
     prediction_key: str
+    use_meta_device: Optional[bool] = False
     poe_type: PositionTypes
     sequence_length: Annotated[int, Field(strict=True, ge=1)]
     vocab_size: Annotated[
@@ -307,9 +338,10 @@ class GPT2LLMConfig(BaseModel):
     attention_config: AttentionConfig
     attention_implementation: AttentionImplementation
     activation_type: ActivationType
-    attention_norm: PydanticPytorchModuleType
-    ffn_norm: PydanticPytorchModuleType
-    lm_head_norm: PydanticPytorchModuleType
+    attention_norm_config: LayerNormWrapperConfig
+    ffn_norm_config: LayerNormWrapperConfig
+    lm_head_norm_config: LayerNormWrapperConfig
+    use_weight_tying: bool
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -422,7 +454,7 @@ class CausalSelfAttention(nn.Module):
             for transform_config in attention_config.qkv_transforms
         )
 
-    def projection(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def projection(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Applies projections to the input tensor to get queries, keys, and values.
 
@@ -430,7 +462,7 @@ class CausalSelfAttention(nn.Module):
             x (torch.Tensor): The input tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.
         """
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         return self.q_attn(x), self.k_attn(x), self.v_attn(x)
@@ -438,7 +470,7 @@ class CausalSelfAttention(nn.Module):
     @staticmethod
     def execute_qkv_transforms(
         q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Applies a series of transformations to the query, key, and value tensors.
 
@@ -450,7 +482,7 @@ class CausalSelfAttention(nn.Module):
             n_head_q (int): The number of heads for the query tensors.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             A tuple containing the transformed query, key, and value tensors.
         """
         batch_size, sequence_length, embedding_dim = q.size()
@@ -681,6 +713,7 @@ class GPT2Block(nn.Module):
         super().__init__()
         self.attention_norm = attention_norm
         self.ffn_norm = ffn_norm
+        self._check_ffn_hidden_dim(n_embd=n_embd, ffn_hidden=ffn_hidden)
         self.attn = CausalSelfAttention(
             n_head_q=n_head_q,
             n_head_kv=n_head_kv,
@@ -693,9 +726,18 @@ class GPT2Block(nn.Module):
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation_type == ActivationType.SWIGLU:
-            self.mlp = SwiGLU(n_embd=n_embd, bias=bias)
+            self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
         else:
             raise NotImplementedError("unimplemented activation")
+
+    def _check_ffn_hidden_dim(self, n_embd: int, ffn_hidden: int) -> None:
+        expected_hidden_dim = 4 * n_embd
+
+        if ffn_hidden != expected_hidden_dim:
+            logger.warning(
+                f"Expected `ffn_hidden` to be 4 * `n_embd` ({expected_hidden_dim}), "
+                f"but got `n_embd = {n_embd}` and `ffn_hidden = {ffn_hidden}`."
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -732,9 +774,10 @@ class GPT2LLM(NNModel):
         activation_type: ActivationType,
         attention_implementation: AttentionImplementation,
         attention_config: AttentionConfig,
-        attention_norm: nn.Module,
-        ffn_norm: nn.Module,
-        lm_head_norm: nn.Module,
+        attention_norm_config: LayerNormWrapperConfig,
+        ffn_norm_config: LayerNormWrapperConfig,
+        lm_head_norm_config: LayerNormWrapperConfig,
+        use_weight_tying: bool,
         seed: int = None,
     ):
         """
@@ -756,13 +799,14 @@ class GPT2LLM(NNModel):
             activation_type (ActivationType): The activation type.
             attention_implementation (AttentionImplementation): The attention implementation.
             attention_config (AttentionConfig): The attention configuration.
-            attention_norm (nn.Module): The attention normalization module.
-            ffn_norm (nn.Module): The feed-forward network normalization module.
-            lm_head_norm (nn.Module): The language model head normalization module.
+            attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
+            ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
+            lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
+            use_weight_tying (bool): Whether to use weight tying.
         """
         weight_decay_groups = {
-            "linear": [".attn", ".mlp"],
+            "linear": [".attn", ".mlp", ".lm_head.weight"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
@@ -810,32 +854,40 @@ class GPT2LLM(NNModel):
                             attention_config=attention_config,
                             dropout=dropout,
                             ffn_hidden=ffn_hidden,
-                            attention_norm=deepcopy(attention_norm),
-                            ffn_norm=deepcopy(ffn_norm),
+                            # deepcopy did not work here! The weights were then automatically
+                            # moved to a cuda device even when the deepcopied weights were on
+                            # a meta device!
+                            attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
+                            ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
                         )
                         for _ in range(n_layer)
                     ]
                 ),
-                lm_head_norm=lm_head_norm,
+                lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
+                # NOTE: If we make the bias configurable, we must update the number of parameters calculation
+                # in the test_initialization_fsdp1.py, accordingly.
+                lm_head=nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False),
             )
         )
-        self.lm_head = nn.Linear(in_features=n_embd, out_features=vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        self.transformer.wte.weight = self.lm_head.weight  # https://paperswithcode.com/method/weight-tying
+        if use_weight_tying:
+            self.transformer.wte.weight = (
+                self.transformer.lm_head.weight
+            )  # https://paperswithcode.com/method/weight-tying
 
-    def forward_impl(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass implementation of the GPT2LLM module.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
                 - sample_key (str): Key for the input tensor containing token ids.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
                 - prediction_key (str): Key for the output tensor containing logits.
         """
         input_ids = inputs[self.sample_key]
@@ -858,19 +910,19 @@ class GPT2LLM(NNModel):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.lm_head_norm(x)
-        logits = self.lm_head(x)
+        logits = self.transformer.lm_head(x)
         return {self.prediction_key: logits}
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
                 - sample_key (str): Key for the input tensor containing token ids.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
                 - prediction_key (str): Key for the output tensor containing logits.
         """
         return self.forward_impl(inputs)

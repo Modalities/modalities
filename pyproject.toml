@@ -1,12 +1,12 @@
 [project]
 name = "modalities"
-version = "0.3.0"
+version = "0.3.2"
 requires-python = ">=3.10,<3.12"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
     "numpy<2.0",
-    "torch>=2.3",
+    "torch==2.6.0",
     "packaging",
     "tqdm",
     "pyyaml",
@@ -23,9 +23,6 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
-    "jsonlines",
-    "Jinja2>=3.1.0",
 ]
 
 [project.urls]
@@ -55,6 +52,9 @@ src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 120
+exclude = [
+    "src/modalities/dataloader/create_packed_data.py",
+]
 
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report term --cov-report html"

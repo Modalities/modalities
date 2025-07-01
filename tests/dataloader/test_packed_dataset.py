@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from modalities.dataloader.dataset import (
@@ -126,7 +127,7 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
     packed_dataset = PackedMemMapDatasetContinuous(
-        default_packed_dataset_path, block_size=block_size, sample_key="input_ids"
+        default_packed_dataset_path, block_size=block_size, sample_key="input_ids", load_index=True
     )
 
     # read in the raw jsonl files for manual tokenization
@@ -227,11 +228,8 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
         collator(list(batch))
 
 
-def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
-    # In this test, we create a packed dataset from a long jsonl file
-    # and iterate over the packed dataset to check if the tokenization is correct.
-    # We do so by manually tokenizing the jsonl file and comparing the tokenized
-    # output with the packed dataset
+@pytest.fixture
+def packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer) -> PackedMemMapDatasetBase:
     packed_generator = PackedDataGenerator(
         src_path=indexed_dummy_data_path_long.raw_data_path,
         tokenizer=wrapped_gpt2_tokenizer,
@@ -246,13 +244,85 @@ def test_original_samples_in_packed_dataset(indexed_dummy_data_path_long, wrappe
     default_packed_dataset_path = packed_generator._default_destination_path()
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
-    packed_dataset = PackedMemMapDatasetBase(default_packed_dataset_path, sample_key="input_ids")
+    dataset = PackedMemMapDatasetBase(default_packed_dataset_path, sample_key="input_ids")
+    return dataset
+
+
+@pytest.fixture
+def tokenized_jsonl_data(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer) -> list[list[int]]:
     # read in the raw jsonl files for manual tokenization
-    with open(indexed_dummy_data_path_long.raw_data_path) as f:
+    with open(indexed_dummy_data_path_long.raw_data_path, "r", encoding="utf-8") as f:
         jsonl_list = [json.loads(line)["text"] for line in f]
 
     eod_token_id = wrapped_gpt2_tokenizer.get_token_id("<|endoftext|>")
     jsonl_tokenized = [wrapped_gpt2_tokenizer.tokenize(v) + [eod_token_id] for v in jsonl_list]
+    return jsonl_tokenized
 
-    for sample, original_sample in zip(packed_dataset, jsonl_tokenized):
+
+def test_original_samples_in_packed_dataset(
+    packed_dataset: PackedMemMapDatasetBase, tokenized_jsonl_data: list[list[int]]
+):
+    # In this test, we create a packed dataset from a long jsonl file
+    # and iterate over the packed dataset to check if the tokenization is correct.
+    # We do so by manually tokenizing the jsonl file and comparing the tokenized
+    # output with the packed dataset
+
+    for sample, original_sample in zip(packed_dataset, tokenized_jsonl_data):
         assert sample["input_ids"].tolist() == original_sample
+
+
+@pytest.mark.parametrize(
+    "slice",
+    [
+        (0, 10),
+        (0, 100),
+        (0, 500),
+        (0, 501),
+        (5, 10),
+        (5, 100),
+        (5, 500),
+        (5, 501),
+        (5, -1),
+        (-3, -1),
+        (3, 1),
+        (3, None),
+        (None, None),
+        (500, 501),
+        (450, 450),
+    ],
+)
+def test_original_samples_in_packed_dataset_slicing(
+    packed_dataset: PackedMemMapDatasetBase,
+    tokenized_jsonl_data: list[list[int]],
+    slice: tuple[int, int],
+):
+    for sample, original_sample in zip(
+        packed_dataset[slice[0] : slice[1]]["input_ids"], tokenized_jsonl_data[slice[0] : slice[1]]
+    ):
+        assert sample.tolist() == original_sample
+
+
+@pytest.mark.parametrize(
+    "token_size_in_bytes, block_size, total_tokens", [(1, 32, 32), (2, 32, 512), (4, 32, 1000), (4, 32, 1234)]
+)
+def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, total_tokens: int):
+    num_samples = (total_tokens - block_size) // (block_size - 1) + 1
+    # given num_samples we calculate the starting index and length of each sample as tuple.
+    result_slow = [
+        ((i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes) for i in range(num_samples)
+    ]
+
+    result_vectorized = PackedMemMapDatasetContinuous._create_packed_index(
+        total_tokens=total_tokens, block_size=block_size, token_size_in_bytes=token_size_in_bytes
+    )
+
+    assert np.all(result_slow == result_vectorized)
+
+
+@pytest.mark.parametrize(
+    "vocab_size, expected_num_bytes",
+    [(254, 1), (255, 1), (256, 1), (257, 2), (65534, 2), (65535, 2), (65536, 2), (65537, 4), (65538, 4), (10000000, 4)],
+)
+def test__get_required_num_of_bytes_to_repr(vocab_size: int, expected_num_bytes: int):
+    num_bytes = PackedDataGenerator._get_required_num_of_bytes_to_repr(int_to_get_repr=vocab_size)
+    assert expected_num_bytes == num_bytes

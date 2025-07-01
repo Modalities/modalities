@@ -1,9 +1,28 @@
-from typing import Dict, List
+from abc import ABC, abstractmethod
 
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.dataloader.collate_fns.collate_if import CollateFnIF
+
+
+class CollateFnIF(ABC):
+    """CollateFnIF class to define a collate function interface."""
+
+    @abstractmethod
+    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> DatasetBatch:
+        """
+        Process a batch of data.
+
+        Args:
+            batch (list[dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
+
+        Returns:
+            DatasetBatch: The processed batch of data.
+
+        Raises:
+            NotImplementedError: This abstract method should be implemented in a subclass.
+        """
+        raise NotImplementedError
 
 
 class GPT2LLMCollateFn(CollateFnIF):
@@ -20,12 +39,12 @@ class GPT2LLMCollateFn(CollateFnIF):
         self.sample_key = sample_key
         self.target_key = target_key
 
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> DatasetBatch:
         """
         Process a batch of data.
 
         Args:
-            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
+            batch (list[dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
 
         Returns:
             DatasetBatch: A processed batch of data where sample and target sequences are created.

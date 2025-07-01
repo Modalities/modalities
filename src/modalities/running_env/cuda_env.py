@@ -20,8 +20,6 @@ class CudaEnv:
             process_group_backend (ProcessGroupBackendType): Process group backend to be used for distributed training.
         """
         self.process_group_backend = process_group_backend
-        # TODO we might want to set this from outside via the config
-        self.local_rank = int(os.getenv("LOCAL_RANK", "0"))
 
     def __enter__(self) -> "CudaEnv":
         """Sets the CUDA environment for distributed training.
@@ -30,7 +28,10 @@ class CudaEnv:
             CudaEnv: Instance of the CudaEnv context manager.
         """
         dist.init_process_group(self.process_group_backend.value)
-        torch.cuda.set_device(self.local_rank)
+        local_rank = int(os.getenv("LOCAL_RANK", "-1"))
+        if local_rank == -1:
+            raise ValueError("LOCAL_RANK environment variable is not set. Please set it before using CudaEnv.")
+        torch.cuda.set_device(local_rank)
         return self
 
     def __exit__(self, type: Any, value: Any, traceback: Any):

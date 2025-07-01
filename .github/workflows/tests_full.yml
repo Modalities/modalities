@@ -21,11 +21,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install curl -y       # required by coveralls
+        sudo apt-get install curl -y                  # required by coveralls
         sudo apt-get install git -y
-        python -m pip install torch
+        python -m pip install torch==2.6.0
         python -m pip install --upgrade pip setuptools wheel
         export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
+        python -m pip install ninja                   # Lowers compilation time of flash attention significantly 
+        python -m pip install flash-attn --no-build-isolation
         python -m pip install -e .[tests]
     - name: Run tests
       run: |

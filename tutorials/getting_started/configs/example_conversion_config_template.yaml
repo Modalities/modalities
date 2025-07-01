@@ -1,0 +1,22 @@
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: tokenizer
+    padding: false
+    truncation: false 
+
+checkpointed_model:
+  component_key: model
+  variant_key: fsdp1_checkpointed
+  config:
+    checkpoint_loading:
+      component_key: checkpoint_loading
+      variant_key: torch
+      config:
+        device: cpu
+        precision: BF16
+    model:
+      instance_key: model
+      pass_type: BY_REFERENCE
+    checkpoint_path: <CHECKPOINT_PATH>

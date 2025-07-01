@@ -1,0 +1,69 @@
+tested_model:
+  component_key: model
+  variant_key: fsdp1_wrapped
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
+initialized_model: 
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: WILL_BE_REPLACED
+        mean: 0.0
+        std: WILL_BE_REPLACED
+        hidden_dim: ${model_raw.config.n_embd}
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: "input_ids"
+    poe_type: ABSOLUTE
+    prediction_key: "logits"
+    sequence_length: 2048
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head_q: 12
+    n_head_kv: 12
+    ffn_hidden: 2048
+    n_embd: 768
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms: []
+    attention_implementation: manual
+    activation_type: gelu
+    attention_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    use_weight_tying: WILL_BE_REPLACED

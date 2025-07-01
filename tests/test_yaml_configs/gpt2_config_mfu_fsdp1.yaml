@@ -1,0 +1,81 @@
+test_model:
+  component_key: model
+  variant_key: fsdp1_wrapped
+  config:
+    model:
+      instance_key: model_initialized
+      pass_type: BY_REFERENCE
+    sync_module_states: true
+    mixed_precision_settings: BF_16
+    sharding_strategy: FULL_SHARD
+    block_names: [GPT2Block]
+
+model_initialized:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: "input_ids"
+    poe_type: ABSOLUTE
+    prediction_key: "logits"
+    sequence_length: 2048
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 12
+    n_head_q: 12
+    n_head_kv: 12
+    ffn_hidden: 3072
+    n_embd: 768
+    dropout: 0.0
+    bias: false # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms: []
+    attention_implementation: manual
+    activation_type: gelu
+    attention_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: false
+        epsilon: 1e-5
+    ffn_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: false
+        epsilon: 1e-5
+    lm_head_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: false
+        epsilon: 1e-5
+    use_weight_tying: true
+    use_meta_device: false
+
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
+  config:
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${model_raw.config.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    world_size: ${cuda_env:WORLD_SIZE}
+    wrapped_model:
+      instance_key: test_model
+      pass_type: BY_REFERENCE

@@ -6,9 +6,8 @@ import threading
 import warnings
 from pathlib import Path
 
-from tqdm import tqdm
-
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.utils.logging import get_logger
 
 
 def create_raw_index(src_path: Path, index_path: Path):
@@ -46,11 +45,11 @@ class IndexGenerator:
         """
         self.src_file = src_file
         self.drop_faulty_entries = drop_faulty_entries
-        with self.src_file.open(mode="r") as fin:
+        with self.src_file.open(mode="rb") as fin:
             # Move the cursor to the end of the file
             fin.seek(0, os.SEEK_END)
-            # Get number of characters in the file
-            self._total_num_chars = fin.tell()
+            # Get number of bytes in the file
+            self._total_num_bytes = fin.tell()
         self._queue_of_raw_lines = queue.Queue()
         self._index_map = []
         self._exception_buffer = []
@@ -78,8 +77,8 @@ class IndexGenerator:
         processor.join()
         if self._exception_buffer:
             raise self._exception_buffer[0]
-        print(f"Created index of length {len(self._index_map)}")
         target_path_for_index_file.write_bytes(pkl.dumps(self._index_map))
+        get_logger().info(f"Index file created at {target_path_for_index_file}")
 
     def _indexer_thread(self):
         # This method is responsible for indexing the lines in the queue and parsing them as JSON.
@@ -113,7 +112,7 @@ class IndexGenerator:
                     self._exception_buffer.append(err)
 
         self._index_map = []
-        for line_start_idx, line in tqdm(queue_generator(), desc="Processed Lines"):
+        for line_start_idx, line in queue_generator():
             if self._check_for_parallel_errors():
                 return
             parse_line_as_json(line_start_idx, line)
@@ -124,13 +123,15 @@ class IndexGenerator:
         # the end of the file is reached. Each line is put into a queue along with its cursor position. If any
         # errors are detected, the method returns immediately.
 
-        with open(self.src_file, "r") as fin:
+        with open(self.src_file, "rb") as fin:
             while True:
                 cursor = fin.tell()
                 line = fin.readline()
                 if self._check_for_parallel_errors():
                     return
-                if fin.tell() == self._total_num_chars:
+                if fin.tell() == self._total_num_bytes:
+                    if line.endswith(b"\n"):
+                        line = line[:-1]
                     self._queue_of_raw_lines.put((cursor, line))
                     break
                 line_without_newline_char = line[:-1]

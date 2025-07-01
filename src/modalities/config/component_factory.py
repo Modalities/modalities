@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Type, TypeVar, Union
+from typing import Any, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -19,24 +19,43 @@ class ComponentFactory:
         """
         self.registry = registry
 
-    def build_components(self, config_dict: Dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
+    def build_components(self, config_dict: dict, components_model_type: Type[BaseModelChild]) -> BaseModelChild:
         """Builds the components from a config dictionary. All components specified in `components_model_type`
         are built from the config dictionary in a recursive manner.
 
         Args:
-            config_dict (Dict): Dictionary with the configuration of the components.
+            config_dict (dict): Dictionary with the configuration of the components.
             components_model_type (Type[BaseModelChild]): Base model type defining the components to be build.
 
         Returns:
             BaseModelChild: Instance of the components_model_type with the built components.
         """
-        component_names = list(components_model_type.model_fields.keys())
-        component_dict = self._build_config(config_dict=config_dict, component_names=component_names)
+        # the components instantiaton model allows for the definition of required and optional top-level components
+        # for example the mfu_calculator might not always be required.
+        component_names_required = [
+            name for name, field in components_model_type.model_fields.items() if field.is_required()
+        ]
+        component_names_optional = [
+            name for name, field in components_model_type.model_fields.items() if not field.is_required()
+        ]
+
+        component_dict = self._build_config(
+            config_dict=config_dict,
+            component_names_required=component_names_required,
+            component_names_optional=component_names_optional,
+        )
         components = components_model_type(**component_dict)
         return components
 
-    def _build_config(self, config_dict: Dict, component_names: List[str]) -> Dict[str, Any]:
-        component_dict_filtered = {name: config_dict[name] for name in component_names}
+    def _build_config(
+        self, config_dict: dict, component_names_required: list[str], component_names_optional: list[str]
+    ) -> dict[str, Any]:
+        component_dict_filtered = {name: config_dict[name] for name in component_names_required}
+        # we only add the optional components if they are present in the config_dict
+        for name in component_names_optional:
+            if name in config_dict:
+                component_dict_filtered[name] = config_dict[name]
+
         components, _ = self._build_component(
             current_component_config=component_dict_filtered,
             component_config=config_dict,
@@ -47,19 +66,17 @@ class ComponentFactory:
 
     def _build_component(
         self,
-        current_component_config: Union[Dict, List, Any],
-        component_config: Union[Dict, List, Any],
-        top_level_components: Dict[str, Any],
-        traversal_path: List,
+        current_component_config: dict | list | Any,
+        component_config: dict | list | Any,
+        top_level_components: dict[str, Any],
+        traversal_path: list,
     ) -> Any:
+        if len(traversal_path) == 1 and traversal_path[0] in top_level_components:
+            # if the top level component is already built due to a referencing config,
+            # we just return this component instead of building it again
+            return top_level_components[traversal_path[0]], top_level_components
         # build sub components first via recursion
         if isinstance(current_component_config, dict):
-            # if the entities are top level components, we return the component,
-            # as it must have been built already via a referencing component
-            if len(traversal_path) > 0 and traversal_path[-1] in top_level_components:
-                entity_key = traversal_path[-1]
-                return top_level_components[entity_key], top_level_components
-            # if it is not a component that has been built already, we need to build it.
             # We first traverse the config for possible sub components that need to build beforehand.
             materialized_component_config = {}
             for sub_entity_key, sub_component_config_dict in current_component_config.items():
@@ -130,16 +147,16 @@ class ComponentFactory:
             return current_component_config, top_level_components
 
     @staticmethod
-    def _is_component_config(config_dict: Dict) -> bool:
+    def _is_component_config(config_dict: dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return "component_key" in config_dict.keys()
 
     @staticmethod
-    def _is_reference_config(config_dict: Dict) -> bool:
+    def _is_reference_config(config_dict: dict) -> bool:
         # TODO instead of field checks, we should introduce an enum for the config type.
         return {"instance_key", "pass_type"} == config_dict.keys()
 
-    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: Dict) -> BaseModel:
+    def _instantiate_component_config(self, component_key: str, variant_key: str, config_dict: dict) -> BaseModel:
         component_config_type: Type[BaseModel] = self.registry.get_config(component_key, variant_key)
         self._assert_valid_config_keys(
             component_key=component_key,
@@ -151,7 +168,7 @@ class ComponentFactory:
         return comp_config
 
     def _assert_valid_config_keys(
-        self, component_key: str, variant_key: str, config_dict: Dict, component_config_type: Type[BaseModelChild]
+        self, component_key: str, variant_key: str, config_dict: dict, component_config_type: Type[BaseModelChild]
     ) -> None:
         required_keys = []
         optional_keys = []
@@ -178,7 +195,7 @@ class ComponentFactory:
         return component
 
     @staticmethod
-    def _base_model_to_dict(base_model: BaseModel) -> Dict:
+    def _base_model_to_dict(base_model: BaseModel) -> dict:
         # converts top level structure of base_model into dictionary while maintaining substructure
         output = {}
         for name, _ in base_model.model_fields.items():

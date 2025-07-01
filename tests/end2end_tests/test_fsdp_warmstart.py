@@ -1,8 +1,8 @@
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 import torch
@@ -15,8 +15,15 @@ from modalities.config.config import ProcessGroupBackendType, PydanticLLMDataLoa
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
-from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.running_env.cuda_env import CudaEnv
+from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
+
+
+def extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
+    pattern = r"seen_steps_(\d+)-seen_tokens_(\d+)"
+    match = re.search(pattern, filename)
+    return int(match.group(1)), int(match.group(2))
+
 
 # NOTE: We need to run the tests in a torch distributed environment with at least two GPUs.
 # CUDA_VISIBLE_DEVICES=0,1 torchrun --rdzv-endpoint localhost:29502 --nnodes 1 --nproc_per_node 2 \
@@ -29,23 +36,8 @@ from modalities.running_env.cuda_env import CudaEnv
 working_dir = Path(os.path.dirname(__file__))
 
 
-class SaveAllResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
-    def __init__(self):
-        self.message_list: List[Message[EvaluationResultBatch]] = []
-
-    def consume_message(self, message: Message[EvaluationResultBatch]):
-        """Consumes a message from a message broker."""
-        self.message_list.append(message)
-
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
-        pass
-
-
-class SaveAllResultSubscriberConfig(BaseModel):
-    pass
-
-
 class TrainDataloaderInstantiationModel(BaseModel):
+    settings: TrainingComponentsInstantiationModel.Settings
     train_dataloader: PydanticLLMDataLoaderIFType
 
 
@@ -55,7 +47,7 @@ class TrainDataloaderInstantiationModel(BaseModel):
 )
 class TestWarmstart:
     @staticmethod
-    def get_loss_scores(messages: List[Message[EvaluationResultBatch]], loss_key: str) -> List[float]:
+    def get_loss_scores(messages: list[Message[EvaluationResultBatch]], loss_key: str) -> list[float]:
         return [message.payload.losses[loss_key].value.item() for message in messages]
 
     def test_warm_start(self):
@@ -69,27 +61,23 @@ class TestWarmstart:
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
             gpt2_8_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path)
+            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path, experiment_id="0")
 
             # adopt the checkpoint path
             checkpoint_path = temp_dir
-            experiment_id_0 = "0"
             gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-                "experiment_id"
-            ] = experiment_id_0
             gpt2_8_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_8_steps_config_dict["settings"]["experiment_id"] = experiment_id_0
             loss_values_experiment_0_path = checkpoint_path + "/experiment_0_loss_scores.txt"
 
             # config for one step model
             gpt2_warm_start_after_4_steps_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(gpt2_warm_start_after_4_steps_config_file_path)
+            gpt2_warm_start_after_4_steps_dict = load_app_config_dict(
+                gpt2_warm_start_after_4_steps_config_file_path, experiment_id="1"
+            )
 
             # adopt the checkpoint path
-            experiment_id_1 = "1"
             gpt2_warm_start_after_4_steps_dict["wrapped_model"]["config"]["checkpoint_path"] = (
                 checkpoint_path + "/0/eid_0-model-seen_steps_4-seen_tokens_2048-target_steps_15-target_tokens_7680.bin"
             )
@@ -100,11 +88,7 @@ class TestWarmstart:
             gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-                "experiment_id"
-            ] = experiment_id_1
             gpt2_warm_start_after_4_steps_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
-            gpt2_warm_start_after_4_steps_dict["settings"]["experiment_id"] = experiment_id_1
             loss_values_experiment_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
 
             # # adopt dataset path
@@ -112,10 +96,9 @@ class TestWarmstart:
             #     working_dir / "lorem_ipsum.pbin"
             # )
 
-            main_obj_0 = Main(gpt2_8_steps_config_file_path)
-            main_obj_0.config_dict = gpt2_8_steps_config_dict
-
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+                main_obj_0 = Main(gpt2_8_steps_config_file_path)
+                main_obj_0.config_dict = gpt2_8_steps_config_dict
                 main_obj_0.add_custom_component(
                     component_key="results_subscriber",
                     variant_key="save_all",
@@ -130,10 +113,57 @@ class TestWarmstart:
 
                 # we collect the loss values from rank 0 and store them in the temporary experiment folder
                 if dist.get_rank() == 0:
-                    messages_0: List[Message[EvaluationResultBatch]] = components_0.evaluation_subscriber.message_list
+                    messages_0: list[Message[EvaluationResultBatch]] = components_0.evaluation_subscriber.message_list
                     loss_scores_0 = TestWarmstart.get_loss_scores(messages_0, "train loss avg")
                     with open(loss_values_experiment_0_path, "w") as f:
                         json.dump(loss_scores_0, f)
+
+                    # make sure that the checkpoints have been written and checkpoint info file has been updated
+                    checkpoint_info_file_path = Path(checkpoint_path) / "0/last_checkpoint_info.json"
+                    assert checkpoint_info_file_path.exists()
+                    with open(checkpoint_info_file_path, "r") as f:
+                        checkpoint_info = json.load(f)
+                    assert checkpoint_info["model_checkpoint_path"] == (
+                        checkpoint_path
+                        + "/0/eid_0-model-seen_steps_12-seen_tokens_6144-target_steps_15-target_tokens_7680.bin"
+                    )
+                    assert checkpoint_info["optimizer_checkpoint_path"] == (
+                        checkpoint_path
+                        + "/0/eid_0-optimizer-seen_steps_12-seen_tokens_6144-target_steps_15-target_tokens_7680.bin"
+                    )
+                    assert Path(checkpoint_info["model_checkpoint_path"]).exists()
+                    assert Path(checkpoint_info["optimizer_checkpoint_path"]).exists()
+
+                    checkpoint_paths = list(Path(checkpoint_path).glob("**/*.bin"))
+                    model_max_seen_steps = -1
+                    model_max_seen_tokens = -1
+                    optimizer_max_seen_steps = -1
+                    optimizer_max_seen_tokens = -1
+                    for checkpoint_path in checkpoint_paths:
+                        seen_steps, seen_tokens = extract_seen_steps_and_tokens(checkpoint_path.name)
+                        if "model" in checkpoint_path.name:
+                            model_max_seen_steps = max(model_max_seen_steps, seen_steps)
+                            model_max_seen_tokens = max(model_max_seen_tokens, seen_tokens)
+                        elif "optimizer" in checkpoint_path.name:
+                            optimizer_max_seen_steps = max(optimizer_max_seen_steps, seen_steps)
+                            optimizer_max_seen_tokens = max(optimizer_max_seen_tokens, seen_tokens)
+                        else:
+                            raise ValueError("Invalid checkpoint path")
+
+                    assert model_max_seen_steps == optimizer_max_seen_steps
+                    assert model_max_seen_tokens == optimizer_max_seen_tokens
+
+                    cp_info_model_seen_steps, cp_info_model_seen_tokens = extract_seen_steps_and_tokens(
+                        checkpoint_info["model_checkpoint_path"]
+                    )
+                    cp_info_optimizer_seen_steps, cp_info_optimizer_seen_tokens = extract_seen_steps_and_tokens(
+                        checkpoint_info["optimizer_checkpoint_path"]
+                    )
+                    assert cp_info_model_seen_steps == cp_info_optimizer_seen_steps
+                    assert cp_info_model_seen_tokens == cp_info_optimizer_seen_tokens
+
+                    assert cp_info_model_seen_steps == model_max_seen_steps
+                    assert cp_info_model_seen_tokens == model_max_seen_tokens
 
                 main_obj_1 = Main(gpt2_warm_start_after_4_steps_config_file_path)
                 main_obj_1.config_dict = gpt2_warm_start_after_4_steps_dict
@@ -147,16 +177,16 @@ class TestWarmstart:
                 components_1 = main_obj_1.build_components(components_model_type=TrainingComponentsInstantiationModel)
 
                 assert (
-                    components_0.scheduler.base_lrs == components_1.scheduler.base_lrs
+                    components_0.app_state.lr_scheduler.base_lrs == components_1.app_state.lr_scheduler.base_lrs
                 )  # make sure that the initial learning rates are the same
-                assert components_1.scheduler.last_epoch == 4  # we start from step 4
+                assert components_1.app_state.lr_scheduler.last_epoch == 4  # we start from step 4
 
                 main_obj_1.run(components_1)
 
                 # we collect the loss values from rank 0 for the warmstart model
                 # and store them in the temporary experiment folder
                 if dist.get_rank() == 0:
-                    messages_1: List[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
+                    messages_1: list[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
                     loss_scores_1 = TestWarmstart.get_loss_scores(messages_1, "train loss avg")
                     with open(loss_values_experiment_1_path, "w") as f:
                         json.dump(loss_scores_1, f)
@@ -175,32 +205,39 @@ class TestWarmstart:
                     assert loaded_loss_values_0[4:] == pytest.approx(loaded_loss_values_1, abs=1e-16)
 
                 # assert that the scheduler state is the same for both models
-                assert components_1.scheduler.last_epoch == components_0.scheduler.last_epoch
-                assert components_0.scheduler.get_last_lr() == components_1.scheduler.get_last_lr()
+                assert components_1.app_state.lr_scheduler.last_epoch == components_0.app_state.lr_scheduler.last_epoch
+                assert (
+                    components_0.app_state.lr_scheduler.get_last_lr()
+                    == components_1.app_state.lr_scheduler.get_last_lr()
+                )
 
     def test_warmstart_dataloader(self):
         # non-skipped config
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path)
+        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path, experiment_id="0")
 
         # skipped config
         gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-        gpt2_warm_start_from_step_1_dict = load_app_config_dict(gpt2_warm_start_from_step_1_config_file_path)
-
-        main_obj_1 = Main(gpt2_two_steps_config_file_path)
-        main_obj_1.config_dict = gpt2_two_steps_config_dict
-
-        main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
-        main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
+        gpt2_warm_start_from_step_1_dict = load_app_config_dict(
+            gpt2_warm_start_from_step_1_config_file_path, experiment_id="1"
+        )
 
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj_1 = Main(gpt2_two_steps_config_file_path)
+            main_obj_1.config_dict = gpt2_two_steps_config_dict
+
+            main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
+            main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
+
             main_obj_1.add_custom_component(
                 component_key="results_subscriber",
                 variant_key="save_all",
                 custom_component=SaveAllResultSubscriber,
                 custom_config=SaveAllResultSubscriberConfig,
             )
-            components_1 = main_obj_1.build_components(components_model_type=TrainDataloaderInstantiationModel)
+            components_1: TrainDataloaderInstantiationModel = main_obj_1.build_components(
+                components_model_type=TrainDataloaderInstantiationModel
+            )
             dataloader_1: LLMDataLoader = components_1.train_dataloader
             dl_1_samples = [s for s in dataloader_1]
 
@@ -216,14 +253,14 @@ class TestWarmstart:
 
             # fast forward the first dataloader
 
-            num_skip_steps = dataloader_2.fast_forward_batch_id
+            num_skip_steps = components_2.settings.training_progress.num_seen_steps
 
             # make sure that we actually skip as defined in the config
             assert num_skip_steps == 4
             assert len(dl_1_samples) == num_skip_steps + len(dl_2_samples)
 
             # make sure that the first dataloader is not skipped
-            assert dataloader_1.fast_forward_batch_id == 0
+            assert components_1.settings.training_progress.num_seen_steps == 0
 
             # iterate through both sample lists from the dataloaders
             # and assert the equality of the samples

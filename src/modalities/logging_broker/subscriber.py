@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from modalities.logging_broker.messages import Message
 
@@ -14,5 +14,5 @@ class MessageSubscriberIF(ABC, Generic[T]):
         raise NotImplementedError
 
     @abstractmethod
-    def consume_dict(self, mesasge_dict: Dict[str, Any]):
+    def consume_dict(self, message_dict: dict[str, Any]):
         raise NotImplementedError

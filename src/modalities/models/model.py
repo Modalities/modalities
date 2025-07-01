@@ -1,13 +1,13 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from modalities.batch import DatasetBatch, InferenceResultBatch
 
-WeightDecayGroups = Dict[str, List[str]]
+WeightDecayGroups = dict[str, list[str]]
 
 
 class ActivationType(str, Enum):
@@ -50,19 +50,19 @@ class NNModel(nn.Module):
         return self._weight_decay_groups
 
     @abstractmethod
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
         """
         raise NotImplementedError
 
-    def get_parameters(self) -> Dict[str, torch.Tensor]:
+    def get_parameters(self) -> dict[str, torch.Tensor]:
         """
         Returns a dictionary of the model's parameters.
 
@@ -75,18 +75,20 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU class to define the SwiGLU activation function."""
 
-    def __init__(self, n_embd: int, bias: bool):
+    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool):
         """
         Initializes the SwiGLU object.
 
         Args:
             n_embd (int): The number of embedding dimensions.
+            ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
+            Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
             bias (bool): Whether to include bias terms in the linear layers.
         """
 
         super().__init__()
 
-        hidden_dim = SwiGLU._get_hidden_dim(n_embd)
+        hidden_dim = SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden)
 
         self.W = nn.Linear(
             in_features=n_embd,
@@ -106,7 +108,7 @@ class SwiGLU(nn.Module):
         )
 
     @staticmethod
-    def _get_hidden_dim(n_embd: int) -> int:
+    def _get_hidden_dim(ffn_hidden: int) -> int:
         # Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
 
         # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
@@ -115,7 +117,7 @@ class SwiGLU(nn.Module):
         # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
         # Besides, we ensure that hidden_dim is the smallest multiple of
         # 256 that is greater than or equal the provided hidden_dim
-        return 256 * ((int(2 * 4 * n_embd / 3) + 256 - 1) // 256)
+        return 256 * ((int(2 * ffn_hidden / 3) + 256 - 1) // 256)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -141,6 +143,6 @@ def model_predict_batch(model: nn.Module, batch: DatasetBatch) -> InferenceResul
     Returns:
         InferenceResultBatch: The batch of inference results containing the predicted targets and predictions.
     """
-    forward_result = model.forward(batch.samples)
+    forward_result = model(batch.samples)
     result_batch = InferenceResultBatch(targets=batch.targets, predictions=forward_result)
     return result_batch

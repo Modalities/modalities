@@ -47,7 +47,7 @@ settings:
   training_progress: 
     global_num_seen_tokens: 0
     num_seen_steps: 0
-    local_num_seen_batches: 0
+    num_seen_samples: 0
     last_step: -1
 
 collate_fn:
@@ -72,7 +72,6 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -84,16 +83,17 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            drop_last: true
-            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
@@ -111,7 +111,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: fsdp1
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -168,33 +168,31 @@ model_raw:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
-        - type_hint: RotaryTransform
-          config:
-            n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
-            seq_length_dim: -2
-    attention_implementation: manual
+      - type_hint: RotaryTransform
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head: ${model_raw.config.n_head_q}
+          seq_length_dim: -2
+          base_freq: 100000
+    attention_implementation: pytorch_flash
     activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
@@ -249,7 +247,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: ai_24_demo
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
