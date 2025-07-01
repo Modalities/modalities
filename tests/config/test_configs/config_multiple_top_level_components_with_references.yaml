@@ -1,0 +1,60 @@
+# we want to test that comp_x_1->val_x is not referencing
+# top-level component val_x
+val_x:    
+    component_key: COMP_X
+    variant_key: default
+    config:
+      val_x: "val_x -> config -> val_x"
+      single_dependency:
+          component_key: COMP_W
+          variant_key: default
+          config:
+            val_w: "val_w_123"
+
+single_dependency:
+    component_key: COMP_W
+    variant_key: default
+    config:
+      val_w: "single_dependency -> config -> val_w"
+
+comp_x_1:
+    component_key: COMP_X
+    variant_key: default
+    config:
+      val_x: "comp_x_1 -> config -> val_x"
+      single_dependency:
+        component_key: COMP_W
+        variant_key: default
+        config:
+          val_w: "val_w_123"
+
+
+# we want to check that comp_x_2 and comp_x_3 are pointing 
+# to the same instance of comp_w_1 and
+# comp_x_1 is not pointing to comp_w_1
+comp_x_2:
+    component_key: COMP_X
+    variant_key: default
+    config:
+      val_x: "comp_x_2 -> config -> val_x"
+      single_dependency:
+        instance_key: comp_w_1
+        pass_type: BY_REFERENCE
+
+comp_w_1:
+  component_key: COMP_W
+  variant_key: default
+  config:
+    val_w: "comp_w_1 -> comp_w"
+
+comp_x_3:
+    component_key: COMP_X
+    variant_key: default
+    config:
+      val_x: "comp_x_3 -> config -> val_x"
+      single_dependency:
+        instance_key: comp_w_1
+        pass_type: BY_REFERENCE
+
+
+
