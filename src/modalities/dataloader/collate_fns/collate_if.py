@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
 
 import torch
 
@@ -10,12 +9,12 @@ class CollateFnIF(ABC):
     """CollateFnIF class to define a collate function interface."""
 
     @abstractmethod
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> DatasetBatch:
         """
         Process a batch of data.
 
         Args:
-            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
+            batch (list[dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
 
         Returns:
             DatasetBatch: The processed batch of data.

@@ -4,7 +4,7 @@ import torch
 from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch
-from modalities.config.pydanctic_if_types import PydanticCollateFnIFType, PydanticTokenizerIFType
+from modalities.config.pydantic_if_types import PydanticCollateFnIFType, PydanticTokenizerIFType
 from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
