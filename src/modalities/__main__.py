@@ -50,13 +50,6 @@ from modalities.running_env.cuda_env import CudaEnv
 from modalities.trainer import Trainer
 from modalities.util import get_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 
-config_file_path_option = click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=False),
-    required=True,
-    help="Path to a file with the YAML config file.",
-)
-
 
 @click.group()
 def main() -> None:
@@ -139,7 +132,12 @@ def CMD_entry_point_generate_text(config_file_path: FilePath):
 
 
 @main.command(name="convert_pytorch_to_hf_checkpoint")
-@config_file_path_option
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
 @click.option(
     "--output_hf_checkpoint_dir",
     type=click_pathlib.Path(exists=False),
@@ -181,7 +179,12 @@ def data():
 
 
 @data.command(name="prepare_instruction_tuning_data")
-@config_file_path_option
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=False),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
 def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
     """
     Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
