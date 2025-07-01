@@ -353,10 +353,10 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             None
         """
         self.block_size = block_size
+        self.reuse_last_target = reuse_last_target
         # TODO passing the load_index flag does not really comply with the inversion
         # of control principle. We should refactor this in the future.
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key, load_index=load_index)
-        self.reuse_last_target = reuse_last_target
 
     @staticmethod
     # TODO: either the return type is false, or the test uses it wrongly

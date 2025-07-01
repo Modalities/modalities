@@ -306,7 +306,7 @@ def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, to
     num_samples = (total_tokens - block_size) // (block_size - 1) + 1
     # given num_samples we calculate the starting index and length of each sample as tuple.
     result_slow = [
-        ((i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes) for i in range(num_samples)
+        [(i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes] for i in range(num_samples)
     ]
 
     result_vectorized = PackedMemMapDatasetContinuous._create_packed_index(

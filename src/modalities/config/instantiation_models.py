@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator
 
 from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
@@ -68,7 +68,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             class Config:
                 extra = "allow"
 
-            @root_validator(pre=True)
+            @model_validator(mode="before")
             def _validate_all_paths(cls, values: dict[str, Any]) -> dict[str, Any]:
                 for field_name, value in values.items():
                     if isinstance(value, str):  # If a value is a string, convert it to Path

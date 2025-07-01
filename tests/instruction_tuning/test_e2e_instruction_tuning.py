@@ -19,7 +19,7 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
 
     # Load config
     dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_sft.yaml")
-    config_dict = load_app_config_dict(dummy_config_path)
+    config_dict = load_app_config_dict(dummy_config_path, experiment_id="test_e2e_instruction_tuning")
 
     # Adapt config for test
     checkpointing_path = tmp_path / "sft_checkpoints/"
@@ -34,10 +34,9 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     # as the real total_steps (which is 12) is smaller
     config_dict["scheduler"]["config"]["total_steps"] = 24 + 1
 
-    main = Main(dummy_config_path)
-    main.config_dict = config_dict
-
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        main = Main(dummy_config_path)
+        main.config_dict = config_dict
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)
 
