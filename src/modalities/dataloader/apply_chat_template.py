@@ -5,7 +5,6 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Tuple
 
-import jsonlines
 from jinja2 import Template
 from jinja2.exceptions import TemplateError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
@@ -121,9 +120,9 @@ def _map_conversation_roles(conversation: List[Dict[str, Any]], role_mapping: Di
 
 
 def _stream_jsonl(src_file_path: str) -> Generator[Dict[str, Any], None, None]:
-    with jsonlines.open(src_file_path) as reader:
-        for obj in reader:
-            yield obj
+    with open(src_file_path, "r", encoding="utf-8") as reader:
+        for line in reader:
+            yield json.loads(line)
 
 
 def _compile_jinja_template(chat_template: str) -> Template:
