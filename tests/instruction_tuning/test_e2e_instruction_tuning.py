@@ -18,11 +18,11 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     monkeypatch.setenv("MASTER_PORT", "9949")
 
     # Load config
-    dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_lorem_ipsum_instruct_fsdp1.yaml")
+    dummy_config_path = _ROOT_DIR / Path("tests/instruction_tuning/files/config_lorem_ipsum_instruct_fsdp1.yaml")
     config_dict = load_app_config_dict(dummy_config_path, experiment_id="test_e2e_instruction_tuning")
 
     # Adapt config for test
-    checkpointing_path = tmp_path / "sft_checkpoints/"
+    checkpointing_path = tmp_path / "instruct_checkpoints/"
     config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpointing_path.__str__()
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
         "checkpoint_path"

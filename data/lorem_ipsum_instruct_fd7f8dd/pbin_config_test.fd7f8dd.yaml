@@ -1,14 +1,14 @@
 settings:
-  dst_path: data/lorem_ipsum_sft_9a435ad/lorem_ipsum_sft_converted_val.9a435ad.pbin
+  dst_path: data/lorem_ipsum_instruct_fd7f8dd/lorem_ipsum_instruct_converted_test.fd7f8dd.pbin
   eod_token: <|endoftext|>
-  index_path: data/lorem_ipsum_sft_9a435ad/lorem_ipsum_sft_converted_val.9a435ad.idx
+  index_path: data/lorem_ipsum_instruct_fd7f8dd/lorem_ipsum_instruct_converted_test.fd7f8dd.idx
   jq_pattern: .chat
   num_cpus: 1
   processed_samples_queue_size: 300
   processing_batch_size: 5
   raw_samples_queue_size: 300
   sequence_length: 2048
-  src_path: data/lorem_ipsum_sft_9a435ad/lorem_ipsum_sft_converted_val.9a435ad.jsonl
+  src_path: data/lorem_ipsum_instruct_fd7f8dd/lorem_ipsum_instruct_converted_test.fd7f8dd.jsonl
 tokenizer:
   component_key: tokenizer
   config:

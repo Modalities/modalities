@@ -1,8 +1,8 @@
 settings:
-  src_path: data/lorem_ipsum_sft.jsonl
-  dst_path: data/lorem_ipsum_sft_converted.jsonl
-  conversations_key: conversations
-  pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
+  src_path: tutorials/instruction_tuning/data/instruction_tuning_data.jsonl
+  dst_path: tutorials/instruction_tuning/prepared_data/instruction_tuning_data_applied_chat_template.jsonl
+  messages_key: messages
+  pbin_creation_config_file_path: tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml
   split_config:
     splitting:
       train: 70
@@ -17,17 +17,18 @@ instruction_data_transformation:
     gpt: Assistant
 
 # The b_include_to_loss_token, e_include_to_loss_token are required to be part of each chat template for proper loss masking!
+# messages is a required special "chat_template_data" and corresponds to the data column settings.messages_key
 jinja2_chat_template: |
     {{ chat_template_data.system_instruction + '\n' }}
-    {% for turn in conversation %}
-    {{ turn.from + ':' }}
-    {% if turn.from == chat_template_data.assistant_role %}
+    {% for turn in messages %}
+    {{ turn.role + ':' }}
+    {% if turn.role == chat_template_data.assistant_role %}
     {{ chat_template_data.special_tokens.b_include_to_loss_token}}
     {% else %}
     {{ " " }}
     {% endif %}
-    {{ turn.value + '\n'}}
-    {% if turn.from == chat_template_data.assistant_role %}
+    {{ turn.content + '\n'}}
+    {% if turn.role == chat_template_data.assistant_role %}
     {{ chat_template_data.special_tokens.e_assistant_token}}
     {{ chat_template_data.special_tokens.e_include_to_loss_token}}
     {% endif %}

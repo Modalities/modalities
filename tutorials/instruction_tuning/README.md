@@ -1,8 +1,5 @@
-# Supervised Fine-tuning with Modalities
+# Instruction Tuning with Modalities
 
-Currently supported are Instruction-tuning and Low-rank Adaption (LorA), as explained in more detail next.
-
-## Instruction-tuning
 > Instruction-tuning currently only works with fast and slow Huggingface tokenizers, as the special tokens need to be added to the tokenizer.
 
 The goal of instruction-tuning is to let the model learn instruction-following capabilites, so that it acts as an helpful assistant within an chat environment.
@@ -130,6 +127,11 @@ Created JSONL file entry:
 
 ### Prepare Instruction-tuning Data
 
+> **Limitation:** 
+> Currently only tokens already known to the tokenizers vocabulary can be added, as resizing the embedding matrix is not yet supported!
+> See the corresponding [issue](https://github.com/Modalities/modalities/issues/208).
+
+
 Run the `prepare_instruction_tuning_data` entry point with:
 ```bash
 modalities data prepare_instruction_tuning_data --config_file_path config_files/data_preparation/apply_chat_template_config.yaml
@@ -256,7 +258,3 @@ Example from the huggingface documentation:
 
 When we add a special token, which exists within the tokenizer voabulary already, HF only marks it as special token (adds it to the trie).
 This means, if the sequence we add as special token already exists in the vocab, there is no need to resize the embedding matrix!
-
-## Low-rank Adaption (LorA)
-
-TBD

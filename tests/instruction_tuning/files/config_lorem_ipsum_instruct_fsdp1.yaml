@@ -11,8 +11,8 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ./data/lorem_ipsum_instruct_fd7f8dd/lorem_ipsum_instruct_converted_train.fd7f8dd.pbin
-    test_dataset_path: ./data/lorem_ipsum_instruct_fd7f8dd/lorem_ipsum_instruct_converted_test.fd7f8dd.pbin
+    train_dataset_path: ./tests/instruction_tuning/files/lorem_ipsum_instruct_converted_train.fd7f8dd.pbin
+    test_dataset_path: ./tests/instruction_tuning/files/lorem_ipsum_instruct_converted_test.fd7f8dd.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 19

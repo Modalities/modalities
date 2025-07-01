@@ -55,10 +55,10 @@ def split_and_apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
     try:
         partitions_sampled = []
         for entry, partition in _split_streaming_data(data=instruction_data, split_config=config.settings.split_config):
-            conversation = entry[config.settings.conversations_key]
-            conversation = _map_conversation_roles(conversation, config.instruction_data_transformation.role_mapping)
-            chat = chat_template.render(conversation=conversation, chat_template_data=config.chat_template_data)
-            entry["chat"] = chat
+            messages = entry[config.settings.messages_key]
+            messages = _map_conversation_roles(messages, config.instruction_data_transformation.role_mapping)
+            rendered_messages = chat_template.render(messages=messages, chat_template_data=config.chat_template_data)
+            entry["chat"] = rendered_messages
             output_file = partition_to_out_file_mapping[partition]
             partitions_sampled.append(partition)
             json.dump(entry, output_file, ensure_ascii=False)

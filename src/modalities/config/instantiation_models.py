@@ -357,7 +357,7 @@ class InstructionTuningInstantiationModel(BaseModel):
     class Settings(BaseModel):
         src_path: FilePath
         dst_path: Path
-        conversations_key: str
+        messages_key: str
         split_config: SplitConfig | None = None
         pbin_creation_config_file_path: FilePath | None = None
 
