@@ -134,9 +134,9 @@ def CMD_entry_point_generate_text(config_file_path: FilePath):
 @main.command(name="convert_pytorch_to_hf_checkpoint")
 @click.option(
     "--config_file_path",
-    type=click_pathlib.Path(exists=False),
+    type=click_pathlib.Path(exists=True),
     required=True,
-    help="Path to a file with the YAML config file.",
+    help="Path to config of model checkpoint.",
 )
 @click.option(
     "--output_hf_checkpoint_dir",
