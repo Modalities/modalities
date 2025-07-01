@@ -11,8 +11,8 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ./data/lorem_ipsum_long.pbin
-    test_dataset_path: ./data/lorem_ipsum.pbin
+    train_dataset_path: ./data/lorem_ipsum_sft_40e0699/lorem_ipsum_sft_converted.40e0699.pbin
+    test_dataset_path: ./data/lorem_ipsum_sft_40e0699/lorem_ipsum_sft_converted.40e0699.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 32
@@ -25,7 +25,7 @@ settings:
   step_profile:
     gradient_accumulation_steps: 2
     local_train_micro_batch_size: 1
-    sequence_length: 256
+    sequence_length: 2048
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -51,20 +51,34 @@ settings:
     num_seen_samples: 0
     last_step: -1
 
-collate_fn:
+collate_fn:  
   component_key: collate_fn
-  variant_key: gpt_2_llm_collator
+  variant_key: mask_loss_collator_wrapper
   config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    target_key: ${settings.referencing_keys.target_key}
+    wrapped_collate_fn:  
+      component_key: collate_fn
+      variant_key: gpt_2_llm_collator
+      config:
+        sample_key: ${settings.referencing_keys.sample_key}
+        target_key: ${settings.referencing_keys.target_key}
+    target_keys_to_mask:
+      - ${settings.referencing_keys.target_key}
+    loss_ignore_index: -100
+    mask_tokens:
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
 
 train_dataset:
   component_key: dataset
   variant_key: packed_mem_map_dataset_continuous
   config:
-    raw_data_path: ${settings.paths.train_dataset_path}
+    raw_data_path: ./data/lorem_ipsum_sft_40e0699/lorem_ipsum_sft_converted.40e0699.pbin
     sequence_length: ${settings.step_profile.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
 
 train_dataloader:
   component_key: data_loader
@@ -325,3 +339,16 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
+    padding: false
+    truncation: false
+    special_tokens:
+      additional_special_tokens: 
+        - "^"
+        - "$"
+        - "°"

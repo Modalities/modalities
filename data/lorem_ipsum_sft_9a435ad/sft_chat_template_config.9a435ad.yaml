@@ -1,0 +1,45 @@
+settings:
+  src_path: data/lorem_ipsum_sft.jsonl
+  dst_path: data/lorem_ipsum_sft_converted.jsonl
+  conversations_key: conversations
+  pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
+  split_config:
+    splitting:
+      train: 70
+      val: 15
+      test: 15
+    seed: 1234
+
+instruction_data_transformation:
+  role_mapping:
+    human_1: User1
+    human_2: User2
+    gpt: Assistant
+
+# The b_include_to_loss_token, e_include_to_loss_token are required to be part of each chat template for proper loss masking!
+jinja2_chat_template: |
+    {{ chat_template_data.system_instruction + '\n' }}
+    {% for turn in conversation %}
+    {{ turn.from + ':' }}
+    {% if turn.from == chat_template_data.assistant_role %}
+    {{ chat_template_data.special_tokens.b_include_to_loss_token}}
+    {% else %}
+    {{ " " }}
+    {% endif %}
+    {{ turn.value + '\n'}}
+    {% if turn.from == chat_template_data.assistant_role %}
+    {{ chat_template_data.special_tokens.e_assistant_token}}
+    {{ chat_template_data.special_tokens.e_include_to_loss_token}}
+    {% endif %}
+    {% endfor %}
+
+# The key-value pairs of chat_template_data are passed to the Jinja2 template and 
+# are not type checked for full compliance with the chat tempalate!
+chat_template_data:
+  assistant_role: Assistant
+  system_instruction: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages."
+  # Currently only works with HF tokenizers, as the special tokens are added to the tokenizer
+  special_tokens:
+      b_include_to_loss_token: ^
+      e_include_to_loss_token: $
+      e_assistant_token: °

@@ -320,7 +320,7 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[dict[str, str]] = None
+    special_tokens: Optional[dict[str, str | list | tuple]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):

@@ -212,7 +212,7 @@ def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
         pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
         with open(pbin_config_file_path, "w") as f:
             yaml.dump(pbin_config, f, allow_unicode=True)
-        pack_encoded_data(pbin_config_file_path)
+        pack_encoded_data(pbin_config, file_existence_policy=FileExistencePolicy.OVERRIDE)
 
 
 @data.command(name="create_raw_index")
