@@ -359,6 +359,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         self.reuse_last_target = reuse_last_target
 
     @staticmethod
+    # TODO: either the return type is false, or the test uses it wrongly
     def _create_packed_index(
         total_tokens: int, block_size: int, token_size_in_bytes: int, reuse_last_target: bool
     ) -> list[tuple[int, int]]:

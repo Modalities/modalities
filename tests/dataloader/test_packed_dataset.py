@@ -4,15 +4,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator, join_embedded_stream_data
 from modalities.dataloader.dataset import (
     PackedMemMapDatasetBase,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
-)
-from modalities.dataloader.packed_data_generator import (
-    EmbeddedStreamData,
-    PackedDataGenerator,
-    join_embedded_stream_data,
 )
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 
@@ -153,6 +149,7 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
         if block_id > 0:
             # we remove the first token from each block as it is a
             # reused token from the previous block
+
             tokens = block["input_ids"].tolist()[1:]
             packed_dataset_tokens_flat += tokens
         else:
