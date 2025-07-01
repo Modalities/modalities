@@ -97,7 +97,7 @@ def _get_hash_sum_sha256_of_file(file_path: Path) -> str:
 
 
 def _store_config_file_with_hash_suffix(config_file_path: Path, dst_path: Path, uuid_str: str) -> None:
-    out_config_file_path = dst_path.parent / f"sft_chat_template_config.{uuid_str}.yaml"
+    out_config_file_path = dst_path.parent / f"instruction_chat_template_config.{uuid_str}.yaml"
     shutil.copyfile(config_file_path, out_config_file_path)
 
 

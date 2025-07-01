@@ -17,9 +17,9 @@ For example, we only calculate the loss for the words not struck-trough:
 ### Overview
 
 To prepare the instruction-tuning data we created a new entry point `prepare_instruction_tuning_data`, which requires a [configuration file](./config_files/data_preparation/apply_chat_template_config.yaml). Within it we define:
-* The path to instruction-tuning dataset as a JSONL file wereas each line contains a structured conversation as an array of dictionaries (configured by the yaml entry: `conversations_key: conversations`).
+* The path to instruction-tuning dataset as a JSONL file wereas each line contains a structured conversation as an array of dictionaries (configured by the yaml entry: `messages_key: messages`).
 * A [jinja2](https://jinja.palletsprojects.com/en/3.1.x/) chat template which defines the rules how to glue `chat_template_data` and the data within the JSONL together to one `chat` string.
-  * As part of the `chat_template_data`, we require the special tokens `b_include_to_loss_token` and `e_include_to_loss_token`.
+  * As part of the `chat_template_data`, we require the special tokens `b_include_to_loss_token` and `e_include_to_loss_token`. A special, required `chat_template_data` is `messages` wich allows to loop over user/assistant turns of one example conversation (i.e. the data in the `messages_key` column)
 * Information how to split the created dataset
 
 > Note: The special tokens `b_include_to_loss_token` and `e_include_to_loss_token` should be tokens already present in the tokenizers vocabulary. They will be marked as special tokens for correct tokenization and loss masking. Once resizing the embedding matrix is supported, this is not necessary anymore.
@@ -30,95 +30,49 @@ Input JSONL file entry:
 ```json
 {
     "id": 16,
-    "conversations": [
+    "messages": [
         {
-            "from": "human_1",
-            "value": "What is the best way to learn a new language?"
+            "role": "human_1",
+            "content": "What is the best way to learn a new language?"
         },
         {
-            "from": "gpt",
-            "value": "The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers."
+            "role": "gpt",
+            "content": "The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers."
         },
         {
-            "from": "human_1",
-            "value": "Thank you for the advice."
+            "role": "human_1",
+            "content": "Thank you for the advice."
         },
         {
-            "from": "gpt",
-            "value": "You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask."
+            "role": "gpt",
+            "content": "You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask."
         }
     ]
 }
 ```
 
-Config:
-```yaml
-settings:
-  src_path: data/lorem_ipsum_sft.jsonl
-  dst_path: data/lorem_ipsum_sft_converted.jsonl
-  conversations_key: conversations
-  pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
-  split_config:
-    splitting:
-      train: 70
-      val: 15
-      test: 15
-    seed: 1234
-
-instruction_data_transformation:
-  role_mapping:
-    human_1: User1
-    human_2: User2
-    gpt: Assistant
-
-# The b_include_to_loss_token, e_include_to_loss_token are required to be part of each chat template for proper loss masking!
-jinja2_chat_template: |
-    {{ chat_template_data.system_instruction + '\n' }}
-    {% for turn in conversation %}
-    {{ turn.from + ':' }}
-    {% if turn.from == chat_template_data.assistant_role %}
-    {{ chat_template_data.special_tokens.b_include_to_loss_token}}
-    {% else %}
-    {{ " " }}
-    {% endif %}
-    {{ turn.value + '\n'}}
-    {% if turn.from == chat_template_data.assistant_role %}
-    {{ chat_template_data.special_tokens.e_assistant_token}}
-    {{ chat_template_data.special_tokens.e_include_to_loss_token}}
-    {% endif %}
-    {% endfor %}
-
-# The key-value pairs of chat_template_data are passed to the Jinja2 template and 
-# are not type checked for full compliance with the chat tempalate!
-chat_template_data:
-  assistant_role: Assistant
-  system_instruction: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages."
-  special_tokens:
-      b_include_to_loss_token: ^
-      e_include_to_loss_token: $
-      e_assistant_token: °
-```
+Config: See [](configs/apply_chat_template_config.yaml) and [](configs/packed_chat_dataset_config.yaml)
 
 Created JSONL file entry:
 ```json
 {
     "id": 16,
-    "conversations": [
+    "messages": [
         {
-            "from": "User1",
-            "value": "What is the best way to learn a new language?"
+            "role": "User1",
+            "content": "What is the best way to learn a new language?"
         },
         {
-            "from": "Assistant",
-            "value": "The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers."
+            "role": "Assistant",
+            "content": "The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers."
         },
         {
-            "from": "User1",
-            "value": "Thank you for the advice."
+            "role": "User1",
+            "content": "Thank you for the advice."
         },
         {
-            "from": "Assistant",
-            "value": "You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask."
+            "role": "Assistant",
+            "content": "You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask."
         }
     ],
     "chat": "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser1: What is the best way to learn a new language?\nAssistant:^The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers.\n°$User1: Thank you for the advice.\nAssistant:^You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask.\n°$"
@@ -132,37 +86,36 @@ Created JSONL file entry:
 > See the corresponding [issue](https://github.com/Modalities/modalities/issues/208).
 
 
-Run the `prepare_instruction_tuning_data` entry point with:
-```bash
-modalities data prepare_instruction_tuning_data --config_file_path config_files/data_preparation/apply_chat_template_config.yaml
-```
+Run the `prepare_instruction_tuning_data` entry point with: [](scripts/prepare_instruction_data.sh)
+
 
 This will create / copy the following files:
 
 ```
- lorem_ipsum_sft_09ca9ed/
- ├── lorem_ipsum_sft_converted_test.09ca9ed.idx
- ├── lorem_ipsum_sft_converted_test.09ca9ed.jsonl
- ├── lorem_ipsum_sft_converted_test.09ca9ed.pbin
- ├── lorem_ipsum_sft_converted_train.09ca9ed.idx
- ├── lorem_ipsum_sft_converted_train.09ca9ed.jsonl
- ├── lorem_ipsum_sft_converted_train.09ca9ed.pbin
- ├── lorem_ipsum_sft_converted_val.09ca9ed.idx
- ├── lorem_ipsum_sft_converted_val.09ca9ed.jsonl
- ├── lorem_ipsum_sft_converted_val.09ca9ed.pbin
- ├── pbin_config_test.09ca9ed.yaml
- ├── pbin_config_train.09ca9ed.yaml
- ├── pbin_config_val.09ca9ed.yaml
- └── sft_chat_template_config.09ca9ed.yaml
+tutorials/instruction_tuning/prepared_data
+└── instruction_tuning_data_8820ad4
+    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.idx
+    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.jsonl
+    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.pbin
+    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.idx
+    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl
+    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.pbin
+    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.idx
+    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.jsonl
+    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.pbin
+    ├── pbin_config_test.8820ad4.yaml
+    ├── pbin_config_train.8820ad4.yaml
+    ├── pbin_config_val.8820ad4.yaml
+    └── instruction_chat_template_config.8820ad4.yaml
 ```
 
 All files names contain the first 7 symbols of the hash of the config file, to group files which belong together!
 Also, a new directory with the original dataset file name and the hash in it its name is created.
 
-1. The JSONLs files with a new attribute `chat` containing the conversations, split into train, test, val e.g. `lorem_ipsum_sft_converted_train.09ca9ed.jsonl`
-2. The config used to generate the `chat` e.g. `sft_chat_template_config.09ca9ed.yaml`
-3. The idx and pbin files for each dataset partition e.g. `lorem_ipsum_sft_converted_train.09ca9ed.idx` and `lorem_ipsum_sft_converted_train.09ca9ed.pbin`
-4. The config file used to create the pbin files. For each partition, only the `src_path`, `index_path` and `dst_path` are replaced automatically, the rest remains as in the original pbin creation config file, as pointed to within `config_files/data_preparation/apply_chat_template_config.yaml`: `pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml`
+1. The JSONLs files with a new attribute `chat` containing the conversations, split into train, test, val e.g. `instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl`
+2. The config used to generate the `chat` e.g. `instruction_chat_template_config.8820ad4.yaml`
+3. The idx and pbin files for each dataset partition e.g. `instruction_tuning_data_applied_chat_template_train.8820ad4.idx` and `instruction_tuning_data_applied_chat_template_train.8820ad4.pbin`
+4. The config file used to create the pbin files. For each partition (train, test, val), only the `src_path`, `index_path` and `dst_path` are replaced automatically, the rest remains as in the original pbin creation config file, as pointed to within [](tutorials/instruction_tuning/configs/apply_chat_template_config.yaml): `pbin_creation_config_file_path: tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml`
 
 > Note: The [packed_chat_dataset_config.yaml](config_files/data_preparation/packed_chat_dataset_config.yaml) must use truncation and padding!
 
@@ -178,7 +131,7 @@ Make sure to use the wrapped collate function.
 * We need a tokenizer to tokenize the `b_include_to_loss_token` and `e_include_to_loss_token`
 * We need to not re-use the last token
 
-For example (Copied from [config_files/training/config_lorem_ipsum_sft.yaml](config_files/training/config_lorem_ipsum_sft.yaml)):
+See [](configs/train_instruct_model_fsdp1_config.yaml) for a full example. Below, the core changes needed for instruction tuning are listed.
 ```yaml
 collate_fn:  
   component_key: collate_fn
@@ -211,7 +164,7 @@ train_dataset:
     raw_data_path: ./data/lorem_ipsum_sft_09ca9ed/lorem_ipsum_sft_converted_train.09ca9ed.pbin
     sequence_length: ${settings.training.sequence_length}
     sample_key:  ${settings.referencing_keys.sample_key}
-    reuse_last_target: true
+    reuse_last_target: false
 ```
 
 and with
@@ -232,10 +185,7 @@ tokenizer:
         - $
 ```
 
-Finally, run the instruction-tuning with the `run` entry point:
-```bash
-torch.distributed.run --nnodes 1 --nproc_per_node 2 --rdzv-endpoint=0.0.0.0:29555 src/modalities/__main__.py run --config_file_path config_files/training/config_lorem_ipsum_sft.yaml
-```
+Finally, run the instruction-tuning with the `run` entry point: [](scripts/train_instruction_tuning_model.sh)
 
 > Note, that it is advised to add a special token (which is already known as non-special token to the tokenizer's voabulary) to indicate the end of an assistant turn within the `b_include_to_loss_token` and `e_include_to_loss_token` in your chat template. Change your chat template accordingly and make sure to inlcude this token as special token in the tokenizer configuration for the pbin file creation step and model training! 
 
