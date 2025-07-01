@@ -312,7 +312,14 @@ class PackedMemMapDatasetBase(Dataset):
 class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
     """PackedMemMapDatasetContinuous class."""
 
-    def __init__(self, raw_data_path: Path, sample_key: str, block_size: int, load_index: Optional[bool] = False):
+    def __init__(
+        self,
+        raw_data_path: Path,
+        sample_key: str,
+        block_size: int,
+        load_index: Optional[bool] = False,
+        reuse_last_target: bool = True,
+    ):
         """
         Initializes a Dataset object. In case `reuse_last_target` is True,
         we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
@@ -327,7 +334,18 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
                 This is only needed for debugging purposes to index the original documents.
                 The continuous packing does not need to load the index and should be
                 deactivated as it significantly increases the instantiation time. Defaults to False.
+            reuse_last_target (bool, optional): Whether to reuse the last target token between samples. Default: True.
+                In pre-training, setting this to True enables overlapping samples:
+                The last target token of one sample becomes the first input token of the next sample,
+                maximizing data throughput.
+                For instruction tuning (IT), where sequences are often short and may end with special tokens
+                (e.g., PAD or EOS), set this to False to avoid overlap:
+                Each token is used only once as a target and never reused as the start of the next sample.
 
+                False: No overlap; each sample is a distinct block of tokens (recommended for instruction tuning).
+                True: Overlap by one token;
+                    each token (except the very first and last) is both a sample and a target
+                    (recommended for pre-training).
         Returns:
             None
         """
@@ -335,26 +353,30 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         # TODO passing the load_index flag does not really comply with the inversion
         # of control principle. We should refactor this in the future.
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key, load_index=load_index)
+        self.reuse_last_target = reuse_last_target
 
     @staticmethod
-    def _create_packed_index(total_tokens: int, block_size: int, token_size_in_bytes: int) -> list[tuple[int, int]]:
-        # Given a fixed number of samples we can compute the total number of tokens as
-        # num_tokens = block_size + (block_size-1) * (num_samples-1)
-        # as the first sample always needs block_size many tokens and the following samples
-        # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
-        # of the subsequent sample).
-        num_samples = (total_tokens - block_size) // (block_size - 1) + 1
-        # create an index array of the form [0, 1, 2, ..., num_samples-1]
-        i_array = np.arange(num_samples)
-        # Vectorized operations
-        # create the starting byte position of each sample
-        first_component = (i_array * block_size - i_array) * token_size_in_bytes
-        # create the second component, which is the length of each sample in bytes
-        second_component = np.full(num_samples, block_size * token_size_in_bytes)
-
-        # Combine both components into a 2D array of tuples (or list of tuples if needed)
-        result = np.stack((first_component, second_component), axis=1)
-        return result
+    def _create_packed_index(
+        total_tokens: int, block_size: int, token_size_in_bytes: int, reuse_last_target: bool
+    ) -> list[tuple[int, int]]:
+        if reuse_last_target:
+            # Given a fixed number of samples we can compute the total number of tokens as
+            # num_tokens = block_size + (block_size-1) * (num_samples-1)
+            # as the first sample always needs block_size many tokens and the following samples
+            # each need block_size-1 many tokens (since we can reuse the last target token as the first input token
+            # of the subsequent sample).
+            num_samples = (total_tokens - block_size) // (block_size - 1) + 1
+            i_array = np.arange(num_samples)
+            sample_start_positions_bytes = (i_array * block_size - i_array) * token_size_in_bytes
+        else:
+            # If not reusing the last token, each sample consists of exactly block_size tokens
+            # with no overlap between samples
+            num_samples = total_tokens // block_size
+            i_array = np.arange(num_samples)
+            sample_start_positions_bytes = (i_array * block_size) * token_size_in_bytes
+        sample_length_bytes = np.full(num_samples, block_size * token_size_in_bytes)
+        result = np.stack((sample_start_positions_bytes, sample_length_bytes), axis=1)
+        return result.tolist()
 
     def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
@@ -370,7 +392,9 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         if self.block_size < 2:
             raise ValueError("Block size must be at least 2.")
 
-        result = self._create_packed_index(total_tokens, self.block_size, self._token_size_in_bytes)
+        result = self._create_packed_index(
+            total_tokens, self.block_size, self._token_size_in_bytes, self.reuse_last_target
+        )
         return result
 
 

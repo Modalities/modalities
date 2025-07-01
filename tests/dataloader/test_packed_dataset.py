@@ -313,7 +313,10 @@ def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, to
     ]
 
     result_vectorized = PackedMemMapDatasetContinuous._create_packed_index(
-        total_tokens=total_tokens, block_size=block_size, token_size_in_bytes=token_size_in_bytes
+        total_tokens=total_tokens,
+        block_size=block_size,
+        token_size_in_bytes=token_size_in_bytes,
+        reuse_last_target=True,
     )
 
     assert np.all(result_slow == result_vectorized)
