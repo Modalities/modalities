@@ -99,7 +99,7 @@ def hf_model_from_checkpoint(
     AutoModelForCausalLM.register(config_class=HFModelAdapterConfig, model_class=HFModelAdapter)
     hf_model_from_checkpoint = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path=checkpoint_conversion.output_hf_checkpoint_dir,
-        torch_dtype=pytorch_model.lm_head.weight.dtype,
+        torch_dtype=pytorch_model.transformer.lm_head.weight.dtype,
         prediction_key=prediction_key,
     )
     hf_model_from_checkpoint = hf_model_from_checkpoint.to(device)
@@ -113,10 +113,7 @@ def test_tensor(device: str, size: int = 10) -> torch.Tensor:
     return test_tensor
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
 def test_models_before_and_after_conversion_produce_same_output(
     device: str,
     pytorch_model: NNModel,
@@ -127,9 +124,9 @@ def test_models_before_and_after_conversion_produce_same_output(
     pytorch_model = put_model_to_eval_mode(model=pytorch_model, device=device)
     hf_model = put_model_to_eval_mode(model=hf_model, device=device)
 
-    output_pytorch_model = pytorch_model.forward(inputs={"input_ids": test_tensor})["logits"]
-    output_hf_model = hf_model.forward(input_ids=test_tensor, return_dict=False)
-    output_hf_model_from_checkpoint = hf_model_from_checkpoint.forward(input_ids=test_tensor, return_dict=False)
+    output_pytorch_model = pytorch_model(inputs={"input_ids": test_tensor})["logits"]
+    output_hf_model = hf_model(input_ids=test_tensor, return_dict=False)
+    output_hf_model_from_checkpoint = hf_model_from_checkpoint(input_ids=test_tensor, return_dict=False)
 
     assert (output_hf_model == output_pytorch_model).all()
     assert (output_hf_model == output_hf_model_from_checkpoint).all()
@@ -141,10 +138,7 @@ def put_model_to_eval_mode(model: NNModel, device: str) -> NNModel:
     return model
 
 
-@pytest.mark.skipif(
-    "RANK" not in os.environ or torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs and a torchrun distributed environment.",
-)
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires a GPU.")
 def test_models_before_and_after_conversion_are_equal(
     pytorch_model: NNModel,
     hf_model: NNModel,

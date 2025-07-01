@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import torch
 from pydantic import BaseModel, ConfigDict
@@ -102,26 +102,26 @@ class HuggingFacePretrainedModel(NNModel):
             model_name, local_files_only=False, *model_args, **kwargs
         )
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
         Args:
-            inputs (Dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
 
         Returns:
-            Dict[str, torch.Tensor]: A dictionary containing output tensors.
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
         """
-        output = self.huggingface_model.forward(inputs[self.sample_key])
+        output = self.huggingface_model(inputs[self.sample_key])
         return {self.prediction_key: output[self.huggingface_prediction_subscription_key]}
 
     @property
-    def fsdp_block_names(self) -> List[str]:
+    def fsdp_block_names(self) -> list[str]:
         """
         Returns a list of FSDP block names.
 
         Returns:
-            List[str]: A list of FSDP block names.
+            list[str]: A list of FSDP block names.
         """
         return self.huggingface_model._no_split_modules
 

@@ -1,10 +1,12 @@
 import pickle
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from transformers import PreTrainedTokenizer
 
 from modalities.dataloader.dataset import (
+    CombinedDataset,
+    Dataset,
     DummyDataset,
     DummySampleConfig,
     MemMapDataset,
@@ -17,13 +19,13 @@ class DatasetFactory:
     """DatasetFactory for building the different dataset types."""
 
     @staticmethod
-    def get_dummy_dataset(num_samples: int, sample_definition: Tuple[DummySampleConfig]) -> DummyDataset:
+    def get_dummy_dataset(num_samples: int, sample_definition: tuple[DummySampleConfig]) -> DummyDataset:
         """
         Returns a DummyDataset object.
 
         Args:
             num_samples (int): The number of samples the dataset should generate.
-            sample_definition (Tuple[DummySampleConfig]): A list of tuples defining the dataset output.
+            sample_definition (tuple[DummySampleConfig]): A list of tuples defining the dataset output.
                 Each tuple contains the sample key, shape and data type.
 
         Returns:
@@ -64,7 +66,7 @@ class DatasetFactory:
         return dataset
 
     @staticmethod
-    def get_raw_index(raw_index_path: Path) -> List[Tuple[int, int]]:
+    def get_raw_index(raw_index_path: Path) -> list[tuple[int, int]]:
         with raw_index_path.open("rb") as f:
             index = pickle.load(f)
         return index
@@ -103,3 +105,15 @@ class DatasetFactory:
             raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
         )
         return dataset
+
+    @staticmethod
+    def get_combined_dataset(datasets: list[Dataset]) -> Dataset:
+        """Factory method for creating a combined datset .
+
+        Args:
+            datasets (list[Dataset]): List of datasets to combine.
+
+        Returns:
+            Dataset: CombinedDataset object.
+        """
+        return CombinedDataset(datasets=datasets)

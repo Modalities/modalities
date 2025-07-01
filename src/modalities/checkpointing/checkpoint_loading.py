@@ -4,8 +4,30 @@ from pathlib import Path
 import torch.nn as nn
 from torch.optim import Optimizer
 
+from modalities.checkpointing.stateful.app_state import AppState
 
-class CheckpointLoadingIF(ABC):
+
+class DistributedCheckpointLoadingIF(ABC):
+    """Distributed checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
+
+    @abstractmethod
+    def load_checkpoint_(self, app_state: AppState, checkpoint_dir_path: Path) -> AppState:
+        """Loads the distributed checkpoint from the specified directory path into the AppState.
+
+        Args:
+            app_state (AppState): The application state with the model, optimizer and lr scheduler.
+            checkpoint_dir_path (Path): The directory path to the distributed checkpoint.
+
+        Raises:
+            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.
+
+        Returns:
+            AppState: The application state with the loaded checkpoint.
+        """
+        raise NotImplementedError
+
+
+class FSDP1CheckpointLoadingIF(ABC):
     """Checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
 
     @abstractmethod
@@ -26,22 +48,19 @@ class CheckpointLoadingIF(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def load_optimizer_checkpoint(
+    def load_optimizer_checkpoint_(
         self,
         optimizer: Optimizer,
         model: nn.Module,
         file_path: Path,
-    ) -> Optimizer:
+    ):
         """
-        Loads an optimizer checkpoint from the specified file path.
+        Loads an optimizer checkpoint from the specified file path (in-place).
 
         Args:
-            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).
             model (nn.Module): The model associated with the optimizer.
             file_path (Path): The path to the checkpoint file.
-
-        Returns:
-            Optimizer: The loaded optimizer with the checkpoint parameters.
 
         Raises:
             NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.

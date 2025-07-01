@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, List
 
 from modalities.logging_broker.messages import Message, MessageTypes
 from modalities.logging_broker.subscriber import MessageSubscriberIF
@@ -22,7 +21,7 @@ class MessageBroker(MessageBrokerIF):
     """The MessageBroker sends notifications to its subscribers."""
 
     def __init__(self) -> None:
-        self.subscriptions: Dict[MessageTypes, List[MessageSubscriberIF]] = defaultdict(list)
+        self.subscriptions: dict[MessageTypes, list[MessageSubscriberIF]] = defaultdict(list)
 
     def add_subscriber(self, subscription: MessageTypes, subscriber: MessageSubscriberIF):
         """Adds a single subscriber."""

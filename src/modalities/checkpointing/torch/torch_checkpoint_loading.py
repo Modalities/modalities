@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 
-from modalities.checkpointing.checkpoint_loading import CheckpointLoadingIF
+from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.config.config import PrecisionEnum
 from modalities.util import get_local_number_of_trainable_parameters
 
 
-class TorchCheckpointLoading(CheckpointLoadingIF):
+class TorchCheckpointLoading(FSDP1CheckpointLoadingIF):
     """Class to load PyTorch model and optimizer checkpoints."""
 
     def __init__(self, device: torch.device, precision: Optional[PrecisionEnum] = None):
@@ -51,7 +51,7 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         if self.precision is not None and self.precision.value != model_state_dtype:
             warning(
                 f"WARNING: Model checkpoint was stored with precision {model_state_dtype} "
-                "but is loaded with precision {self.precision.value}."
+                f"but is loaded with precision {self.precision.value}."
             )
 
         # assign=True makes sure that the model is loaded with the same precision
@@ -65,17 +65,14 @@ class TorchCheckpointLoading(CheckpointLoadingIF):
         )
         return model
 
-    def load_optimizer_checkpoint(self, optimizer: Optimizer, model: nn.Module, file_path: Path) -> Optimizer:
+    def load_optimizer_checkpoint_(self, optimizer: Optimizer, model: nn.Module, file_path: Path):
         """
-        Load the optimizer checkpoint from the specified file path.
+        Load the optimizer checkpoint from the specified file path (in-place).
 
         Args:
-            optimizer (Optimizer): The optimizer to load the checkpoint into.
+            optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).
             model (nn.Module): The model associated with the optimizer.
             file_path (Path): The path to the checkpoint file.
-
-        Returns:
-            Optimizer: The optimizer with the loaded checkpoint.
 
         Raises:
             NotImplementedError: This method is not implemented yet. It is reserved for future work.

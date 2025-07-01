@@ -1,56 +1,53 @@
 [project]
-name = "modalities"
-version = "0.3.0"
-requires-python = ">=3.10,<3.12"
-description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
-readme = "README.md"
 dependencies = [
-    "numpy<2.0",
-    "torch>=2.3",
-    "packaging",
-    "tqdm",
-    "pyyaml",
-    "transformers",
-    "datasets",
-    "protobuf",
-    "SentencePiece",
-    "rich",
-    "omegaconf",
-    "pydantic",
-    "click",
-    "click_pathlib",
-    "jq",
-    "class_resolver",
-    "wandb",
-    "einops>=0.7.0",
-    "flash-attn",     # install this directly via `pip install flash-attn --no-build-isolation`
-    "jsonlines",
-    "Jinja2>=3.1.0",
+  "numpy<2.0",
+  "torch==2.6.0",
+  "packaging",
+  "tqdm",
+  "pyyaml",
+  "transformers",
+  "datasets",
+  "protobuf",
+  "SentencePiece",
+  "rich",
+  "omegaconf",
+  "pydantic",
+  "click",
+  "click_pathlib",
+  "jq",
+  "class_resolver",
+  "wandb",
+  "einops>=0.7.0",
 ]
+description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
+name = "modalities"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+version = "0.3.2"
 
 [project.urls]
 Homepage = "https://github.com/Modalities/modalities"
 Issues = "https://github.com/Modalities/modalities/issues"
 
 [project.optional-dependencies]
+install_helper = ["ninja"]
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
-install_helper = ["ninja"]
 
 [project.scripts]
 modalities = "modalities.__main__:main"
 
 [build-system]
-requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
+requires = ["setuptools >= 61.0.0"]
 
 [tool.black]
-target-version = ["py310"]
 line-length = 120
+target-version = ["py310"]
 
 [tool.isort]
-profile = "black"
 line_length = 120
+profile = "black"
 src_paths = ["src", "tests"]
 
 [tool.ruff]
@@ -66,22 +63,15 @@ omit = ["*/src/modalities/dataloader/open_gptx_dataset/*"]
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
 exclude_also = [
-    # Don't complain about missing debug-only code:
-    "def __repr__",
-    "if self\\.debug",
-
-    # Don't complain if tests don't hit defensive assertion code:
-    "raise AssertionError",
-    "raise NotImplementedError",
-
-    # Don't complain if non-runnable code isn't run:
-    "if 0:",
-    "if __name__ == .__main__.:",
-
-    # Don't complain about abstract methods, they aren't run:
-    "@(abc\\.)?abstractmethod",
+  # Don't complain about missing debug-only code:
+  "def __repr__",
+  "if self\\.debug", # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError", # Don't complain if non-runnable code isn't run:
+  "if 0:",
+  "if __name__ == .__main__.:", # Don't complain about abstract methods, they aren't run:
+  "@(abc\\.)?abstractmethod",
 ]
-
 
 ignore_errors = true
 

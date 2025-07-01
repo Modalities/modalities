@@ -1,10 +1,9 @@
 from enum import Enum
-from typing import Dict
 
 from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydanctic_if_types import PydanticPytorchModuleType
+from modalities.config.pydantic_if_types import PydanticPytorchModuleType
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -22,12 +21,12 @@ class ModelTypeEnum(Enum):
     CHECKPOINTED_MODEL = "checkpointed_model"
 
 
-def get_model_from_config(config: Dict, model_type: ModelTypeEnum):
+def get_model_from_config(config: dict, model_type: ModelTypeEnum):
     """
     Retrieves a model from the given configuration based on the specified model type.
 
     Args:
-        config (Dict): The configuration dictionary.
+        config (dict): The configuration dictionary.
         model_type (ModelTypeEnum): The type of the model to retrieve.
 
     Returns:

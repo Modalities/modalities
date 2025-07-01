@@ -1,18 +1,18 @@
 import os
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
 
-from modalities.config.pydanctic_if_types import (
+from modalities.config.pydantic_if_types import (
+    PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
-    PydanticLRSchedulerIFType,
     PydanticMessageSubscriberIFType,
-    PydanticOptimizerIFType,
+    PydanticMFUCalculatorABCType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
@@ -56,7 +56,7 @@ class TrainingTarget(BaseModel):
 class TrainingProgress(BaseModel):
     global_num_seen_tokens: Annotated[int, Field(strict=True, ge=0)]
     num_seen_steps: Annotated[int, Field(strict=True, ge=0)]
-    local_num_seen_batches: Annotated[int, Field(strict=True, ge=0)]
+    num_seen_samples: Annotated[int, Field(strict=True, ge=0)]
     last_step: Annotated[int, Field(strict=True, ge=-1)]
 
 
@@ -69,7 +69,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
                 extra = "allow"
 
             @root_validator(pre=True)
-            def _validate_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            def _validate_all_paths(cls, values: dict[str, Any]) -> dict[str, Any]:
                 for field_name, value in values.items():
                     if isinstance(value, str):  # If a value is a string, convert it to Path
                         values[field_name] = Path(value)
@@ -79,11 +79,14 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
         class WarmstartCheckpointPaths(BaseModel):
             model_checkpoint_path: Path
-            optimizer_checkpoint_path: Path
+            optimizer_checkpoint_path: Optional[Path] = None
+
+        class DCPWarmstartCheckpointPaths(BaseModel):
+            checkpoint_folder_path: Path
 
         experiment_id: str
         config_file_path: FilePath
-        referencing_keys: Dict[str, str]
+        referencing_keys: dict[str, str]
         cuda_env: CudaEnvSettings
         paths: Paths
         intervals: Intervals
@@ -91,7 +94,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         step_profile: StepProfile
         training_target: TrainingTarget
         training_progress: TrainingProgress
-        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths] = None
+        warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
@@ -165,17 +168,17 @@ class TrainingComponentsInstantiationModel(BaseModel):
             return self
 
     settings: Settings
-    wrapped_model: PydanticPytorchModuleType
-    optimizer: PydanticOptimizerIFType
-    scheduler: PydanticLRSchedulerIFType
+    app_state: PydanticAppStateType
     loss_fn: PydanticLossIFType
     train_dataset: PydanticDatasetIFType
     train_dataloader: PydanticLLMDataLoaderIFType
-    eval_dataloaders: List[PydanticLLMDataLoaderIFType]
+    eval_dataloaders: list[PydanticLLMDataLoaderIFType]
     progress_subscriber: PydanticMessageSubscriberIFType
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
+    mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
+    model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")
     def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel.Settings":
@@ -212,7 +215,7 @@ class TextGenerationInstantiationModel(BaseModel):
         model_path: FilePath
         sequence_length: int
         device: PydanticPytorchDeviceType
-        referencing_keys: Dict[str, str]
+        referencing_keys: dict[str, str]
 
         # avoid warning about protected namespace 'model_', see
         # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
@@ -246,10 +249,10 @@ class TrainingReportGenerator:
         self.training_progress = training_progress
 
     def get_report(self) -> str:
-        def _get_formatted_dict_str(d: Dict[str, Any]) -> str:
+        def _get_formatted_dict_str(d: dict[str, Any]) -> str:
             return "\n\t".join([f"{k}: {v}" for k, v in d.items()])
 
-        def _get_formatted_list_str(lst: List[str]) -> str:
+        def _get_formatted_list_str(lst: list[str]) -> str:
             return "\n\t".join(lst)
 
         training_target_str = _get_formatted_dict_str(dict(self.training_target))
@@ -273,7 +276,7 @@ class TrainingReportGenerator:
         )
         return report
 
-    def _get_issue_warnings(self) -> List[str]:
+    def _get_issue_warnings(self) -> list[str]:
         issue_warnings = []
         num_tokens = (
             self.step_profile.local_train_micro_batch_size
@@ -359,9 +362,9 @@ class InstructionTuningInstantiationModel(BaseModel):
         pbin_creation_config_file_path: FilePath | None = None
 
     class InstructionDataTransformation(BaseModel):
-        role_mapping: Dict[str, str]
+        role_mapping: dict[str, str]
 
     settings: Settings
     instruction_data_transformation: InstructionDataTransformation
     jinja2_chat_template: str
-    chat_template_data: Dict[str, Any]
+    chat_template_data: dict[str, Any]

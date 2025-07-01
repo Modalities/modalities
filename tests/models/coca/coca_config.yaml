@@ -29,7 +29,7 @@ text_decoder_config:
   attention_config:
     attention_engine_type: pytorch_flash_attention
   n_head: 12
-  ffn_hidden: 2048
+  ffn_hidden: 3072
   n_embd: 768
   dropout: 0.0
   bias: true

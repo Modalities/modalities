@@ -45,7 +45,7 @@ class TextInferenceComponent:
         generated_token_ids = []
         generated_text_old = ""
         for _ in range(max_new_tokens):
-            logits = self.model.forward(input_dict)["logits"]
+            logits = self.model(input_dict)["logits"]
             logits = logits[:, -1, :]
             if self.temperature > 0:
                 logits = logits / self.temperature

@@ -1,4 +1,4 @@
-settings:  
+settings:
   experiment_id: ${modalities_env:experiment_id}
   config_file_path: ${modalities_env:config_file_path}
   referencing_keys:
@@ -10,44 +10,28 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ../modalities_in_15_mins/data/preprocessed/fineweb_edu_num_docs_483606.pbin
+    checkpoint_saving_path: ../data/checkpoints
+    train_dataset_path: ../data/mem_map/redpajama_v2_samples_512_train.pbin
   intervals:
-    training_log_interval_in_steps: 5
-    checkpointing_interval_in_steps: 500
-    evaluation_interval_in_steps: 500
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 11   # we want to get exactly one checkpoint
+    evaluation_interval_in_steps: 1000
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
-    local_train_micro_batch_size: 64
+    local_train_micro_batch_size: 8
     sequence_length: 256
   training_target:
-    num_target_tokens:
-      component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
-      config:
-        dataset_path: ${settings.paths.train_dataset_path}
-        sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-    num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
+    num_target_tokens: 81920 # num_target_steps * world_size * local_train_micro_batch_size * sequence_length * gradient_accumulation_steps
+    num_target_steps: 20    # we want to run for exactly 20 steps (although we will only get one checkpoint after 11 steps)
+  training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
-    local_num_seen_batches: 0
+    num_seen_samples: 0
     last_step: -1
 
 collate_fn:
@@ -72,7 +56,6 @@ train_dataloader:
     num_workers: 2
     pin_memory: true
     dataloader_tag: train
-    skip_num_batches: ${settings.training_progress.local_num_seen_batches}
     dataset:
       instance_key: train_dataset
       pass_type: BY_REFERENCE
@@ -84,16 +67,17 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: true
-            drop_last: true
-            seed: 42
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
@@ -111,7 +95,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -124,24 +108,35 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
-wrapped_model:
-  component_key: model
-  variant_key: fsdp_wrapped
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
   config:
-    model:
-      instance_key: model
-      pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
-    block_names: [GPT2Block]
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    world_size: ${settings.cuda_env.world_size}
 
-model:
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
+initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: model_raw
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
@@ -153,10 +148,27 @@ model:
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
 model_raw:
   component_key: model
   variant_key: gpt2
   config:
+    use_meta_device: false
+    use_weight_tying: true
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
@@ -168,39 +180,37 @@ model_raw:
     ffn_hidden: 128
     n_embd: 128
     dropout: 0.0
-    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    bias: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
           config:
             n_embd: ${model_raw.config.n_embd}
-            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            n_head: ${model_raw.config.n_head_q}
             seq_length_dim: -2
-    attention_implementation: manual
+            base_freq: 100000
+    attention_implementation: pytorch_flash
     activation_type: swiglu
-    attention_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    attention_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    ffn_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    ffn_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
-    lm_head_norm:
-      component_key: layer_norm
-      variant_key: rms_norm
+    lm_head_norm_config:
+      norm_type: rms_norm
       config:
         ndim: ${model_raw.config.n_embd}
         bias: true
         epsilon: 1e-5
 
-scheduler:
+lr_scheduler:
   component_key: scheduler
   variant_key: onecycle_lr
   config:
@@ -225,30 +235,23 @@ optimizer:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
 
 progress_subscriber:
   component_key: progress_subscriber
-  variant_key: rich
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    num_seen_steps: ${settings.training_progress.num_seen_steps}
-    num_target_steps: ${settings.training_target.num_target_steps}
-    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
-    eval_dataloaders:
-      instance_key: eval_dataloaders
-      pass_type: BY_REFERENCE
+  variant_key: dummy
+  config: {}
 
 evaluation_subscriber:
   component_key: results_subscriber
@@ -256,7 +259,7 @@ evaluation_subscriber:
   config:
     global_rank: ${settings.cuda_env.global_rank}
     project: warmstart_tutorial
-    mode: ONLINE
+    mode: OFFLINE
     experiment_id: ${settings.experiment_id}
-    directory: wandb_storage
+    directory: ../data/wandb_storage
     config_file_path: ${settings.config_file_path}

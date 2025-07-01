@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 import torch
 
 from modalities.batch import DatasetBatch
@@ -20,12 +18,12 @@ class GPT2LLMCollateFn(CollateFnIF):
         self.sample_key = sample_key
         self.target_key = target_key
 
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> DatasetBatch:
         """
         Process a batch of data.
 
         Args:
-            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
+            batch (list[dict[str, torch.Tensor]]): A list of dictionaries containing tensors.
 
         Returns:
             DatasetBatch: A processed batch of data where sample and target sequences are created.
