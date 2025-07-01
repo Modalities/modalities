@@ -1,6 +1,6 @@
 settings:
-  src_path: data/smol-smoltalk_train_first_10K.jsonl
-  dst_path: data/smol-smoltalk_train_first_10K_converted.jsonl
+  src_path: data/lorem_ipsum_instruct.jsonl
+  dst_path: data/lorem_ipsum_instruct_converted.jsonl
   messages_key: messages
   pbin_creation_config_file_path: config_files/data_preparation/packed_chat_dataset_config.yaml
   split_config:
@@ -12,9 +12,9 @@ settings:
 
 instruction_data_transformation:
   role_mapping:
-    system: System
-    user: User
-    assistant: Assistant
+    human_1: User1
+    human_2: User2
+    gpt: Assistant
 
 # The b_include_to_loss_token, e_include_to_loss_token are required to be part of each chat template for proper loss masking!
 # messages is a required special "chat_template_data" and corresponds to the data column settings.messages_key

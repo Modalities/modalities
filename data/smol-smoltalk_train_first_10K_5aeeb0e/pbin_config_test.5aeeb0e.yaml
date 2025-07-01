@@ -1,0 +1,25 @@
+settings:
+  dst_path: data/smol-smoltalk_train_first_10K_5aeeb0e/smol-smoltalk_train_first_10K_converted_test.5aeeb0e.pbin
+  eod_token: <|endoftext|>
+  index_path: data/smol-smoltalk_train_first_10K_5aeeb0e/smol-smoltalk_train_first_10K_converted_test.5aeeb0e.idx
+  jq_pattern: .chat
+  num_cpus: 1
+  processed_samples_queue_size: 300
+  processing_batch_size: 5
+  raw_samples_queue_size: 300
+  sequence_length: 8192
+  src_path: data/smol-smoltalk_train_first_10K_5aeeb0e/smol-smoltalk_train_first_10K_converted_test.5aeeb0e.jsonl
+tokenizer:
+  component_key: tokenizer
+  config:
+    max_length: 8192
+    padding: max_length
+    pretrained_model_name_or_path: Qwen/Qwen2.5-0.5B
+    special_tokens:
+      additional_special_tokens:
+      - <|im_start|>
+      - <|im_end|>
+      - <|endoftext|>
+      pad_token: <|endoftext|>
+    truncation: true
+  variant_key: pretrained_hf_tokenizer

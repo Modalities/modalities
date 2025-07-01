@@ -364,7 +364,7 @@ class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
     sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
-    reuse_last_target: Optional[bool] = True
+    reuse_last_target: bool = Field(default=True)
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):

@@ -7,6 +7,7 @@ from modalities.batch import DatasetBatch
 from modalities.config.pydantic_if_types import PydanticCollateFnIFType, PydanticTokenizerIFType
 from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
+from modalities.util import warn_rank_0
 
 
 class LossMaskingTokenConfig(BaseModel):
@@ -110,6 +111,8 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             mask_no_shift_2    [0,1,0,0,-1,0,0,0]
             cumsum_no_shift    [0,1,1,1, 0,0,0,0]
 
+        If the b_mask_token_id is not found in the target tensor, we skip the sample.
+
         Args:
             target (torch.Tensor): The target tensor to be masked.
             b_mask_token_id (int): The token ID indicating the beginning of the mask.
@@ -120,17 +123,20 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
             torch.Tensor: The masked target tensor.
 
         Raises:
-            ValueError: If the b_mask_token_id or e_mask_token_id is not found in the target tensor.
             ValueError: If the end mask token indicator is before the begin mask token indicator in the target tensor.
             ValueError: If the masking tokens are not alternating in the target tensor.
         """
         if b_mask_token_id not in target:
-            raise ValueError(
-                "b_mask_token_id not found in target. in masking tokens for loss computation. "
+            warn_rank_0(
+                "During masking tokens for loss computation, b_mask_token_id not found in target. "
                 + "Make sure the tokenizer tokenizes as expected. "
                 + "Frequent source of error is the tokenization of spaces: "
-                + "e.g. ' <token>' and '<token>' are different tokens."
+                + "e.g. ' <token>' and '<token>' are different tokens. "
+                + "Another reason for this error could be the first user query might take up all context, "
+                + "before the assistant turn appears. Increase the context size or check your data. "
+                + "We skip this sample."
             )
+            return torch.ones_like(target) * loss_ignore_index
 
         mask = torch.zeros_like(target)
         # we shift the mask to the right, to exclude not only the end mask token but also
