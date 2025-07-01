@@ -18,7 +18,7 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     monkeypatch.setenv("MASTER_PORT", "9949")
 
     # Load config
-    dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_sft.yaml")
+    dummy_config_path = _ROOT_DIR / Path("tests/config/test_configs/config_lorem_ipsum_instruct_fsdp1.yaml")
     config_dict = load_app_config_dict(dummy_config_path, experiment_id="test_e2e_instruction_tuning")
 
     # Adapt config for test
@@ -27,12 +27,6 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
         "checkpoint_path"
     ] = checkpointing_path.__str__()
-    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = 1
-
-    # Here we need to set it to the batched size of our dataset + 1 to not abort early
-    # With the original configuration as above and data prallel of 2 total_steps of 16 per GPU is okay,
-    # as the real total_steps (which is 12) is smaller
-    config_dict["scheduler"]["config"]["total_steps"] = 24 + 1
 
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         main = Main(dummy_config_path)
@@ -41,7 +35,7 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
         main.run(components)
 
     checkpoint_files = [
-        "model" in path.name or "optimizer" in path.name or path.suffix == ".yaml"
+        ("model" in path.name or "optimizer" in path.name) and path.suffix == ".bin"
         for path in list(checkpointing_path.glob("*"))[0].glob("*")
     ]
-    assert sum(checkpoint_files) == 1, "Output of the test i.e. a model checkpoint was not created!"
+    assert sum(checkpoint_files) == 2, "Output of the test i.e. a model checkpoint and optimizer state was not created!"
