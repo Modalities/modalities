@@ -321,9 +321,12 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         reuse_last_target: bool = True,
     ):
         """
-        Initializes a Dataset object. In case `reuse_last_target` is True,
-        we reuse the last target token as the first one for the next sample. If `reuse_last_target` is False,
-        we don't reuse the last target in the next sample but never have the the first token of a sample as the target.
+        Initializes a Dataset object for continuous packed data. If `reuse_last_target` is True,
+        the last target token of one sample is reused as the first input token of the next sample,
+        creating an overlap of one token between samples (recommended for pre-training).
+        If `reuse_last_target` is False, there is no overlap:
+        Each sample is a distinct block, and the first token of each sample is never used as a target
+        (recommended for instruction tuning).
 
         Args:
             raw_data_path (Path): Path to a packed binary file (*.pbin).
