@@ -10,9 +10,9 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: ./tutorials/instruction_tuning/checkpoints
-    train_dataset_path: ./tutorials/instruction_tuning/prepared_data/smol-smoltalk_train_first_10K_2caf768/smol-smoltalk_train_first_10K_train.2caf768.pbin
-    test_dataset_path: ./tutorials/instruction_tuning/prepared_data/smol-smoltalk_train_first_10K_2caf768/smol-smoltalk_train_first_10K_test.2caf768.pbin
+    checkpoint_saving_path: ./checkpoints
+    train_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_2caf768/smol-smoltalk_train_first_10K_train.2caf768.pbin
+    test_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_2caf768/smol-smoltalk_train_first_10K_test.2caf768.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 438

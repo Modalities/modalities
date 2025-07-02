@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: tutorials/instruction_tuning/checkpoints/2025-07-02__11-58-16_c5e77038/eid_2025-07-02__11-58-16_c5e77038-model-seen_steps_438-seen_tokens_57409536-target_steps_438-target_tokens_57409536.bin
+  model_path: checkpoints/2025-07-02__11-58-16_c5e77038/eid_2025-07-02__11-58-16_c5e77038-model-seen_steps_438-seen_tokens_57409536-target_steps_438-target_tokens_57409536.bin
   device: 0
   sequence_length: 8192
 

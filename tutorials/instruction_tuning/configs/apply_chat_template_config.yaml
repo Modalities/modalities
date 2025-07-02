@@ -1,8 +1,8 @@
 settings:
-  src_path: tutorials/instruction_tuning/data/smol-smoltalk_train_first_10K.jsonl
-  dst_path: tutorials/instruction_tuning/prepared_data/smol-smoltalk_train_first_10K.jsonl
+  src_path: data/smol-smoltalk_train_first_10K.jsonl
+  dst_path: prepared_data/smol-smoltalk_train_first_10K.jsonl
   messages_key: messages
-  pbin_creation_config_file_path: tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml
+  pbin_creation_config_file_path: configs/packed_chat_dataset_config.yaml
   split_config:
     splitting:
       train: 70

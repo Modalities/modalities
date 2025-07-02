@@ -86,10 +86,10 @@ The core of the instruction-tuning setup lies in the `collate_fn` and `train_dat
 
       * Set `reuse_last_target: false`. This is **crucial** to load the truncated and padded data correctly.
 
-Finally, start the fine-tuning process by running:
+Finally, start the fine-tuning process by running on your GPUs with IDs 0,1,2,3:
 
 ```bash
-bash scripts/train_instruction_tuning_model.sh
+bash scripts/train_instruction_tuning_model.sh 0,1,2,3
 ```
 
 -----
