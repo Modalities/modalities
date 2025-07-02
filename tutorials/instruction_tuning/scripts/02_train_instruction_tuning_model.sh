@@ -8,13 +8,13 @@ fi
 
 if [ -z "$2" ] 
   then
-    config_file_path=configs/train_instruct_model_fsdp1_config.yaml
+    config_file_path="configs/train_instruct_model_fsdp2_config.yaml"
 else
     config_file_path=$2
 fi
 
 export CUDA_VISIBLE_DEVICES="$1"
-num_gpus=$(echo $CUDA_VISIBLE_DEVICES | tr -cd ',' | wc -c)
+num_gpus=$(( $(echo "$CUDA_VISIBLE_DEVICES" | tr -cd ',' | wc -c) + 1 ))
 python -m torch.distributed.run \
   --nnodes 1 \
   --nproc_per_node $num_gpus \

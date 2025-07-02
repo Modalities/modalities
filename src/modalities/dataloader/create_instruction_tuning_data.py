@@ -41,6 +41,6 @@ def create_partitioned_instruction_tuning_index_and_pbin_files(
         pbin_config["settings"]["src_path"] = str(jsonl_data_out_file_path)
         pbin_config["settings"]["index_path"] = str(idx_file_path)
         pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
-        with open(pbin_config_file_path, "w") as f:
+        with open(pbin_config_file_path, "w", encoding="utf-8") as f:
             yaml.dump(pbin_config, f, allow_unicode=True)
         pack_encoded_data(pbin_config, file_existence_policy=FileExistencePolicy.OVERRIDE)

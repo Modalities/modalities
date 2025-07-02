@@ -10,13 +10,13 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: data/checkpoints
-    train_dataset_path: "replace by train temp path" # will be overridden in the test
-    test_dataset_path: "replace by test temp path" # will be overridden in the test
+    checkpoint_saving_path: ./checkpoints
+    train_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_train.d91ea04.pbin
+    test_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_test.d91ea04.pbin
   intervals:
     training_log_interval_in_steps: 1
-    checkpointing_interval_in_steps: 19
-    evaluation_interval_in_steps: 19
+    checkpointing_interval_in_steps: 10
+    evaluation_interval_in_steps: 10000
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
@@ -24,27 +24,12 @@ settings:
     enforce_last_step_checkpointed: false
   step_profile:
     gradient_accumulation_steps: 2
-    local_train_micro_batch_size: 1
-    sequence_length: 2048
+    local_train_micro_batch_size: 2
+    sequence_length: 8192 # Qwen2.5 would have 32768
   training_target:
-    num_target_tokens:
-      component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
-      config:
-        dataset_path: ${settings.paths.train_dataset_path}
-        sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-    num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        num_ranks: ${settings.cuda_env.world_size}
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  # had to hack here: Value error, Not enough tokens in the dataset. Actual: 57434112, Expected: >=57442304
+    num_target_tokens: 655360
+    num_target_steps: 10
   training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
@@ -65,11 +50,21 @@ collate_fn:
       - ${settings.referencing_keys.target_key}
     loss_ignore_index: -100
     mask_tokens:
-      b_include_to_loss_token: ^
-      e_include_to_loss_token: $
+      b_include_to_loss_token: "<|im_start|>"
+      e_include_to_loss_token: "<|im_end|>"
     tokenizer:
-      instance_key: tokenizer
-      pass_type: BY_REFERENCE
+      component_key: tokenizer
+      variant_key: pretrained_hf_tokenizer
+      config:
+        pretrained_model_name_or_path: Qwen/Qwen2.5-0.5B
+        padding: false
+        truncation: false
+        special_tokens:
+          pad_token: <|endoftext|>
+          additional_special_tokens: 
+            - ${collate_fn.config.mask_tokens.b_include_to_loss_token}
+            - ${collate_fn.config.mask_tokens.e_include_to_loss_token}
+            - "<|endoftext|>"
 
 train_dataset:
   component_key: dataset
@@ -113,48 +108,7 @@ train_dataloader:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
 
-test_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_continuous
-  config:
-    raw_data_path: ${settings.paths.test_dataset_path}
-    sequence_length: ${settings.step_profile.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
-
-test_dataloader:
-  component_key: data_loader
-  variant_key: default
-  config:
-    num_workers: 2
-    pin_memory: true
-    dataloader_tag: test
-    dataset:
-      instance_key: test_dataset
-      pass_type: BY_REFERENCE
-    batch_sampler:
-      component_key: batch_sampler
-      variant_key: default
-      config:
-        batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        drop_last: true
-        sampler:
-          component_key: sampler
-          variant_key: distributed_sampler
-          config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            drop_last: true
-            dataset:
-              instance_key: test_dataset
-              pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
-      pass_type: BY_REFERENCE
-
-eval_dataloaders:
-  - instance_key: test_dataloader
-    pass_type: BY_REFERENCE
+eval_dataloaders: []
 
 checkpoint_saving:
   component_key: checkpoint_saving
@@ -167,7 +121,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp1
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -180,12 +134,20 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    world_size: ${settings.cuda_env.world_size}
 app_state:
   component_key: app_state
   variant_key: raw
   config:
     model: 
-      instance_key: wrapped_model
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
@@ -194,16 +156,19 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model:
+fsdp_model:
   component_key: model
-  variant_key: fsdp1_wrapped
+  variant_key: fsdp2_wrapped
   config:
     model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
-    sync_module_states: true
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
     block_names: [Qwen2DecoderLayer]
 
 model_raw:
@@ -241,15 +206,15 @@ optimizer:
     weight_decay: 1e-1
     weight_decay_groups_excluded: []
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp1
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: fsdp_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
@@ -277,15 +242,4 @@ evaluation_subscriber:
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
 
-tokenizer:
-  component_key: tokenizer
-  variant_key: pretrained_hf_tokenizer
-  config:
-    pretrained_model_name_or_path: data/tokenizer/hf_gpt2
-    padding: false
-    truncation: false
-    special_tokens:
-      additional_special_tokens: 
-        - "^"
-        - "$"
-        - "°"
+

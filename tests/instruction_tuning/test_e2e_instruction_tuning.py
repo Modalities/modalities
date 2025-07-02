@@ -1,4 +1,9 @@
+import os
 from pathlib import Path
+
+import pytest
+import torch
+import torch.multiprocessing as mp
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.config.config import (
@@ -15,12 +20,16 @@ from modalities.dataloader.create_instruction_tuning_data import (
     create_partitioned_instruction_tuning_index_and_pbin_files,
 )
 from modalities.dataloader.dataset_factory import DatasetFactory
-from modalities.running_env.cuda_env import CudaEnv
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from tests.conftest import _ROOT_DIR
+from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
-def test_e2e_instruction_tuning(monkeypatch, tmp_path):
+@pytest.mark.skipif(
+    torch.cuda.device_count() < 2,
+    reason="This test requires 2 GPUs",
+)
+def test_e2e_instruction_tuning(tmp_path):
     """
     End-to-end test for instruction tuning training. Takes ~25 seconds to run.
     This test prepares the data, applies the chat template, and runs the training.
@@ -28,7 +37,13 @@ def test_e2e_instruction_tuning(monkeypatch, tmp_path):
     """
     created_files = data_preperation(tmp_path)
     check_correct_packing(created_files)
-    training(monkeypatch, tmp_path, created_files)
+    world_size = 2
+    mp.spawn(
+        training,
+        args=(world_size, tmp_path, created_files),
+        nprocs=world_size,
+        join=True,
+    )
 
 
 def data_preperation(tmp_path) -> list[Path]:
@@ -47,10 +62,11 @@ def data_preperation(tmp_path) -> list[Path]:
 
     created_files = list(Path(list(Path(tmp_path).glob("*"))[0]).glob("*"))
     assert len(created_files) > 0, "No files were created during data preparation."
+    # we set validation zo zero to test only with train and test data
     for suffix in [".jsonl", ".idx", ".pbin"]:
-        assert 3 == [path.suffix for path in created_files].count(
+        assert 2 == [path.suffix for path in created_files].count(
             suffix
-        ), f"Expected 3 {suffix} files to be created, but found a different number."
+        ), f"Expected 2 {suffix} files to be created, but found a different number."
     return created_files
 
 
@@ -79,18 +95,17 @@ def check_correct_packing(created_files: list[Path]) -> None:
     )
 
 
-def training(monkeypatch, tmp_path, created_files: list[Path]) -> None:
+def training(process_id: int, world_size: int, tmp_path, created_files: list[Path]) -> None:
     """
     Run the instruction-tuning training and verify that a model checkpoint was created.
     """
-    monkeypatch.setenv("RANK", "0")
-    monkeypatch.setenv("LOCAL_RANK", "0")
-    monkeypatch.setenv("WORLD_SIZE", "1")
-    monkeypatch.setenv("MASTER_ADDR", "localhost")
-    monkeypatch.setenv("MASTER_PORT", "9949")
 
     # Load config
-    config_path = _ROOT_DIR / Path("tests/instruction_tuning/files/config_lorem_ipsum_instruct_fsdp1.yaml")
+    os.environ["LOCAL_RANK"] = str(process_id)
+    os.environ["RANK"] = str(process_id)
+    os.environ["WORLD_SIZE"] = str(world_size)
+
+    config_path = _ROOT_DIR / Path("tests/instruction_tuning/files/instruction_tune_model_config.yaml")
     config_dict = load_app_config_dict(config_path, experiment_id="test_e2e_instruction_tuning")
 
     # Adapt config for test
@@ -99,6 +114,7 @@ def training(monkeypatch, tmp_path, created_files: list[Path]) -> None:
     config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
         "checkpoint_path"
     ] = checkpointing_path.__str__()
+
     for partition in ["train", "test"]:
         # find train pbin in created files
         pbin_file_path = [file for file in created_files if file.suffix == ".pbin" and partition in file.name][0]
@@ -108,17 +124,22 @@ def training(monkeypatch, tmp_path, created_files: list[Path]) -> None:
             new_value=str(pbin_file_path),
             config_dict=config_dict,
         )
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+    with MultiProcessingCudaEnv(
+        process_group_backend=ProcessGroupBackendType.nccl,
+        global_rank=process_id,
+        local_rank=process_id,
+        world_size=world_size,
+        rdvz_port=22356,
+    ):
         main = Main(config_path)
         main.config_dict = config_dict
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)
 
-    checkpoint_files = [
-        ("model" in path.name or "optimizer" in path.name) and path.suffix == ".bin"
-        for path in list(checkpointing_path.glob("*"))[0].glob("*")
-    ]
-    assert sum(checkpoint_files) == 2, "Output of the test i.e. a model checkpoint and optimizer state was not created!"
+        checkpoint_files = [(".distcp" == path.suffix) for path in list(checkpointing_path.rglob("*"))]
+        assert (
+            sum(checkpoint_files) == 2
+        ), "Output of the test i.e. a model checkpoint and optimizer state was not created!"
 
 
 def _recursive_overwrite_resolved_config(value_to_override: str, new_value: str, config_dict: dict) -> dict:

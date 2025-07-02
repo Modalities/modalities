@@ -6,8 +6,8 @@ settings:
   split_config:
     splitting:
       train: 70
-      val: 15
-      test: 15
+      val: 0
+      test: 30
     seed: 1234
 
 instruction_data_transformation:

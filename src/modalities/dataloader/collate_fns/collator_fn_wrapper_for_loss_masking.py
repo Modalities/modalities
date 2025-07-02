@@ -137,6 +137,15 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
                 + "We skip this sample."
             )
             return torch.ones_like(target) * loss_ignore_index
+        if e_mask_token_id not in target:
+            warn_rank_0(
+                "During masking tokens for loss computation, e_mask_token_id not found in target. "
+                + "Make sure the tokenizer tokenizes as expected. "
+                + "Frequent source of error is the tokenization of spaces: "
+                + "e.g. ' <token>' and '<token>' are different tokens. "
+                + "We skip this sample."
+            )
+            return torch.ones_like(target) * loss_ignore_index
 
         mask = torch.zeros_like(target)
         # we shift the mask to the right, to exclude not only the end mask token but also

@@ -2,7 +2,7 @@ settings:
   referencing_keys:
     sample_key: input_ids
     prediction_key: logits
-  model_path: checkpoints/2025-07-02__11-58-16_c5e77038/eid_2025-07-02__11-58-16_c5e77038-model-seen_steps_438-seen_tokens_57409536-target_steps_438-target_tokens_57409536.bin
+  model_path: checkpoints/2025-07-02__17-25-05_91a54afb/eid_2025-07-02__17-25-05_91a54afb-seen_steps_438-seen_tokens_43057152-target_steps_584-target_tokens_57409536/converted_checkpoint.pth
   device: 0
   sequence_length: 8192
 
@@ -12,7 +12,7 @@ text_inference_component:
   config:
     device: ${settings.device}
     model:
-      instance_key: checkpointed_model
+      instance_key: model_raw
       pass_type: BY_REFERENCE
     tokenizer:
       instance_key: tokenizer
@@ -21,22 +21,6 @@ text_inference_component:
     eod_token: <|endoftext|>
     prompt_template: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser: {prompt_input}\nAssistant: "
     temperature: 0
-    # chat: false
-
-checkpointed_model:
-  component_key: model
-  variant_key: fsdp1_checkpointed
-  config: 
-    checkpoint_loading:
-      component_key: checkpoint_loading
-      variant_key: torch
-      config:
-        device: ${settings.device}
-        precision: BF16
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    checkpoint_path: ${settings.model_path}
 
 model_raw:
   component_key: model

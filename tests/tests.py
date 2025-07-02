@@ -297,9 +297,10 @@ def main(
         subprocess_run(
             f"cd {instruction_tuning_example_directory}; "
             + f"sh {script_file} {','.join(map(str, device_ids[:2]))} "
-            + "configs/small_train_instruct_model_fsdp1_config.yaml"
+            + "configs/small_train_instruct_model_fsdp2_config.yaml"
         )
-        # we do not run scripts/03_generate_text.sh, as this is only for the end-to-end experience with the tutorial
+        # we do not run scripts/03_convert_distributed_model_to_torch.sh and scripts/04_generate_text.sh,
+        # as this is only for the end-to-end experience of the tutorial
     print("\n=== DONE ===")
 
 

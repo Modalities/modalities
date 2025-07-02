@@ -5,8 +5,9 @@ This tutorial guides you through fine-tuning a base language model to follow ins
 We'll cover three main steps:
 
 1.  **📝 Data Preparation:** Convert a standard instruction dataset into a tokenized format suitable for training, using a custom chat template.
-2.  **🧠 Model Fine-Tuning:** Use the `modalities` library to instruction-tune the Qwen/Qwen2.5-0.5B model.
-3.  **💬 Text Generation:** Interact with your newly fine-tuned model to see its conversational abilities.
+2.  **🧠 Model Fine-Tuning:** Use the `modalities` library to instruction-tune the Qwen/Qwen2.5-0.5B model with FSDP2.
+3.  **⟳ Model conversion** Use `torch` to convert our distributed checkpoint to a single model file.
+4.  **💬 Text Generation:** Interact with your newly fine-tuned and converted model to see its conversational abilities.
 
 -----
 
@@ -94,7 +95,13 @@ bash scripts/train_instruction_tuning_model.sh 0,1,2,3
 
 -----
 
-## Step 3: Chat with Your Fine-Tuned Model 💬
+## Step 3: Convert our Distributed Model Checkpoint to a Single Model File ⟳
+
+Adapt the model checkpoint directory in [](scripts/03_convert_distributed_model_to_torch.sh) and run it. It will create a model file under the same directory.
+
+-----
+
+## Step 4: Chat with Your Fine-Tuned Model 💬
 
 Once training is complete, it's time to chat with your model\!
 
