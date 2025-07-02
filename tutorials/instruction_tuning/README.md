@@ -28,12 +28,6 @@ For example, in the conversation below, the model's weights are only updated bas
 
 -----
 
-## Prerequisites
-
-Before you begin, please generate the necessary dataset by running the data generation part of the [Modalities in 15 mins Tutorial](https://www.google.com/search?q=../modalities_in_15_mins/modalities_demo.ipynb).
-
------
-
 ## Step 1: Prepare the Instruction-Tuning Data 📝
 
 We'll use a custom script to format our conversational data. This script applies a chat template to each conversation, tokenizes the text, and splits it into `train`, `test`, and `validation` sets.
