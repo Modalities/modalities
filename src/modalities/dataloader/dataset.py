@@ -359,10 +359,9 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         super().__init__(raw_data_path=raw_data_path, sample_key=sample_key, load_index=load_index)
 
     @staticmethod
-    # TODO: either the return type is false, or the test uses it wrongly
     def _create_packed_index(
         total_tokens: int, block_size: int, token_size_in_bytes: int, reuse_last_target: bool
-    ) -> list[tuple[int, int]]:
+    ) -> np.ndarray:
         if reuse_last_target:
             # Given a fixed number of samples we can compute the total number of tokens as
             # num_tokens = block_size + (block_size-1) * (num_samples-1)
@@ -380,7 +379,7 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
             sample_start_positions_bytes = (i_array * block_size) * token_size_in_bytes
         sample_length_bytes = np.full(num_samples, block_size * token_size_in_bytes)
         result = np.stack((sample_start_positions_bytes, sample_length_bytes), axis=1)
-        return result.tolist()
+        return result
 
     def _generate_packing_index(self) -> list[tuple[int, int]]:
         # Generates the packing index for the dataset.
