@@ -317,8 +317,8 @@ class PackedMemMapDatasetContinuous(PackedMemMapDatasetBase):
         raw_data_path: Path,
         sample_key: str,
         block_size: int,
+        reuse_last_target: bool,
         load_index: Optional[bool] = False,
-        reuse_last_target: bool = True,
     ):
         """
         Initializes a Dataset object for continuous packed data. If `reuse_last_target` is True,

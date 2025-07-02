@@ -325,7 +325,6 @@ class PreTrainedHFTokenizerConfig(BaseModel):
 
 class PreTrainedSPTokenizerConfig(BaseModel):
     tokenizer_model_file: str
-    # TODO: add support for special tokens, see issue #222
 
 
 class SequentialSamplerConfig(BaseModel):

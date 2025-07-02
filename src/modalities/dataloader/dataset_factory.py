@@ -87,7 +87,7 @@ class DatasetFactory:
             raw_data_path (Path): The path to the raw data.
             sequence_length (int): The length of each sequence.
             sample_key (str): The key used to retrieve the samples from the dataset.
-            reuse_last_target (bool): Whether to reuse the last target. Defaults to True.
+            reuse_last_target (bool): Whether to reuse the last target.
 
         Returns:
             PackedMemMapDatasetContinuous: The packed memory-mapped dataset.

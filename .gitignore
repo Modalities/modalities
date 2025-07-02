@@ -167,4 +167,3 @@ tests/tmp/*
 
 tutorials/profiling/experiments
 tutorials/instruction_tuning/prepared_data
-data/smol-smoltalk.jsonl
