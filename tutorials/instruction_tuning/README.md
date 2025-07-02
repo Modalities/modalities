@@ -1,178 +1,116 @@
-# Instruction Tuning with Modalities
+# Instruction Tuning with Modalities 🚀
 
-In this tutorial, we will follow the following steps:
-* Instruction tuning data preparation: convert an existing instruction tuning dataset into text by applying a custom chat template and split the data into train, test, validation partitions. We also directly create indices and binary files of the tokenized data.
-* We use the modalities training entry points to fine-tune a the Qwen2.5-0.5B base model hosted on HuggingFace.
-* We generate text with our instruction tuned model in the completion mode
+This tutorial guides you through fine-tuning a base language model to follow instructions and act as a helpful chat assistant.
 
+We'll cover three main steps:
+
+1.  **📝 Data Preparation:** Convert a standard instruction dataset into a tokenized format suitable for training, using a custom chat template.
+2.  **🧠 Model Fine-Tuning:** Use the `modalities` library to instruction-tune the Qwen/Qwen2.5-0.5B model.
+3.  **💬 Text Generation:** Interact with your newly fine-tuned model to see its conversational abilities.
+
+-----
 
 ## What is Instruction Tuning?
-> Instruction-tuning currently only works with fast and slow Huggingface tokenizers, as the special tokens need to be added to the tokenizer.
 
-The goal of instruction-tuning is to let the model learn instruction-following capabilites, so that it acts as an helpful assistant within an chat environment.
-For this, we need to further fine-tune the model on conversational instruction data.
-Specifically, we need the model to only learn to act as the assistant. Hence, we allow full attention on conversation, but calculate the loss only on the assistants untterances. 
+Instruction tuning is the process of fine-tuning a pre-trained language model on conversational data. The goal is to teach the model how to follow instructions and respond as a helpful assistant.
 
-For example, we only calculate the loss for the words not struck-trough:
+To do this, we only want the model to learn the assistant's speaking style, not the user's. We achieve this through **loss masking**, where we calculate the learning loss only on the assistant's responses.
 
-> ~~You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser1: What is the best way to learn a new language?\nAssistant:^~~
-> The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers.\n°
-> ~~$User1: Thank you for the advice.\nAssistant:^~~
-> You're welcome! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask.\n°
-> ~~$~~
+For example, in the conversation below, the model's weights are only updated based on the text that isn't struck through:
+
+> ~~You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\\nUser: What is the best way to learn a new language?\\nAssistant:<start_assistant>~~
+> The best way to learn a new language is to practice regularly, immerse yourself in the language, and use a variety of resources like books, apps, and language classes. It's also helpful to practice with native speakers.\\n°
+> ~~User: Thank you for the advice.\\nAssistant:<start_assistant>~~
+> You're welcome\! Learning a new language can be a rewarding experience. If you have any more questions, feel free to ask.\\n°
+> ~~<end_assistant>~~
+
+> **Note:** This tutorial currently supports fast and slow Hugging Face tokenizers, as special tokens must be added to the tokenizer for loss masking.
+
+-----
 
 ## Prerequisites
-We will use the data from the [Modalities in 15 mins Tutorial](../modalities_in_15_mins/modalities_demo.ipynb). 
-If you haven't already, please run the data generation part of the notebook to generate the data.
 
+Before you begin, please generate the necessary dataset by running the data generation part of the [Modalities in 15 mins Tutorial](https://www.google.com/search?q=../modalities_in_15_mins/modalities_demo.ipynb).
 
+-----
 
-### Prepare Instruction-tuning Data
+## Step 1: Prepare the Instruction-Tuning Data 📝
 
-For a config example see [](configs/apply_chat_template_config.yaml) and [](configs/packed_chat_dataset_config.yaml)
+We'll use a custom script to format our conversational data. This script applies a chat template to each conversation, tokenizes the text, and splits it into `train`, `test`, and `validation` sets.
 
-To prepare the instruction-tuning data we created a new entry point `prepare_instruction_tuning_data`, which requires a [configuration file](./config_files/data_preparation/apply_chat_template_config.yaml). Within it we define:
-* The path to instruction-tuning dataset as a JSONL file wereas each line contains a structured conversation as an array of dictionaries (configured by the yaml entry: `messages_key: messages`).
-* A [jinja2](https://jinja.palletsprojects.com/en/3.1.x/) chat template which defines the rules how to glue `chat_template_data` and the data within the JSONL together to one `chat` string.
-  * As part of the `chat_template_data`, we require the special tokens `b_include_to_loss_token` and `e_include_to_loss_token`. A special, required `chat_template_data` is `messages` wich allows to loop over user/assistant turns of one example conversation (i.e. the data in the `messages_key` column)
-* Information how to split the created dataset
-* A mapping to map the bare roles within a dataset to their surface form within the chat template e.g.: `"role": "user"` will be rendered `User` with:
-  ```yaml
-  instruction_data_transformation:
-    role_mapping:
-      user: User
-  ```
-> Note: The special tokens `b_include_to_loss_token` and `e_include_to_loss_token` should be tokens already present in the tokenizers vocabulary. They will be marked as special tokens for correct tokenization and loss masking. Once resizing the embedding matrix is supported, this is not necessary anymore.
+See the configuration files for more details:
 
-> **Limitation:** 
-> Currently only tokens already known to the tokenizers vocabulary can be added, as resizing the embedding matrix is not yet supported!
-> See the corresponding [issue](https://github.com/Modalities/modalities/issues/208).
+  * [`apply_chat_template_config.yaml`](tutorials/instruction_tuning/configs/apply_chat_template_config.yaml)
+  * [`packed_chat_dataset_config.yaml`](tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml)
 
-<details>
-  <summary>A Note on Tokenization in Huggingface</summary>
-The special tokens are added to a [Trie](https://en.wikipedia.org/wiki/Trie).
-With that data structure, longer special tokens are matched with a higher priority than shorter ones. Regular tokens are tokenized after handling the special tokens first.
-Example from the huggingface documentation:
+To prepare the data, run the `prepare_instruction_tuning_data` entry point using the provided script:
 
-```python
->>> trie = Trie()
->>> trie.split("[CLS] This is a extra_id_100")
-["[CLS] This is a extra_id_100"]
-
->>> trie.add("[CLS]")
->>> trie.add("extra_id_1")
->>> trie.add("extra_id_100")
->>> trie.split("[CLS] This is a extra_id_100")
-["[CLS]", " This is a ", "extra_id_100"]
+```bash
+bash scripts/prepare_instruction_data.sh
 ```
 
-When we add a special token, which exists within the tokenizer voabulary already, HF only marks it as special token (adds it to the trie).
-This means, if the sequence we add as special token already exists in the vocab, there is no need to resize the embedding matrix!
+### How Data Preparation Works
 
-</details>
+The script uses the settings in your configuration file to:
 
+  * **Load Data**: Reads a JSONL file where each line is a conversation.
+  * **Apply Chat Template**: Uses a [Jinja2](https://jinja.palletsprojects.com/en/3.1.x/) template to structure the raw data into a chat format. We use special tokens, `b_include_to_loss_token` and `e_include_to_loss_token`, to mark the beginning and end of the assistant's messages. These markers tell the model which parts of the text to learn from.
+    * **Map Roles**: Converts role identifiers (e.g., `"role": "user"`) into display names (e.g., `User:`).
+  * **Tokenize and Save**: Tokenizes the formatted text and writes it as binary (`.pbin`) and index files (`.idx`) for efficient loading during training.
 
-Run the `prepare_instruction_tuning_data` entry point with: [](scripts/prepare_instruction_data.sh)
+> **⚠️ Important Limitation:** Currently, special tokens like `b_include_to_loss_token` must already exist in the tokenizer's vocabulary. We cannot add new tokens on the fly because resizing the model's embedding matrix is not yet supported. See the corresponding [issue](https://github.com/Modalities/modalities/issues/208) for more details.
 
+### Output Files
 
-This will create / copy the following files:
+After running the script, you will find a new directory (`tutorials/instruction_tuning/prepared_data/instruction_tuning_data_8820ad4`) containing:
 
-```
-tutorials/instruction_tuning/prepared_data
-└── instruction_tuning_data_8820ad4
-    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.idx
-    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.jsonl
-    ├── instruction_tuning_data_applied_chat_template_test.8820ad4.pbin
-    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.idx
-    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl
-    ├── instruction_tuning_data_applied_chat_template_train.8820ad4.pbin
-    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.idx
-    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.jsonl
-    ├── instruction_tuning_data_applied_chat_template_val.8820ad4.pbin
-    ├── pbin_config_test.8820ad4.yaml
-    ├── pbin_config_train.8820ad4.yaml
-    ├── pbin_config_val.8820ad4.yaml
-    └── instruction_chat_template_config.8820ad4.yaml
-```
+  * **JSONL files**: The split datasets with the applied chat template (e.g., `instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl`).
+  * **Binary and Index files**: The tokenized data partitions for training (e.g., `..._train.8820ad4.pbin` and `..._train.8820ad4.idx`).
+  * **Config files**: The configuration files used for data generation, saved for reproducibility.
 
-All files names contain the first 7 symbols of the hash of the config file, to group files which belong together!
-Also, a new directory with the original dataset file name and the hash in it its name is created.
+All generated files share a unique hash (e.g., `8820ad4`) based on the config file, making it easy to group them.
 
-1. The JSONLs files with a new attribute `chat` containing the conversations, split into train, test, val e.g. `instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl`
-2. The config used to generate the `chat` e.g. `instruction_chat_template_config.8820ad4.yaml`
-3. The idx and pbin files for each dataset partition e.g. `instruction_tuning_data_applied_chat_template_train.8820ad4.idx` and `instruction_tuning_data_applied_chat_template_train.8820ad4.pbin`
-4. The config file used to create the pbin files. For each partition (train, test, val), only the `src_path`, `index_path` and `dst_path` are replaced automatically, the rest remains as in the original pbin creation config file, as pointed to within [](tutorials/instruction_tuning/configs/apply_chat_template_config.yaml): `pbin_creation_config_file_path: tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml`
+-----
 
-> Note: The [packed_chat_dataset_config.yaml](config_files/data_preparation/packed_chat_dataset_config.yaml) must use truncation and padding!
+## Step 2: Fine-Tune the Model 🧠
 
+With your data prepared, you can now fine-tune the model. We use a collate function wrapper, `mask_loss_collator_wrapper`, to handle the loss masking during training.
 
-### Instruction-Tuning
+See the full configuration in [train_instruct_model_fsdp1_config.yaml](tutorials/instruction_tuning/configs/train_instruct_model_fsdp1_config.yaml).
 
-With your prepared instruction-tuning data as pbin file, you can now instruction-tune.
+### Key Configuration Changes
 
-Make sure to use the wrapped collate function.
+The core of the instruction-tuning setup lies in the `collate_fn` and `train_dataset` configurations:
 
-* You need to look up the `b_include_to_loss_token` and `e_include_to_loss_token` as defined within your `sft_chat_template_config.09ca9ed.yaml`.
-* Set the `loss_ignore_index` which gets ignored by your loss function. In torch this is usually -100.
-* We need a tokenizer to tokenize the `b_include_to_loss_token` and `e_include_to_loss_token`
-* We need to not re-use the last token
+1.  **`collate_fn`**: This function prepares data batches for the model.
 
-See [](configs/train_instruct_model_fsdp1_config.yaml) for a full example. Below, the core changes needed for instruction tuning are listed.
-```yaml
-collate_fn:  
-  component_key: collate_fn
-  variant_key: mask_loss_collator_wrapper
-  config:
-    wrapped_collate_fn:  
-      component_key: collate_fn
-      variant_key: gpt_2_llm_collator
-      config:
-        sample_key: ${settings.referencing_keys.sample_key}
-        target_key: ${settings.referencing_keys.target_key}
-    target_keys_to_mask:
-      - ${settings.referencing_keys.target_key}
-    loss_ignore_index: -100
-    mask_tokens:
-      b_include_to_loss_token: "<|im_start|>"
-      e_include_to_loss_token: "<|im_end|>"
-    tokenizer:
-      component_key: tokenizer
-      variant_key: pretrained_hf_tokenizer
-      config:
-        pretrained_model_name_or_path: Qwen/Qwen2.5-0.5B
-        padding: false
-        truncation: false
-        special_tokens:
-          pad_token: <|endoftext|>
-          additional_special_tokens: 
-            - ${collate_fn.config.mask_tokens.b_include_to_loss_token}
-            - ${collate_fn.config.mask_tokens.e_include_to_loss_token}
-            - "<|endoftext|>"
+      * It uses the special tokens (`b_include_to_loss_token` and `e_include_to_loss_token`) to identify the assistant's replies.
+      * It masks the loss for all other tokens by setting their label to `-100`, which is the standard ignore index in PyTorch.
+      * It requires a tokenizer configuration that recognizes your special tokens.
+
+2.  **`train_dataset`**:
+
+      * Set `reuse_last_target: false`. This is **crucial** to load the truncated and padded data correctly.
+
+Finally, start the fine-tuning process by running:
+
+```bash
+bash scripts/train_instruction_tuning_model.sh
 ```
 
-with
+-----
 
-```yaml
-train_dataset:
-  component_key: dataset
-  variant_key: packed_mem_map_dataset_continuous
-  config:
-    raw_data_path: ${settings.paths.train_dataset_path}
-    sequence_length: ${settings.step_profile.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
-    reuse_last_target: false # Important!
-```
+## Step 3: Chat with Your Fine-Tuned Model 💬
 
-Finally, run the instruction-tuning with the `run` entry point: [](scripts/train_instruction_tuning_model.sh)
+Once training is complete, it's time to chat with your model\!
 
-> Note, that it is advised to add a special token (which is already known as non-special token to the tokenizer's voabulary) to indicate the end of an assistant turn within the `b_include_to_loss_token` and `e_include_to_loss_token` in your chat template. Change your chat template accordingly and make sure to inlcude this token as special token in the tokenizer configuration for the pbin file creation step and model training! 
+1.  Update the model path in [`text_generation_config.yaml`](tutorials/instruction_tuning/configs/text_generation_config.yaml) to point to the checkpoint you just created in `tutorials/instruction_tuning/checkpoints`.
+2.  Run the generation script:
+    ```bash
+    bash tutorials/instruction_tuning/scripts/03_generate_text.sh
+    ```
+3.  When prompted, ask a question like, "What is 2 + 2?".
 
-### Chat with your instruction-tuned Model
+Since we are using completion mode, the script prefixes your input with the start of the chat template. The model will generate a response and stop automatically because we defined an end token (`<|endoftext|>`) during data preparation.
 
-Now that we trained our model, update the model path in [](tutorials/instruction_tuning/configs/text_generation_config.yaml) to your checkpoint created in [](tutorials/instruction_tuning/checkpoints).
-Then, run [](tutorials/instruction_tuning/scripts/03_generate_text.sh) and prompt for "What is 2 + 2?".
-
-As this is the completion mode of inference, we copied the start of our chat template defined in [](tutorials/instruction_tuning/configs/apply_chat_template_config.yaml) before the user message. The model will automatically end it's response, as we used the `e_assistant_token: <|endoftext|>` as a special token during data preparation!
-
-Note: Training on only 1K data is not sufficient, as we only train for a single epoch!
-
+> **Note:** Training on a small dataset (1k examples) for a single epoch is not enough to achieve high performance, but it's a great way to verify that your pipeline is working correctly\!
