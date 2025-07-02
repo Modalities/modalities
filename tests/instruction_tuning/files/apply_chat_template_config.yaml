@@ -2,7 +2,7 @@ settings:
   src_path: tests/instruction_tuning/files/lorem_ipsum_instruct.jsonl
   dst_path: tests/instruction_tuning/files/out_files/lorem_ipsum_instruct_converted.jsonl
   messages_key: messages
-  pbin_creation_config_file_path: tests/instruction_tuning/files/packed_chat_dataset_config copy.yaml
+  pbin_creation_config_file_path: tests/instruction_tuning/files/packed_chat_dataset_config.yaml
   split_config:
     splitting:
       train: 70
