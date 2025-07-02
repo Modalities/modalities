@@ -9,11 +9,10 @@ from jinja2 import Template
 from jinja2.exceptions import TemplateError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
-from modalities.config.config import load_app_config_dict
-from modalities.config.instantiation_models import InstructionTuningInstantiationModel, SplitConfig
+from modalities.config.instantiation_models import InstructionTuningDataInstantiationModel, SplitConfig
 
 
-def split_and_apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
+def split_and_apply_chat_template(config_file_path: Path, config_dict: dict) -> Dict[str, Path]:
     """
     Applies a chat template to the given configuration file.
 
@@ -26,8 +25,7 @@ def split_and_apply_chat_template(config_file_path: Path) -> Dict[str, Path]:
     Raises:
         Exception: If an error occurs during the application of the chat template.
     """
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
-    config = InstructionTuningInstantiationModel(**config_dict)
+    config = InstructionTuningDataInstantiationModel(**config_dict)
     instruction_data = _stream_jsonl(config.settings.src_path)
     chat_template = _get_chat_template(config.jinja2_chat_template)
 

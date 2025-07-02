@@ -353,7 +353,7 @@ class SplitConfig(BaseModel):
         return splitting
 
 
-class InstructionTuningInstantiationModel(BaseModel):
+class InstructionTuningDataInstantiationModel(BaseModel):
     class Settings(BaseModel):
         src_path: FilePath
         dst_path: Path
