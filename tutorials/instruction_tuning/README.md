@@ -34,8 +34,8 @@ We'll use a custom script to format our conversational data. This script applies
 
 See the configuration files for more details:
 
-  * [`apply_chat_template_config.yaml`](tutorials/instruction_tuning/configs/apply_chat_template_config.yaml)
-  * [`packed_chat_dataset_config.yaml`](tutorials/instruction_tuning/configs/packed_chat_dataset_config.yaml)
+  * [`apply_chat_template_config.yaml`](configs/apply_chat_template_config.yaml)
+  * [`packed_chat_dataset_config.yaml`](configs/packed_chat_dataset_config.yaml)
 
 To prepare the data, run the `prepare_instruction_tuning_data` entry point using the provided script:
 
@@ -56,7 +56,7 @@ The script uses the settings in your configuration file to:
 
 ### Output Files
 
-After running the script, you will find a new directory (`tutorials/instruction_tuning/prepared_data/instruction_tuning_data_8820ad4`) containing:
+After running the script, you will find a new directory (`prepared_data/instruction_tuning_data_8820ad4`) containing:
 
   * **JSONL files**: The split datasets with the applied chat template (e.g., `instruction_tuning_data_applied_chat_template_train.8820ad4.jsonl`).
   * **Binary and Index files**: The tokenized data partitions for training (e.g., `..._train.8820ad4.pbin` and `..._train.8820ad4.idx`).
@@ -70,7 +70,7 @@ All generated files share a unique hash (e.g., `8820ad4`) based on the config fi
 
 With your data prepared, you can now fine-tune the model. We use a collate function wrapper, `mask_loss_collator_wrapper`, to handle the loss masking during training.
 
-See the full configuration in [train_instruct_model_fsdp1_config.yaml](tutorials/instruction_tuning/configs/train_instruct_model_fsdp1_config.yaml).
+See the full configuration in [train_instruct_model_fsdp1_config.yaml](configs/train_instruct_model_fsdp1_config.yaml).
 
 ### Key Configuration Changes
 
@@ -98,10 +98,10 @@ bash scripts/train_instruction_tuning_model.sh
 
 Once training is complete, it's time to chat with your model\!
 
-1.  Update the model path in [`text_generation_config.yaml`](tutorials/instruction_tuning/configs/text_generation_config.yaml) to point to the checkpoint you just created in `tutorials/instruction_tuning/checkpoints`.
+1.  Update the model path in [`text_generation_config.yaml`](configs/text_generation_config.yaml) to point to the checkpoint you just created in `tutorials/instruction_tuning/checkpoints`.
 2.  Run the generation script:
     ```bash
-    bash tutorials/instruction_tuning/scripts/03_generate_text.sh
+    bash scripts/03_generate_text.sh
     ```
 3.  When prompted, ask a question like, "What is 2 + 2?".
 

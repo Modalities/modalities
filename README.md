@@ -80,10 +80,9 @@ pip install modalities
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --seed --python 3.11 --prompt modalities
 source .venv/bin/activate
-uv pip install torch==2.6.0
-uv pip install ninja     # Lowers compilation time of flash attention significantly 
+uv pip install torch --torch-backend=auto
 uv pip install flash-attn --no-build-isolation
-uv pip install -e .[linting,tests]
+uv pip install -e .[tests,linting] --torch-backend=auto
 pre-commit install --install-hooks
 ```
 
