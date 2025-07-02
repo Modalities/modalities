@@ -12,6 +12,8 @@ from modalities.dataloader.apply_chat_template import split_and_apply_chat_templ
 def create_instruction_tuning_data(config_file_path: Path):
     """
     Create instruction tuning data by applying the chat template to the raw data.
+    We split the dataset into partitions based on the split configuration
+    and create index and pbin files for each partition.
     """
     config_dict = load_app_config_dict(config_file_path=config_file_path)
     # split and apply chat template
@@ -38,6 +40,7 @@ def create_partitioned_instruction_tuning_index_and_pbin_files(
         )
         shutil.copyfile(config.settings.pbin_creation_config_file_path, pbin_config_file_path)
         pbin_config = load_app_config_dict(config_file_path=pbin_config_file_path)
+        # each partition gets its own pbin config file to create the pbin file
         pbin_config["settings"]["src_path"] = str(jsonl_data_out_file_path)
         pbin_config["settings"]["index_path"] = str(idx_file_path)
         pbin_config["settings"]["dst_path"] = str(idx_file_path.with_suffix(".pbin"))
