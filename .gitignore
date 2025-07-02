@@ -167,3 +167,4 @@ tests/tmp/*
 
 tutorials/profiling/experiments
 tutorials/instruction_tuning/prepared_data
+config_files/instruction_tuning
