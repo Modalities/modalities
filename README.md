@@ -74,6 +74,20 @@ To install Modalities via pip, run
 pip install modalities
 ```
 
+### Option 3: Feature Complete via UV
+
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --seed --python 3.11 --prompt modalities
+source .venv/bin/activate
+uv pip install torch
+uv pip install ninja
+uv pip install --no-build-isolation flash-attn==2.7.4.post1
+# for developer: use [tests,linting] and install pre-commit hooks
+uv pip install -e .[tests,linting]
+pre-commit install --install-hooks
+```
+
 ## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
 

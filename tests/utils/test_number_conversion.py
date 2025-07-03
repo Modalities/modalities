@@ -326,7 +326,7 @@ def test_get_num_tokens_from_packed_mem_map_dataset_continuous(
     gradient_accumulation_steps: int,
 ):
     dataset = DatasetFactory.get_packed_mem_map_dataset_continuous(
-        raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text"
+        raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text", reuse_last_target=True
     )
 
     max_num_tokens = len(dataset._index) * sequence_length
@@ -342,6 +342,8 @@ def test_get_num_tokens_from_packed_mem_map_dataset_continuous(
             num_ranks=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
+            sample_key=dataset.sample_key,
+            reuse_last_target=True,
         )
         == effective_num_tokens
     )

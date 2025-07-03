@@ -9,6 +9,7 @@ logs/
 core.*
 checkpoint
 wandb
+artifacts
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -165,3 +166,6 @@ tests/tmp/*
 *.pbin
 
 tutorials/profiling/experiments
+tutorials/instruction_tuning/prepared_data
+config_files/instruction_tuning
+data/lorem_ipsum_instruct.jsonl

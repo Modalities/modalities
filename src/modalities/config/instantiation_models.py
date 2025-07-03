@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator, root_validator
+from pydantic import BaseModel, ConfigDict, Field, FilePath, field_validator, model_validator
 
 from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
@@ -68,7 +68,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
             class Config:
                 extra = "allow"
 
-            @root_validator(pre=True)
+            @model_validator(mode="before")
             def _validate_all_paths(cls, values: dict[str, Any]) -> dict[str, Any]:
                 for field_name, value in values.items():
                     if isinstance(value, str):  # If a value is a string, convert it to Path
@@ -332,3 +332,39 @@ class TrainingReportGenerator:
             )
 
         return issue_warnings
+
+
+class Splitting(BaseModel):
+    train: int
+    val: int
+    test: int
+
+
+class SplitConfig(BaseModel):
+    splitting: Splitting
+    seed: int
+
+    @field_validator("splitting", mode="before")
+    def validate_splitting(cls, splitting) -> Optional[Splitting]:
+        if splitting is None:
+            return None
+        if splitting["train"] + splitting["val"] + splitting["test"] != 100:
+            raise ValueError("The sum of the split configuration must be 100 (excluding the seed).")
+        return splitting
+
+
+class InstructionTuningDataInstantiationModel(BaseModel):
+    class Settings(BaseModel):
+        src_path: FilePath
+        dst_path: Path
+        messages_key: str
+        split_config: SplitConfig | None = None
+        pbin_creation_config_file_path: FilePath | None = None
+
+    class InstructionDataTransformation(BaseModel):
+        role_mapping: dict[str, str]
+
+    settings: Settings
+    instruction_data_transformation: InstructionDataTransformation
+    jinja2_chat_template: str
+    chat_template_data: dict[str, Any]

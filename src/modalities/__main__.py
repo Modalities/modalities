@@ -31,6 +31,7 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
+from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
@@ -170,6 +171,20 @@ def data():
     Collection of utilities to preprocess, analyse and modify training data.
     """
     pass
+
+
+@data.command(name="prepare_instruction_tuning_data")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
+    """
+    Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
+    """
+    create_instruction_tuning_data(config_file_path=config_file_path)
 
 
 @data.command(name="create_raw_index")

@@ -164,3 +164,10 @@ This side-effect in the transformers library has lead to the eod token being app
 https://github.com/Modalities/modalities/blob/1c1ccdc973283c45bc8c9fadf4d20f03e435cd04/src/modalities/dataloader/create_packed_data.py#L327-L330
 
 Additionally, I added a script that verifies the consistency of the indexation and tokenization of a given JSONL file. We run the indexation and tokenization routines in modalities and compare it to tokenized JSONL file to which we applied the HF tokenizer directly. 
+
+## PR #379 Instruction Tuning Support
+
+  * New entry point `apply_chat_template` to form chats and create index and pbin files of it
+  * A wrapper for collate functions to include tokens in the loss which appear between indicator tokens
+  * A new parameter for the PackedMemMapDatasetContinuous to allow not to re-use the last target token
+  * A tutorial how to apply instruction-tuning on a Huggingface Model
