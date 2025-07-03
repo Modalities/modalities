@@ -1,10 +1,9 @@
-from typing import Dict, List
+from typing import List
 
 import torch
 from pydantic import BaseModel
 
-from modalities.batch import DatasetBatch
-from modalities.config.pydantic_if_types import PydanticCollateFnIFType, PydanticTokenizerIFType
+from modalities.config.pydantic_if_types import PydanticTokenizerIFType
 from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.util import warn_rank_0
@@ -15,18 +14,16 @@ class LossMaskingTokenConfig(BaseModel):
     e_include_to_loss_token: str
 
 
-class LossMaskingCollateFnWrapperConfig(BaseModel):
-    wrapped_collate_fn: PydanticCollateFnIFType
+class LossMaskingCollateFnConfig(BaseModel):
     target_keys_to_mask: List[str]
     loss_ignore_index: int
     mask_tokens: LossMaskingTokenConfig
     tokenizer: PydanticTokenizerIFType
 
 
-class LossMaskingCollateFnWrapper(CollateFnIF):
+class LossMaskingCollateFn(CollateFnIF):
     def __init__(
         self,
-        wrapped_collate_fn: CollateFnIF,
         target_keys_to_mask: List[str],
         loss_ignore_index: int,
         mask_tokens: LossMaskingTokenConfig,
@@ -34,7 +31,7 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
     ):
         """
         Initializes the LossMaskingCollateFnWrapper.
-        Wraps the given wrapped_collate_fn and masks the target keys if not within the given special mask tokens.
+        The colate function masks the target keys if not within the given special mask tokens.
         Does not include both mask tokens into the loss. If you need a token to indicate the end of the assistant,
         use another special token for this!
         Works also for the continuous dataset reading, as if the "end-include-to-loss" token is detected in the front,
@@ -44,7 +41,6 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
 
 
         Args:
-            wrapped_collate_fn (CollateFnIF): The wrapped collate function.
             target_keys_to_mask (List[str]): The list of target keys to mask.
             loss_ignore_index (int): The index to ignore in the loss calculation.
             mask_tokens (MaskingTokenConfig): Entails begin and end tokens, which mark (exclusive) inclusion to the
@@ -54,7 +50,6 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
         Raises:
             ValueError: If b_mask_token_id and e_mask_token_id are the same.
         """
-        self.wrapped_collate_fn = wrapped_collate_fn
         self.target_keys_to_mask = target_keys_to_mask
         self.loss_ignore_index = loss_ignore_index
         self.tokenizer = tokenizer
@@ -65,30 +60,30 @@ class LossMaskingCollateFnWrapper(CollateFnIF):
                 "b_mask_token_id and e_mask_token_id of the LossMaskingCollateFnWrapper must be different!"
             )
 
-    def __call__(self, batch: List[Dict[str, torch.Tensor]]) -> DatasetBatch:
+    def __call__(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
-        Collates a batch of data by calling the wrapped collate function and applies target masking.
+        Collates a batch of data by applying target masking.
 
         Args:
-            batch (List[Dict[str, torch.Tensor]]): A list of dictionaries, where each dictionary represents a sample
-            in the batch. Each dictionary contains keys corresponding to different data modalities and their
+            batch (dict[str, torch.Tensor]): The batch contains keys corresponding to different
+                data modalities and their
             respective tensors.
 
         Returns:
-            DatasetBatch: A batch of collated data with masked targets.
+            dict[str, torch.Tensor]: A batch dict with masked targets.
 
         """
-        dataset_batch = self.wrapped_collate_fn(batch)
+
         for target_key_to_mask in self.target_keys_to_mask:
-            target = dataset_batch.targets[target_key_to_mask]
+            target = batch[target_key_to_mask]
             masked_target = self._mask_target(
                 target=target,
                 b_mask_token_id=self.b_mask_token_id,
                 e_mask_token_id=self.e_mask_token_id,
                 loss_ignore_index=self.loss_ignore_index,
             )
-            dataset_batch.targets[target_key_to_mask] = masked_target
-        return dataset_batch
+            batch[target_key_to_mask] = masked_target
+        return batch
 
     def _mask_target(
         self, target: torch.Tensor, b_mask_token_id: int, e_mask_token_id: int, loss_ignore_index: int

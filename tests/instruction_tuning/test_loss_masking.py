@@ -4,12 +4,12 @@ import pytest
 import torch
 
 from modalities.batch import DatasetBatch
-from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
+from modalities.dataloader.collate_fns.autoregressive_collate_fn import AutoregressiveCollateFn
+from modalities.dataloader.collate_fns.loss_masking_collate_fn import (
     LossMaskingCollateFnWrapper,
     LossMaskingCollateFnWrapperConfig,
     LossMaskingTokenConfig,
 )
-from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 
 
@@ -28,7 +28,7 @@ def dummy_tokenizer():
 @pytest.fixture
 def loss_masking_config(dummy_tokenizer) -> LossMaskingCollateFnWrapperConfig:
     return dict(
-        wrapped_collate_fn=GPT2LLMCollateFn(sample_key="sample", target_key="target"),
+        wrapped_collate_fn=AutoregressiveCollateFn(sample_key="sample", target_key="target"),
         target_keys_to_mask=["target"],
         loss_ignore_index=-100,
         mask_tokens=LossMaskingTokenConfig(b_include_to_loss_token="begin", e_include_to_loss_token="end"),
