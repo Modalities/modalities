@@ -35,6 +35,9 @@ class AppStateFactory:
     def get_dcp_checkpointed_app_state_(
         raw_app_state: AppState,
         checkpoint_dir_path: Path,
+        load_model_checkpoint: bool = True,
+        load_optimizer_checkpoint: bool = True,
+        load_lr_scheduler_checkpoint: bool = True,
     ) -> AppState:
         """Loads the checkpointed state dict into the raw AppState object
         (i.e., non-checkpoint loaded AppState) in-place.
@@ -54,5 +57,19 @@ class AppStateFactory:
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
         cp_loading = DCPCheckpointLoading(global_rank=dist.get_rank())
-        cp_loading.load_checkpoint_(app_state=raw_app_state, checkpoint_dir_path=checkpoint_dir_path)
+
+        tmp_app_state = AppStateFactory.get_raw_app_state(
+            model=raw_app_state.model if load_model_checkpoint else None,
+            optimizer=raw_app_state.optimizer if load_optimizer_checkpoint else None,
+            lr_scheduler=raw_app_state.lr_scheduler if load_lr_scheduler_checkpoint else None,
+        )
+
+        cp_loading.load_checkpoint_(app_state=tmp_app_state, checkpoint_dir_path=checkpoint_dir_path)
+        raw_app_state.model = tmp_app_state.model if tmp_app_state.model is not None else raw_app_state.model
+        raw_app_state.optimizer = (
+            tmp_app_state.optimizer if tmp_app_state.optimizer is not None else raw_app_state.optimizer
+        )
+        raw_app_state.lr_scheduler = (
+            tmp_app_state.lr_scheduler if tmp_app_state.lr_scheduler is not None else raw_app_state.lr_scheduler
+        )
         return raw_app_state

@@ -15,6 +15,8 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
+from modalities.utils.logging import get_logger
+
 
 class StatefulComponents(Enum):
     MODEL = "model"
@@ -34,13 +36,19 @@ class AppState(Stateful):
     https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html
     """
 
-    def __init__(self, model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None):
+    def __init__(
+        self,
+        model: Optional[nn.Module] = None,
+        optimizer: Optional[Optimizer] = None,
+        lr_scheduler: Optional[LRScheduler] = None,
+    ):
         """Initializes the AppState object.
 
         Args:
-            model (nn.Module): The model can be either a non-sharded model, FSDP1 or FSDP2 model.
-            optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
-            lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.
+            model (nn.Module, optional): The model can be either a non-sharded model, FSDP1 or FSDP2 model.
+            optimizer (Optimizer, optional): The optimizer can be either a non-sharded optimizer,
+                FSDP1 or FSDP2 optimizer.
+            lr_scheduler (LRScheduler, optional): The lr scheduler used during training. Defaults to None.
         """
         self._model = model
         self._optimizer = optimizer
@@ -76,12 +84,13 @@ class AppState(Stateful):
         # this line automatically manages FSDP FQN's, as well as sets the default
         # state dict type to FSDP.SHARDED_STATE_DICT
         # model_state_dict, optimizer_state_dict = get_state_dict(self._model, self._optimizer)
-        sd = {
-            StatefulComponents.MODEL.value: ModelStateRetriever.get_state_dict(app_state=self),
-            StatefulComponents.OPTIMIZER.value: OptimizerStateRetriever.get_state_dict(
-                app_state=self,
-            ),
-        }
+        sd = {}
+        if self._model is not None:
+            sd[StatefulComponents.MODEL.value] = ModelStateRetriever.get_state_dict(app_state=self)
+
+        if self._optimizer is not None:
+            sd[StatefulComponents.OPTIMIZER.value] = OptimizerStateRetriever.get_state_dict(app_state=self)
+
         if self._lr_scheduler is not None:
             sd[StatefulComponents.LR_SCHEDULER.value] = LRSchedulerStateRetriever.get_state_dict(app_state=self)
         return sd
@@ -101,15 +110,32 @@ class AppState(Stateful):
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
 
-        ModelStateRetriever.load_state_dict_(app_state=self, state_dict=state_dict[StatefulComponents.MODEL.value])
-        OptimizerStateRetriever.load_state_dict_(
-            app_state=self,
-            state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
-        )
+        if self._model is not None:
+            ModelStateRetriever.load_state_dict_(app_state=self, state_dict=state_dict[StatefulComponents.MODEL.value])
+
+        if self._optimizer is not None:
+            if StatefulComponents.OPTIMIZER.value in state_dict:
+                OptimizerStateRetriever.load_state_dict_(
+                    app_state=self,
+                    state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
+                )
+            else:
+                get_logger(name="app_state").warning(
+                    "Did not load optimizer checkpoint! "
+                    f"Optimizer state dict not found in state_dict: {state_dict.keys()}."
+                )
+
         if self._lr_scheduler is not None:
-            LRSchedulerStateRetriever.load_state_dict_(
-                app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
-            )
+            if StatefulComponents.LR_SCHEDULER.value in state_dict:
+                LRSchedulerStateRetriever.load_state_dict_(
+                    app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
+                )
+            else:
+                get_logger(name="app_state").warning(
+                    "Did not load lr scheduler checkpoint! "
+                    f"LR scheduler state dict not found in state_dict: {state_dict.keys()}."
+                )
+
         self._is_loaded = True
 
 
