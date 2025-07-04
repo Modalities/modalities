@@ -44,7 +44,7 @@ conda activate modalities
 # install PyTorch, Ninja and Flash Attention (mandatory)
 pip install torch==2.6.0
 pip install ninja     # Lowers compilation time of flash attention significantly 
-pip install flash-attn --no-build-isolation
+pip install flash-attn==2.7.4.post1 --no-build-isolation
 ```
 
 ### Option 1: Installation from source
