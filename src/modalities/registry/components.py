@@ -39,11 +39,11 @@ from modalities.config.config import (
     FSDP1CheckpointSavingConfig,
     FSDP2WrappedModelConfig,
     FSDPWrappedModelConfig,
-    GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MemMapDatasetIterativeConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -61,10 +61,12 @@ from modalities.config.config import (
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
 )
-from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
-    LossMaskingCollateFnWrapper,
-    LossMaskingCollateFnWrapperConfig,
+from modalities.dataloader.collate_fns.autoregressive_collate_fn import (
+    AutoregressiveCollateFn,
+    AutoregressiveCollateFnConfig,
 )
+from modalities.dataloader.collate_fns.collator import DefaultWrappingCollator, DefaultWrappingCollatorConfig
+from modalities.dataloader.collate_fns.loss_masking_collate_fn import LossMaskingCollateFn, LossMaskingCollateFnConfig
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
@@ -77,7 +79,6 @@ from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
-from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
@@ -204,6 +205,12 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "dataset",
+        "mem_map_dataset_iterative",
+        DatasetFactory.get_mem_map_dataset_iterative,
+        MemMapDatasetIterativeConfig,
+    ),
+    ComponentEntity(
+        "dataset",
         "packed_mem_map_dataset_megatron",
         DatasetFactory.get_packed_mem_map_dataset_megatron,
         PackedMemMapDatasetMegatronConfig,
@@ -219,11 +226,10 @@ COMPONENTS = [
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
-    ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
+    ComponentEntity("collator", "default_wrapping_collator", DefaultWrappingCollator, DefaultWrappingCollatorConfig),
+    ComponentEntity("collate_fn", "autoregressive", AutoregressiveCollateFn, AutoregressiveCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
-    ComponentEntity(
-        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
-    ),
+    ComponentEntity("collate_fn", "masked_loss", LossMaskingCollateFn, LossMaskingCollateFnConfig),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
     # checkpointing
