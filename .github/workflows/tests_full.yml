@@ -27,7 +27,7 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         export FLASH_ATTENTION_SKIP_CUDA_BUILD=TRUE
         python -m pip install ninja                   # Lowers compilation time of flash attention significantly 
-        python -m pip install flash-attn --no-build-isolation
+        python -m pip install flash-attn==2.7.4.post1 --no-build-isolation
         python -m pip install -e .[tests]
     - name: Run tests
       run: |
