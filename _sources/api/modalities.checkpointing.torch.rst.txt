@@ -1,0 +1,21 @@
+modalities.checkpointing.torch package
+======================================
+
+Submodules
+----------
+
+modalities.checkpointing.torch.torch\_checkpoint\_loading module
+----------------------------------------------------------------
+
+.. automodule:: modalities.checkpointing.torch.torch_checkpoint_loading
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.checkpointing.torch
+   :members:
+   :show-inheritance:
+   :undoc-members:
