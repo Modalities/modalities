@@ -67,13 +67,40 @@ class AppState(Stateful):
     def model(self) -> nn.Module:
         return self._model
 
+    @model.setter
+    def model(self, model: nn.Module) -> None:
+        """Sets the model in the AppState object.
+
+        Args:
+            model (nn.Module): The model to set in the AppState object.
+        """
+        self._model = model
+
     @property
     def optimizer(self) -> Optimizer:
         return self._optimizer
 
+    @optimizer.setter
+    def optimizer(self, optimizer: Optimizer) -> None:
+        """Sets the optimizer in the AppState object.
+
+        Args:
+            optimizer (Optimizer): The optimizer to set in the AppState object.
+        """
+        self._optimizer = optimizer
+
     @property
     def lr_scheduler(self) -> LRScheduler:
         return self._lr_scheduler
+
+    @lr_scheduler.setter
+    def lr_scheduler(self, lr_scheduler: LRScheduler) -> None:
+        """Sets the learning rate scheduler in the AppState object.
+
+        Args:
+            lr_scheduler (LRScheduler): The learning rate scheduler to set in the AppState object.
+        """
+        self._lr_scheduler = lr_scheduler
 
     def state_dict(self) -> dict[str, Any]:
         """Returns the state dict of the AppState object.
