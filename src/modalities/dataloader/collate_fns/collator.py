@@ -70,11 +70,14 @@ class DefaultWrappingCollator(CollatorIF):
         Returns:
             DatasetBatch: The processed batch of data.
         """
+        # convert to tensors
+        batch = [{k: torch.tensor(v) for k, v in tensor_dict.items()} for tensor_dict in batch]
+
         if self.sequence_length is not None and self.padding_token_id is not None:
             # Pad and truncate the sequences in the batch to the fixed sequence length
             self._pad_and_truncate_inplace(batch)
 
-        sample_tensor_dict = {key: torch.stack([torch.tensor(d[key]) for d in batch]) for key in self.sampple_keys}
+        sample_tensor_dict = {key: torch.stack([d[key] for d in batch]) for key in self.sampple_keys}
         for wrapped_collate_fn in self.collate_fns:
             sample_tensor_dict = wrapped_collate_fn(sample_tensor_dict)
 

@@ -157,8 +157,7 @@ class LossMaskingCollateFn(CollateFnIF):
         if not ((0 <= include_to_loss_mask).all() and (include_to_loss_mask <= 1).all()):
             raise ValueError(
                 "end mask token indicator is before begin mask token indicator in the target. "
-                + "This is not supported by the LossMaskingCollateFnWrapper."
-                + "Make sure to use padding and truncation with the tokenizer for PackedMemMapDatasetContinuous"
+                + "This is not supported by the LossMaskingCollateFn."
             )
 
         # apply mask: if mask is 1, keep the target, otherwise replace with loss_ignore_index
