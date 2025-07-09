@@ -161,12 +161,6 @@ eval_dataloaders:
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE
 
-checkpoint_loading:
-  component_key: checkpoint_loading
-  variant_key: dcp
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-
 checkpoint_saving:
   component_key: checkpoint_saving
   variant_key: default
