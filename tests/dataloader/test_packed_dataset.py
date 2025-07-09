@@ -99,7 +99,9 @@ def test_packed_continuous_dataset_loading(
 def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
     dummy_packed_data_path.unlink(missing_ok=True)
     with pytest.raises(FileNotFoundError):
-        PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
+        PackedMemMapDatasetContinuous(
+            dummy_packed_data_path, block_size=10, sample_key="input_ids", reuse_last_target=True
+        )
 
 
 def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
@@ -123,7 +125,11 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
     packed_dataset = PackedMemMapDatasetContinuous(
-        default_packed_dataset_path, block_size=block_size, sample_key="input_ids", load_index=True
+        default_packed_dataset_path,
+        block_size=block_size,
+        sample_key="input_ids",
+        load_index=True,
+        reuse_last_target=True,
     )
 
     # read in the raw jsonl files for manual tokenization
@@ -184,9 +190,12 @@ def test_join_packed_datasets(dummy_packed_data_path, tmpdir):
     assert loaded_joint_data
     assert loaded_joint_data.data_len == sum(d.data_len for d in stream_data)
 
-    loaded_dataset = PackedMemMapDatasetContinuous(joined_target_file, block_size=2, sample_key="whatever")
+    loaded_dataset = PackedMemMapDatasetContinuous(
+        joined_target_file, block_size=2, sample_key="whatever", reuse_last_target=True
+    )
     original_datasets = [
-        PackedMemMapDatasetContinuous(p, block_size=2, sample_key="whatever") for p in packed_data_clones
+        PackedMemMapDatasetContinuous(p, block_size=2, sample_key="whatever", reuse_last_target=True)
+        for p in packed_data_clones
     ]
 
     original_datasets_concatenated = []
@@ -217,7 +226,9 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
         fin.write(token_size_in_bytes.to_bytes(4, byteorder="little"))
     assert pbin_path.is_file()
     sample_key = "input_ids"
-    ds = PackedMemMapDatasetContinuous(raw_data_path=pbin_path, block_size=10, sample_key=sample_key)
+    ds = PackedMemMapDatasetContinuous(
+        raw_data_path=pbin_path, block_size=10, sample_key=sample_key, reuse_last_target=True
+    )
     assert list(ds)
 
     collator = GPT2LLMCollateFn(sample_key=sample_key, target_key="abc")
