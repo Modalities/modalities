@@ -381,20 +381,20 @@ class ModelFactory:
             """Dataclass to hold tensor statistics."""
 
             global_shape: list[int]
+            local_shape: list[int]
+            is_dtensor: bool
+            nan_count: int
+            inf_count: int
             mean: float
             std: float
             min: float
             max: float
-            nan_count: int
-            inf_count: int
-            local_shape: list[int]
 
         @dataclass
         class CounterRef:
             value: int = 0
 
         rank = dist.get_rank() if dist.is_initialized() else 0
-        dist.get_world_size() if dist.is_initialized() else 1
 
         if tracked_ranks is not None and rank not in tracked_ranks:
             return model
@@ -404,35 +404,51 @@ class ModelFactory:
 
         def get_tensor_stats(tensor: torch.Tensor) -> TensorStats:
             """Get statistics of a tensor."""
+            local_tensor = tensor.to_local() if isinstance(tensor, dist.tensor.DTensor) else tensor
+            float_dtypes = {torch.float, torch.bfloat16}
+            numeric_dtypes = float_dtypes | {torch.int, torch.long}
+
+            dtype = local_tensor.dtype
+            is_float = dtype in float_dtypes
+            is_numeric = dtype in numeric_dtypes
+
             tensor_stats = TensorStats(
                 global_shape=list(tensor.shape),
-                mean=tensor.mean().item(),
-                std=tensor.to_local().std().item() if isinstance(tensor, dist.tensor.DTensor) else tensor.std().item(),
-                min=tensor.min().item(),
-                max=tensor.max().item(),
-                nan_count=torch.isnan(tensor).sum().item(),
-                inf_count=torch.isinf(tensor).sum().item(),
-                local_shape=list(tensor.to_local().shape)
-                if isinstance(tensor, dist.tensor.DTensor)
-                else list(tensor.shape),
+                local_shape=list(local_tensor.shape),
+                is_dtensor=isinstance(tensor, dist.tensor.DTensor),
+                nan_count=torch.isnan(local_tensor).sum().item(),
+                inf_count=torch.isinf(local_tensor).sum().item(),
+                mean=local_tensor.mean().item() if is_float else -1,
+                std=local_tensor.std().item() if is_float else -1,
+                min=local_tensor.min().item() if is_numeric else -1,
+                max=local_tensor.max().item() if is_numeric else -1,
             )
             return tensor_stats
 
         def write_out_tensor_stats(tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int):
             """Write out tensor statistics to a file."""
-            with open(logging_file_path, "a") as f:
+            with open(logging_file_path, "a", encoding="utf-8") as f:
                 tensor_stats_dict = asdict(tensor_stats)
-                tensor_stats_dict.update(
-                    {
-                        "counter": counter,
-                        "hook_type": hook_type,
-                        "tensor_tag": tensor_tag,
-                        "rank": rank,
-                    }
-                )
+                tensor_stats_dict = {
+                    "tensor_tag": tensor_tag,
+                    "hook_type": hook_type,
+                    **tensor_stats_dict,
+                    "counter": counter,
+                    "rank": rank,
+                }
+
                 f.write(json.dumps(tensor_stats_dict) + "\n")
 
-        def pre_forward_hook(module: nn.Module, input, counter: CounterRef):
+        def pre_forward_hook(module: nn.Module, forward_input, counter: CounterRef):
+            if isinstance(forward_input, tuple):
+                forward_inputs = forward_input
+            else:
+                forward_inputs = (forward_input,)
+
+            for forward_input in forward_inputs:
+                tensor_stats = get_tensor_stats(forward_input)
+                write_out_tensor_stats(tensor_stats, counter.value, "forward_input", module._debug_name, rank)
+
             # Retrieves statistics of the module's parameters before forward pass.
             for name, param in module.named_parameters(recurse=False):
                 tensor_stats = get_tensor_stats(param)
@@ -440,25 +456,25 @@ class ModelFactory:
                 write_out_tensor_stats(
                     tensor_stats=tensor_stats,
                     counter=counter.value,
-                    hook_type="pre_forward",
+                    hook_type="forward_weights",
                     tensor_tag=full_name,
                     rank=rank,
                 )
             counter.value += 1
 
-        def forward_hook(module: nn.Module, input, output, counter: CounterRef):
-            if isinstance(output, tuple):
-                outputs = output
+        def forward_hook(module: nn.Module, foward_input, forward_output, counter: CounterRef):
+            if isinstance(forward_output, tuple):
+                forward_outputs = forward_output
             else:
-                outputs = (output,)
+                forward_outputs = (forward_output,)
 
-            for i, out in enumerate(outputs):
+            for out in forward_outputs:
                 tensor_stats = get_tensor_stats(out)
                 write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
             counter.value += 1
 
         def backward_hook(module, grad_input, grad_output, counter: CounterRef):
-            for i, grad_out in enumerate(grad_output):
+            for grad_out in grad_output:
                 tensor_stats = get_tensor_stats(grad_out)
                 write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
             counter.value += 1
