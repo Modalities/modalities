@@ -580,7 +580,7 @@ class Main:
         return components
 
     def run(self, components: TrainingComponentsInstantiationModel):
-        """Entrypoint fo running the training process.
+        """Entrypoint for running the training process.
 
         We pass in a TrainingComponentsInstantiationModel,
         which is a pydantic model that contains all the components needed for the training process.

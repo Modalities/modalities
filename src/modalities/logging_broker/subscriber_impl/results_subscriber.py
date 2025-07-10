@@ -70,7 +70,12 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         with open(config_file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
         self.run = wandb.init(
-            project=project, name=experiment_id, mode=mode.value.lower(), dir=logging_directory, config=config
+            project=project,
+            name=experiment_id,
+            mode=mode.value.lower(),
+            dir=logging_directory,
+            config=config,
+            settings=wandb.Settings(init_timeout=120),
         )
 
         self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
