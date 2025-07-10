@@ -80,7 +80,7 @@ pip install modalities
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --seed --python 3.11 --prompt modalities
 source .venv/bin/activate
-uv pip install torch
+uv pip install torch==2.7.1
 uv pip install ninja
 uv pip install --no-build-isolation flash-attn==2.8.0.post2
 # for developer: use [tests,linting] and install pre-commit hooks
