@@ -23,8 +23,8 @@ settings:
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
   step_profile:
-    gradient_accumulation_steps: 2
-    local_train_micro_batch_size: 2
+    gradient_accumulation_steps: 4
+    local_train_micro_batch_size: 1
     sequence_length: 8192 # Qwen2.5 would have 32768
   training_target:
   # had to hack here: Value error, Not enough tokens in the dataset. Actual: 57434112, Expected: >=57442304
