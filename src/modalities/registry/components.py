@@ -68,6 +68,7 @@ from modalities.config.config import (
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.sampler_factory import ResumableDistributedMultiDimSamplerConfig, SamplerFactory
 from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -224,8 +225,15 @@ COMPONENTS = [
     # samplers
     ComponentEntity("sampler", "sequential_sampler", SequentialSampler, SequentialSamplerConfig),
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
+    ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     ComponentEntity(
         "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
+    ),
+    ComponentEntity(
+        "sampler",
+        "resumable_distributed_multi_dim_sampler",
+        SamplerFactory.create_resumable_distributed_multi_dim_sampler,
+        ResumableDistributedMultiDimSamplerConfig,
     ),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
