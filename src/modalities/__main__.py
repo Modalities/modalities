@@ -58,13 +58,26 @@ def main() -> None:
     required=True,
     help="Path to the YAML training config file.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path):
+@click.option(
+    "--test_comm",
+    is_flag=True,
+    default=False,
+    help="If set, run a communication test before training.",
+)
+def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        if test_comm:
+            from modalities.utils.test_communication import test_communication
+
+            print_rank_0("Running communication test...")
+            test_communication()
+            print_rank_0("Communication test succeeded.")
+
         main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
