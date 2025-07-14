@@ -597,9 +597,9 @@ class GPT2ModelFactory:
         )
 
         transformer_block_tp_plan = {
-            "transformer.h.attention_norm": SequenceParallel(),
-            "transformer.h.ffn_norm": SequenceParallel(),
-            "transformer.h.attn": PrepareModuleInput(
+            "attention_norm": SequenceParallel(),
+            "ffn_norm": SequenceParallel(),
+            "attn": PrepareModuleInput(
                 # here we prepare the actual input of the attention module
                 # (i.e., the arguements to the forward method)
                 # The incomming inputs are sharded on the sequence dimension
@@ -612,17 +612,17 @@ class GPT2ModelFactory:
                 input_layouts=(Shard(1),),
                 desired_input_layouts=(Replicate(),),
             ),
-            "transformer.h.attn.q_attn": ColwiseParallel(),
-            "transformer.h.attn.k_attn": ColwiseParallel(),
-            "transformer.h.attn.v_attn": ColwiseParallel(),
-            "transformer.h.attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),
-            "transformer.h.mlp": PrepareModuleInput(
+            "attn.q_attn": ColwiseParallel(),
+            "attn.k_attn": ColwiseParallel(),
+            "attn.v_attn": ColwiseParallel(),
+            "attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),
+            "mlp": PrepareModuleInput(
                 input_layouts=(Shard(1),),
                 desired_input_layouts=(Replicate(),),
             ),
-            "transformer.h.mlp.W": ColwiseParallel(),
-            "transformer.h.mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
-            "transformer.h.mlp.V": ColwiseParallel(),
+            "mlp.W": ColwiseParallel(),
+            "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
+            "mlp.V": ColwiseParallel(),
         }
 
         for transformer_block in model.transformer.h:
