@@ -12,7 +12,7 @@ from modalities.utils.communication_test import run_communication_test
     "RANK" not in os.environ or torch.cuda.device_count() < 2,
     reason="This test requires 2 GPUs and a torchrun distributed environment.",
 )
-def test_communication_test():
+def test_run_communication_test():
     """
     Test to ensure that the communication test runs without errors.
     This is a simple smoke test to verify that the communication setup is functional.
