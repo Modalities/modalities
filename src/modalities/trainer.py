@@ -232,7 +232,6 @@ class Trainer:
             if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
-                # torch.cuda.reset_peak_memory_stats(device)
 
                 thoughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
@@ -281,7 +280,6 @@ class Trainer:
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
                         "train mfu (16-bit)": ResultItem(mfu_score, 2),
                         "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
-                        # "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,

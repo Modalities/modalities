@@ -36,12 +36,12 @@ class SamplerFactory:
         drop_last: Optional[bool] = False,
         skip_num_global_samples: Optional[int] = 0,
     ) -> ResumableDistributedSampler:
-        rank = device_mesh.get_coordinate()[0]
+        dp_rank = device_mesh[data_parallel_key.value].get_coordinate()[0]
         num_replicas = device_mesh[data_parallel_key.value].size()
 
         sampler = ResumableDistributedSampler(
             dataset=dataset,
-            rank=rank,
+            rank=dp_rank,
             num_replicas=num_replicas,
             epoch=epoch,
             shuffle=shuffle,

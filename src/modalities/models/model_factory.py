@@ -374,8 +374,33 @@ class ModelFactory:
 
     @staticmethod
     def get_debugging_enriched_model(
-        model: nn.Module, logging_dir_path: Path, tracked_ranks: Optional[Set[int]] = None
+        model: nn.Module, logging_dir_path: Path, tracked_ranks: Optional[Set[int]] = None, log_interval_steps: int = 1
     ) -> nn.Module:
+        """
+        Enriches the model with debugging hooks to log tensor statistics during forward and backward passes.
+        During the forward pass, it logs the input and output tensors of each module, as well as the parameters.
+        Similarly, during the backward pass, it logs the gradients of the output tensors.
+
+        The following tensor statistics are logged:
+            - global shape
+            - local shape
+            - is_dtensor (whether the tensor is a DTensor)
+            - nan count
+            - inf count
+            - mean
+            - std
+            - min
+            - max
+        The statistics are written to a JSONL file in the specified logging directory.
+
+        Args:
+            model (nn.Module): The model to be enriched with debugging hooks.
+            logging_dir_path (Path): The directory path where the tensor statistics will be logged.
+            tracked_ranks (Optional[Set[int]]): A set of ranks to track. If provided, only these ranks
+                will log the statistics. If None, all ranks will log the statistics.
+            log_interval_steps (int): The interval in steps at which to log the tensor statistics. Default is 1.
+        """
+
         @dataclass
         class TensorStats:
             """Dataclass to hold tensor statistics."""
@@ -392,6 +417,9 @@ class ModelFactory:
 
         @dataclass
         class CounterRef:
+            """Dataclass to hold a counter reference for tracking the number of hooks called.
+            This is used as a closure to keep track of the number of hooks called."""
+
             value: int = 0
 
         rank = dist.get_rank() if dist.is_initialized() else 0
@@ -439,7 +467,11 @@ class ModelFactory:
 
                 f.write(json.dumps(tensor_stats_dict) + "\n")
 
-        def pre_forward_hook(module: nn.Module, forward_input, counter: CounterRef):
+        def pre_forward_hook(module: nn.Module, forward_input, counter: CounterRef, log_interval_steps: int):
+            if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
+                counter.value += 1
+                return
+
             if isinstance(forward_input, tuple):
                 forward_inputs = forward_input
             else:
@@ -462,7 +494,11 @@ class ModelFactory:
                 )
             counter.value += 1
 
-        def forward_hook(module: nn.Module, foward_input, forward_output, counter: CounterRef):
+        def forward_hook(module: nn.Module, foward_input, forward_output, counter: CounterRef, log_interval_steps: int):
+            if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
+                counter.value += 1
+                return
+
             if isinstance(forward_output, tuple):
                 forward_outputs = forward_output
             else:
@@ -473,7 +509,11 @@ class ModelFactory:
                 write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
             counter.value += 1
 
-        def backward_hook(module, grad_input, grad_output, counter: CounterRef):
+        def backward_hook(module, grad_input, grad_output, counter: CounterRef, log_interval_steps: int):
+            if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
+                counter.value += 1
+                return
+
             for grad_out in grad_output:
                 tensor_stats = get_tensor_stats(grad_out)
                 write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
@@ -484,9 +524,15 @@ class ModelFactory:
                 full_name = f"{prefix}.{name}" if prefix else name
                 child._debug_name = full_name
 
-                child.register_forward_pre_hook(partial(pre_forward_hook, counter=CounterRef()))
-                child.register_forward_hook(partial(forward_hook, counter=CounterRef()))
-                child.register_full_backward_hook(partial(backward_hook, counter=CounterRef()))
+                child.register_forward_pre_hook(
+                    partial(pre_forward_hook, counter=CounterRef(), log_interval_steps=log_interval_steps)
+                )
+                child.register_forward_hook(
+                    partial(forward_hook, counter=CounterRef(), log_interval_steps=log_interval_steps)
+                )
+                child.register_full_backward_hook(
+                    partial(backward_hook, counter=CounterRef(), log_interval_steps=log_interval_steps)
+                )
                 register_hooks_recursively(child, full_name)
 
         register_hooks_recursively(model)

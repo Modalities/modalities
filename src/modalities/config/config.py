@@ -290,6 +290,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     logging_dir_path: Path
     tracked_ranks: Optional[Set[int]] = None
+    log_interval_steps: Optional[int] = 1
 
     @field_validator("tracked_ranks", mode="before")
     def convert_list_to_set(cls, v):
