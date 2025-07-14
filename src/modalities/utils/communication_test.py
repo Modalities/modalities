@@ -5,7 +5,7 @@ import torch
 import torch.distributed as dist
 
 
-def test_communication():
+def run_communication_test():
     """Test the all_gather communication operation in a distributed setting."""
     rank = dist.get_rank()
     local_rank = int(os.environ["LOCAL_RANK"])
