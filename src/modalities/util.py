@@ -1,8 +1,6 @@
 import hashlib
-import os
 import time
 import warnings
-from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -314,32 +312,3 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
             module_class = get_module_class_from_name(child_module, name)
             if module_class is not None:
                 return module_class
-
-
-def is_launched_via_torchrun() -> bool:
-    """Check if the current process is launched via `torchrun` by checking for
-    the presence of specific environment variables.
-
-    Returns:
-        bool: True if launched via `torchrun`, False otherwise.
-    """
-    launched_via_torchrun = all(
-        env_var in os.environ for env_var in ["RANK", "LOCAL_RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"]
-    )
-    return launched_via_torchrun
-
-
-@contextmanager
-def temporary_env(env_vars: dict):
-    old_values = {key: os.environ.get(key) for key in env_vars.keys()}
-
-    os.environ.update(env_vars)
-
-    try:
-        yield
-    finally:
-        for key, old_value in old_values.items():
-            if old_value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = old_value
