@@ -306,7 +306,7 @@ Further scaling results can be found at [MareNostrum5 Scaling Experiments](https
 Modalities welcomes your contributions! Please check out our
 [contributing](CONTRIBUTING.md) guidelines regarding the details on formatting, testing,
 etc.<br/><br/><br/>
-Thanks so much to all of our amazing contributors!
+Thanks so much to all of our contributors!
 
 <a href="https://github.com/modalities/modalities/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
