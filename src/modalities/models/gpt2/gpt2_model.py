@@ -124,6 +124,8 @@ class RotaryTransform(QueryKeyValueTransform):
             base_freq (int): Base frequency for RoPE. Defaults to 10000.
         """
         super().__init__()
+        # this also holds when using TP, since n_embd is the total embedding size and
+        # n_head is the number of heads globally
         dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
         inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))

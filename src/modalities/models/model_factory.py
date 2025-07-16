@@ -644,7 +644,6 @@ class GPT2ModelFactory:
 
         transformer_block_tp_plan = {
             "attention_norm": SequenceParallel(),
-            "ffn_norm": SequenceParallel(),
             "attn": PrepareModuleInput(
                 # here we prepare the actual input of the attention module
                 # (i.e., the arguements to the forward method)
@@ -662,6 +661,7 @@ class GPT2ModelFactory:
             "attn.k_attn": ColwiseParallel(),
             "attn.v_attn": ColwiseParallel(),
             "attn.c_proj": RowwiseParallel(output_layouts=Shard(1)),
+            "ffn_norm": SequenceParallel(),
             "mlp": PrepareModuleInput(
                 input_layouts=(Shard(1),),
                 desired_input_layouts=(Replicate(),),
