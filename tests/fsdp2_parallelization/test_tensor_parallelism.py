@@ -50,7 +50,7 @@ class TestTensorParallelism:
             join=True,
         )
 
-    def _test_tp_sharding_impl(self, process_id: int, fsdp_config_path: Path, tp_config_path: Path, world_size: int):
+    def _test_tp_sharding_impl(self, process_id: int, fsdp2_config_path: Path, tp_config_path: Path, world_size: int):
         # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
@@ -60,7 +60,7 @@ class TestTensorParallelism:
             rdvz_port=22490,
         ):
             torch.manual_seed(42)
-            fsdp2_model, fsdp2_device_mesh = self._get_components(fsdp_config_path)
+            fsdp2_model, fsdp2_device_mesh = self._get_components(fsdp2_config_path)
             torch.manual_seed(42)
             tp_model, tp_device_mesh = self._get_components(tp_config_path)
 
@@ -80,9 +80,6 @@ class TestTensorParallelism:
             fsdp2_output = fsdp2_model(input_dict)["logits"].float()
             tp_output = tp_model(input_dict)["logits"].float()
 
-            print(f"FSDP2 Output: {fsdp2_output.shape}, TP Output: {tp_output.shape}")
-            print(f"FSDP2 Output: {fsdp2_output} \n TP Output: {tp_output}")
-
             assert fsdp2_output.shape == tp_output.shape, "Output shapes do not match"
             assert torch.allclose(fsdp2_output, tp_output, atol=1e-6, rtol=1e-5), "Outputs do not match"
 
@@ -92,8 +89,8 @@ class TestTensorParallelism:
         tp_model: nn.Module,
         fsdp2_device_mesh: DeviceMesh,
         tp_device_mesh: DeviceMesh,
-        atol=1e-6,
-        rtol=1e-5,
+        atol: float = 1e-6,
+        rtol: float = 1e-5,
     ) -> list[str]:
         mismatches = []
 
@@ -109,13 +106,13 @@ class TestTensorParallelism:
         assert params_fsdp2.keys() == params_tp.keys(), "Model structures differ"
 
         for name in params_fsdp2:
-            t_a, t_b = params_fsdp2[name], params_tp[name]
+            t_fsdp2, t_tp = params_fsdp2[name], params_tp[name]
 
             # Redistribute DTensors to Replicate
-            if isinstance(t_a, DTensor):
-                t_a_materialized = t_a.redistribute(fsdp2_device_mesh, [Replicate()]).to_local()
-            if isinstance(t_b, DTensor):
-                t_b_materialized = t_b.redistribute(tp_device_mesh, [Replicate(), Replicate()]).to_local()
+            if isinstance(t_fsdp2, DTensor):
+                t_a_materialized = t_fsdp2.redistribute(fsdp2_device_mesh, [Replicate()]).to_local()
+            if isinstance(t_tp, DTensor):
+                t_b_materialized = t_tp.redistribute(tp_device_mesh, [Replicate(), Replicate()]).to_local()
 
             if not torch.allclose(t_a_materialized, t_b_materialized, atol=atol, rtol=rtol):
                 mismatches.append(name)
