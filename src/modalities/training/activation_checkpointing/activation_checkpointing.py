@@ -102,7 +102,7 @@ class ActivationCheckpointing:
            are recomputed in the backward pass.
 
         Args:
-            sac_variant (SelectiveActivationCheckpointingVariants): The activation checkpointing variant to use.
+            ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
             layers_fqn (str): The fully qualified name (FQN) of the layers to apply activation checkpointing to.
             model (nn.Module): The model to apply activation checkpointing to (in place).
             ac_fun_params (ActivationCheckpointedModelConfig.*Params): The parameters for the activation
