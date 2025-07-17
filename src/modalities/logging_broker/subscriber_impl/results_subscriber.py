@@ -108,10 +108,6 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
 
         wandb.log(data=throughput_metrics, step=eval_result.num_train_steps_done)
 
-        # wandb.log({"tokens_loss": wandb.plot.scatter("num_tokens", "loss", title="Tokens vs Loss")})
-        # wandb.log({"steps_loss": wandb.plot.scatter("steps_loss", "loss", title="Steps vs Loss")})
-        # wandb.log({"samples_loss": wandb.plot.scatter("samples_loss", "loss", title="Samples vs Loss")})
-
 
 class EvaluationResultToDiscSubscriber(MessageSubscriberIF[EvaluationResultBatch]):
     """A subscriber that writes EvaluationResultBatch messages to a JSONL file."""
