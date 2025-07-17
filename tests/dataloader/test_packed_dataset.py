@@ -22,7 +22,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
 
 
 @pytest.mark.parametrize(
-    "block_size, expected_length, expected_output",
+    "block_size, expected_length, expected_output, reuse_last_target",
     [
         (
             2,
@@ -48,6 +48,7 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
                 [17, 18],
                 [18, 19],
             ],
+            True,
         ),
         (
             3,
@@ -63,18 +64,28 @@ def test_packed_megatron_dataset_loading(dummy_packed_data_path, block_size, exp
                 [14, 15, 16],
                 [16, 17, 18],
             ],
+            True,
         ),
-        (10, 2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]),
-        (6, 3, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11, 12, 13, 14, 15]]),
-        (20, 1, [list(range(20))]),
-        (21, 0, ValueError),
-        (1, 0, ValueError),
+        (10, 2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]], True),
+        (6, 3, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11, 12, 13, 14, 15]], True),
+        (20, 1, [list(range(20))], True),
+        (21, 0, ValueError, True),
+        (1, 0, ValueError, True),
+        # "block_size, expected_length, expected_output, re_use_last_token",
+        # tokens = list(range(20))
+        (2, 10, [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15], [16, 17], [18, 19]], False),
+        (6, 3, [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [12, 13, 14, 15, 16, 17]], False),
     ],
 )
-def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, expected_length, expected_output):
+def test_packed_continuous_dataset_loading(
+    dummy_packed_data_path, block_size, expected_length, expected_output, reuse_last_target
+):
     try:
         ds = PackedMemMapDatasetContinuous(
-            raw_data_path=dummy_packed_data_path, block_size=block_size, sample_key="input_ids"
+            raw_data_path=dummy_packed_data_path,
+            block_size=block_size,
+            sample_key="input_ids",
+            reuse_last_target=reuse_last_target,
         )
     except ValueError:
         assert expected_output == ValueError
@@ -88,7 +99,9 @@ def test_packed_continuous_dataset_loading(dummy_packed_data_path, block_size, e
 def test_packed_continuous_dataset_missing_file(dummy_packed_data_path):
     dummy_packed_data_path.unlink(missing_ok=True)
     with pytest.raises(FileNotFoundError):
-        PackedMemMapDatasetContinuous(dummy_packed_data_path, block_size=10, sample_key="input_ids")
+        PackedMemMapDatasetContinuous(
+            dummy_packed_data_path, block_size=10, sample_key="input_ids", reuse_last_target=True
+        )
 
 
 def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokenizer):
@@ -112,7 +125,11 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
     assert not default_packed_dataset_path.is_file()
     packed_generator.run()
     packed_dataset = PackedMemMapDatasetContinuous(
-        default_packed_dataset_path, block_size=block_size, sample_key="input_ids", load_index=True
+        default_packed_dataset_path,
+        block_size=block_size,
+        sample_key="input_ids",
+        load_index=True,
+        reuse_last_target=True,
     )
 
     # read in the raw jsonl files for manual tokenization
@@ -138,6 +155,7 @@ def test_create_packed_dataset(indexed_dummy_data_path_long, wrapped_gpt2_tokeni
         if block_id > 0:
             # we remove the first token from each block as it is a
             # reused token from the previous block
+
             tokens = block["input_ids"].tolist()[1:]
             packed_dataset_tokens_flat += tokens
         else:
@@ -172,9 +190,12 @@ def test_join_packed_datasets(dummy_packed_data_path, tmpdir):
     assert loaded_joint_data
     assert loaded_joint_data.data_len == sum(d.data_len for d in stream_data)
 
-    loaded_dataset = PackedMemMapDatasetContinuous(joined_target_file, block_size=2, sample_key="whatever")
+    loaded_dataset = PackedMemMapDatasetContinuous(
+        joined_target_file, block_size=2, sample_key="whatever", reuse_last_target=True
+    )
     original_datasets = [
-        PackedMemMapDatasetContinuous(p, block_size=2, sample_key="whatever") for p in packed_data_clones
+        PackedMemMapDatasetContinuous(p, block_size=2, sample_key="whatever", reuse_last_target=True)
+        for p in packed_data_clones
     ]
 
     original_datasets_concatenated = []
@@ -205,7 +226,9 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
         fin.write(token_size_in_bytes.to_bytes(4, byteorder="little"))
     assert pbin_path.is_file()
     sample_key = "input_ids"
-    ds = PackedMemMapDatasetContinuous(raw_data_path=pbin_path, block_size=10, sample_key=sample_key)
+    ds = PackedMemMapDatasetContinuous(
+        raw_data_path=pbin_path, block_size=10, sample_key=sample_key, reuse_last_target=True
+    )
     assert list(ds)
 
     collator = GPT2LLMCollateFn(sample_key=sample_key, target_key="abc")
@@ -294,11 +317,14 @@ def test_continuously_packed_index(token_size_in_bytes: int, block_size: int, to
     num_samples = (total_tokens - block_size) // (block_size - 1) + 1
     # given num_samples we calculate the starting index and length of each sample as tuple.
     result_slow = [
-        ((i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes) for i in range(num_samples)
+        [(i * block_size - i) * token_size_in_bytes, block_size * token_size_in_bytes] for i in range(num_samples)
     ]
 
     result_vectorized = PackedMemMapDatasetContinuous._create_packed_index(
-        total_tokens=total_tokens, block_size=block_size, token_size_in_bytes=token_size_in_bytes
+        total_tokens=total_tokens,
+        block_size=block_size,
+        token_size_in_bytes=token_size_in_bytes,
+        reuse_last_target=True,
     )
 
     assert np.all(result_slow == result_vectorized)

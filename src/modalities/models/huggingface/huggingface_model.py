@@ -99,7 +99,7 @@ class HuggingFacePretrainedModel(NNModel):
         # This is taken care of internally in huggingface hub see:
         # https://github.com/huggingface/huggingface_hub/blob/3788f537b10c7d02149d6bf017d2ce19885f90a2/src/huggingface_hub/file_download.py#L1457
         self.huggingface_model = model_type.value.from_pretrained(
-            model_name, local_files_only=False, *model_args, **kwargs
+            str(model_name), local_files_only=False, *model_args, **kwargs
         )
 
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:

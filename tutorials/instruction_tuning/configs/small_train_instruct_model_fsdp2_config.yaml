@@ -1,0 +1,245 @@
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpoint_saving_path: ./checkpoints
+    train_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_train.d91ea04.pbin
+    test_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_test.d91ea04.pbin
+  intervals:
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 10
+    evaluation_interval_in_steps: 10000
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: true
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile:
+    gradient_accumulation_steps: 2
+    local_train_micro_batch_size: 2
+    sequence_length: 8192 # Qwen2.5 would have 32768
+  training_target:
+  # had to hack here: Value error, Not enough tokens in the dataset. Actual: 57434112, Expected: >=57442304
+    num_target_tokens: 655360
+    num_target_steps: 10
+  training_progress:
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    num_seen_samples: 0
+    last_step: -1
+
+collate_fn:  
+  component_key: collate_fn
+  variant_key: mask_loss_collator_wrapper
+  config:
+    wrapped_collate_fn:  
+      component_key: collate_fn
+      variant_key: gpt_2_llm_collator
+      config:
+        sample_key: ${settings.referencing_keys.sample_key}
+        target_key: ${settings.referencing_keys.target_key}
+    target_keys_to_mask:
+      - ${settings.referencing_keys.target_key}
+    loss_ignore_index: -100
+    mask_tokens:
+      b_include_to_loss_token: "<|im_start|>"
+      e_include_to_loss_token: "<|im_end|>"
+    tokenizer:
+      component_key: tokenizer
+      variant_key: pretrained_hf_tokenizer
+      config:
+        pretrained_model_name_or_path: Qwen/Qwen2.5-0.5B
+        padding: false
+        truncation: false
+        special_tokens:
+          pad_token: <|endoftext|>
+          additional_special_tokens: 
+            - ${collate_fn.config.mask_tokens.b_include_to_loss_token}
+            - ${collate_fn.config.mask_tokens.e_include_to_loss_token}
+            - "<|endoftext|>"
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.train_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key:  ${settings.referencing_keys.sample_key}
+    reuse_last_target: false
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: resumable_distributed_sampler
+          config:
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders: []
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: -1   # -1 to save all checkpoints
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: dcp
+      config:
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    world_size: ${settings.cuda_env.world_size}
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [Qwen2DecoderLayer]
+
+model_raw:
+  component_key: model
+  variant_key: huggingface_pretrained_model
+  config:
+    model_type: AutoModelForCausalLM
+    model_name: Qwen/Qwen2.5-0.5B
+    prediction_key: logits
+    huggingface_prediction_subscription_key: logits
+    sample_key: input_ids
+
+lr_scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 6e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.01
+    anneal_strategy: cos
+    last_epoch: ${settings.training_progress.last_step}
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0001
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1
+    weight_decay_groups_excluded: []
+    wrapped_model: 
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp2
+  config:
+    wrapped_model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+
+progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: modalities_dcp_tests
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: wandb_storage
+    config_file_path: ${settings.config_file_path}
+
+

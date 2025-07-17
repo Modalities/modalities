@@ -1,0 +1,47 @@
+settings:
+  referencing_keys:
+    sample_key: input_ids
+    prediction_key: logits
+  model_path: checkpoints/2025-07-02__17-25-05_91a54afb/eid_2025-07-02__17-25-05_91a54afb-seen_steps_438-seen_tokens_43057152-target_steps_584-target_tokens_57409536/converted_checkpoint.pth
+  device: 0
+  sequence_length: 8192
+
+text_inference_component:
+  component_key: inference_component
+  variant_key: text
+  config:
+    device: ${settings.device}
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+    sequence_length: ${settings.sequence_length}
+    eod_token: <|endoftext|>
+    prompt_template: "You are Mody, a helpful assistant trained by the modalities team. Answer friendly and informatively to the user's messages.\nUser: {prompt_input}\nAssistant: "
+    temperature: 0
+
+model_raw:
+  component_key: model
+  variant_key: huggingface_pretrained_model
+  config:
+    model_type: AutoModelForCausalLM
+    model_name: Qwen/Qwen2.5-0.5B
+    prediction_key: logits
+    huggingface_prediction_subscription_key: logits
+    sample_key: input_ids
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: Qwen/Qwen2.5-0.5B
+    padding: false
+    truncation: false
+    special_tokens:
+      pad_token: <|endoftext|>
+      additional_special_tokens: 
+        - "<|im_start|>"
+        - "<|im_end|>"
+        - "<|endoftext|>"

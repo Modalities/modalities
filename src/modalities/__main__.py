@@ -24,9 +24,12 @@ from modalities.api import (
 )
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
+from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
 from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
+from modalities.util import print_rank_0
+from modalities.utils.communication_test import run_communication_test
 
 
 @click.group()
@@ -41,13 +44,24 @@ def main() -> None:
     required=True,
     help="Path to the YAML training config file.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path):
+@click.option(
+    "--test_comm",
+    is_flag=True,
+    default=False,
+    help="If set, run a communication test before training.",
+)
+def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        if test_comm:
+            print_rank_0("Running communication test...")
+            run_communication_test()
+            print_rank_0("Communication test succeeded.")
+
         main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -154,6 +168,20 @@ def data():
     Collection of utilities to preprocess, analyse and modify training data.
     """
     pass
+
+
+@data.command(name="prepare_instruction_tuning_data")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
+    """
+    Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
+    """
+    create_instruction_tuning_data(config_file_path=config_file_path)
 
 
 @data.command(name="create_raw_index")
