@@ -24,10 +24,12 @@ from modalities.api import (
 )
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
+from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
 from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
-from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
+from modalities.util import print_rank_0
+from modalities.utils.communication_test import run_communication_test
 
 
 @click.group()
@@ -42,13 +44,24 @@ def main() -> None:
     required=True,
     help="Path to the YAML training config file.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path):
+@click.option(
+    "--test_comm",
+    is_flag=True,
+    default=False,
+    help="If set, run a communication test before training.",
+)
+def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+        if test_comm:
+            print_rank_0("Running communication test...")
+            run_communication_test()
+            print_rank_0("Communication test succeeded.")
+
         main_obj = Main(config_file_path)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
@@ -155,6 +168,20 @@ def data():
     Collection of utilities to preprocess, analyse and modify training data.
     """
     pass
+
+
+@data.command(name="prepare_instruction_tuning_data")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a file with the YAML config file.",
+)
+def entry_point_data_prepare_instruction_tuning_data(config_file_path: Path):
+    """
+    Utility for preparing instruction-tuning data by converting, train-val-splitting, index- and pbin-file-creation.
+    """
+    create_instruction_tuning_data(config_file_path=config_file_path)
 
 
 @data.command(name="create_raw_index")
@@ -493,63 +520,6 @@ def CMD_shuffle_jsonl_data(
         output_data_path=output_data_path,
         file_existence_policy=file_existence_policy,
         seed=seed,
-    )
-
-
-@main.group(name="profile")
-def profile():
-    """
-    Collection of utilities to profile modalities.
-    """
-    pass
-
-
-@profile.command(name="train_step")
-@click.option(
-    "--config_file_path",
-    type=click_pathlib.Path(exists=True),
-    required=True,
-    help="Path to the YAML training config file.",
-)
-@click.option(
-    "--experiment_folder_path",
-    type=click_pathlib.Path(file_okay=False),
-    required=True,
-    help="Path to the experiment output directory.",
-)
-@click.option(
-    "--num_warmup_steps",
-    type=int,
-    default=1,
-    show_default=True,
-    help="Number of warmup steps to skip in profiling.",
-)
-@click.option(
-    "--num_measurement_steps",
-    type=int,
-    default=3,
-    show_default=True,
-    help="Number of steps to measure during profiling.",
-)
-def CMD_entry_point_run_train_step_profiler(
-    config_file_path: Path,
-    experiment_folder_path: Path,
-    num_warmup_steps: int,
-    num_measurement_steps: int,
-):
-    """Run train step profiler and write result to JSON if global rank=0.
-
-    Args:
-        config_file_path (Path): Path to the YAML training config file.
-        experiment_folder_path (Path): Path to the experiment output directory.
-        num_warmup_steps (int): Number of warmup steps to skip in profiling.
-        num_measurement_steps (int): Number of steps to measure during profiling.
-    """
-    ModalitiesProfiler.get_train_step_statistics(
-        config_file_path=config_file_path,
-        experiment_folder_path=experiment_folder_path,
-        num_warmup_steps=num_warmup_steps,
-        num_measurement_steps=num_measurement_steps,
     )
 
 

@@ -16,11 +16,11 @@ from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoa
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.checkpointing.stateful.app_state import AppState
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
-from modalities.models.gpt2.collator import CollateFnIF
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF

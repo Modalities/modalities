@@ -20,6 +20,7 @@ class TextInferenceComponent:
         device: torch.device,
     ) -> None:
         self.model = model
+        self.model.to(device)
         self.model.eval()
         self.tokenizer = tokenizer
         self.eod_token = eod_token

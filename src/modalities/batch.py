@@ -115,9 +115,9 @@ class EvaluationResultBatch(Batch):
             rounded_result_item_dict = {}
             for k, item in result_item_dict.items():
                 if item.decimal_places is not None:
-                    rounded_result_item_dict[k] = round(item.value.mean().item(), item.decimal_places)
+                    rounded_result_item_dict[k] = round(item.value.float().mean().item(), item.decimal_places)
                 else:
-                    rounded_result_item_dict[k] = item.value.mean()
+                    rounded_result_item_dict[k] = item.value.float().mean()
             return rounded_result_item_dict
 
         eval_str = f"Dataloader: {self.dataloader_tag} | "
