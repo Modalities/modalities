@@ -1,0 +1,565 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.api &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.api</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.api</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tqdm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilePath</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">modalities.inference.inference</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">inference</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointConversion</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.component_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComponentFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.instantiation_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PackedDatasetComponentsInstantiationModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.create_index</span><span class="w"> </span><span class="kn">import</span> <span class="n">IndexGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.create_packed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmbeddedStreamData</span><span class="p">,</span> <span class="n">PackedDataGenerator</span><span class="p">,</span> <span class="n">join_embedded_stream_data</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">PackedMemMapDatasetBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.large_file_lines_reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">LargeFileLinesReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.preprocessing.tokenization.tokenized_file_writer</span><span class="w"> </span><span class="kn">import</span> <span class="n">TokenizedFileWriter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.huggingface_adapters.hf_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">HFModelAdapter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.preprocessing.create_chunks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Chunking</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.preprocessing.shuffle_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataShuffler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.registry.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">COMPONENTS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.registry.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.seeding</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_hashed_seed</span>
+
+
+<div class="viewcode-block" id="FileExistencePolicy">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.FileExistencePolicy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FileExistencePolicy</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">SKIP</span> <span class="o">=</span> <span class="s2">&quot;skip&quot;</span>
+    <span class="n">ERROR</span> <span class="o">=</span> <span class="s2">&quot;error&quot;</span>
+    <span class="n">OVERRIDE</span> <span class="o">=</span> <span class="s2">&quot;override&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="enforce_file_existence_policy">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.enforce_file_existence_policy">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">enforce_file_existence_policy</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enforces the file existence policy. Function returns True, if processing should be stopped. Otherwise False.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_path (Path): File path to the file to check.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): The file existence policy.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: Raised if the file existence policy is unknown or the policy requires to raise a ValueError.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if processing should be stopped, otherwise False.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file_existence_policy</span> <span class="o">==</span> <span class="n">FileExistencePolicy</span><span class="o">.</span><span class="n">SKIP</span><span class="p">:</span>
+        <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File already exists at </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span><span class="si">}</span><span class="s2">. Skipping ...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="n">file_existence_policy</span> <span class="o">==</span> <span class="n">FileExistencePolicy</span><span class="o">.</span><span class="n">OVERRIDE</span><span class="p">:</span>
+        <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File already exists at </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span><span class="si">}</span><span class="s2">. Overriding it.&quot;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">file_existence_policy</span> <span class="o">==</span> <span class="n">FileExistencePolicy</span><span class="o">.</span><span class="n">ERROR</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;File already exists. Delete it or specify different output folder.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown file existence policy: </span><span class="si">{</span><span class="n">file_existence_policy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_raw_data_index">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.create_raw_data_index">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_raw_data_index</span><span class="p">(</span>
+    <span class="n">src_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">index_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span> <span class="o">=</span> <span class="n">FileExistencePolicy</span><span class="o">.</span><span class="n">ERROR</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates the index file for the content of a large jsonl-file. The index file</span>
+<span class="sd">    contains the byte-offsets and lengths of each line in the jsonl-file.</span>
+<span class="sd">    Background is the ability to further process the respective file without loading it,</span>
+<span class="sd">    while splitting its content line-based. This step is necessary in advance of further processing like tokenization.</span>
+<span class="sd">    It is only necessary once for a jsonl-file and allows therefore different tokenizations without re-indexing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        src_path (Path): The path to the jsonl-file.</span>
+<span class="sd">        index_path (Path): The path to the index file, that will be created.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the index file already exists.</span>
+<span class="sd">            Defaults to FileExistencePolicy.ERROR.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the index file already exists.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">src_path</span> <span class="o">==</span> <span class="n">index_path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output index paths must be different.&quot;</span><span class="p">)</span>
+    <span class="n">index_path</span> <span class="o">=</span> <span class="n">LargeFileLinesReader</span><span class="o">.</span><span class="n">default_index_path</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="n">index_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">index_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">index_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Reading raw data from </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> and&quot;</span> <span class="sa">f</span><span class="s2">&quot; writing index to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">index_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> ...&quot;</span>
+    <span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">index_path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">generator</span> <span class="o">=</span> <span class="n">IndexGenerator</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span>
+    <span class="n">generator</span><span class="o">.</span><span class="n">create_index</span><span class="p">(</span><span class="n">index_path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="generate_text">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.generate_text">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_text</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">:</span> <span class="n">FilePath</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Inference function to generate text with a given model.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_file_path (FilePath): Path to the YAML config file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">inference</span><span class="o">.</span><span class="n">generate_text</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="convert_pytorch_to_hf_checkpoint">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.convert_pytorch_to_hf_checkpoint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_pytorch_to_hf_checkpoint</span><span class="p">(</span>
+    <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">output_hf_checkpoint_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HFModelAdapter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a PyTorch checkpoint to a Hugging Face checkpoint.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_file_path (Path): Path to the config that generated the pytorch checkpoint.</span>
+<span class="sd">        output_hf_checkpoint_dir (Path): Path to the output directory for the converted HF checkpoint.</span>
+<span class="sd">        prediction_key (str): The key in the models output where one can find the predictions of interest.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        HFModelAdapter: The Hugging Face model adapter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cp</span> <span class="o">=</span> <span class="n">CheckpointConversion</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">,</span> <span class="n">output_hf_checkpoint_dir</span><span class="p">)</span>
+    <span class="n">hf_model</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">convert_pytorch_to_hf_checkpoint</span><span class="p">(</span><span class="n">prediction_key</span><span class="o">=</span><span class="n">prediction_key</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model was successfully converted and saved to </span><span class="si">{</span><span class="n">output_hf_checkpoint_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">hf_model</span></div>
+
+
+
+<div class="viewcode-block" id="shuffle_tokenized_data">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.shuffle_tokenized_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">shuffle_tokenized_data</span><span class="p">(</span>
+    <span class="n">input_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Shuffles a tokenized file (.pbin) and stores it on disc.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_data_path (Path): File path to the tokenized data (.pbin).</span>
+<span class="sd">        output_data_path (Path): File path to write the shuffled tokenized data.</span>
+<span class="sd">        batch_size (int): Number of documents to process per batch.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.</span>
+<span class="sd">        seed (Optional[int]): The seed to use for shuffling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">input_data_path</span> <span class="o">==</span> <span class="n">output_data_path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output file paths must be different.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">output_data_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">DataShuffler</span><span class="o">.</span><span class="n">shuffle_tokenized_data</span><span class="p">(</span>
+        <span class="n">input_data_path</span><span class="o">=</span><span class="n">input_data_path</span><span class="p">,</span> <span class="n">output_data_path</span><span class="o">=</span><span class="n">output_data_path</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shuffle_jsonl_data">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.shuffle_jsonl_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">shuffle_jsonl_data</span><span class="p">(</span>
+    <span class="n">input_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Shuffles a JSONL file (.jsonl) and stores it on disc.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_data_path (Path): File path to the jsonl data (.jsonl).</span>
+<span class="sd">        output_data_path (Path): File path to write the shuffled jsonl data.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.</span>
+<span class="sd">        seed (Optional[int]): The seed to use for shuffling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">input_data_path</span> <span class="o">==</span> <span class="n">output_data_path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output file paths must be different.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">output_data_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">DataShuffler</span><span class="o">.</span><span class="n">shuffle_jsonl_data</span><span class="p">(</span><span class="n">input_data_path</span><span class="o">=</span><span class="n">input_data_path</span><span class="p">,</span> <span class="n">output_data_path</span><span class="o">=</span><span class="n">output_data_path</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_filtered_tokenized_dataset">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.create_filtered_tokenized_dataset">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_filtered_tokenized_dataset</span><span class="p">(</span>
+    <span class="n">input_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">filter_routine</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">bool</span><span class="p">],</span>
+    <span class="n">output_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">if</span> <span class="n">input_data_path</span> <span class="o">==</span> <span class="n">output_data_path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output file paths must be different.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">output_data_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">sample_key</span> <span class="o">=</span> <span class="s2">&quot;text&quot;</span>
+
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">PackedMemMapDatasetBase</span><span class="p">(</span><span class="n">raw_data_path</span><span class="o">=</span><span class="n">input_data_path</span><span class="p">,</span> <span class="n">sample_key</span><span class="o">=</span><span class="n">sample_key</span><span class="p">,</span> <span class="n">load_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Both generators below run lazily.</span>
+    <span class="n">filter_generator</span> <span class="o">=</span> <span class="p">(</span><span class="n">filter_routine</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)))</span>
+    <span class="c1"># We lazily extract the samples, as the TokenizedFileWriter.write_tokenized_dataset</span>
+    <span class="c1"># expects an iterator of numpy arrays.</span>
+    <span class="n">samples_extrator</span> <span class="o">=</span> <span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">sample_key</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)))</span>
+    <span class="c1"># Automatically skips samples for which the filter_routine returns False.</span>
+    <span class="c1"># Also evaluates lazily.</span>
+    <span class="n">dataset_filtered</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">compress</span><span class="p">(</span><span class="n">samples_extrator</span><span class="p">,</span> <span class="n">filter_generator</span><span class="p">)</span>
+
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing filtered dataset to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_data_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="n">TokenizedFileWriter</span><span class="o">.</span><span class="n">write_tokenized_dataset</span><span class="p">(</span>
+        <span class="n">tokenized_dataset</span><span class="o">=</span><span class="n">dataset_filtered</span><span class="p">,</span>
+        <span class="n">tokenized_dataset_file_path</span><span class="o">=</span><span class="n">output_data_path</span><span class="p">,</span>
+        <span class="n">token_size_in_bytes</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">token_size_in_bytes</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtered dataset was successfully written to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_data_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_shuffled_dataset_chunk">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.create_shuffled_dataset_chunk">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_shuffled_dataset_chunk</span><span class="p">(</span>
+    <span class="n">file_path_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+    <span class="n">output_chunk_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">chunk_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_chunks</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+    <span class="n">global_seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a shuffled dataset chunk.</span>
+<span class="sd">    Given a dataset consisting of multiple tokenized pbin files, this function</span>
+<span class="sd">    creates a shuffled dataset chunk for a given chunk id.</span>
+<span class="sd">    From each tokenized pbin file, the respective chunk is extracted, shuffled</span>
+<span class="sd">    and written to a new pbin file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_path_list (list[Path]): List of paths to the tokenized input pbin files.</span>
+<span class="sd">        output_chunk_file_path (Path): Path to the output chunk which will be stored in pbin format.</span>
+<span class="sd">        chunk_id (int): The id of the chunk to create.</span>
+<span class="sd">        num_chunks (int): The total number of chunks to create.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.</span>
+<span class="sd">        global_seed (Optional[int]): The global seed to use for shuffling.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the chunk has no samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">output_chunk_file_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">token_size_in_bytes</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">file_path_list</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Loading file chunks of </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">file_path</span> <span class="o">==</span> <span class="n">output_chunk_file_path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output chunk file paths must be different.&quot;</span><span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">PackedMemMapDatasetBase</span><span class="p">(</span><span class="n">raw_data_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span> <span class="n">sample_key</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">,</span> <span class="n">load_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">token_size_in_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">token_size_in_bytes</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">token_size_in_bytes</span>
+        <span class="k">elif</span> <span class="n">token_size_in_bytes</span> <span class="o">!=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">token_size_in_bytes</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;All datasets must have the same token size in bytes.&quot;</span><span class="p">)</span>
+
+        <span class="n">file_samples</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">Chunking</span><span class="o">.</span><span class="n">get_tokenized_file_chunk</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">num_chunks</span><span class="o">=</span><span class="n">num_chunks</span><span class="p">,</span> <span class="n">chunk_id</span><span class="o">=</span><span class="n">chunk_id</span>
+        <span class="p">)</span>
+        <span class="n">samples</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">file_samples</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> has no samples. Please decrease the number of chunks to less than </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># samples are shuffled in place</span>
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shuffling chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="n">seed</span> <span class="o">=</span> <span class="n">calculate_hashed_seed</span><span class="p">(</span><span class="n">input_data</span><span class="o">=</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">global_seed</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">chunk_id</span><span class="p">)])</span> <span class="k">if</span> <span class="n">global_seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">Chunking</span><span class="o">.</span><span class="n">shuffle_file_chunks_in_place</span><span class="p">(</span><span class="n">file_chunks</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="n">TokenizedFileWriter</span><span class="o">.</span><span class="n">write_tokenized_dataset</span><span class="p">(</span>
+        <span class="n">tokenized_dataset</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span>
+        <span class="n">tokenized_dataset_file_path</span><span class="o">=</span><span class="n">output_chunk_file_path</span><span class="p">,</span>
+        <span class="n">token_size_in_bytes</span><span class="o">=</span><span class="n">token_size_in_bytes</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> was successfully written to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_shuffled_jsonl_dataset_chunk">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.create_shuffled_jsonl_dataset_chunk">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_shuffled_jsonl_dataset_chunk</span><span class="p">(</span>
+    <span class="n">file_path_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+    <span class="n">output_chunk_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">chunk_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_chunks</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+    <span class="n">global_seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a shuffled jsonl dataset chunk.</span>
+<span class="sd">    Given a dataset consisting of multiple jsonl files, this function</span>
+<span class="sd">    creates a shuffled dataset chunk for a given chunk id.</span>
+<span class="sd">    From each jsonl file, the respective chunk is extracted, shuffled</span>
+<span class="sd">    and written to a new jsonl file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_path_list (list[Path]): List of paths to the input jsonl files.</span>
+<span class="sd">        output_chunk_file_path (Path): Path to the output chunk which will be stored in jsonl format.</span>
+<span class="sd">        chunk_id (int): The id of the chunk to create.</span>
+<span class="sd">        num_chunks (int): The total number of chunks to create.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the output chunk file already exists.</span>
+<span class="sd">        global_seed (Optional[int]): The global seed to use for shuffling.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the chunk has no samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">output_chunk_file_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">file_path_list</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Loading file chunks of </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">file_path</span> <span class="o">==</span> <span class="n">output_chunk_file_path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input and output chunk file paths must be different.&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+
+        <span class="n">file_samples</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Chunking</span><span class="o">.</span><span class="n">get_jsonl_file_chunk</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">num_chunks</span><span class="o">=</span><span class="n">num_chunks</span><span class="p">,</span> <span class="n">chunk_id</span><span class="o">=</span><span class="n">chunk_id</span>
+        <span class="p">)</span>
+        <span class="n">samples</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">file_samples</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> has no samples. Please decrease the number of chunks to less than </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># samples are shuffled in place</span>
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shuffling chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="n">seed</span> <span class="o">=</span> <span class="n">calculate_hashed_seed</span><span class="p">(</span><span class="n">input_data</span><span class="o">=</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">global_seed</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">chunk_id</span><span class="p">)])</span> <span class="k">if</span> <span class="n">global_seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">Chunking</span><span class="o">.</span><span class="n">shuffle_file_chunks_in_place</span><span class="p">(</span><span class="n">file_chunks</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+    <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chunk </span><span class="si">{</span><span class="n">chunk_id</span><span class="si">}</span><span class="s2"> was successfully written to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">output_chunk_file_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="pack_encoded_data">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.pack_encoded_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pack_encoded_data</span><span class="p">(</span>
+    <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">file_existence_policy</span><span class="p">:</span> <span class="n">FileExistencePolicy</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Packs and encodes an indexed, large jsonl-file.</span>
+<span class="sd">    (see also `create_index` for more information)</span>
+<span class="sd">    Returns .pbin-file, which can be inserted into a training process directly</span>
+<span class="sd">    and does not require its original jsonl-file or the respective index file anymore.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_dict (dict): Dictionary containing the configuration for the packed data generation.</span>
+<span class="sd">        file_existence_policy (FileExistencePolicy): Policy to apply when the output file already exists.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># TODO: if we want to use alternative entrypoints together with the ResolverRegistry,</span>
+    <span class="c1">#  we can currently not rely on the existing class resolver.</span>
+    <span class="c1">#  This is based on its connection to the overall `AppConfig`.</span>
+    <span class="c1">#  One would requires an object of it to instantiate the ResolverRegistry.</span>
+    <span class="c1">#  This could get resolved by implementing on own ResolverRegistry for each entrypoint or adapting the existing</span>
+    <span class="c1">#  ResolverRegistry to work dynamically with any type-hinted config object from config.py.</span>
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">)</span>
+    <span class="n">component_factory</span> <span class="o">=</span> <span class="n">ComponentFactory</span><span class="p">(</span><span class="n">registry</span><span class="o">=</span><span class="n">registry</span><span class="p">)</span>
+    <span class="n">components</span><span class="p">:</span> <span class="n">PackedDatasetComponentsInstantiationModel</span> <span class="o">=</span> <span class="n">component_factory</span><span class="o">.</span><span class="n">build_components</span><span class="p">(</span>
+        <span class="n">config_dict</span><span class="o">=</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">components_model_type</span><span class="o">=</span><span class="n">PackedDatasetComponentsInstantiationModel</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dst_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stop_process</span> <span class="o">=</span> <span class="n">enforce_file_existence_policy</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dst_path</span><span class="p">,</span> <span class="n">file_existence_policy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stop_process</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="n">generator</span> <span class="o">=</span> <span class="n">PackedDataGenerator</span><span class="p">(</span>
+        <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">src_path</span><span class="p">,</span>
+        <span class="n">index_path</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">index_path</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">tokenizer</span><span class="p">,</span>
+        <span class="n">eod_token</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">eod_token</span><span class="p">,</span>
+        <span class="n">jq_pattern</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">jq_pattern</span><span class="p">,</span>
+        <span class="n">number_of_processes</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">num_cpus</span><span class="p">,</span>
+        <span class="n">processing_batch_size</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">processing_batch_size</span><span class="p">,</span>
+        <span class="n">raw_samples_queue_size</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">raw_samples_queue_size</span><span class="p">,</span>
+        <span class="n">processed_samples_queue_size</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">processed_samples_queue_size</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">generator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dst_path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="merge_packed_data_files">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.api.merge_packed_data_files">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">merge_packed_data_files</span><span class="p">(</span><span class="n">src_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">target_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility function for merging different pbin-files into one.</span>
+<span class="sd">    This is especially useful, if different datasets were at different points in time or if one encoding takes so long,</span>
+<span class="sd">    that the overall process was done in chunks.</span>
+<span class="sd">    It is important that the same tokenizer got used for all chunks.</span>
+
+<span class="sd">    Specify an arbitrary amount of pbin-files and/or directory containing such as input.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        src_paths (list[Path]): List of paths to the pbin-files or directories containing such.</span>
+<span class="sd">        target_path (Path): The path to the merged pbin-file, that will be created.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_files</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">src_paths</span><span class="p">:</span>
+        <span class="n">p</span><span class="p">:</span> <span class="n">Path</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="n">input_files</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;**/*.pbin&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">embedded_datasets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="p">,</span> <span class="n">input_files</span><span class="p">))</span>
+    <span class="n">join_embedded_stream_data</span><span class="p">(</span><span class="n">embedded_datasets</span><span class="p">,</span> <span class="n">target_path</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
