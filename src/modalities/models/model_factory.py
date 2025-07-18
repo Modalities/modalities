@@ -682,7 +682,7 @@ class GPT2ModelFactory:
             }
         else:
             raise NotImplementedError(
-                "Only SwiGLU is supported for the MLP in GPT2. "
+                "Only SwiGLU and GELU (used in TransformersMLP) are supported for the MLP in GPT2. "
                 "Please implement the tensor parallelization for other MLP types."
             )
         transformer_block_tp_plan.update(mlp_plan)
