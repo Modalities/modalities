@@ -45,27 +45,27 @@ def tmp_config_dir(tmp_path_factory) -> Path:
 class TestTensorParallelism:
     def _get_components(self, config_file_path: Path) -> Tuple[FSDP2, DeviceMesh]:
         class ComponentsInstantiationModel(BaseModel):
-            fsdp_model: PydanticFSDP2ModuleType
+            model: PydanticFSDP2ModuleType
             device_mesh: PydanticDeviceMeshIFType
 
         main_obj = Main(config_file_path)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )
-        return components.fsdp_model, components.device_mesh
+        return components.model, components.device_mesh
 
     @pytest.mark.parametrize(
-        "activation_type, fsdp_config_path, tp_config_path, port",
+        "activation_type, fsdp2_config_path, tp_config_path, port",
         [
             (
                 "gelu",
-                Path("tests/fsdp2_parallelization/tp_test_configs/fsdp_config.yaml"),
+                Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
                 22755,
             ),
             (
                 "swiglu",
-                Path("tests/fsdp2_parallelization/tp_test_configs/fsdp_config.yaml"),
+                Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
                 22756,
             ),
@@ -74,7 +74,7 @@ class TestTensorParallelism:
     def test_tp_sharding(
         self,
         activation_type: str,
-        fsdp_config_path: Path,
+        fsdp2_config_path: Path,
         tp_config_path: Path,
         tmp_config_dir: Path,
         port: int,
@@ -82,7 +82,7 @@ class TestTensorParallelism:
         world_size = 4
         mp.spawn(
             self._test_tp_sharding_impl,
-            args=(activation_type, fsdp_config_path, tp_config_path, world_size, tmp_config_dir, port),
+            args=(activation_type, fsdp2_config_path, tp_config_path, world_size, tmp_config_dir, port),
             nprocs=world_size,
             join=True,
         )
@@ -91,7 +91,7 @@ class TestTensorParallelism:
         self,
         process_id: int,
         activation_type: str,
-        fsdp_config_path: Path,
+        fsdp2_config_path: Path,
         tp_config_path: Path,
         world_size: int,
         tmp_config_dir: Path,
@@ -107,7 +107,7 @@ class TestTensorParallelism:
         ):
             # Seed before FSDP2 instantiation
             torch.manual_seed(42)
-            fsdp2_path = patch_config_file(fsdp_config_path, activation_type, tmp_config_dir)
+            fsdp2_path = patch_config_file(fsdp2_config_path, activation_type, tmp_config_dir)
             fsdp2_model, fsdp2_mesh = self._get_components(fsdp2_path)
 
             # Seed again before TP instantiation to match
@@ -160,13 +160,13 @@ class TestTensorParallelism:
             yield from model.named_parameters()
             yield from model.named_buffers()
 
-        fsdp_tensors = dict(all_named_tensors(fsdp2_model))
+        fsdp2_tensors = dict(all_named_tensors(fsdp2_model))
         tp_tensors = dict(all_named_tensors(tp_model))
 
-        assert fsdp_tensors.keys() == tp_tensors.keys(), "Model structures differ"
+        assert fsdp2_tensors.keys() == tp_tensors.keys(), "Model structures differ"
 
-        for name in fsdp_tensors:
-            a, b = fsdp_tensors[name], tp_tensors[name]
+        for name in fsdp2_tensors:
+            a, b = fsdp2_tensors[name], tp_tensors[name]
 
             a_mat = a.redistribute(fsdp2_mesh, [Replicate()]).to_local() if isinstance(a, DTensor) else a
             b_mat = b.redistribute(tp_mesh, [Replicate(), Replicate()]).to_local() if isinstance(b, DTensor) else b

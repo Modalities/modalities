@@ -1,4 +1,4 @@
-fsdp_model:
+model:
   component_key: model
   variant_key: fsdp2_wrapped
   config:
