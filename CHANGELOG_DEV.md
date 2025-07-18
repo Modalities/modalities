@@ -185,4 +185,4 @@ There are now three AC variants:
 
 * adds support for Tensor Parallelism (including Sequence Parallelism). 
 * adds a debugging toolkit to track the input and output tensors during a forward pass, gradients during the backward pass and weight tensors.
-Tensors can bei either normal Tensors or DTensors.  
+Tensors can be either normal Tensors or DTensors.  
