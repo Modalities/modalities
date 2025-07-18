@@ -32,6 +32,8 @@ from modalities.models.gpt2.gpt2_model import (
     AttentionImplementation,
     LayerNormWrapperConfig,
     PositionTypes,
+    SwiGLU,
+    TransformerMLP,
 )
 from modalities.models.model import ActivationType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
@@ -666,10 +668,24 @@ class GPT2ModelFactory:
                 input_layouts=(Shard(1),),
                 desired_input_layouts=(Replicate(),),
             ),
-            "mlp.W": ColwiseParallel(),
-            "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
-            "mlp.V": ColwiseParallel(),
         }
+        if isinstance(model.transformer.h[0].mlp, SwiGLU):
+            mlp_plan = {
+                "mlp.W": ColwiseParallel(),
+                "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
+                "mlp.V": ColwiseParallel(),
+            }
+        elif isinstance(model.transformer.h[0].mlp, TransformerMLP):
+            mlp_plan = {
+                "mlp.c_fc": ColwiseParallel(),
+                "mlp.c_proj": RowwiseParallel(output_layouts=Shard(1)),
+            }
+        else:
+            raise NotImplementedError(
+                "Only SwiGLU is supported for the MLP in GPT2. "
+                "Please implement the tensor parallelization for other MLP types."
+            )
+        transformer_block_tp_plan.update(mlp_plan)
 
         for transformer_block in model.transformer.h:
             # override the number of q and kv heads
