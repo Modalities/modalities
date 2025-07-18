@@ -171,3 +171,18 @@ Additionally, I added a script that verifies the consistency of the indexation a
   * A wrapper for collate functions to include tokens in the loss which appear between indicator tokens
   * A new parameter for the PackedMemMapDatasetContinuous to allow not to re-use the last target token
   * A tutorial how to apply instruction-tuning on a Huggingface Model
+
+
+## PR #359 Activation Checkpoint with FSDP2 
+
+This PR adds activation checkpointing (AC) support for FSDP2. 
+There are now three AC variants: 
+* Full AC (same as before, where entire complete modules get ACed, leading to the largest memory footprint reduction)
+* Selective Layer AC (only very nth layer or module is ACed)
+* Selective OP Ac (only certain OPs, typically low memory but compute intense, are checkpointed)
+
+## PR #374 Tensor Parallelism Support
+
+* adds support for Tensor Parallelism (including Sequence Parallelism). 
+* adds a debugging toolkit to track the input and output tensors during a forward pass, gradients during the backward pass and weight tensors.
+Tensors can be either normal Tensors or DTensors.  

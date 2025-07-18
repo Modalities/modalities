@@ -29,6 +29,7 @@ from modalities.config.config import (
     DCPAppStateConfig,
     DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
+    DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
@@ -43,6 +44,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
+    GPT2ModelTPConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -70,6 +72,7 @@ from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking impo
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.sampler_factory import ResumableDistributedMultiDimSamplerConfig, SamplerFactory
 from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -142,6 +145,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2_tp", GPT2ModelFactory.get_gpt2_tensor_parallelized_model, GPT2ModelTPConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -167,6 +171,9 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity(
+        "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
@@ -222,8 +229,15 @@ COMPONENTS = [
     # samplers
     ComponentEntity("sampler", "sequential_sampler", SequentialSampler, SequentialSamplerConfig),
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
+    ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     ComponentEntity(
         "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
+    ),
+    ComponentEntity(
+        "sampler",
+        "resumable_distributed_multi_dim_sampler",
+        SamplerFactory.create_resumable_distributed_multi_dim_sampler,
+        ResumableDistributedMultiDimSamplerConfig,
     ),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),

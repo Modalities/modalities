@@ -59,7 +59,7 @@ class TestExperimentIdGeneration:
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path",
         [
-            (22358, "../end2end_tests/system_tests/configs/fsdp2_gpt2_train_num_steps_8.yaml"),
+            (22658, "../end2end_tests/system_tests/configs/fsdp2_gpt2_train_num_steps_8.yaml"),
         ],
     )
     def test_experiment_id_generation_and_syncing(rdvz_port, relative_config_path: str, temporary_folder_path: Path):
