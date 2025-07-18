@@ -12,7 +12,7 @@ from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticAppStateType
 from modalities.util import get_total_number_of_trainable_parameters
-from modalities.utils.typing import FSDPX
+from modalities.utils.typing_utils import FSDPX
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 

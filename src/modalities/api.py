@@ -24,7 +24,7 @@ from modalities.preprocessing.create_chunks import Chunking
 from modalities.preprocessing.shuffle_data import DataShuffler
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 from modalities.utils.seeding import calculate_hashed_seed
 
 

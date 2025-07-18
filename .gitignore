@@ -164,7 +164,7 @@ tests/tmp/*
 *wandb_storage*
 .coverage/*
 *.pbin
-
+tutorials/scaling_up/experiments
 tutorials/profiling/experiments
 tutorials/instruction_tuning/prepared_data
 config_files/instruction_tuning

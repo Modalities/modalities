@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoadingIF, FSDP1CheckpointLoadingIF
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.running_env.env_utils import MixedPrecisionSettings
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 
 class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
