@@ -166,7 +166,7 @@ COMPONENTS = [
     ComponentEntity(
         "model",
         "activation_checkpointed",
-        ModelFactory.get_activation_checkpointed_model_,
+        ModelFactory.get_activation_checkpointed_fsdp2_model_,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),

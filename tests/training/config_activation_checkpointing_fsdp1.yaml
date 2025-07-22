@@ -7,6 +7,7 @@ test_model:
       instance_key: wrapped_model
       pass_type: BY_REFERENCE
     layers_fqn: transformer.h
+    ac_fun_params: {}
 
 wrapped_model:
   component_key: model
