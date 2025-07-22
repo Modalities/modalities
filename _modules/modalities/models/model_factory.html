@@ -1,0 +1,875 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.model_factory &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.models.model_factory</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.models.model_factory</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">asdict</span><span class="p">,</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed._composable.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedPrecisionPolicy</span><span class="p">,</span> <span class="n">fully_shard</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceMesh</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPModule</span> <span class="k">as</span> <span class="n">FSDP2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP1</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShardingStrategy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor.parallel</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ColwiseParallel</span><span class="p">,</span>
+    <span class="n">PrepareModuleInput</span><span class="p">,</span>
+    <span class="n">RowwiseParallel</span><span class="p">,</span>
+    <span class="n">SequenceParallel</span><span class="p">,</span>
+    <span class="n">parallelize_module</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor.placement_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Replicate</span><span class="p">,</span> <span class="n">Shard</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">deprecated</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDP1CheckpointLoadingIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActivationCheckpointedModelConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelStateError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.gpt2.gpt2_model</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">GPT2LLM</span><span class="p">,</span>
+    <span class="n">AttentionConfig</span><span class="p">,</span>
+    <span class="n">AttentionImplementation</span><span class="p">,</span>
+    <span class="n">LayerNormWrapperConfig</span><span class="p">,</span>
+    <span class="n">PositionTypes</span><span class="p">,</span>
+    <span class="n">SwiGLU</span><span class="p">,</span>
+    <span class="n">TransformerMLP</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActivationType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.nn.model_initialization.initialization_if</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelInitializationIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.env_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDP2MixedPrecisionSettings</span><span class="p">,</span> <span class="n">MixedPrecisionSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParallelismDegrees</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.fsdp_auto_wrapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPTransformerAutoWrapPolicyFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.activation_checkpointing.activation_checkpointing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ActivationCheckpointing</span><span class="p">,</span>
+    <span class="n">apply_activation_checkpointing_fsdp1_inplace</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.activation_checkpointing.activation_checkpointing_variants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ActivationCheckpointingVariants</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_local_number_of_trainable_parameters</span><span class="p">,</span> <span class="n">get_module_class_from_name</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="s2">&quot;model_factory&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ModelFactory">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModelFactory</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Model factory class to create models.&quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_model_on_meta_device</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">meta_counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">param_counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">(),</span> <span class="n">model</span><span class="o">.</span><span class="n">named_buffers</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="n">tensor</span><span class="o">.</span><span class="n">device</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;meta&quot;</span><span class="p">):</span>
+                <span class="n">meta_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">param_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">meta_counter</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">meta_counter</span> <span class="o">&lt;</span> <span class="n">param_counter</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ModelStateError</span><span class="p">(</span><span class="s2">&quot;Either all or none of the parameters and buffers must be on meta device!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">meta_counter</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="ModelFactory.get_fsdp1_checkpointed_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_fsdp1_checkpointed_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fsdp1_checkpointed_model</span><span class="p">(</span>
+        <span class="n">checkpoint_loading</span><span class="p">:</span> <span class="n">FSDP1CheckpointLoadingIF</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FSDP1</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads a FSDP1 checkpointed model from the given checkpoint path.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_loading (FSDP1CheckpointLoadingIF): The checkpoint loading</span>
+<span class="sd">                approach used to load the model checkpoint.</span>
+<span class="sd">            checkpoint_path (Path): The path to the checkpoint file.</span>
+<span class="sd">            model (nn.Module): The model to be loaded with the checkpoint.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            nn.Module: The loaded wrapped model.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">wrapped_model</span> <span class="o">=</span> <span class="n">checkpoint_loading</span><span class="o">.</span><span class="n">load_model_checkpoint</span><span class="p">(</span>
+            <span class="n">file_path</span><span class="o">=</span><span class="n">checkpoint_path</span><span class="p">,</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">wrapped_model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_fsdp1_wrapped_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_fsdp1_wrapped_model">[docs]</a>
+    <span class="nd">@deprecated</span><span class="p">(</span>
+        <span class="s2">&quot;With version 0.4, we upgraded FSDP to FSDP 2.0. &quot;</span>
+        <span class="s2">&quot;Use GeneralModelFactory.get_fsdp2_wrapped_model(...) instead.&quot;</span><span class="p">,</span>
+        <span class="n">category</span><span class="o">=</span><span class="ne">FutureWarning</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fsdp1_wrapped_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">sync_module_states</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span><span class="p">,</span>
+        <span class="n">sharding_strategy</span><span class="p">:</span> <span class="n">ShardingStrategy</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FSDP1</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the FSDP1-wrapped model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The original model to be wrapped.</span>
+<span class="sd">            sync_module_states (bool): Whether to synchronize module states across ranks.</span>
+<span class="sd">            block_names (list[str]): List of block names.</span>
+<span class="sd">            mixed_precision_settings (MixedPrecisionSettings): Mixed precision settings.</span>
+<span class="sd">            sharding_strategy (ShardingStrategy): Sharding strategy.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            FSDP1: The FSDP1-wrapped model.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            &#39;FSDPTransformerAutoWrapPolicyFactory` is hardcoded and should be passed in instead.</span>
+<span class="sd">            Different auto wrap policies may be supported in the future.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">_is_model_on_meta_device</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ModelStateError</span><span class="p">(</span><span class="s2">&quot;Meta device initialization is not supported for FSDP1. Use FSDP2 instead.&quot;</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2"> unsharded number of parameters: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="c1"># Here, FSDPTransformerAutoWrapPolicyFactory is hardcoded and should be passed in instead!</span>
+        <span class="c1"># we also might want to have different auto wrap policies later...</span>
+        <span class="n">fsdp_auto_wrap_factory</span> <span class="o">=</span> <span class="n">FSDPTransformerAutoWrapPolicyFactory</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">block_names</span><span class="o">=</span><span class="n">block_names</span><span class="p">)</span>
+
+        <span class="c1"># model is on CPU before input to FSDP1</span>
+        <span class="n">fsdp_model</span> <span class="o">=</span> <span class="n">FSDP1</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span>
+            <span class="n">auto_wrap_policy</span><span class="o">=</span><span class="n">fsdp_auto_wrap_factory</span><span class="o">.</span><span class="n">get_auto_wrap_policy</span><span class="p">(),</span>
+            <span class="n">mixed_precision</span><span class="o">=</span><span class="n">mixed_precision_settings</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">sharding_strategy</span><span class="o">=</span><span class="n">sharding_strategy</span><span class="p">,</span>
+            <span class="n">device_id</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+            <span class="n">sync_module_states</span><span class="o">=</span><span class="n">sync_module_states</span><span class="p">,</span>
+            <span class="n">use_orig_params</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2"> sharded number of parameters: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">fsdp_model</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">fsdp_model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_fsdp2_wrapped_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_fsdp2_wrapped_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fsdp2_wrapped_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span>
+        <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">FSDP2MixedPrecisionSettings</span><span class="p">,</span>
+        <span class="n">reshard_after_forward</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FSDP2</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the FSDP2-wrapped model.</span>
+
+<span class="sd">        Based on https://github.com/pytorch/torchtitan/blob/de9fd2b9ea7e763c9182e0df81fc32c2618cc0b6/torchtitan/parallelisms/parallelize_llama.py#L459</span>
+<span class="sd">        and https://github.com/pytorch/torchtitan/blob/43584e0a4e72645e25cccd05d86f9632587a8beb/docs/fsdp.md</span>
+<span class="sd">        NOTE: Torch Titan already implement pipeline parallelism. We skip that here for now.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The original model to be wrapped.</span>
+<span class="sd">            block_names (list[str]): List of block names.</span>
+<span class="sd">            device_mesh (DeviceMesh): The device mesh.</span>
+<span class="sd">            mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.</span>
+<span class="sd">            reshard_after_forward (bool): Whether to reshard after forward.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            FSDP2: The FSDP2-wrapped model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2"> unsharded number of parameters (possibly on meta device): &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="c1"># map the block names to the actual block class (e.b., GPT2Block)</span>
+        <span class="n">block_types</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">get_module_class_from_name</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">block_names</span><span class="p">])</span>
+
+        <span class="n">mp_policy</span> <span class="o">=</span> <span class="n">MixedPrecisionPolicy</span><span class="p">(</span>
+            <span class="n">param_dtype</span><span class="o">=</span><span class="n">mixed_precision_settings</span><span class="o">.</span><span class="n">param_dtype</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">mixed_precision_settings</span><span class="o">.</span><span class="n">reduce_dtype</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise</span>
+        <span class="n">fsdp2_degrees</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_REPLICATE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_SHARD</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_REPLICATE</span> <span class="ow">in</span> <span class="n">device_mesh</span><span class="o">.</span><span class="n">mesh_dim_names</span>
+            <span class="k">else</span> <span class="p">(</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_SHARD</span><span class="o">.</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+        <span class="n">fsdp_config</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mesh&quot;</span><span class="p">:</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">fsdp2_degrees</span><span class="p">],</span> <span class="s2">&quot;mp_policy&quot;</span><span class="p">:</span> <span class="n">mp_policy</span><span class="p">}</span>
+
+        <span class="n">modules</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">modules</span><span class="p">())</span>
+        <span class="c1"># we first shard all the blocks</span>
+        <span class="k">for</span> <span class="n">module_id</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">modules</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">block_types</span><span class="p">):</span>
+                <span class="c1"># As an optimization, we do not reshard after forward for the last</span>
+                <span class="c1"># transformer block since FSDP would prefetch it immediately.</span>
+                <span class="n">reshard_block_after_forward</span> <span class="o">=</span> <span class="n">reshard_after_forward</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">module_id</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">modules</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="n">fully_shard</span><span class="p">(</span>
+                    <span class="n">module</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">fsdp_config</span><span class="p">,</span>
+                    <span class="n">reshard_after_forward</span><span class="o">=</span><span class="n">reshard_block_after_forward</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="c1"># finally, we shard the entire model</span>
+        <span class="n">fully_shard</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">fsdp_config</span><span class="p">,</span> <span class="n">reshard_after_forward</span><span class="o">=</span><span class="n">reshard_after_forward</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2"> sharded number of parameters: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_weight_initialized_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_weight_initialized_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_weight_initialized_model</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">model_initializer</span><span class="p">:</span> <span class="n">ModelInitializationIF</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the given model with weights using the provided model initializer.</span>
+<span class="sd">        The model can be on a meta device.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to be initialized with weights.</span>
+<span class="sd">            model_initializer (ModelInitializationIF): The model initializer object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            nn.Module: The initialized model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">reset_parameters_if_function_exists</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+            <span class="c1"># Recursively apply to all submodules</span>
+            <span class="k">for</span> <span class="n">submodule</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">children</span><span class="p">():</span>
+                <span class="n">reset_parameters_if_function_exists</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
+
+            <span class="c1"># Check if the module has the `reset_parameters` method</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;reset_parameters&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;reset_parameters&quot;</span><span class="p">)):</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">reset_parameters</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">_is_model_on_meta_device</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">):</span>
+            <span class="c1"># Allocate buffers and sharded parameters on GPU</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to_empty</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+
+        <span class="c1"># initialize the weights if they are on a meta device</span>
+        <span class="c1"># call reset_parameters on all nn.Modules that implement this function</span>
+        <span class="c1"># (normally all norms)</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">reset_parameters_if_function_exists</span><span class="p">(</span><span class="n">module</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
+            <span class="n">model_initializer</span><span class="o">.</span><span class="n">initialize_in_place</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_activation_checkpointed_fsdp1_model_">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_activation_checkpointed_fsdp1_model_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_activation_checkpointed_fsdp1_model_</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">FSDP1</span><span class="p">,</span> <span class="n">activation_checkpointing_modules</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FSDP1</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply activation checkpointing to the given FSDP1-wrapped model (in-place operation).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (FSDP1): The FSDP1-wrapped model to apply activation checkpointing to.</span>
+<span class="sd">            activation_checkpointing_modules (list[str]): List of module names to apply activation checkpointing to.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: Activation checkpointing can only be applied to FSDP1-wrapped models!</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            FSDP1: The model with activation checkpointing applied.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">activation_checkpointing_modules</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP1</span><span class="p">):</span>
+                <span class="n">apply_activation_checkpointing_fsdp1_inplace</span><span class="p">(</span>
+                    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                    <span class="n">activation_checkpointing_modules</span><span class="o">=</span><span class="n">activation_checkpointing_modules</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Activation checkpointing can only be applied to FSDP1-wrapped models! &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Current model type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_activation_checkpointed_fsdp2_model_">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_activation_checkpointed_fsdp2_model_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_activation_checkpointed_fsdp2_model_</span><span class="p">(</span>
+        <span class="n">ac_variant</span><span class="p">:</span> <span class="n">ActivationCheckpointingVariants</span><span class="p">,</span>
+        <span class="n">layers_fqn</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">ac_fun_params</span><span class="p">:</span> <span class="p">(</span>
+            <span class="n">ActivationCheckpointedModelConfig</span><span class="o">.</span><span class="n">FullACParams</span>
+            <span class="o">|</span> <span class="n">ActivationCheckpointedModelConfig</span><span class="o">.</span><span class="n">SelectiveLayerACParams</span>
+            <span class="o">|</span> <span class="n">ActivationCheckpointedModelConfig</span><span class="o">.</span><span class="n">SelectiveOpACParams</span>
+        <span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;FSDP2 variant for applying activation checkpointing to the given model (in-place operation).</span>
+
+<span class="sd">        Important: When using FSDP2, we always first apply activation checkpointing to the model</span>
+<span class="sd">                   and then wrap it with FSDP2.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.</span>
+<span class="sd">            layers_fqn (str): Fully qualified name (FQN) of the layers to apply activation checkpointing to.</span>
+<span class="sd">            model (nn.Module): The (unwrapped) model to apply activation checkpointing to.</span>
+<span class="sd">            ac_fun_params (ACM.FullACParams  |  ACM.SelectiveLayerACParams  |  ACM.SelectiveOpACParams):</span>
+<span class="sd">                The parameters for the activation checkpointing function, depending on the variant.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: Activation checkpointing can only be applied to unwrapped nn.Module models</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            nn.Module: The model with activation checkpointing applied.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Activation checkpointing can only be applied to unwrapped nn.Module model! &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Current model type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">ActivationCheckpointing</span><span class="o">.</span><span class="n">apply_activation_checkpointing_</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">layers_fqn</span><span class="o">=</span><span class="n">layers_fqn</span><span class="p">,</span>
+            <span class="n">ac_variant</span><span class="o">=</span><span class="n">ac_variant</span><span class="p">,</span>
+            <span class="n">ac_fun_params</span><span class="o">=</span><span class="n">ac_fun_params</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_compiled_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_compiled_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_compiled_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">fullgraph</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply torch.compile to each transformer block, which makes compilation efficient due to</span>
+<span class="sd">        repeated structure. Alternatively one can compile the whole model (after applying DP).</span>
+<span class="sd">        Inspired by: https://github.com/pytorch/torchtitan/blob/6b2912a9b53464bfef744e62100716271b2b248f/torchtitan/parallelisms/parallelize_llama.py#L275</span>
+
+<span class="sd">        Note: With fullgraph=True, we enforce the block to be compiled as a whole, which raises an error on</span>
+<span class="sd">              graph breaks and maximizes speedup.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to be compiled.</span>
+<span class="sd">            block_names (list[str]): List of block names to be compiled individually.</span>
+<span class="sd">            fullgraph (bool): Flag enforcing the block to be compiled without graph breaks.</span>
+<span class="sd">            debug (Optional[bool]): Flag to enable debug mode. Default is False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            nn.Module: The compiled model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">get_parent_module_and_child_name</span><span class="p">(</span><span class="n">child_module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+            <span class="c1"># returns the parent module and the child name of the given child module</span>
+            <span class="n">selected_parent_candidate</span><span class="p">,</span> <span class="n">selected_child_name</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="n">num_candidates</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">parent_candidate</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">child_name</span><span class="p">,</span> <span class="n">child_candidate</span> <span class="ow">in</span> <span class="n">parent_candidate</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">child_candidate</span> <span class="ow">is</span> <span class="n">child_module</span><span class="p">:</span>
+                        <span class="n">selected_parent_candidate</span> <span class="o">=</span> <span class="n">parent_candidate</span>
+                        <span class="n">selected_child_name</span> <span class="o">=</span> <span class="n">child_name</span>
+                        <span class="n">num_candidates</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">num_candidates</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ModelStateError</span><span class="p">(</span><span class="s2">&quot;No valid parent candidate&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">num_candidates</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ModelStateError</span><span class="p">(</span><span class="s2">&quot;Multiple valid parent candidates&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">selected_parent_candidate</span><span class="p">,</span> <span class="n">selected_child_name</span>
+
+        <span class="c1"># get all block types that we want to compile individually</span>
+        <span class="n">block_types</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">block_names</span><span class="p">:</span>
+            <span class="n">module_class</span> <span class="o">=</span> <span class="n">get_module_class_from_name</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">module_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">block_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">module_class</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The block name </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not match any modules in the model&quot;</span><span class="p">)</span>
+
+        <span class="n">block_types</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">block_types</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">block_types</span><span class="p">):</span>
+                <span class="n">options</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;trace.enabled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span> <span class="k">if</span> <span class="n">debug</span> <span class="k">else</span> <span class="p">{}</span>
+                <span class="n">compiled_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">fullgraph</span><span class="o">=</span><span class="n">fullgraph</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">)</span>
+                <span class="n">parent_module</span><span class="p">,</span> <span class="n">child_name</span> <span class="o">=</span> <span class="n">get_parent_module_and_child_name</span><span class="p">(</span><span class="n">child_module</span><span class="o">=</span><span class="n">module</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
+                <span class="n">parent_module</span><span class="o">.</span><span class="n">register_module</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">child_name</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="n">compiled_module</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="ModelFactory.get_debugging_enriched_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.ModelFactory.get_debugging_enriched_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_debugging_enriched_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">logging_dir_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">tracked_ranks</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">log_interval_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enriches the model with debugging hooks to log tensor statistics during forward and backward passes.</span>
+<span class="sd">        During the forward pass, it logs the input and output tensors of each module, as well as the parameters.</span>
+<span class="sd">        Similarly, during the backward pass, it logs the gradients of the output tensors.</span>
+
+<span class="sd">        The following tensor statistics are logged:</span>
+<span class="sd">            - global shape</span>
+<span class="sd">            - local shape</span>
+<span class="sd">            - is_dtensor (whether the tensor is a DTensor)</span>
+<span class="sd">            - nan count</span>
+<span class="sd">            - inf count</span>
+<span class="sd">            - mean</span>
+<span class="sd">            - std</span>
+<span class="sd">            - min</span>
+<span class="sd">            - max</span>
+<span class="sd">        The statistics are written to a JSONL file in the specified logging directory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to be enriched with debugging hooks.</span>
+<span class="sd">            logging_dir_path (Path): The directory path where the tensor statistics will be logged.</span>
+<span class="sd">            tracked_ranks (Optional[Set[int]]): A set of ranks to track. If provided, only these ranks</span>
+<span class="sd">                will log the statistics. If None, all ranks will log the statistics.</span>
+<span class="sd">            log_interval_steps (int): The interval in steps at which to log the tensor statistics. Default is 1.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="nd">@dataclass</span>
+        <span class="k">class</span><span class="w"> </span><span class="nc">TensorStats</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Dataclass to hold tensor statistics.&quot;&quot;&quot;</span>
+
+            <span class="n">global_shape</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+            <span class="n">local_shape</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+            <span class="n">is_dtensor</span><span class="p">:</span> <span class="nb">bool</span>
+            <span class="n">nan_count</span><span class="p">:</span> <span class="nb">int</span>
+            <span class="n">inf_count</span><span class="p">:</span> <span class="nb">int</span>
+            <span class="n">mean</span><span class="p">:</span> <span class="nb">float</span>
+            <span class="n">std</span><span class="p">:</span> <span class="nb">float</span>
+            <span class="nb">min</span><span class="p">:</span> <span class="nb">float</span>
+            <span class="nb">max</span><span class="p">:</span> <span class="nb">float</span>
+
+        <span class="nd">@dataclass</span>
+        <span class="k">class</span><span class="w"> </span><span class="nc">CounterRef</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Dataclass to hold a counter reference for tracking the number of hooks called.</span>
+<span class="sd">            This is used as a closure to keep track of the number of hooks called.&quot;&quot;&quot;</span>
+
+            <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="k">if</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="n">tracked_ranks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">rank</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tracked_ranks</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">model</span>
+        <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logging_dir_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">logging_file_path</span> <span class="o">=</span> <span class="n">logging_dir_path</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;tensor_stats_rank_</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">.jsonl&quot;</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_stats</span><span class="p">(</span><span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorStats</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Get statistics of a tensor.&quot;&quot;&quot;</span>
+            <span class="n">local_tensor</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to_local</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">tensor</span><span class="o">.</span><span class="n">DTensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">tensor</span>
+            <span class="n">float_dtypes</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">}</span>
+            <span class="n">numeric_dtypes</span> <span class="o">=</span> <span class="n">float_dtypes</span> <span class="o">|</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">}</span>
+
+            <span class="n">dtype</span> <span class="o">=</span> <span class="n">local_tensor</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="n">is_float</span> <span class="o">=</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">float_dtypes</span>
+            <span class="n">is_numeric</span> <span class="o">=</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">numeric_dtypes</span>
+
+            <span class="n">tensor_stats</span> <span class="o">=</span> <span class="n">TensorStats</span><span class="p">(</span>
+                <span class="n">global_shape</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+                <span class="n">local_shape</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">local_tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+                <span class="n">is_dtensor</span><span class="o">=</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">tensor</span><span class="o">.</span><span class="n">DTensor</span><span class="p">),</span>
+                <span class="n">nan_count</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">local_tensor</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
+                <span class="n">inf_count</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">local_tensor</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
+                <span class="n">mean</span><span class="o">=</span><span class="n">local_tensor</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="n">is_float</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">std</span><span class="o">=</span><span class="n">local_tensor</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="n">is_float</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                <span class="nb">min</span><span class="o">=</span><span class="n">local_tensor</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="n">is_numeric</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                <span class="nb">max</span><span class="o">=</span><span class="n">local_tensor</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="n">is_numeric</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">tensor_stats</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">write_out_tensor_stats</span><span class="p">(</span><span class="n">tensor_stats</span><span class="p">:</span> <span class="n">TensorStats</span><span class="p">,</span> <span class="n">counter</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">hook_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tensor_tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Write out tensor statistics to a file.&quot;&quot;&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">logging_file_path</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">tensor_stats_dict</span> <span class="o">=</span> <span class="n">asdict</span><span class="p">(</span><span class="n">tensor_stats</span><span class="p">)</span>
+                <span class="n">tensor_stats_dict</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;tensor_tag&quot;</span><span class="p">:</span> <span class="n">tensor_tag</span><span class="p">,</span>
+                    <span class="s2">&quot;hook_type&quot;</span><span class="p">:</span> <span class="n">hook_type</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">tensor_stats_dict</span><span class="p">,</span>
+                    <span class="s2">&quot;counter&quot;</span><span class="p">:</span> <span class="n">counter</span><span class="p">,</span>
+                    <span class="s2">&quot;rank&quot;</span><span class="p">:</span> <span class="n">rank</span><span class="p">,</span>
+                <span class="p">}</span>
+
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">tensor_stats_dict</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">pre_forward_hook</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">forward_input</span><span class="p">,</span> <span class="n">counter</span><span class="p">:</span> <span class="n">CounterRef</span><span class="p">,</span> <span class="n">log_interval_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">log_interval_steps</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">%</span> <span class="n">log_interval_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">return</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">forward_input</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">forward_inputs</span> <span class="o">=</span> <span class="n">forward_input</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">forward_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">forward_input</span><span class="p">,)</span>
+
+            <span class="k">for</span> <span class="n">forward_input</span> <span class="ow">in</span> <span class="n">forward_inputs</span><span class="p">:</span>
+                <span class="n">tensor_stats</span> <span class="o">=</span> <span class="n">get_tensor_stats</span><span class="p">(</span><span class="n">forward_input</span><span class="p">)</span>
+                <span class="n">write_out_tensor_stats</span><span class="p">(</span><span class="n">tensor_stats</span><span class="p">,</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;forward_input&quot;</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">_debug_name</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+
+            <span class="c1"># Retrieves statistics of the module&#39;s parameters before forward pass.</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                <span class="n">tensor_stats</span> <span class="o">=</span> <span class="n">get_tensor_stats</span><span class="p">(</span><span class="n">param</span><span class="p">)</span>
+                <span class="n">full_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="n">_debug_name</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">write_out_tensor_stats</span><span class="p">(</span>
+                    <span class="n">tensor_stats</span><span class="o">=</span><span class="n">tensor_stats</span><span class="p">,</span>
+                    <span class="n">counter</span><span class="o">=</span><span class="n">counter</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="n">hook_type</span><span class="o">=</span><span class="s2">&quot;forward_weights&quot;</span><span class="p">,</span>
+                    <span class="n">tensor_tag</span><span class="o">=</span><span class="n">full_name</span><span class="p">,</span>
+                    <span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">forward_hook</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">foward_input</span><span class="p">,</span> <span class="n">forward_output</span><span class="p">,</span> <span class="n">counter</span><span class="p">:</span> <span class="n">CounterRef</span><span class="p">,</span> <span class="n">log_interval_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">log_interval_steps</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">%</span> <span class="n">log_interval_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">return</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">forward_output</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">forward_outputs</span> <span class="o">=</span> <span class="n">forward_output</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">forward_outputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">forward_output</span><span class="p">,)</span>
+
+            <span class="k">for</span> <span class="n">out</span> <span class="ow">in</span> <span class="n">forward_outputs</span><span class="p">:</span>
+                <span class="n">tensor_stats</span> <span class="o">=</span> <span class="n">get_tensor_stats</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+                <span class="n">write_out_tensor_stats</span><span class="p">(</span><span class="n">tensor_stats</span><span class="p">,</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;forward_output&quot;</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">_debug_name</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+            <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">backward_hook</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">grad_input</span><span class="p">,</span> <span class="n">grad_output</span><span class="p">,</span> <span class="n">counter</span><span class="p">:</span> <span class="n">CounterRef</span><span class="p">,</span> <span class="n">log_interval_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">log_interval_steps</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">%</span> <span class="n">log_interval_steps</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">return</span>
+
+            <span class="k">for</span> <span class="n">grad_out</span> <span class="ow">in</span> <span class="n">grad_output</span><span class="p">:</span>
+                <span class="n">tensor_stats</span> <span class="o">=</span> <span class="n">get_tensor_stats</span><span class="p">(</span><span class="n">grad_out</span><span class="p">)</span>
+                <span class="n">write_out_tensor_stats</span><span class="p">(</span><span class="n">tensor_stats</span><span class="p">,</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;backward_output&quot;</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">_debug_name</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+            <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">register_hooks_recursively</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+                <span class="n">full_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">prefix</span> <span class="k">else</span> <span class="n">name</span>
+                <span class="n">child</span><span class="o">.</span><span class="n">_debug_name</span> <span class="o">=</span> <span class="n">full_name</span>
+
+                <span class="n">child</span><span class="o">.</span><span class="n">register_forward_pre_hook</span><span class="p">(</span>
+                    <span class="n">partial</span><span class="p">(</span><span class="n">pre_forward_hook</span><span class="p">,</span> <span class="n">counter</span><span class="o">=</span><span class="n">CounterRef</span><span class="p">(),</span> <span class="n">log_interval_steps</span><span class="o">=</span><span class="n">log_interval_steps</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">child</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span>
+                    <span class="n">partial</span><span class="p">(</span><span class="n">forward_hook</span><span class="p">,</span> <span class="n">counter</span><span class="o">=</span><span class="n">CounterRef</span><span class="p">(),</span> <span class="n">log_interval_steps</span><span class="o">=</span><span class="n">log_interval_steps</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">child</span><span class="o">.</span><span class="n">register_full_backward_hook</span><span class="p">(</span>
+                    <span class="n">partial</span><span class="p">(</span><span class="n">backward_hook</span><span class="p">,</span> <span class="n">counter</span><span class="o">=</span><span class="n">CounterRef</span><span class="p">(),</span> <span class="n">log_interval_steps</span><span class="o">=</span><span class="n">log_interval_steps</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">register_hooks_recursively</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">full_name</span><span class="p">)</span>
+
+        <span class="n">register_hooks_recursively</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">model</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="GPT2ModelFactory">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.GPT2ModelFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2ModelFactory</span><span class="p">:</span>
+<div class="viewcode-block" id="GPT2ModelFactory.get_gpt2_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.GPT2ModelFactory.get_gpt2_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_gpt2_model</span><span class="p">(</span>
+        <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">poe_type</span><span class="p">:</span> <span class="n">PositionTypes</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">vocab_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_layer</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_head_q</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_head_kv</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">ffn_hidden</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">bias</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">activation_type</span><span class="p">:</span> <span class="n">ActivationType</span><span class="p">,</span>
+        <span class="n">attention_implementation</span><span class="p">:</span> <span class="n">AttentionImplementation</span><span class="p">,</span>
+        <span class="n">attention_config</span><span class="p">:</span> <span class="n">AttentionConfig</span><span class="p">,</span>
+        <span class="n">attention_norm_config</span><span class="p">:</span> <span class="n">LayerNormWrapperConfig</span><span class="p">,</span>
+        <span class="n">ffn_norm_config</span><span class="p">:</span> <span class="n">LayerNormWrapperConfig</span><span class="p">,</span>
+        <span class="n">lm_head_norm_config</span><span class="p">:</span> <span class="n">LayerNormWrapperConfig</span><span class="p">,</span>
+        <span class="n">use_weight_tying</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">use_meta_device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GPT2LLM</span><span class="p">:</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">sample_key</span><span class="o">=</span><span class="n">sample_key</span><span class="p">,</span>
+            <span class="n">prediction_key</span><span class="o">=</span><span class="n">prediction_key</span><span class="p">,</span>
+            <span class="n">poe_type</span><span class="o">=</span><span class="n">poe_type</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="n">sequence_length</span><span class="p">,</span>
+            <span class="n">vocab_size</span><span class="o">=</span><span class="n">vocab_size</span><span class="p">,</span>
+            <span class="n">n_layer</span><span class="o">=</span><span class="n">n_layer</span><span class="p">,</span>
+            <span class="n">n_head_q</span><span class="o">=</span><span class="n">n_head_q</span><span class="p">,</span>
+            <span class="n">n_head_kv</span><span class="o">=</span><span class="n">n_head_kv</span><span class="p">,</span>
+            <span class="n">n_embd</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span>
+            <span class="n">ffn_hidden</span><span class="o">=</span><span class="n">ffn_hidden</span><span class="p">,</span>
+            <span class="n">dropout</span><span class="o">=</span><span class="n">dropout</span><span class="p">,</span>
+            <span class="n">bias</span><span class="o">=</span><span class="n">bias</span><span class="p">,</span>
+            <span class="n">activation_type</span><span class="o">=</span><span class="n">activation_type</span><span class="p">,</span>
+            <span class="n">attention_implementation</span><span class="o">=</span><span class="n">attention_implementation</span><span class="p">,</span>
+            <span class="n">attention_config</span><span class="o">=</span><span class="n">attention_config</span><span class="p">,</span>
+            <span class="n">attention_norm_config</span><span class="o">=</span><span class="n">attention_norm_config</span><span class="p">,</span>
+            <span class="n">ffn_norm_config</span><span class="o">=</span><span class="n">ffn_norm_config</span><span class="p">,</span>
+            <span class="n">lm_head_norm_config</span><span class="o">=</span><span class="n">lm_head_norm_config</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+            <span class="n">use_weight_tying</span><span class="o">=</span><span class="n">use_weight_tying</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">use_meta_device</span> <span class="ow">and</span> <span class="n">use_weight_tying</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Weight tying is not supported on meta device. &quot;</span>
+                <span class="s2">&quot;Please set at least use_meta_device=False or use_weight_tying=False.&quot;</span>
+                <span class="s2">&quot;https://github.com/Modalities/modalities/issues/357&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">use_meta_device</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;meta&quot;</span><span class="p">):</span>
+                <span class="n">model</span> <span class="o">=</span> <span class="n">GPT2LLM</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">GPT2LLM</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="GPT2ModelFactory.get_gpt2_tensor_parallelized_model">
+<a class="viewcode-back" href="../../../api/modalities.models.html#modalities.models.model_factory.GPT2ModelFactory.get_gpt2_tensor_parallelized_model">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_gpt2_tensor_parallelized_model</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">GPT2LLM</span><span class="p">,</span> <span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+        <span class="n">tp_mesh</span> <span class="o">=</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">TP</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+        <span class="n">model_tp_plan</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="c1"># Row-wise parallelism might seem counterintuitive here,</span>
+            <span class="c1"># but the embedding layer has weight shape (vocab_size, n_embd).</span>
+            <span class="c1"># Row-wise sharding allows each rank to store a slice of the vocabulary</span>
+            <span class="c1"># and perform lookups only for the tokens it owns.</span>
+            <span class="c1"># The input token IDs are replicated across all ranks so that each rank</span>
+            <span class="c1"># can identify which tokens it is responsible for.</span>
+            <span class="c1"># Each rank produces a partial embedding output, and an all-reduce is performed</span>
+            <span class="c1"># in the background to obtain the full embedding vectors of shape</span>
+            <span class="c1"># (batch_size, sequence_length, n_embd).</span>
+            <span class="c1"># Finally, we shard the output on the sequence dimension to enable sequence parallelism</span>
+            <span class="c1"># in the downstream transformer blocks.</span>
+            <span class="s2">&quot;transformer.wte&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(</span>
+                <span class="n">input_layouts</span><span class="o">=</span><span class="n">Replicate</span><span class="p">(),</span>
+                <span class="n">output_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;transformer.lm_head_norm&quot;</span><span class="p">:</span> <span class="n">SequenceParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;transformer.lm_head&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(</span>
+                <span class="n">input_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+                <span class="n">output_layouts</span><span class="o">=</span><span class="n">Replicate</span><span class="p">(),</span>  <span class="c1"># Shard(-1) if loss parallelism is used</span>
+                <span class="n">use_local_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># default, should be not loss_parallel if loss parallelism is used</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">wpe</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">):</span>
+            <span class="c1"># If the position embedding is an nn.Embedding, we can shard it on the sequence dimension</span>
+            <span class="c1"># to enable sequence parallelism in the downstream transformer blocks.</span>
+            <span class="c1"># Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.</span>
+            <span class="n">model_tp_plan</span><span class="p">[</span><span class="s2">&quot;transformer.wpe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">RowwiseParallel</span><span class="p">(</span>
+                <span class="n">input_layouts</span><span class="o">=</span><span class="n">Replicate</span><span class="p">(),</span>
+                <span class="n">output_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">parallelize_module</span><span class="p">(</span>
+            <span class="n">module</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">device_mesh</span><span class="o">=</span><span class="n">tp_mesh</span><span class="p">,</span>
+            <span class="n">parallelize_plan</span><span class="o">=</span><span class="n">model_tp_plan</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">transformer_block_tp_plan</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;attention_norm&quot;</span><span class="p">:</span> <span class="n">SequenceParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;attn&quot;</span><span class="p">:</span> <span class="n">PrepareModuleInput</span><span class="p">(</span>
+                <span class="c1"># here we prepare the actual input of the attention module</span>
+                <span class="c1"># (i.e., the arguements to the forward method)</span>
+                <span class="c1"># The incomming inputs are sharded on the sequence dimension</span>
+                <span class="c1"># due to the pre-layer attention norm running sequence parallelism.</span>
+                <span class="c1"># The inputs are transformed into the desired format by replicating</span>
+                <span class="c1"># them across all ranks.</span>
+                <span class="c1"># In the pytorch tutorial and torch titan we pass in an additional None argument</span>
+                <span class="c1"># for freqs_cis (i.e., precomputed cosine and sine frequencies.), which is not</span>
+                <span class="c1"># needed here due to implementation differences.</span>
+                <span class="n">input_layouts</span><span class="o">=</span><span class="p">(</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">),),</span>
+                <span class="n">desired_input_layouts</span><span class="o">=</span><span class="p">(</span><span class="n">Replicate</span><span class="p">(),),</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;attn.q_attn&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;attn.k_attn&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;attn.v_attn&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;attn.c_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(</span><span class="n">output_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
+            <span class="s2">&quot;ffn_norm&quot;</span><span class="p">:</span> <span class="n">SequenceParallel</span><span class="p">(),</span>
+            <span class="s2">&quot;mlp&quot;</span><span class="p">:</span> <span class="n">PrepareModuleInput</span><span class="p">(</span>
+                <span class="n">input_layouts</span><span class="o">=</span><span class="p">(</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">),),</span>
+                <span class="n">desired_input_layouts</span><span class="o">=</span><span class="p">(</span><span class="n">Replicate</span><span class="p">(),),</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mlp</span><span class="p">,</span> <span class="n">SwiGLU</span><span class="p">):</span>
+            <span class="n">mlp_plan</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;mlp.W&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+                <span class="s2">&quot;mlp.W_2&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(</span><span class="n">output_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
+                <span class="s2">&quot;mlp.V&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+            <span class="p">}</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mlp</span><span class="p">,</span> <span class="n">TransformerMLP</span><span class="p">):</span>
+            <span class="n">mlp_plan</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;mlp.c_fc&quot;</span><span class="p">:</span> <span class="n">ColwiseParallel</span><span class="p">(),</span>
+                <span class="s2">&quot;mlp.c_proj&quot;</span><span class="p">:</span> <span class="n">RowwiseParallel</span><span class="p">(</span><span class="n">output_layouts</span><span class="o">=</span><span class="n">Shard</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
+            <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="s2">&quot;Only SwiGLU and GELU (used in TransformersMLP) are supported for the MLP in GPT2. &quot;</span>
+                <span class="s2">&quot;Please implement the tensor parallelization for other MLP types.&quot;</span>
+            <span class="p">)</span>
+        <span class="n">transformer_block_tp_plan</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">mlp_plan</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">transformer_block</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">transformer</span><span class="o">.</span><span class="n">h</span><span class="p">:</span>
+            <span class="c1"># override the number of q and kv heads</span>
+            <span class="k">if</span> <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_q</span> <span class="o">%</span> <span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Number of query heads </span><span class="si">{</span><span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_q</span><span class="si">}</span><span class="s2"> must be divisible by &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;the number of tensor parallel devices </span><span class="si">{</span><span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_kv</span> <span class="o">%</span> <span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Number of key-value heads </span><span class="si">{</span><span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_kv</span><span class="si">}</span><span class="s2"> must be divisible by &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;the number of tensor parallel devices </span><span class="si">{</span><span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_q</span> <span class="o">=</span> <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_q</span> <span class="o">//</span> <span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+            <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_kv</span> <span class="o">=</span> <span class="n">transformer_block</span><span class="o">.</span><span class="n">attn</span><span class="o">.</span><span class="n">n_head_kv</span> <span class="o">//</span> <span class="n">tp_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+            <span class="n">parallelize_module</span><span class="p">(</span>
+                <span class="n">module</span><span class="o">=</span><span class="n">transformer_block</span><span class="p">,</span>
+                <span class="n">device_mesh</span><span class="o">=</span><span class="n">tp_mesh</span><span class="p">,</span>
+                <span class="n">parallelize_plan</span><span class="o">=</span><span class="n">transformer_block_tp_plan</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">model</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

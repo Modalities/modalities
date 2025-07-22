@@ -1,0 +1,21 @@
+modalities.utils.profilers package
+==================================
+
+Submodules
+----------
+
+modalities.utils.profilers.batch\_generator module
+--------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.batch_generator
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.utils.profilers
+   :members:
+   :show-inheritance:
+   :undoc-members:
