@@ -71,8 +71,8 @@ class TestFSDPLossConvergence:
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path",
         [
-            (22355, "configs/fsdp1_gpt2_train_num_steps_8.yaml"),
-            (22356, "configs/fsdp2_gpt2_train_num_steps_8.yaml"),
+            (22801, "configs/fsdp1_gpt2_train_num_steps_8.yaml"),
+            (22802, "configs/fsdp2_gpt2_train_num_steps_8.yaml"),
         ],
     )
     def test_fsdp_loss_convergence(rdvz_port, relative_config_path: str):

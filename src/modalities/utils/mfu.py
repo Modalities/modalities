@@ -7,7 +7,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.types import Number
 
 from modalities.util import get_total_number_of_trainable_parameters
-from modalities.utils.typing import FSDPX
+from modalities.utils.typing_utils import FSDPX
 
 # A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/
 # H100: https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/

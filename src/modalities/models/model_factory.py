@@ -13,6 +13,7 @@ from torch.distributed.fsdp import ShardingStrategy
 from typing_extensions import deprecated
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
+from modalities.config.config import ActivationCheckpointedModelConfig
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -26,9 +27,15 @@ from modalities.nn.model_initialization.initialization_if import ModelInitializa
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
-from modalities.training.activation_checkpointing import apply_activation_checkpointing_inplace
+from modalities.training.activation_checkpointing.activation_checkpointing import (
+    ActivationCheckpointing,
+    apply_activation_checkpointing_fsdp1_inplace,
+)
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    ActivationCheckpointingVariants,
+)
 from modalities.util import get_local_number_of_trainable_parameters, get_module_class_from_name
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 logger = get_logger("model_factory")
 
@@ -115,7 +122,7 @@ class ModelFactory:
         # we also might want to have different auto wrap policies later...
         fsdp_auto_wrap_factory = FSDPTransformerAutoWrapPolicyFactory(model=model, block_names=block_names)
 
-        # model is on CPU before input to FSDP
+        # model is on CPU before input to FSDP1
         fsdp_model = FSDP1(
             model,
             auto_wrap_policy=fsdp_auto_wrap_factory.get_auto_wrap_policy(),
@@ -230,8 +237,8 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_fsdp1_model(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
-        """Apply activation checkpointing to the given model (in-place operation).
+    def get_activation_checkpointed_fsdp1_model_(model: FSDP1, activation_checkpointing_modules: list[str]) -> FSDP1:
+        """Apply activation checkpointing to the given FSDP1-wrapped model (in-place operation).
 
         Args:
             model (FSDP1): The FSDP1-wrapped model to apply activation checkpointing to.
@@ -245,15 +252,58 @@ class ModelFactory:
         """
         if len(activation_checkpointing_modules) > 0:
             if isinstance(model, FSDP1):
-                apply_activation_checkpointing_inplace(
+                apply_activation_checkpointing_fsdp1_inplace(
                     model=model,
                     activation_checkpointing_modules=activation_checkpointing_modules,
                 )
             else:
                 raise ValueError(
                     "Activation checkpointing can only be applied to FSDP1-wrapped models! "
-                    f"Current model type: {type(model)}"
+                    f"Current model type: {type(model)}."
                 )
+        return model
+
+    @staticmethod
+    def get_activation_checkpointed_fsdp2_model_(
+        ac_variant: ActivationCheckpointingVariants,
+        layers_fqn: str,
+        model: nn.Module,
+        ac_fun_params: (
+            ActivationCheckpointedModelConfig.FullACParams
+            | ActivationCheckpointedModelConfig.SelectiveLayerACParams
+            | ActivationCheckpointedModelConfig.SelectiveOpACParams
+        ),
+    ) -> nn.Module:
+        """FSDP2 variant for applying activation checkpointing to the given model (in-place operation).
+
+        Important: When using FSDP2, we always first apply activation checkpointing to the model
+                   and then wrap it with FSDP2.
+
+        Args:
+            ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
+            layers_fqn (str): Fully qualified name (FQN) of the layers to apply activation checkpointing to.
+            model (nn.Module): The (unwrapped) model to apply activation checkpointing to.
+            ac_fun_params (ACM.FullACParams  |  ACM.SelectiveLayerACParams  |  ACM.SelectiveOpACParams):
+                The parameters for the activation checkpointing function, depending on the variant.
+
+        Raises:
+            ValueError: Activation checkpointing can only be applied to unwrapped nn.Module models
+
+        Returns:
+            nn.Module: The model with activation checkpointing applied.
+        """
+        if not isinstance(model, nn.Module):
+            raise ValueError(
+                "Activation checkpointing can only be applied to unwrapped nn.Module model! "
+                f"Current model type: {type(model)}"
+            )
+
+        ActivationCheckpointing.apply_activation_checkpointing_(
+            model=model,
+            layers_fqn=layers_fqn,
+            ac_variant=ac_variant,
+            ac_fun_params=ac_fun_params,
+        )
         return model
 
     @staticmethod
@@ -278,12 +328,23 @@ class ModelFactory:
         """
 
         def get_parent_module_and_child_name(child_module: nn.Module, model: nn.Module) -> tuple[nn.Module, str]:
+            # returns the parent module and the child name of the given child module
+            selected_parent_candidate, selected_child_name = None, None
+            num_candidates = 0
             for _, parent_candidate in model.named_modules():
                 for child_name, child_candidate in parent_candidate.named_children():
                     if child_candidate is child_module:
-                        return parent_candidate, child_name
-            raise ModelStateError("No valid parent candidate")
+                        selected_parent_candidate = parent_candidate
+                        selected_child_name = child_name
+                        num_candidates += 1
+            if num_candidates == 0:
+                raise ModelStateError("No valid parent candidate")
+            elif num_candidates > 1:
+                raise ModelStateError("Multiple valid parent candidates")
+            else:
+                return selected_parent_candidate, selected_child_name
 
+        # get all block types that we want to compile individually
         block_types = []
         for name in block_names:
             module_class = get_module_class_from_name(model, name)

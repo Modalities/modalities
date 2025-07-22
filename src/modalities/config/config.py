@@ -39,6 +39,9 @@ from modalities.running_env.env_utils import (
     has_bfloat_support,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    ActivationCheckpointingVariants,
+)
 from modalities.util import parse_enum_by_name
 
 
@@ -299,9 +302,25 @@ class WeightInitializedModelConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class ActivationCheckpointedModelConfig(BaseModel):
+class FSDP1ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class ActivationCheckpointedModelConfig(BaseModel):
+    class FullACParams(BaseModel):
+        pass
+
+    class SelectiveLayerACParams(BaseModel):
+        ac_freq: Annotated[int, Field(strict=True, ge=1)]
+
+    class SelectiveOpACParams(BaseModel):
+        save_ops_keys: list[str]
+
+    ac_variant: ActivationCheckpointingVariants
+    layers_fqn: str
+    model: PydanticPytorchModuleType
+    ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
@@ -410,6 +429,11 @@ class RichProgressSubscriberConfig(BaseModel):
 
 class DummyResultSubscriberConfig(BaseModel):
     pass
+
+
+class EvaluationResultToDiscSubscriberConfig(BaseModel):
+    output_folder_path: Path
+    experiment_id: str
 
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):

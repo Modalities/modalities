@@ -25,6 +25,7 @@ from modalities.nn.model_initialization.initialization_if import ModelInitializa
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.utils.mfu import MFUCalculatorABC
+from modalities.utils.profilers.batch_generator import DatasetBatchGeneratorIF
 
 
 class PydanticThirdPartyTypeIF:
@@ -79,3 +80,6 @@ PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThi
 PydanticDeviceMeshIFType = Annotated[DeviceMesh, PydanticThirdPartyTypeIF(DeviceMesh)]
 PydanticAppStateType = Annotated[AppState, PydanticThirdPartyTypeIF(AppState)]
 PydanticMFUCalculatorABCType = Annotated[MFUCalculatorABC, PydanticThirdPartyTypeIF(MFUCalculatorABC)]
+PydanticDatasetBatchGeneratorIFType = Annotated[
+    DatasetBatchGeneratorIF, PydanticThirdPartyTypeIF(DatasetBatchGeneratorIF)
+]

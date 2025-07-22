@@ -33,6 +33,8 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    EvaluationResultToDiscSubscriberConfig,
+    FSDP1ActivationCheckpointedModelConfig,
     FSDP1CheckpointedModelConfig,
     FSDP1CheckpointedOptimizerConfig,
     FSDP1CheckpointLoadingConfig,
@@ -114,6 +116,7 @@ from modalities.utils.number_conversion import (
     NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
+from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
 
 
 @dataclass
@@ -153,7 +156,13 @@ COMPONENTS = [
     ComponentEntity(
         "model",
         "activation_checkpointed_fsdp1",
-        ModelFactory.get_activation_checkpointed_fsdp1_model,
+        ModelFactory.get_activation_checkpointed_fsdp1_model_,
+        FSDP1ActivationCheckpointedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_fsdp2_model_,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
@@ -226,6 +235,10 @@ COMPONENTS = [
     ),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    # dataset batch generator
+    ComponentEntity(
+        "dataset_batch_generator", "random", RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
@@ -264,6 +277,12 @@ COMPONENTS = [
     # Results subscriber
     ComponentEntity(
         "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
+    ),
+    ComponentEntity(
+        "results_subscriber",
+        "to_disc",
+        ResultsSubscriberFactory.get_evaluation_result_to_disc_subscriber,
+        EvaluationResultToDiscSubscriberConfig,
     ),
     ComponentEntity(
         "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig

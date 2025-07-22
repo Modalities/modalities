@@ -1,0 +1,99 @@
+
+test_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: activation_checkpointed_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+activation_checkpointed_model: 
+  component_key: model
+  variant_key: activation_checkpointed
+  config:
+    ac_variant: full_activation_checkpointing
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    layers_fqn: transformer.h
+    ac_fun_params: {}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: input_ids
+    poe_type: NOPE
+    sequence_length: 256
+    prediction_key: logits
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 2
+    n_head_q: 8
+    n_head_kv: 8
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+            base_freq: 10000
+    attention_implementation: manual
+    activation_type: gelu
+    attention_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    use_weight_tying: true
+    use_meta_device: false
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: ${cuda_env:WORLD_SIZE} # i.e., fully sharded
+    world_size: ${cuda_env:WORLD_SIZE}
