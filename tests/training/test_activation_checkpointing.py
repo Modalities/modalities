@@ -38,6 +38,10 @@ class SelectiveOpActivationCheckpointingInstantiationModel(BaseModel):
     selective_op_activation_checkpointed_model: PydanticPytorchModuleType
 
 
+@pytest.mark.skipif(
+    torch.cuda.device_count() < 2,
+    reason="This test requires more than one GPU",
+)
 @pytest.mark.parametrize(
     "rdvz_port, world_size, relative_config_path",
     [
@@ -83,6 +87,10 @@ def _test_full_activation_checkpointing_FSDP1_legacy_thread(
         )
 
 
+@pytest.mark.skipif(
+    torch.cuda.device_count() < 2,
+    reason="This test requires more than one GPU",
+)
 @pytest.mark.parametrize(
     "rdvz_port, world_size, relative_config_path",
     [
