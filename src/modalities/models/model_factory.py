@@ -264,7 +264,7 @@ class ModelFactory:
         return model
 
     @staticmethod
-    def get_activation_checkpointed_model_(
+    def get_activation_checkpointed_fsdp2_model_(
         ac_variant: ActivationCheckpointingVariants,
         layers_fqn: str,
         model: nn.Module,
@@ -275,7 +275,9 @@ class ModelFactory:
         ),
     ) -> nn.Module:
         """FSDP2 variant for applying activation checkpointing to the given model (in-place operation).
-        When using FSDP2, we always first apply activation checkpointing to the model and then wrap it with FSDP2.
+
+        Important: When using FSDP2, we always first apply activation checkpointing to the model
+                   and then wrap it with FSDP2.
 
         Args:
             ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
