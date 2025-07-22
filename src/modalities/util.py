@@ -65,6 +65,18 @@ def get_experiment_id_from_config(config_file_path: Optional[Path], hash_length:
 def get_synced_string(
     string_to_be_synced: str, from_rank: int = 0, max_string_byte_length: Optional[int] = 1024
 ) -> str:
+    """Broadcast a string from one rank to all other ranks in the distributed setup.
+
+    Args:
+        string_to_be_synced (str): The string to be synced across ranks.
+        from_rank (int, optional): The rank that generates the string. Defaults to 0.
+        max_string_byte_length (Optional[int], optional): Maximum byte length of the string to be synced.
+            Defaults to 1024.
+    Returns:
+        str: The synced string, decoded from the byte array.
+    Raises:
+        ValueError: If the string exceeds the maximum byte length.
+    """
     rank = dist.get_rank()
     if rank == from_rank:
         # Generate a unique folder name
@@ -112,9 +124,9 @@ def get_synced_experiment_id_of_run(
     Returns:
         str: The experiment ID.
     """
-    experimenet_id = get_experiment_id_from_config(config_file_path, hash_length)
+    experiment_id = get_experiment_id_from_config(config_file_path, hash_length)
     experiment_id_synced = get_synced_string(
-        string_to_be_synced=experimenet_id,
+        string_to_be_synced=experiment_id,
         from_rank=0,
         max_string_byte_length=max_experiment_id_byte_length,
     )
