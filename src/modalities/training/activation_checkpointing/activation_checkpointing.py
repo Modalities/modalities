@@ -23,12 +23,15 @@ def is_module_to_apply_activation_checkpointing(
     return isinstance(submodule, tuple(activation_checkpointing_modules))
 
 
-def apply_activation_checkpointing_inplace(model: nn.Module, activation_checkpointing_modules: list[str]):
+def apply_activation_checkpointing_fsdp1_inplace(model: FSDP1, activation_checkpointing_modules: list[str]):
     activation_checkpointing_module_types = [
         get_module_class_from_name(model, m) for m in activation_checkpointing_modules
     ]
-    if not isinstance(model, (FSDP1)):
-        raise ValueError("activation checkpointing can only be applied to FSDP1 wrapped models!")
+    if not isinstance(model, FSDP1):
+        raise ValueError(
+            "This activation checkpointing component can only be applied to FSDP1 wrapped models. "
+            "Use the respective FSDP2 component for FSDP2 models."
+        )
     non_reentrant_wrapper = partial(ptd_checkpoint_wrapper, checkpoint_impl=CheckpointImpl.NO_REENTRANT, debug=False)
 
     apply_activation_checkpointing(
@@ -76,7 +79,7 @@ class ActivationCheckpointing:
         # for low precision training, it's useful to always save
         # the result of max, since the absolute maximum is
         # used to compute the scaling factor for quantization.
-        "torch.ops.aten.max.default": ops.aten.max.default,
+        "ops.aten.max.default": ops.aten.max.default,
     }
 
     @staticmethod
@@ -147,12 +150,12 @@ class ActivationCheckpointing:
 
     @staticmethod
     def _apply_full_ac(module: nn.Module) -> nn.Module:
-        module_saced = ptd_checkpoint_wrapper(module, preserve_rng_state=False)
-        return module_saced
+        module_aced = ptd_checkpoint_wrapper(module, preserve_rng_state=False)
+        return module_aced
 
     @staticmethod
     def _apply_selective_op_ac(module: nn.Module, save_ops_keys: list[str]) -> nn.Module:
-        def _get_custom_policy(meta, save_ops_set: Set):  # closure to capture meta
+        def _get_custom_policy(meta: dict[str, int], save_ops_set: Set):  # closure to capture meta
             def _custom_policy(ctx, func, *args, **kwargs):
                 mode = "recompute" if ctx.is_recompute else "forward"
                 mm_count_key = f"{mode}_mm_count"
@@ -160,6 +163,7 @@ class ActivationCheckpointing:
                     meta[mm_count_key] += 1
                 # Saves output of all compute ops in save_ops_set, except every second mm
                 # NOTE: we should make this configurable and not hide it in the code
+                # To make this completely configurable, we would have to store the checkpointing frequency of every OP.
                 to_save = func in save_ops_set and not (
                     func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0
                 )

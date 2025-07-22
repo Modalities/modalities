@@ -312,15 +312,15 @@ class ActivationCheckpointedModelConfig(BaseModel):
         pass
 
     class SelectiveLayerACParams(BaseModel):
-        ac_freq: int
+        ac_freq: Annotated[int, Field(strict=True, ge=1)]
 
     class SelectiveOpACParams(BaseModel):
         save_ops_keys: list[str]
 
     ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
-    model: PydanticPytorchModuleType | PydanticFSDP1ModuleType
-    ac_fun_params: Optional[FullACParams | SelectiveLayerACParams | SelectiveOpACParams] = None
+    model: PydanticPytorchModuleType
+    ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):

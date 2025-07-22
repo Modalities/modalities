@@ -40,6 +40,7 @@ activation_checkpointed_model:
       instance_key: model_raw
       pass_type: BY_REFERENCE
     layers_fqn: transformer.h
+    ac_fun_params: {}
 
 model_raw:
   component_key: model

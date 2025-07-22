@@ -29,7 +29,7 @@ from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
     ActivationCheckpointing,
-    apply_activation_checkpointing_inplace,
+    apply_activation_checkpointing_fsdp1_inplace,
 )
 from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
     ActivationCheckpointingVariants,
@@ -252,14 +252,14 @@ class ModelFactory:
         """
         if len(activation_checkpointing_modules) > 0:
             if isinstance(model, FSDP1):
-                apply_activation_checkpointing_inplace(
+                apply_activation_checkpointing_fsdp1_inplace(
                     model=model,
                     activation_checkpointing_modules=activation_checkpointing_modules,
                 )
             else:
                 raise ValueError(
                     "Activation checkpointing can only be applied to FSDP1-wrapped models! "
-                    f"Current model type: {type(model)}"
+                    f"Current model type: {type(model)}."
                 )
         return model
 
