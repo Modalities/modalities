@@ -16,7 +16,7 @@ from modalities.checkpointing.checkpoint_loading import DistributedCheckpointLoa
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving, CheckpointSavingExecutionABC
 from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavingStrategyIF
 from modalities.checkpointing.stateful.app_state import AppState
-from modalities.dataloader.collate_fns.collate_if import CollateFnIF
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF, CollatorIF
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
@@ -68,6 +68,7 @@ PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(T
 PydanticDatasetIFType = Annotated[Dataset, PydanticThirdPartyTypeIF(Dataset)]
 PydanticSamplerIFType = Annotated[Sampler, PydanticThirdPartyTypeIF(Sampler)]
 PydanticCollateFnIFType = Annotated[CollateFnIF, PydanticThirdPartyTypeIF(CollateFnIF)]
+PydanticCollatorIFType = Annotated[CollatorIF, PydanticThirdPartyTypeIF(CollatorIF)]
 PydanticLLMDataLoaderIFType = Annotated[LLMDataLoader, PydanticThirdPartyTypeIF(LLMDataLoader)]
 PydanticOptimizerIFType = Annotated[Optimizer, PydanticThirdPartyTypeIF(Optimizer)]
 PydanticLRSchedulerIFType = Annotated[LRScheduler, PydanticThirdPartyTypeIF(LRScheduler)]
