@@ -272,6 +272,10 @@ class Trainer:
                 mfu_score = torch.tensor(-1.0)
                 if self.mfu_calculator is not None:
                     mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
+
+                peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                torch.cuda.reset_peak_memory_stats(device)
+
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
@@ -280,6 +284,7 @@ class Trainer:
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
                         "train mfu (16-bit)": ResultItem(mfu_score, 2),
                         "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
+                        "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,
