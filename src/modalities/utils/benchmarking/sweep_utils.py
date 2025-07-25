@@ -89,32 +89,3 @@ class SweepGenerator:
                 return [sweep_dict]
 
         return expand(sweep)
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Generate sweep configurations.")
-    parser.add_argument(
-        "--sweep_config_path",
-        type=Path,
-        required=True,
-        help="Path to the sweep configuration YAML file.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=Path,
-        required=True,
-        help="Directory to save the generated sweep configurations.",
-    )
-    parser.add_argument(
-        "--world_sizes",
-        type=int,
-        nargs="+",
-        default=[2],
-        help="List of world sizes for which to generate configurations.",
-    )
-
-    args = parser.parse_args()
-
-    SweepGenerator.generate_sweep_configs(args.sweep_config_path, args.output_dir, args.world_sizes)

@@ -61,7 +61,7 @@ def _keep_or_update_experiment_folder(config_file_path: Path):
         return new_config_path
 
 
-def prepare_missing_runs(exp_root: Path, file_list_path: Path, expected_steps: int):
+def list_missing_runs(exp_root: Path, file_list_path: Path, expected_steps: int):
     exp_root = exp_root.resolve()
 
     # Find all candidate config files and filter out resolved configs
@@ -101,17 +101,3 @@ def prepare_missing_runs(exp_root: Path, file_list_path: Path, expected_steps: i
         for cfg in candidate_configs:
             f.write(str(cfg) + "\n")
     print(f"Wrote {len(candidate_configs)} config paths to {file_list_path}")
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("experiment_dir", type=Path, help="Root folder of experiment grid search")
-    parser.add_argument("file_list_path", type=Path, help="Output file to store configs to run")
-    parser.add_argument(
-        "--expected-steps", type=int, required=True, help="Expected number of steps in evaluation_results.jsonl"
-    )
-    args = parser.parse_args()
-
-    prepare_missing_runs(args.experiment_dir, args.file_list_path, args.expected_steps)
