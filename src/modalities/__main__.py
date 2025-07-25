@@ -50,11 +50,22 @@ def main() -> None:
     default=False,
     help="If set, run a communication test before training.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
+@click.option(
+    "--experiment_id",
+    type=str,
+    default=None,
+    help="Optional experiment ID to use for this run. If not provided, it will be derived from the config file path.",
+)
+def CMD_entry_point_run_modalities(
+    config_file_path: Path, test_comm: bool = False, experiment_id: Optional[str] = None
+):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
+        test_comm (bool): If set, run a communication test before training.
+        experiment_id (Optional[str]): Optional experiment ID to use for this run.
+            If not provided it will be generated. Default is None.
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if test_comm:
@@ -62,7 +73,7 @@ def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = Fal
             run_communication_test()
             print_rank_0("Communication test succeeded.")
 
-        main_obj = Main(config_file_path)
+        main_obj = Main(config_file_path, experiment_id=experiment_id)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 

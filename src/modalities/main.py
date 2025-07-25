@@ -1,4 +1,3 @@
-import logging
 import os
 import shutil
 from datetime import datetime
@@ -22,6 +21,9 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(name="main")
 
 
 class Main:
@@ -97,7 +99,11 @@ class Main:
         if components.settings.cuda_env.global_rank == 0:
             experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
-            shutil.copy(self.config_path, experiment_path / self.config_path.name)
+            if not (experiment_path / self.config_path.name).exists():
+                shutil.copy(self.config_path, experiment_path / self.config_path.name)
+            else:
+                logger.warning(f"Config file {self.config_path.name} already exists in {experiment_path}. Overwriting.")
+
             resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
             with open(resolved_config_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.config_dict, f)
@@ -145,7 +151,7 @@ class Main:
         )
         num_params = get_total_number_of_trainable_parameters(components.app_state.model)
         components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
-        logging.info(f"Training model with {num_params} parameters.")
+        logger.info(f"Training model with {num_params} parameters.")
 
         print_rank_0(f"Model initialized at {datetime.now()}.")
 

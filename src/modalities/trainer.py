@@ -262,7 +262,7 @@ class Trainer:
                     "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
 
-                consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
+                consumed_tokens = torch.tensor(training_progress.num_seen_tokens_total)
                 metrics = {
                     "consumed tokens": ResultItem(consumed_tokens, 0),
                     "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
