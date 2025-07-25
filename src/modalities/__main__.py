@@ -29,6 +29,8 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
+from modalities.utils.benchmarking.benchmarking_utils import list_missing_runs
+from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
 
 
@@ -50,11 +52,22 @@ def main() -> None:
     default=False,
     help="If set, run a communication test before training.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
+@click.option(
+    "--experiment_id",
+    type=str,
+    default=None,
+    help="Optional experiment ID to use for this run. If not provided, it will be derived from the config file path.",
+)
+def CMD_entry_point_run_modalities(
+    config_file_path: Path, test_comm: bool = False, experiment_id: Optional[str] = None
+):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
+        test_comm (bool): If set, run a communication test before training.
+        experiment_id (Optional[str]): Optional experiment ID to use for this run.
+            If not provided it will be generated. Default is None.
     """
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         if test_comm:
@@ -62,7 +75,7 @@ def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = Fal
             run_communication_test()
             print_rank_0("Communication test succeeded.")
 
-        main_obj = Main(config_file_path)
+        main_obj = Main(config_file_path, experiment_id=experiment_id)
         components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main_obj.run(components)
 
@@ -521,6 +534,67 @@ def CMD_shuffle_jsonl_data(
         file_existence_policy=file_existence_policy,
         seed=seed,
     )
+
+
+@main.group(name="benchmark")
+def benchmark():
+    """
+    Collection of utilities to prepare and run benchmarks.
+    """
+    pass
+
+
+@benchmark.command(name="prepare_sweep_configs")
+@click.option(
+    "--sweep_config_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to the sweep configuration YAML file.",
+)
+@click.option(
+    "--output_dir",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    required=True,
+    help="Directory to save the generated sweep configurations.",
+)
+@click.option(
+    "--world_sizes",
+    type=str,
+    default="2",
+    help="Comma-separated list of world sizes, e.g. --world_sizes '2,4,8'",
+)
+def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes: str):
+    """
+    Utility for preparing sweep configurations.
+    """
+    world_sizes = list(map(int, world_sizes.split(",")))
+    SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes)
+
+
+@benchmark.command(name="list_missing_runs")
+@click.option(
+    "--experiment_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Path to the root directory of the experiment containing config files.",
+)
+@click.option(
+    "--file_list_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output file to store paths of configs to run.",
+)
+@click.option(
+    "--expected_steps",
+    type=int,
+    required=True,
+    help="Expected number of steps in evaluation_results.jsonl",
+)
+def entry_point_prepare_missing_runs(experiment_dir: Path, file_list_path: Path, expected_steps: int):
+    """
+    Prepare a list of missing runs from a grid search experiment directory.
+    """
+    list_missing_runs(experiment_dir, file_list_path, expected_steps)
 
 
 if __name__ == "__main__":
