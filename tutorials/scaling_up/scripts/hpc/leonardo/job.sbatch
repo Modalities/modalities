@@ -15,12 +15,11 @@ set -x
 
 # Setup environment
 module load cuda/12.3
-source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace working with stable
+source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace "working" with "stable" if needed
 
 #### Environment variables
 export CXX=g++
 export CC=gcc
-# chatgpt suggested env variables
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export NCCL_IB_TIMEOUT=100
 export NCCL_SOCKET_TIMEOUT=3600
@@ -33,30 +32,44 @@ export NCCL_SOCKET_IFNAME=ib0
 export GLOO_SOCKET_IFNAME=ib0
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
-MASTER_PORT=$((6000 + RANDOM % 1000))  # randomize to avoid reuse collisions
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+MASTER_PORT=6015
 
 # Get GPUs per node from Slurm or fallback
 GPUS_PER_NODE=${SLURM_GPUS_ON_NODE:-4}
-# Compute total number of ranks
 NUM_RANKS=$((SLURM_JOB_NUM_NODES * GPUS_PER_NODE))
-# Construct config list filename
-CONFIG_LIST_FILE="global_file_list.${NUM_RANKS}.txt"
+CONFIG_LIST_FILE="global_file_list.${NUM_RANKS}.${SLURM_PROCID}.txt"
 
 echo "START TIME: $(date)"
-# --- Step 1: Filter the remaining runs on a single process while others wait (prevents race conditions) ---
-srun --ntasks=1 modalities benchmark list_missing_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS
 
-# --- Step 2: Loop over each remaining config and benchmark the setting ---
-while IFS= read -r config_file; do
-    echo "Processing config: $config_file"
-    srun torchrun --rdzv-endpoint $MASTER_ADDR:$MASTER_PORT --nnodes $SLURM_JOB_NUM_NODES --nproc_per_node $GPUS_PER_NODE $(which modalities) run --config_file_path $config_file --experiment_id ""
-done < "$CONFIG_LIST_FILE"
+# Step 1: Filter configs
+modalities benchmark list_remaining_runs \
+  --experiment_dir "$EXPERIMENT_ROOT/$NUM_RANKS" \
+  --file_list_path "$CONFIG_LIST_FILE" \
+  --expected_steps "$EXPECTED_STEPS" \
+  --skip_exception_types "OutOfMemoryError,ValueError"
+
+
+# Step 2: Read configs into Bash array and loop
+mapfile -t config_files < "$CONFIG_LIST_FILE"
+
+for config_file in "${config_files[@]}"; do
+  echo "Processing config: $config_file"
+  error_log_folder="$(dirname "$config_file")/error_logs"
+
+  srun torchrun \
+    --rdzv-endpoint "$MASTER_ADDR:$MASTER_PORT" \
+    --nnodes "$SLURM_JOB_NUM_NODES" \
+    --nproc_per_node "$GPUS_PER_NODE" \
+    --rdzv_backend c10d \
+    "$(which modalities)" run \
+    --config_file_path "$config_file" \
+    --experiment_id "" \
+    --error_log_folder "$error_log_folder"
+done
+
 echo "END TIME: $(date)"
 
-
 # Clean up
-srun --ntasks=1 rm "$CONFIG_LIST_FILE"
-
-
+rm "$CONFIG_LIST_FILE"
 echo "=== FINISHED ==="

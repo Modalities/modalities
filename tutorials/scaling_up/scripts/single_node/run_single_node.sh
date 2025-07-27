@@ -36,7 +36,7 @@ if [ -f "$CONFIG_LIST_FILE" ]; then
     rm "$CONFIG_LIST_FILE"
 fi
 
-modalities benchmark list_missing_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS
+modalities benchmark list_remaining_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS
 
 # --- Step 2: Loop over each config ---
 while IFS= read -r file; do

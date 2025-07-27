@@ -1,6 +1,8 @@
 sweep:
-  local_train_micro_batch_size: [1, 2, 4]
-  sequence_length: [256, 512]
+  local_train_micro_batch_size: [1]
+  sequence_length: [256]
+  ffn_hidden: [128, 1048576]
+  n_layer: [2, 100]
 
 settings:
   experiment_id: ${modalities_env:experiment_id}
@@ -16,7 +18,7 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: ${modalities_env:config_folder_path}
-    train_dataset_path: ../../data/lorem_ipsum_long.pbin
+    train_dataset_path: ../../../data/lorem_ipsum_long.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 32
@@ -187,10 +189,10 @@ model_raw:
     sequence_length: ${settings.step_profile.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 2
+    n_layer: ${sweep.n_layer}
     n_head_q: 8
     n_head_kv: 4
-    ffn_hidden: 128
+    ffn_hidden: ${sweep.ffn_hidden}
     n_embd: 128
     dropout: 0.0
     bias: false
