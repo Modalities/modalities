@@ -1,9 +1,13 @@
 #!/bin/sh
 set -eu
 
+# change to the script's directory
+# this ensures that relative paths work correctly
+cd "$(dirname "$0")" || exit 1
+
 # --- Config ---
-EXPERIMENT_ROOT="/raid/s3/opengptx/max_lue/repositories/modalities/tutorials/scaling_up/experiments/2025-07-25__17-56-24_7c50522e"
-CONFIG_LIST_FILE="file_list.txt"
+EXPERIMENT_ROOT="/raid/s3/opengptx/max_lue/repositories/modalities/tutorials/scaling_up/experiments/2025-07-27__14-52-54_d149d990"
+CONFIG_LIST_FILE="config_file_list.txt"
 EXPECTED_STEPS=20
 
 # --- Functions ---
@@ -27,6 +31,11 @@ get_last_integer_folder() {
 }
 
 # --- Step 1: Find configs to run ---
+if [ -f "$CONFIG_LIST_FILE" ]; then
+    echo "Removing existing $CONFIG_LIST_FILE"
+    rm "$CONFIG_LIST_FILE"
+fi
+
 modalities benchmark list_missing_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS
 
 # --- Step 2: Loop over each config ---
