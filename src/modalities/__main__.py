@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import json
+import os
+import socket
+import traceback
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import click_pathlib
@@ -29,7 +32,7 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
-from modalities.utils.benchmarking.benchmarking_utils import list_missing_runs
+from modalities.utils.benchmarking.benchmarking_utils import list_remaining_runs
 from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
 
@@ -58,8 +61,17 @@ def main() -> None:
     default=None,
     help="Optional experiment ID to use for this run. If not provided, it will be derived from the config file path.",
 )
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
 def CMD_entry_point_run_modalities(
-    config_file_path: Path, test_comm: bool = False, experiment_id: Optional[str] = None
+    config_file_path: Path,
+    test_comm: bool = False,
+    experiment_id: Optional[str] = None,
+    error_log_folder: Optional[Path] = None,
 ):
     """Entrypoint to run the model training.
 
@@ -68,16 +80,46 @@ def CMD_entry_point_run_modalities(
         test_comm (bool): If set, run a communication test before training.
         experiment_id (Optional[str]): Optional experiment ID to use for this run.
             If not provided it will be generated. Default is None.
+        error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
     """
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        if test_comm:
-            print_rank_0("Running communication test...")
-            run_communication_test()
-            print_rank_0("Communication test succeeded.")
 
-        main_obj = Main(config_file_path, experiment_id=experiment_id)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    def format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+        """Format an exception into a structured JSON string with error message, type, and stack trace."""
+        error = {
+            "error": str(e),
+            "type": type(e).__name__,
+            "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
+        }
+
+        return json.dumps({"environment": environment, "error": error}, indent=2)
+
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            if test_comm:
+                print_rank_0("Running communication test...")
+                run_communication_test()
+                print_rank_0("Communication test succeeded.")
+
+            main_obj = Main(config_file_path, experiment_id=experiment_id)
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        if error_log_folder is not None:
+            environment = {
+                "rank": int(os.environ["RANK"]),
+                "local_rank": int(os.environ["LOCAL_RANK"]),
+                "world_size": int(os.environ["WORLD_SIZE"]),
+                "hostname": socket.gethostname(),
+            }
+            error_log_folder = (
+                error_log_folder.parent
+                / f"{error_log_folder.stem}_{environment['hostname']}_{environment['local_rank']}.log"
+            )
+            error_log_folder.parent.mkdir(parents=True, exist_ok=True)
+            with open(error_log_folder, "w", encoding="utf-8") as f:
+                f.write(format_exception_as_json(e, environment))
+
+        raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
 
 @main.command(name="warmstart")
@@ -571,7 +613,7 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes)
 
 
-@benchmark.command(name="list_missing_runs")
+@benchmark.command(name="list_remaining_runs")
 @click.option(
     "--experiment_dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -590,11 +632,20 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     required=True,
     help="Expected number of steps in evaluation_results.jsonl",
 )
-def entry_point_prepare_missing_runs(experiment_dir: Path, file_list_path: Path, expected_steps: int):
+@click.option(
+    "--skip_exception_types",
+    type=str,
+    default="",
+    help="Exception types to skip when checking for successful runs. List of exceptions is comma-separated.",
+)
+def entry_point_prepare_remaining_runs(
+    experiment_dir: Path, file_list_path: Path, expected_steps: int, skip_exception_types: str = ""
+):
     """
-    Prepare a list of missing runs from a grid search experiment directory.
+    Prepare a list of remaining runs from a grid search experiment directory.
     """
-    list_missing_runs(experiment_dir, file_list_path, expected_steps)
+    skip_exception_types = skip_exception_types.split(",")
+    list_remaining_runs(experiment_dir, file_list_path, expected_steps, skip_exception_types)
 
 
 if __name__ == "__main__":

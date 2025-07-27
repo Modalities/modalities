@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 from datetime import datetime
@@ -8,7 +9,7 @@ from pathlib import Path
 class FileNames(Enum):
     CONFIG_FILE = "config.yaml"
     RESULTS_FILE = "evaluation_results.jsonl"
-    ERRORS_FILE = "errors.jsonl"
+    ERRORS_FILE_REGEX = "errors_logs_*.log"  # Format: errors_logs_<hostname>_<local_rank>.log
 
 
 def _count_jsonl_lines(jsonl_path: Path) -> int:
@@ -33,20 +34,35 @@ def _get_most_recent_configs(file_paths: list[Path]) -> list[Path]:
     return [config[0] for config in latest_configs.values()]
 
 
-def _is_experiment_successful(config_file_path: Path, expected_steps: int) -> bool:
-    """Check if the experiment is successful based on the number of steps in the results file."""
+def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_exception_types: list[str] = None) -> bool:
+    """Check if the experiment is done based on the number of steps in the results file and potential error types."""
     results_path = config_file_path.parent / FileNames.RESULTS_FILE.value
-    if not results_path.exists():
-        return False  # Missing outputs
-    steps_found = _count_jsonl_lines(results_path)
-    return steps_found == expected_steps
+    # Check if results file exists and has the expected number of steps
+    if results_path.exists():
+        steps_found = _count_jsonl_lines(results_path)
+        if steps_found == expected_steps:
+            return True
+    # Check if there are any errors due to which we want to skip the experiment (e.g., OOM errors)
+    if skip_exception_types is not None:
+        error_log_paths = list(config_file_path.parent.glob(FileNames.ERRORS_FILE_REGEX.value))
+        error_types = []
+        for error_log_path in error_log_paths:
+            with error_log_path.open("r", encoding="utf-8") as f:
+                error_type = json.load(f)["error"]["type"]
+            error_types.append(error_type)
+        # Check if any of the error types are in the skip list
+        if len(set(skip_exception_types).intersection(set(error_types))) > 0:
+            return True
+
+    return False
 
 
 def _keep_or_update_experiment_folder(config_file_path: Path):
     experiment_folder_path = config_file_path.parent
-    error_log_path = experiment_folder_path / FileNames.ERRORS_FILE.value
+    error_log_paths = list(experiment_folder_path.glob(FileNames.ERRORS_FILE_REGEX.value))
     results_log_path = experiment_folder_path / FileNames.RESULTS_FILE.value
-    if not error_log_path.exists() and not results_log_path.exists():
+
+    if len(error_log_paths) == 0 and not results_log_path.exists():
         # No errors and no results, keep the folder
         return config_file_path
     else:
@@ -61,29 +77,32 @@ def _keep_or_update_experiment_folder(config_file_path: Path):
         return new_config_path
 
 
-def list_missing_runs(exp_root: Path, file_list_path: Path, expected_steps: int):
+def list_remaining_runs(
+    exp_root: Path, file_list_path: Path, expected_steps: int, skip_exception_types: list[str] = None
+):
     exp_root = exp_root.resolve()
 
     # Find all candidate config files and filter out resolved configs
     candidate_configs = list(exp_root.glob("**/*.yaml"))
     candidate_configs = [yaml_path for yaml_path in candidate_configs if not yaml_path.name.endswith(".resolved.yaml")]
-
     print("=========ALL============")
     for config in candidate_configs:
         print(config)
 
     # filter only most recent configs
     candidate_configs = _get_most_recent_configs(candidate_configs)
-
     print("=========MOST=RECENT============")
     for config in candidate_configs:
         print(config)
 
-    # filter non-successful experiments
+    # filter non-successful experiments, i.e., those that do not have the
+    # expected number of steps in evaluation_results.jsonl
+    # we can also skip certain exception types if specified
     candidate_configs = [
-        yaml_path for yaml_path in candidate_configs if not _is_experiment_successful(yaml_path, expected_steps)
+        yaml_path
+        for yaml_path in candidate_configs
+        if not _is_experiment_done(yaml_path, expected_steps, skip_exception_types)
     ]
-
     print("=========NON=SUCCESSFUL============")
     for config in candidate_configs:
         print(config)
@@ -91,7 +110,6 @@ def list_missing_runs(exp_root: Path, file_list_path: Path, expected_steps: int)
     # keep experiment folders that have not been run yet and create
     # new experiment folders for those that have been run but failed
     candidate_configs = [_keep_or_update_experiment_folder(yaml_path) for yaml_path in candidate_configs]
-
     print("=========UPDATED============")
     for config in candidate_configs:
         print(config)
