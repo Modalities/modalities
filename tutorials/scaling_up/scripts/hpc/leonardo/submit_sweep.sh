@@ -7,12 +7,12 @@ cd "$(dirname "$0")" || exit 1
 
 
 # --- Config ---
-EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-27__18-02-55_2cc4cfcf"
+EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-27__22-16-22_5c3794cb"
 EXPECTED_STEPS=20
 CONFIG_LIST_FILE="global_file_list.txt"
 
 ACCOUNT=EUHPC_E05_119
-TIME_LIMIT=00:10:00
+TIME_LIMIT=3:00:00
 GPUS_PER_NODE=4
 
 # Retrieve the list of configs to run
@@ -28,7 +28,7 @@ for ws in $worldsizes; do
     if [ "$NODES" -gt 64 ]; then
         QOS="boost_qos_bprod"
     else
-        QOS="boost_qos_dbg" # "normal"
+        QOS="normal" # "boost_qos_dbg" # normal
     fi
     # submit the job for the current world size
     sbatch --account=$ACCOUNT \

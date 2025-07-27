@@ -10,11 +10,12 @@
 #SBATCH --exclusive
 
 # Enable logging
-set -euo pipefail
-set -x
+set -x  # Every command and its arguments are printed to stderr before being executed.
 
 # Setup environment
 module load cuda/12.3
+module load gcc/12.2.0
+module load binutils/2.42
 source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace "working" with "stable" if needed
 
 #### Environment variables

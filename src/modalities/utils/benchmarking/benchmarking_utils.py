@@ -9,7 +9,7 @@ from pathlib import Path
 class FileNames(Enum):
     CONFIG_FILE = "config.yaml"
     RESULTS_FILE = "evaluation_results.jsonl"
-    ERRORS_FILE_REGEX = "errors_logs_*.log"  # Format: errors_logs_<hostname>_<local_rank>.log
+    ERRORS_FILE_REGEX = "error_logs_*.log"  # Format: errors_logs_<hostname>_<local_rank>.log
 
 
 def _count_jsonl_lines(jsonl_path: Path) -> int:
@@ -103,7 +103,7 @@ def list_remaining_runs(
         for yaml_path in candidate_configs
         if not _is_experiment_done(yaml_path, expected_steps, skip_exception_types)
     ]
-    print("=========NON=SUCCESSFUL============")
+    print("=========REMAINING============")
     for config in candidate_configs:
         print(config)
 
