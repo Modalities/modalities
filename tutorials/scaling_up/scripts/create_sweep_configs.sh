@@ -1,4 +1,4 @@
-#!/bin/sh#!/bin/sh
+#!/bin/sh
 set -eu
 # change to the script's directory
 # this ensures that relative paths work correctly
