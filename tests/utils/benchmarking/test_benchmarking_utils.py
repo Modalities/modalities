@@ -159,13 +159,11 @@ def test_get_updated_sweep_status(tmp_path):
     # create new experiment folders for configs that have partial results already
     # e.g., an error log or some steps in evaluation_results.jsonl
     updated_configs = set(remaining_configs)
-    updated_configs.remove(experiments_path / "4/abcd0000_2025-07-27__18-00-00/config.yaml")
-    updated_configs.remove(experiments_path / "8/abcd0001_2025-07-27__18-00-00/config.yaml")
-    updated_configs.add(experiments_path / "4/abcd0000_x/config.yaml")
-    updated_configs.add(experiments_path / "8/abcd0001_x/config.yaml")
+    updated_configs = {Path(str(yaml_path).replace("2025-07-27__18-00-00", "x")) for yaml_path in updated_configs}
+
     assert updated_configs == set(file_list_dict[SweepSets.UPDATED_CONFIGS.value])
 
-    # check that the new config is equal to the historically failed one
+    # make sure that all configs that need to be run or rerun got a new folder
     with (experiments_path / "4/abcd0000_x/config.yaml").open("r", encoding="utf-8") as f:
         config_content = json.load(f)
     assert config_content["config_id"] == "4_abcd0000_2025-07-27__18-00-00"
@@ -173,3 +171,7 @@ def test_get_updated_sweep_status(tmp_path):
     with (experiments_path / "8/abcd0001_x/config.yaml").open("r", encoding="utf-8") as f:
         config_content = json.load(f)
     assert config_content["config_id"] == "8_abcd0001_2025-07-27__18-00-00"
+
+    with (experiments_path / "16/abcd0001_x/config.yaml").open("r", encoding="utf-8") as f:
+        config_content = json.load(f)
+    assert config_content["config_id"] == "16_abcd0001_2025-07-27__18-00-00"

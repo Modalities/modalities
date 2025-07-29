@@ -65,24 +65,17 @@ def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_except
     return False
 
 
-def _keep_or_update_experiment_folder(config_file_path: Path):
+def update_experiment_folder(config_file_path: Path):
     experiment_folder_path = config_file_path.parent
-    error_log_paths = list(experiment_folder_path.glob(FileNames.ERRORS_FILE_REGEX.value))
-    results_log_path = experiment_folder_path / FileNames.RESULTS_FILE.value
-
-    if len(error_log_paths) == 0 and not results_log_path.exists():
-        # No errors and no results, keep the folder
-        return config_file_path
-    else:
-        # copy the config file to a new folder
-        hash = config_file_path.parent.name.split("_", maxsplit=1)[0]
-        ts = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-        new_folder_name = f"{hash}_{ts}"
-        new_folder = experiment_folder_path.parent / new_folder_name
-        new_folder.mkdir(parents=True, exist_ok=True)
-        new_config_path = new_folder / config_file_path.name
-        shutil.copy(config_file_path, new_config_path)
-        return new_config_path
+    # copy the config file to a new folder
+    hash = config_file_path.parent.name.split("_", maxsplit=1)[0]
+    ts = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
+    new_folder_name = f"{hash}_{ts}"
+    new_folder = experiment_folder_path.parent / new_folder_name
+    new_folder.mkdir(parents=True, exist_ok=True)
+    new_config_path = new_folder / config_file_path.name
+    shutil.copy(config_file_path, new_config_path)
+    return new_config_path
 
 
 def get_current_sweep_status(
@@ -122,10 +115,9 @@ def get_updated_sweep_status(
     file_list_dict = get_current_sweep_status(
         exp_root=exp_root, expected_steps=expected_steps, skip_exception_types=skip_exception_types
     )
-    # keep experiment folders that have not been run yet and create
-    # new experiment folders for those that have been run but failed
+    # create new experiment folders for all remaining configs
     updated_configs = [
-        _keep_or_update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
+        update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
     ]
     file_list_dict[SweepSets.UPDATED_CONFIGS.value] = updated_configs
 
