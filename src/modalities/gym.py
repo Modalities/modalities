@@ -66,7 +66,8 @@ class Gym:
             checkpointing_interval_in_steps=checkpointing_interval_in_steps,
         )
 
-        print_rank_0(f"Start model training at {datetime.now()}.")
+        start_time = datetime.now()
+        print_rank_0(f"Start model training at {start_time}.")
         self.trainer.train(
             app_state=app_state,
             train_loader=train_data_loader,
@@ -75,7 +76,9 @@ class Gym:
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
         )
-        print_rank_0(f"Training done at {datetime.now()}.")
+        end_time = datetime.now()
+        print_rank_0(f"Training done at {end_time}.")
+        print_rank_0(f"Total training time: {end_time - start_time}")
 
     def _run_checkpointing(
         self,
