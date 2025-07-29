@@ -32,7 +32,7 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
-from modalities.utils.benchmarking.benchmarking_utils import list_remaining_runs
+from modalities.utils.benchmarking.benchmarking_utils import get_updated_sweep_status
 from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
 
@@ -645,7 +645,12 @@ def entry_point_prepare_remaining_runs(
     Prepare a list of remaining runs from a grid search experiment directory.
     """
     skip_exception_types = skip_exception_types.split(",")
-    list_remaining_runs(experiment_dir, file_list_path, expected_steps, skip_exception_types)
+    get_updated_sweep_status(
+        exp_root=experiment_dir,
+        expected_steps=expected_steps,
+        file_list_path=file_list_path,
+        skip_exception_types=skip_exception_types,
+    )
 
 
 if __name__ == "__main__":

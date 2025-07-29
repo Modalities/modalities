@@ -4,6 +4,14 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Optional
+
+
+class SweepSets(Enum):
+    ALL_CONFIGS = "all_configs"
+    MOST_RECENT_CONFIGS = "most_recent_configs"
+    REMAINING_CONFIGS = "remaining_configs"
+    UPDATED_CONFIGS = "updated_configs"
 
 
 class FileNames(Enum):
@@ -77,23 +85,20 @@ def _keep_or_update_experiment_folder(config_file_path: Path):
         return new_config_path
 
 
-def list_remaining_runs(
-    exp_root: Path, file_list_path: Path, expected_steps: int, skip_exception_types: list[str] = None
-):
+def get_current_sweep_status(
+    exp_root: Path, expected_steps: int, skip_exception_types: list[str] = None
+) -> dict[str, list[Path]]:
+    """Get the status of the sweep by listing all configs and checking their results."""
     exp_root = exp_root.resolve()
-
+    file_list_dict = {}
     # Find all candidate config files and filter out resolved configs
     candidate_configs = list(exp_root.glob("**/*.yaml"))
     candidate_configs = [yaml_path for yaml_path in candidate_configs if not yaml_path.name.endswith(".resolved.yaml")]
-    print("=========ALL============")
-    for config in candidate_configs:
-        print(config)
+    file_list_dict[SweepSets.ALL_CONFIGS.value] = candidate_configs
 
     # filter only most recent configs
     candidate_configs = _get_most_recent_configs(candidate_configs)
-    print("=========MOST=RECENT============")
-    for config in candidate_configs:
-        print(config)
+    file_list_dict[SweepSets.MOST_RECENT_CONFIGS.value] = candidate_configs
 
     # filter non-successful experiments, i.e., those that do not have the
     # expected number of steps in evaluation_results.jsonl
@@ -103,19 +108,31 @@ def list_remaining_runs(
         for yaml_path in candidate_configs
         if not _is_experiment_done(yaml_path, expected_steps, skip_exception_types)
     ]
-    print("=========REMAINING============")
-    for config in candidate_configs:
-        print(config)
+    file_list_dict[SweepSets.REMAINING_CONFIGS.value] = candidate_configs
+    return file_list_dict
 
+
+def get_updated_sweep_status(
+    exp_root: Path,
+    expected_steps: int,
+    file_list_path: Optional[Path] = None,
+    skip_exception_types: Optional[list[str]] = None,
+) -> dict[str, list[Path]]:
+    """List all remaining runs in the experiment root directory and write them to a file."""
+    file_list_dict = get_current_sweep_status(
+        exp_root=exp_root, expected_steps=expected_steps, skip_exception_types=skip_exception_types
+    )
     # keep experiment folders that have not been run yet and create
     # new experiment folders for those that have been run but failed
-    candidate_configs = [_keep_or_update_experiment_folder(yaml_path) for yaml_path in candidate_configs]
-    print("=========UPDATED============")
-    for config in candidate_configs:
-        print(config)
+    updated_configs = [
+        _keep_or_update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
+    ]
+    file_list_dict[SweepSets.UPDATED_CONFIGS.value] = updated_configs
 
     # Write the config list
-    with file_list_path.open("w", encoding="utf-8") as f:
-        for cfg in candidate_configs:
-            f.write(str(cfg) + "\n")
-    print(f"Wrote {len(candidate_configs)} config paths to {file_list_path}")
+    if file_list_path is not None:
+        with file_list_path.open("w", encoding="utf-8") as f:
+            for cfg in updated_configs:
+                f.write(str(cfg) + "\n")
+
+    return file_list_dict
