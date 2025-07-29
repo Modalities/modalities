@@ -78,7 +78,7 @@ class Gym:
         )
         end_time = datetime.now()
         print_rank_0(f"Training done at {end_time}.")
-        print_rank_0(f"Total training time: {end_time - start_time}")
+        print_rank_0(f"Total training time: {(end_time - start_time).total_seconds()} seconds.")
 
     def _run_checkpointing(
         self,
