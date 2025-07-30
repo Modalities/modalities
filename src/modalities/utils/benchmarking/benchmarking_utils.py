@@ -6,6 +6,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(name="main")
+
 
 class SweepSets(Enum):
     ALL_CONFIGS = "all_configs"
@@ -110,21 +114,29 @@ def get_updated_sweep_status(
     expected_steps: int,
     file_list_path: Optional[Path] = None,
     skip_exception_types: Optional[list[str]] = None,
+    new_folders_for_remaining: bool = False,
 ) -> dict[str, list[Path]]:
     """List all remaining runs in the experiment root directory and write them to a file."""
     file_list_dict = get_current_sweep_status(
         exp_root=exp_root, expected_steps=expected_steps, skip_exception_types=skip_exception_types
     )
-    # create new experiment folders for all remaining configs
-    updated_configs = [
-        update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
-    ]
-    file_list_dict[SweepSets.UPDATED_CONFIGS.value] = updated_configs
+    if not new_folders_for_remaining or set(file_list_dict[SweepSets.REMAINING_CONFIGS.value]) == set(
+        file_list_dict[SweepSets.ALL_CONFIGS.value]
+    ):
+        logger.info("No runs executed so far. Returning the list of all configs without creating new folders.")
+        file_list_dict[SweepSets.UPDATED_CONFIGS.value] = file_list_dict[SweepSets.REMAINING_CONFIGS.value]
+    else:
+        logger.info("Some runs have been executed. Creating new folders for remaining configs.")
+        # create new experiment folders for all remaining configs
+        updated_configs = [
+            update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
+        ]
+        file_list_dict[SweepSets.UPDATED_CONFIGS.value] = updated_configs
 
     # Write the config list
     if file_list_path is not None:
         with file_list_path.open("w", encoding="utf-8") as f:
-            for cfg in updated_configs:
+            for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
                 f.write(str(cfg) + "\n")
 
-    return file_list_dict
+        return file_list_dict

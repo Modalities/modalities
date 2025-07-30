@@ -638,8 +638,18 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     default="",
     help="Exception types to skip when checking for successful runs. List of exceptions is comma-separated.",
 )
+@click.option(
+    "--new_folders_for_remaining",
+    is_flag=True,
+    default=False,
+    help="If set, create new folders for remaining runs.",
+)
 def entry_point_prepare_remaining_runs(
-    experiment_dir: Path, file_list_path: Path, expected_steps: int, skip_exception_types: str = ""
+    experiment_dir: Path,
+    file_list_path: Path,
+    expected_steps: int,
+    skip_exception_types: str = "",
+    new_folders_for_remaining: bool = False,
 ):
     """
     Prepare a list of remaining runs from a grid search experiment directory.
@@ -650,6 +660,7 @@ def entry_point_prepare_remaining_runs(
         expected_steps=expected_steps,
         file_list_path=file_list_path,
         skip_exception_types=skip_exception_types,
+        new_folders_for_remaining=new_folders_for_remaining,
     )
 
 
