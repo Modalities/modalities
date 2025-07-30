@@ -9,15 +9,6 @@
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 
-# Enable logging
-set -x  # Every command and its arguments are printed to stderr before being executed.
-
-# Setup environment
-module load cuda/12.3
-module load gcc/12.2.0
-module load binutils/2.42
-source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace "working" with "stable" if needed
-
 #### Environment variables
 export CXX=g++
 export CC=gcc
@@ -34,6 +25,14 @@ export GLOO_SOCKET_IFNAME=ib0
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export NCCL_ASYNC_ERROR_HANDLING=1
 
+# Enable logging
+set -x  # Every command and its arguments are printed to stderr before being executed.
+
+# Setup environment
+module load cuda/12.3
+source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace "working" with "stable" if needed
+
+
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 MASTER_PORT=6015
 
@@ -49,7 +48,8 @@ modalities benchmark list_remaining_runs \
   --experiment_dir "$EXPERIMENT_ROOT/$NUM_RANKS" \
   --file_list_path "$CONFIG_LIST_FILE" \
   --expected_steps "$EXPECTED_STEPS" \
-  --skip_exception_types "OutOfMemoryError,ValueError"
+  --skip_exception_types "OutOfMemoryError,ValueError" \
+  --new_folders_for_remaining
 
 
 # Step 2: Read configs into Bash array and loop
@@ -59,16 +59,24 @@ for config_file in "${config_files[@]}"; do
   echo "Processing config: $config_file"
   error_log_folder="$(dirname "$config_file")/error_logs"
 
-  srun torchrun \
-    --rdzv-endpoint "$MASTER_ADDR:$MASTER_PORT" \
-    --nnodes "$SLURM_JOB_NUM_NODES" \
-    --nproc_per_node "$GPUS_PER_NODE" \
-    --rdzv_backend c10d \
-    --rdzv_conf join_timeout=120 \
-    "$(which modalities)" run \
-    --config_file_path "$config_file" \
-    --experiment_id "" \
-    --error_log_folder "$error_log_folder"
+  srun --exclusive bash -c "
+    source /etc/profile
+    export USER=\${USER:-\$(whoami)}
+    module load cuda/12.3
+    source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate
+
+    set -euo pipefail
+    torchrun \
+      --rdzv-endpoint $MASTER_ADDR:$MASTER_PORT \
+      --nnodes $SLURM_JOB_NUM_NODES \
+      --nproc_per_node $GPUS_PER_NODE \
+      --rdzv_backend c10d \
+      --rdzv_conf join_timeout=120 \
+      $(which modalities) run \
+      --config_file_path $config_file \
+      --experiment_id \"\" \
+      --error_log_folder $error_log_folder
+  " || echo "Config $config_file failed, continuing..."
 done
 
 echo "END TIME: $(date)"
