@@ -7,7 +7,7 @@ cd "$(dirname "$0")" || exit 1
 
 
 # --- Config ---
-EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-27__22-16-22_5c3794cb"
+EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-28__14-13-18_b7117a39"
 EXPECTED_STEPS=20
 CONFIG_LIST_FILE="global_file_list.txt"
 

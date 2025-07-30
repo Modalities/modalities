@@ -32,6 +32,7 @@ export NCCL_IB_RETRY_CNT=10
 export NCCL_SOCKET_IFNAME=ib0
 export GLOO_SOCKET_IFNAME=ib0
 export CUDA_VISIBLE_DEVICES=0,1,2,3
+export NCCL_ASYNC_ERROR_HANDLING=1
 
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 MASTER_PORT=6015
@@ -63,6 +64,7 @@ for config_file in "${config_files[@]}"; do
     --nnodes "$SLURM_JOB_NUM_NODES" \
     --nproc_per_node "$GPUS_PER_NODE" \
     --rdzv_backend c10d \
+    --rdzv_conf join_timeout=120 \
     "$(which modalities)" run \
     --config_file_path "$config_file" \
     --experiment_id "" \
