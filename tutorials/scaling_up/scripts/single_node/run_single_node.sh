@@ -6,7 +6,7 @@ set -eu
 cd "$(dirname "$0")" || exit 1
 
 # --- Config ---
-EXPERIMENT_ROOT="/raid/s3/opengptx/max_lue/repositories/modalities/tutorials/scaling_up/experiments/2025-07-27__14-52-54_d149d990"
+EXPERIMENT_ROOT=$1 # The first argument is the experiment root directory
 CONFIG_LIST_FILE="config_file_list.txt"
 EXPECTED_STEPS=20
 
@@ -36,7 +36,7 @@ if [ -f "$CONFIG_LIST_FILE" ]; then
     rm "$CONFIG_LIST_FILE"
 fi
 
-modalities benchmark list_remaining_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS
+modalities benchmark list_remaining_runs --experiment_dir $EXPERIMENT_ROOT  --file_list_path $CONFIG_LIST_FILE --expected_steps $EXPECTED_STEPS  --new_folders_for_remaining
 
 # --- Step 2: Loop over each config ---
 while IFS= read -r file; do
