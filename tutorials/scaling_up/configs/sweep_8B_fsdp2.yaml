@@ -173,15 +173,6 @@ fsdp_model:
       reduce_dtype: BF_16
     block_names: [GPT2Block]
 
-compiled_model:
-  component_key: model
-  variant_key: compiled
-  config:
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    block_names: [GPT2Block]
-
 model_raw:
   component_key: model
   variant_key: gpt2

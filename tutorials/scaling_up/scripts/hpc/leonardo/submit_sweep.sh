@@ -7,12 +7,12 @@ cd "$(dirname "$0")" || exit 1
 
 
 # --- Config ---
-EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-28__14-13-18_b7117a39"
+EXPERIMENT_ROOT="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/repositories/working/modalities/tutorials/scaling_up/experiments/2025-07-30__21-50-11_fca0790e"
 EXPECTED_STEPS=20
 CONFIG_LIST_FILE="global_file_list.txt"
 
 ACCOUNT=EUHPC_E05_119
-TIME_LIMIT=3:00:00
+TIME_LIMIT=03:00:00
 GPUS_PER_NODE=4
 
 # Retrieve the list of configs to run

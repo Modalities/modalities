@@ -60,7 +60,12 @@ def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_except
         error_types = []
         for error_log_path in error_log_paths:
             with error_log_path.open("r", encoding="utf-8") as f:
-                error_type = json.load(f)["error"]["type"]
+                try:
+                    error_dict = json.load(f)
+                    error_type = error_dict["error"]["type"]
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"Failed to parse error log {error_log_path}: {e}")
+                    error_type = "ErrorFileParsingError"
             error_types.append(error_type)
         # Check if any of the error types are in the skip list
         if len(set(skip_exception_types).intersection(set(error_types))) > 0:
