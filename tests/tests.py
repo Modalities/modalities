@@ -301,6 +301,18 @@ def main(
         )
         # we do not run scripts/03_convert_distributed_model_to_torch.sh and scripts/04_generate_text.sh,
         # as this is only for the end-to-end experience of the tutorial
+
+        # getting scaling up example
+        print("\n=== RUN SCALING UP EXAMPLE ===")
+        run_scaling_up_example_directory = _ROOT_DIR / "tutorials" / "scaling_up"
+        run_scaling_up_example_script = (
+            _ROOT_DIR / "tutorials" / "scaling_up" / "scripts" / "run_scaling_up_example_single_node.sh"
+        )
+        assert isfile(run_scaling_up_example_script), f"ERROR! {run_scaling_up_example_script} does not exist."
+        command_scaling_up_example = f"cd {run_scaling_up_example_directory}; "
+        command_scaling_up_example += "bash scripts/run_scaling_up_example_single_node.sh"
+        subprocess_run(command_scaling_up_example)
+
     print("\n=== DONE ===")
 
 

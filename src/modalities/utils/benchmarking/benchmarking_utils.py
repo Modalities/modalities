@@ -90,7 +90,19 @@ def update_experiment_folder(config_file_path: Path):
 def get_current_sweep_status(
     exp_root: Path, expected_steps: int, skip_exception_types: list[str] = None
 ) -> dict[str, list[Path]]:
-    """Get the status of the sweep by listing all configs and checking their results."""
+    """Get the status of the sweep by assigning the config file paths to categories
+    'all', 'most_recent', and 'remaining'.
+
+    Args:
+        exp_root (Path): The root directory of the experiment.
+        expected_steps (int): The expected number of steps in the evaluation results.
+        skip_exception_types (Optional[list[str]]): List of exception types to skip when checking if
+            an experiment is done. A skipped experiment is considered as done in this case.
+    Returns:
+        dict[str, list[Path]]: A dictionary with keys 'all_configs', 'most_recent_configs', and 'remaining_configs',
+            each containing a list of Path objects pointing to the respective config files.
+    """
+
     exp_root = exp_root.resolve()
     file_list_dict = {}
     # Find all candidate config files and filter out resolved configs
@@ -121,7 +133,17 @@ def get_updated_sweep_status(
     skip_exception_types: Optional[list[str]] = None,
     new_folders_for_remaining: bool = False,
 ) -> dict[str, list[Path]]:
-    """List all remaining runs in the experiment root directory and write them to a file."""
+    """List all remaining runs in the experiment root directory and optionally write them to a file.
+
+    Args:
+        exp_root (Path): The root directory of the experiment.
+        expected_steps (int): The expected number of steps in the evaluation results.
+        file_list_path (Optional[Path]): If provided, the list of remaining runs will be written to this file.
+        skip_exception_types (Optional[list[str]]): List of exception types to skip when
+            checking if an experiment is done. A skipped experiment is considered as done in this case.
+        new_folders_for_remaining (bool): If True, create new folders for remaining configs.
+
+    """
     file_list_dict = get_current_sweep_status(
         exp_root=exp_root, expected_steps=expected_steps, skip_exception_types=skip_exception_types
     )
