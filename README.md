@@ -44,7 +44,7 @@ conda activate modalities
 # install PyTorch, Ninja and Flash Attention (mandatory)
 pip install torch==2.6.0
 pip install ninja     # Lowers compilation time of flash attention significantly 
-pip install flash-attn --no-build-isolation
+pip install flash-attn==2.7.4.post1 --no-build-isolation
 ```
 
 ### Option 1: Installation from source
@@ -72,6 +72,20 @@ To install Modalities via pip, run
 
 ```sh
 pip install modalities
+```
+
+### Option 3: Feature Complete via UV
+
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --seed --python 3.11 --prompt modalities
+source .venv/bin/activate
+uv pip install torch
+uv pip install ninja
+uv pip install --no-build-isolation flash-attn==2.7.4.post1
+# for developer: use [tests,linting] and install pre-commit hooks
+uv pip install -e .[tests,linting]
+pre-commit install --install-hooks
 ```
 
 ## Usage

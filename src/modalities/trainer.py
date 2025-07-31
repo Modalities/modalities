@@ -172,7 +172,7 @@ class Trainer:
         # batch loop
         batch: DatasetBatch
         # TODO: why do we need a barrier here?
-        dist.barrier()
+        # dist.barrier()
         forward_backward_time_recorder = TimeRecorder()
         forward_backward_time_recorder.start()
         gradient_norm_scores = []

@@ -8,7 +8,7 @@ from typing import BinaryIO
 import numpy as np
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 
 class TokenizedFileWriter:

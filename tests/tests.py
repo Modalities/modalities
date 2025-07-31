@@ -213,7 +213,7 @@ def main(
         print(f"\n=== RUN MAIN TESTS on CPU and CUDA devices {device_ids} ===")
         command_unit_tests = (
             f"cd {_ROOT_DIR} && CUDA_VISIBLE_DEVICES="
-            f"{','.join(map(str, device_ids)) if len(device_ids) >0 else ''} python -m pytest"
+            f"{','.join(map(str, device_ids)) if len(device_ids) > 0 else ''} python -m pytest"
         )
         if main_tests_name_filter is not None:
             command_unit_tests += f" -k {main_tests_name_filter}"
@@ -279,6 +279,28 @@ def main(
         )
         subprocess_run(command_warmstart_example)
 
+        # instruction tuning example
+        print("\n=== RUN INSTRUCTION TUNING EXAMPLE ===")
+        instruction_tuning_example_directory = _ROOT_DIR / "tutorials/instruction_tuning"
+
+        # prepare instruction tuning data
+        script_file = "scripts/01_prepare_instruction_data.sh"
+        # tests/config/test_configs/config_small_instruct_model_fsdp1_training.yaml
+        script_file_path = instruction_tuning_example_directory / script_file
+        assert isfile(script_file_path), f"ERROR! {script_file_path} does not exist."
+        subprocess_run(f"cd {instruction_tuning_example_directory}; sh {script_file}")
+
+        # small-scale instruction tuning
+        script_file = "scripts/02_train_instruction_tuning_model.sh"
+        script_file_path = instruction_tuning_example_directory / script_file
+        assert isfile(script_file_path), f"ERROR! {script_file_path} does not exist."
+        subprocess_run(
+            f"cd {instruction_tuning_example_directory}; "
+            + f"sh {script_file} {','.join(map(str, device_ids[:2]))} "
+            + "configs/small_train_instruct_model_fsdp2_config.yaml"
+        )
+        # we do not run scripts/03_convert_distributed_model_to_torch.sh and scripts/04_generate_text.sh,
+        # as this is only for the end-to-end experience of the tutorial
     print("\n=== DONE ===")
 
 

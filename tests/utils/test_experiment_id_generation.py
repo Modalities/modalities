@@ -7,7 +7,7 @@ import torch
 import torch.multiprocessing as mp
 
 from modalities.config.config import ProcessGroupBackendType
-from modalities.util import get_experiment_id_of_run
+from modalities.util import get_synced_experiment_id_of_run
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
@@ -45,7 +45,7 @@ class TestExperimentIdGeneration:
             world_size=world_size,
             rdvz_port=rdvz_port,
         ):
-            experiment_id = get_experiment_id_of_run(
+            experiment_id = get_synced_experiment_id_of_run(
                 config_file_path=config_file_path,
                 hash_length=8,
                 max_experiment_id_byte_length=1024,
@@ -59,7 +59,7 @@ class TestExperimentIdGeneration:
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path",
         [
-            (22358, "../end2end_tests/system_tests/configs/fsdp2_gpt2_train_num_steps_8.yaml"),
+            (22658, "../end2end_tests/system_tests/configs/fsdp2_gpt2_train_num_steps_8.yaml"),
         ],
     )
     def test_experiment_id_generation_and_syncing(rdvz_port, relative_config_path: str, temporary_folder_path: Path):

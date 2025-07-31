@@ -29,10 +29,13 @@ from modalities.config.config import (
     DCPAppStateConfig,
     DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
+    DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
+    EvaluationResultToDiscSubscriberConfig,
+    FSDP1ActivationCheckpointedModelConfig,
     FSDP1CheckpointedModelConfig,
     FSDP1CheckpointedOptimizerConfig,
     FSDP1CheckpointLoadingConfig,
@@ -41,6 +44,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
+    GPT2ModelTPConfig,
     LinearLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
@@ -61,9 +65,14 @@ from modalities.config.config import (
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
 )
+from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
+    LossMaskingCollateFnWrapper,
+    LossMaskingCollateFnWrapperConfig,
+)
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.dataset import DummyDatasetConfig
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.dataloader.sampler_factory import ResumableDistributedMultiDimSamplerConfig, SamplerFactory
 from modalities.dataloader.samplers import ResumableDistributedSampler
 from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
@@ -110,6 +119,7 @@ from modalities.utils.number_conversion import (
     NumTokensFromNumStepsConfig,
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
+from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
 
 
 @dataclass
@@ -135,6 +145,7 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity("model", "gpt2_tp", GPT2ModelFactory.get_gpt2_tensor_parallelized_model, GPT2ModelTPConfig),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -149,11 +160,20 @@ COMPONENTS = [
     ComponentEntity(
         "model",
         "activation_checkpointed_fsdp1",
-        ModelFactory.get_activation_checkpointed_fsdp1_model,
+        ModelFactory.get_activation_checkpointed_fsdp1_model_,
+        FSDP1ActivationCheckpointedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
+        "activation_checkpointed",
+        ModelFactory.get_activation_checkpointed_fsdp2_model_,
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    ComponentEntity(
+        "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
@@ -209,16 +229,30 @@ COMPONENTS = [
     # samplers
     ComponentEntity("sampler", "sequential_sampler", SequentialSampler, SequentialSamplerConfig),
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
+    ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),
     ComponentEntity(
         "sampler", "resumable_distributed_sampler", ResumableDistributedSampler, ResumableDistributedSamplerConfig
+    ),
+    ComponentEntity(
+        "sampler",
+        "resumable_distributed_multi_dim_sampler",
+        SamplerFactory.create_resumable_distributed_multi_dim_sampler,
+        ResumableDistributedMultiDimSamplerConfig,
     ),
     # batch samplers
     ComponentEntity("batch_sampler", "default", BatchSampler, BatchSamplerConfig),
     # collators
     ComponentEntity("collate_fn", "gpt_2_llm_collator", GPT2LLMCollateFn, GPT2LLMCollateFnConfig),
     ComponentEntity("collate_fn", "coca_collator", CoCaCollatorFn, CoCaCollateFnConfig),
+    ComponentEntity(
+        "collate_fn", "mask_loss_collator_wrapper", LossMaskingCollateFnWrapper, LossMaskingCollateFnWrapperConfig
+    ),
     # data loaders
     ComponentEntity("data_loader", "default", DataloaderFactory.get_dataloader, LLMDataLoaderConfig),
+    # dataset batch generator
+    ComponentEntity(
+        "dataset_batch_generator", "random", RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+    ),
     # checkpointing
     ComponentEntity("checkpoint_saving", "default", CheckpointSaving, CheckpointSavingConfig),
     # checkpointing strategies
@@ -257,6 +291,12 @@ COMPONENTS = [
     # Results subscriber
     ComponentEntity(
         "results_subscriber", "dummy", ResultsSubscriberFactory.get_dummy_result_subscriber, DummyResultSubscriberConfig
+    ),
+    ComponentEntity(
+        "results_subscriber",
+        "to_disc",
+        ResultsSubscriberFactory.get_evaluation_result_to_disc_subscriber,
+        EvaluationResultToDiscSubscriberConfig,
     ),
     ComponentEntity(
         "results_subscriber", "rich", ResultsSubscriberFactory.get_rich_result_subscriber, RichResultSubscriberConfig

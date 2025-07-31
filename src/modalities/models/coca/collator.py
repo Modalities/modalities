@@ -4,7 +4,7 @@ import torch
 from pydantic import BaseModel
 
 from modalities.batch import DatasetBatch
-from modalities.models.gpt2.collator import CollateFnIF
+from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 
 
 class CoCaCollateFnConfig(BaseModel):

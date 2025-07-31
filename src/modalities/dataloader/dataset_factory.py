@@ -73,22 +73,36 @@ class DatasetFactory:
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(
-        raw_data_path: Path, sequence_length: int, sample_key: str
+        raw_data_path: Path, sequence_length: int, sample_key: str, reuse_last_target: bool
     ) -> PackedMemMapDatasetContinuous:
         """
-        Returns a PackedMemMapDatasetContinuous object.
+        Initializes a PackedMemMapDatasetContinuous object. If `reuse_last_target` is True,
+        the last target token of one sample is reused as the first input token of the next sample,
+        creating an overlap of one token between samples (recommended for pre-training).
+        If `reuse_last_target` is False, there is no overlap:
+        Each sample is a distinct block, and the first token of each sample is never used as a target
+        (recommended for instruction tuning).
 
         Args:
             raw_data_path (Path): The path to the raw data.
             sequence_length (int): The length of each sequence.
             sample_key (str): The key used to retrieve the samples from the dataset.
+            reuse_last_target (bool): Whether to reuse the last target.
 
         Returns:
             PackedMemMapDatasetContinuous: The packed memory-mapped dataset.
-
         """
         dataset = PackedMemMapDatasetContinuous(
-            raw_data_path=raw_data_path, block_size=sequence_length + 1, sample_key=sample_key
+            raw_data_path=raw_data_path,
+            # we can increase the block size by 1, as we reuse the last target token
+            # if we do not reuse the last target token, we should not increase the block size, as the this would lead to
+            # getting samples with increasing offset, e.g.:
+            # [0, 1, 2, ..., sequence_length - 1] for the first sample,
+            # [1, 2, 3, ..., sequence_length] for the second sample
+            # and so on, which is not what we want.
+            block_size=(sequence_length + 1) if reuse_last_target else sequence_length,
+            sample_key=sample_key,
+            reuse_last_target=reuse_last_target,
         )
         return dataset
 

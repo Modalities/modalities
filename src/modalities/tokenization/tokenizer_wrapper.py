@@ -108,12 +108,18 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
 
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=pretrained_model_name_or_path)
         if special_tokens is not None:
+            old_vocab_size = len(self.tokenizer.get_vocab())
             # TODO check if we always want to set
             # replace_additional_special_tokens=False
             self.tokenizer.add_special_tokens(
                 special_tokens_dict=special_tokens,
                 replace_additional_special_tokens=False,
             )
+            if len(self.tokenizer.get_vocab()) > old_vocab_size:
+                raise NotImplementedError(
+                    "Currently only tokens already known to the tokenizers vocabulary can be added,"
+                    + " as resizing the embedding matrix is not yet supported!"
+                )
         self.max_length = max_length
         self.truncation = truncation
         self.padding = padding

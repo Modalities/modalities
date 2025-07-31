@@ -1,7 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Callable, Literal, Optional
+from typing import Annotated, Any, Callable, Literal, Optional, Set
 
 import torch
 from omegaconf import OmegaConf
@@ -39,6 +39,9 @@ from modalities.running_env.env_utils import (
     has_bfloat_support,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    ActivationCheckpointingVariants,
+)
 from modalities.util import parse_enum_by_name
 
 
@@ -283,6 +286,32 @@ class FSDP2WrappedModelConfig(BaseModel):
         return self
 
 
+class DebuggingEnrichedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    logging_dir_path: Path
+    tracked_ranks: Optional[Set[int]] = None
+    log_interval_steps: Optional[int] = 1
+
+    @field_validator("tracked_ranks", mode="before")
+    def convert_list_to_set(cls, v):
+        if v is None:
+            return v
+        return set(v)
+
+
+class GPT2ModelTPConfig(BaseModel):
+    model: PydanticPytorchModuleType  # TODO set proper type
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_tp_mesh_existence(self):
+        if ParallelismDegrees.TP.value not in self.device_mesh.mesh_dim_names:
+            raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
+        if ParallelismDegrees.DP_REPLICATE.value in self.device_mesh.mesh_dim_names:
+            raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism. ")
+        return self
+
+
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleType
     block_names: list[str]
@@ -299,9 +328,25 @@ class WeightInitializedModelConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class ActivationCheckpointedModelConfig(BaseModel):
+class FSDP1ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class ActivationCheckpointedModelConfig(BaseModel):
+    class FullACParams(BaseModel):
+        pass
+
+    class SelectiveLayerACParams(BaseModel):
+        ac_freq: Annotated[int, Field(strict=True, ge=1)]
+
+    class SelectiveOpACParams(BaseModel):
+        save_ops_keys: list[str]
+
+    ac_variant: ActivationCheckpointingVariants
+    layers_fqn: str
+    model: PydanticPytorchModuleType
+    ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
@@ -320,7 +365,7 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[dict[str, str]] = None
+    special_tokens: Optional[dict[str, str | list | tuple]] = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
@@ -363,6 +408,7 @@ class PackedMemMapDatasetContinuousConfig(BaseModel):
     raw_data_path: Path
     sequence_length: Annotated[int, Field(strict=True, gt=1)]
     sample_key: str
+    reuse_last_target: bool = Field(default=True)
 
 
 class PackedMemMapDatasetMegatronConfig(BaseModel):
@@ -409,6 +455,11 @@ class RichProgressSubscriberConfig(BaseModel):
 
 class DummyResultSubscriberConfig(BaseModel):
     pass
+
+
+class EvaluationResultToDiscSubscriberConfig(BaseModel):
+    output_folder_path: Path
+    experiment_id: str
 
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):

@@ -58,6 +58,8 @@ class NumTokensFromPackedMemMapDatasetContinuousConfig(BaseModel):
     num_ranks: Annotated[int, Field(strict=True, gt=0)]
     local_micro_batch_size: Annotated[int, Field(strict=True, gt=0)]
     gradient_accumulation_steps: Annotated[int, Field(strict=True, gt=0)]
+    sample_key: str = Field(default="text")
+    reuse_last_target: bool = Field(default=True)
 
 
 class NumStepsFromRawDatasetIndexConfig(BaseModel):
@@ -289,6 +291,8 @@ class NumberConversion:
         num_ranks: int,
         local_micro_batch_size: int,
         gradient_accumulation_steps: int,
+        sample_key: str,
+        reuse_last_target: bool,
     ) -> int:
         """Get the number of tokens in a tokenized dataset that will be effectively used during training.
             Due to the way the data is packed, batched and distributed, the number of tokens used during training
@@ -312,7 +316,10 @@ class NumberConversion:
             int: Number of tokens that will be effectively used during training.
         """
         dataset = DatasetFactory.get_packed_mem_map_dataset_continuous(
-            raw_data_path=dataset_path, sequence_length=sequence_length, sample_key="text"
+            raw_data_path=dataset_path,
+            sequence_length=sequence_length,
+            sample_key=sample_key,
+            reuse_last_target=reuse_last_target,
         )
         global_num_tokens_dataset = len(dataset) * sequence_length
         num_steps = NumberConversion.get_num_steps_from_num_tokens(
