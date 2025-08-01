@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional, Type
 
+import torch.distributed as dist
 import yaml
 from pydantic import BaseModel
 
@@ -22,7 +23,6 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
-from modalities.utils.file_ops import get_file_md5sum
 from modalities.utils.logger_utils import get_logger
 
 logger = get_logger(name="main")
@@ -97,24 +97,36 @@ class Main:
         Args:
             components (TrainingComponentsInstantiationModel): The components needed for the training process.
         """
-        # save the config file to the checkpointing path
-        if components.settings.cuda_env.global_rank == 0:
-            experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
-            os.makedirs(experiment_path, exist_ok=True)
-            if not (experiment_path / self.config_path.name).exists():
-                shutil.copy(self.config_path, experiment_path / self.config_path.name)
-            else:
-                logger.warning(f"Config file {self.config_path.name} already exists in {experiment_path}.")
-                # compare md5 hashes of the two files
-                existing_config_path = experiment_path / self.config_path.name
-                if get_file_md5sum(existing_config_path) != get_file_md5sum(self.config_path):
-                    raise RunningEnvError(
-                        f"Config file {self.config_path.name} already exists in {experiment_path}, "
-                        "but the content is different. Please remove the existing config file or "
-                        "create a new experiment ID."
-                    )
+        # The typical training setup is that the config file is located outside of the experiment folder
+        # and the experiment folder is empty.
+        # Before starting the training, the config file is copied to the experiment folder for reproducibility purposes.
+        # However, for instance for benchmarking, the config file might be already located inside the experiment folder.
+        # In this case, we only allow the config file to be present in the experiment folder.
+        # NOTE: For the future, these constraints might be relaxed, as some components might have to
+        # store meta data in the experiment folder at instantiation time.
+        experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
+        expected_config_file_path = experiment_path / self.config_path.name
+        if experiment_path.is_dir():
+            present_files = list(experiment_path.iterdir())
+            if len(present_files) == 1 and expected_config_file_path not in present_files:
+                raise RunningEnvError(
+                    f"The experiment folder is non-empty and contains a file {present_files[0].name} that "
+                    f"is not the config file. Please ensure that the config file is the only file present "
+                    "in the experiment folder."
+                )
+            elif len(present_files) > 1:
+                raise RunningEnvError(
+                    f"The experiment folder is non-empty and contains multiple files: {present_files}. "
+                    f"Please ensure that the config file is the only file present."
+                )
+        dist.barrier()
 
-            resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
+        if components.settings.cuda_env.global_rank == 0:
+            os.makedirs(experiment_path, exist_ok=True)
+            if self.config_path != expected_config_file_path:
+                shutil.copy(self.config_path, expected_config_file_path)
+
+            resolved_config_path = (expected_config_file_path).with_suffix(".yaml.resolved")
             with open(resolved_config_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.config_dict, f)
 
