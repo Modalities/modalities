@@ -12,6 +12,7 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
 from modalities.evaluator import Evaluator
+from modalities.exceptions import RunningEnvError
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import MessageTypes, ProgressUpdate
@@ -21,6 +22,7 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
+from modalities.utils.file_ops import get_file_md5sum
 from modalities.utils.logger_utils import get_logger
 
 logger = get_logger(name="main")
@@ -102,7 +104,15 @@ class Main:
             if not (experiment_path / self.config_path.name).exists():
                 shutil.copy(self.config_path, experiment_path / self.config_path.name)
             else:
-                logger.warning(f"Config file {self.config_path.name} already exists in {experiment_path}. Overwriting.")
+                logger.warning(f"Config file {self.config_path.name} already exists in {experiment_path}.")
+                # compare md5 hashes of the two files
+                existing_config_path = experiment_path / self.config_path.name
+                if get_file_md5sum(existing_config_path) != get_file_md5sum(self.config_path):
+                    raise RunningEnvError(
+                        f"Config file {self.config_path.name} already exists in {experiment_path}, "
+                        "but the content is different. Please remove the existing config file or "
+                        "create a new experiment ID."
+                    )
 
             resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
             with open(resolved_config_path, "w", encoding="utf-8") as f:
