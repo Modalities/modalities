@@ -42,6 +42,8 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
     _check_conversion_criteria(config)
 
+    ffn_norm_key = "ffn_norm" if "ffn_norm" in config else "ffn_norm_config"
+
     return GPT2Config(
         vocab_size=config["vocab_size"],
         hidden_size=config["n_embd"],
@@ -53,9 +55,9 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
-        layer_norm_eps=_get_layer_norm_value(config["ffn_norm_config"]["config"], "eps"),
-        layer_norm_elementwise_affine=_get_layer_norm_value(config["ffn_norm_config"]["config"], "elementwise_affine"),
-        layer_norm_bias=_get_layer_norm_value(config["ffn_norm_config"]["config"], "bias"),
+        layer_norm_eps=_get_layer_norm_value(config[ffn_norm_key]["config"], "eps"),
+        layer_norm_elementwise_affine=_get_layer_norm_value(config[ffn_norm_key]["config"], "elementwise_affine"),
+        layer_norm_bias=_get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation=_map_attention_type(config),
@@ -97,9 +99,14 @@ def _check_conversion_criteria(model_config: dict) -> None:
     assert model_config["activation_type"] == "swiglu"
     assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
 
-    norms = ["attention_norm_config", "ffn_norm_config", "lm_head_norm_config"]
+    if "attention_norm" in model_config:
+        norms = ["attention_norm", "ffn_norm", "lm_head_norm"]
+        norm_type_key = "variant_key"
+    else:
+        norms = ["attention_norm_config", "ffn_norm_config", "lm_head_norm_config"]
+        norm_type_key = "norm_type"
     for norm in norms:
-        assert model_config[norm]["norm_type"] == "layer_norm"
+        assert model_config[norm][norm_type_key] == "layer_norm"
 
     assert (
         len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
