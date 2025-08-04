@@ -45,7 +45,7 @@ The config file hash is also used as the name for the experiment config.
 ```
 
 ## Running the Experiments
-To run the experiments, you can either run them on a single node or on a cluster.
+The experiments can be run either on a single node or on a cluster.
 Before running experiments, we need to create the experiment configs from the sweep configuration. The sweep config contains the typical training config but is enriched with a sweep configuration that defines the hyperparameters to sweep over.
 A minimal example could be to sweep over the local batch size and the model's sequence length, as shown below.
 
@@ -100,7 +100,7 @@ For an end to end script, also see `scripts/run_scaling_up_single_node.sh`.
 ### HPC Cluster Benchmarking
 To run the experiments on a SLURM cluster, you can use the script `scripts/hpc/leonardo/submit_sweep.sh`, which submits an sbatch job to the cluster for each node configuration. Each sbatch job will run all the experiments on the specified number of ranks and the specified sweep configuration.
 
-The sbatch job is defined in the file `scripts/hpc/leonardo/job.sbatch`. Note that both the `submit_sweep.sh` and the `job.sbatch` are dedicated to the Leonardo HPC cluster, so you will need to adapt environmental setttings to your specific HPC cluster.
+The sbatch job is defined in the file `scripts/hpc/leonardo/job.sbatch`. Note that both the `submit_sweep.sh` and the `job.sbatch` are dedicated to the Leonardo HPC cluster, so you will need to adapt environmental setttings (e.g., python env path  or slurm partition) to your specific HPC cluster. Respective hints are given by "TODO" comments in both scripts. 
 
 ## Evaluation 
 To evaluate the results of the experiments, you can use the Jupyter notebook `analysis/throughput_analysis.ipynb`.

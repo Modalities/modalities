@@ -74,7 +74,15 @@ def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_except
     return False
 
 
-def update_experiment_folder(config_file_path: Path):
+def update_experiment_folder(config_file_path: Path) -> Path:
+    """Create a new folder for the experiment based on the config file path.
+    The new folder will have the same hash as the original folder, but with a timestamp appended.
+
+    Args:
+        config_file_path (Path): The path to the config file.
+    Returns:
+        Path: The path to the new config file in the experiment folder.
+    """
     experiment_folder_path = config_file_path.parent
     # copy the config file to a new folder
     hash = config_file_path.parent.name.split("_", maxsplit=1)[0]

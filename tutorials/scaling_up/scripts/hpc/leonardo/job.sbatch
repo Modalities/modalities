@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=boost_usr_prod
+#SBATCH --partition=boost_usr_prod        # TODO: Change to your partition
 #SBATCH --job-name=8B_FSDP2_compiled
 #SBATCH --output=../../../logs/8B_large_scale_%j.out
 #SBATCH --error=../../../logs/8B_large_scale_%j.err
@@ -29,8 +29,10 @@ export NCCL_ASYNC_ERROR_HANDLING=1
 set -x  # Every command and its arguments are printed to stderr before being executed.
 
 # Setup environment
+# TODO:  Change to your environment path
+python_env="/leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate"
 module load cuda/12.3
-source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate # TODO replace "working" with "stable" if needed
+source "$python_env"
 
 
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
@@ -63,7 +65,7 @@ for config_file in "${config_files[@]}"; do
     source /etc/profile
     export USER=\${USER:-\$(whoami)}
     module load cuda/12.3
-    source /leonardo_scratch/fast/EUHPC_D21_101/max_lue/python_envs/working/leonardo_modalities/bin/activate
+    source $python_env
 
     set -euo pipefail
     torchrun \
