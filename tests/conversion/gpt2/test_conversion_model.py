@@ -30,6 +30,15 @@ def test_convert_model_checkpoint_produces_same_logits_as_original(gpt2_config_p
     check_converted_model(hf_model, modalities_model, num_testruns=1, vocab_size=vocab_size)
 
 
+@pytest.mark.parametrize("corrupt_model_head_key_in_state_dict", [True])
+def test_convert_model_with_wrong_key_in_checkpoint_state_dict_fails(
+    gpt2_config_path: str, corrupt_model_head_key_in_state_dict: bool
+):
+    modalities_config = load_app_config_dict(gpt2_config_path)
+    with pytest.raises(RuntimeError):
+        convert_model_checkpoint(modalities_config)
+
+
 def test_copying_base_modules_weights_yields_identical_modules():
     m1 = nn.Linear(10, 10, bias=True)
     m2 = nn.Linear(10, 10, bias=True)
