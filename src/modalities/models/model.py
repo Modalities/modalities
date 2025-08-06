@@ -75,7 +75,9 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU class to define the SwiGLU activation function."""
 
-    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool):
+    def __init__(
+        self, n_embd: int, ffn_hidden: int, bias: bool, enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None
+    ):
         """
         Initializes the SwiGLU object.
 
@@ -84,11 +86,17 @@ class SwiGLU(nn.Module):
             ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
             Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
             bias (bool): Whether to include bias terms in the linear layers.
+            enforce_swiglu_hidden_dim_multiple_of (int): The multiple of which the hidden dimension should be enforced.
+                This is required for FSDP + TP as the combincation does not support uneven sharding (yet).
+                Defaults to 256 if not provided.
         """
 
         super().__init__()
-
-        hidden_dim = SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden)
+        if enforce_swiglu_hidden_dim_multiple_of is None:
+            enforce_swiglu_hidden_dim_multiple_of = 256
+        hidden_dim = SwiGLU._get_hidden_dim(
+            ffn_hidden=ffn_hidden, enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of
+        )
 
         self.W = nn.Linear(
             in_features=n_embd,
@@ -108,7 +116,7 @@ class SwiGLU(nn.Module):
         )
 
     @staticmethod
-    def _get_hidden_dim(ffn_hidden: int) -> int:
+    def _get_hidden_dim(ffn_hidden: int, enforce_swiglu_hidden_dim_multiple_of: int) -> int:
         # Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
 
         # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
@@ -116,8 +124,13 @@ class SwiGLU(nn.Module):
         # linear layer are equivalent to the TransformerMLP, we need to adapt the SwiGLU hidden dimension as follows:
         # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
         # Besides, we ensure that hidden_dim is the smallest multiple of
-        # 256 that is greater than or equal the provided hidden_dim
-        return 256 * ((int(2 * ffn_hidden / 3) + 256 - 1) // 256)
+        # `enforce_swiglu_hidden_dim_multiple_of` that is greater than or equal the provided hidden_dim.
+        # In case of TP we must set this to be at least of world size as FSDP + TP does not uneven sharding.
+        # FSDP itself without TP support it already however.
+        return enforce_swiglu_hidden_dim_multiple_of * (
+            (int(2 * ffn_hidden / 3) + enforce_swiglu_hidden_dim_multiple_of - 1)
+            // enforce_swiglu_hidden_dim_multiple_of
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
