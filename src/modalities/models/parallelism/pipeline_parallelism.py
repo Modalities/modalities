@@ -1,4 +1,4 @@
-# Some portions of this implementation are inspired and/or adapted
+# Some portions of this implementation are inspired, adapted, or refactored
 # from Meta's open-source project TorchTitan,
 # licensed under the BSD 3-Clause License.
 
@@ -14,25 +14,100 @@ from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 
 
 class FQNsPerStageGenerator(ABC):
-    @abstractmethod
     def generate_fqns_per_stage(
         self, num_stages: int, num_layers: int, input_layer_equivalence: int = 1, output_layer_equivalence: int = 1
     ) -> list[list[str]]:
         """
-        Generate a list of fully qualified names (FQNs) for each pipeline stage.
+        Generate FQNs for each stage in a GPT-2 model.
 
         Args:
             num_stages (int): Number of stages in the pipeline.
             num_layers (int): Total number of layers in the model.
-            input_layer_equivalence (int): Determines to how many transformer layers
-                the input layer corresponds. Default is 1.
-            output_layer_equivalence (int): Determines to how many transformer layers
-                the output layer corresponds. Default is 1.
+            input_layer_equivalence (int): Number of layers corresponding to the input layer.
+            output_layer_equivalence (int): Number of layers corresponding to the output layer.
 
         Returns:
-            list[list[str]]: A list containing an FQN list for each stage.
+            list[list[str]]: A list containing FQNs for each stage.
+        """
+
+        # Potential split points for GPT-2 model with each potential split point
+        # listing the FQNs of the modules in that stage and the computational weight.
+        # The computational weight of the input and output modules are estimated
+        # based on the number of layers they correspond to.
+        potential_split_points = self._get_potential_split_points(
+            num_layers=num_layers,
+            input_layer_equivalence=input_layer_equivalence,
+            output_layer_equivalence=output_layer_equivalence,
+        )
+        # Calculate the weight per stage based on the total weight and number of stages
+        weight_per_stage = math.ceil(sum(weight for _, weight in potential_split_points) / num_stages)
+        # pack the stages with the layers
+        next_split_point = 0
+        module_names_per_stage: list[list[str]] = []
+        for _ in range(num_stages):
+            stage_fqns = []
+            stage_weight = 0
+            while next_split_point < len(potential_split_points):
+                fqns, weight = potential_split_points[next_split_point]
+                if weight > weight_per_stage:
+                    raise ValueError(
+                        f"Weight of {weight} for {fqns} exceeds weight per stage {weight_per_stage}. "
+                        "Please adjust the number of stages or the weight distribution."
+                    )
+                if stage_weight + weight > weight_per_stage:
+                    break
+                stage_fqns.extend(fqns)
+                stage_weight += weight
+                next_split_point += 1
+            module_names_per_stage.append(stage_fqns)
+
+        return module_names_per_stage
+
+    @abstractmethod
+    def _get_potential_split_points(
+        self, num_layers: int, input_layer_equivalence: int = 1, output_layer_equivalence: int = 1
+    ) -> list[tuple[list[str], int]]:
+        """
+        Returns a list of potential split points for the GPT-2 model.
+
+        Args:
+            num_layers (int): Total number of layers in the model.
+            input_layer_equivalence (int): Number of layers corresponding to the input layer.
+            output_layer_equivalence (int): Number of layers corresponding to the output layer.
+
+        Returns:
+            list[tuple[list[str], int]]: A list containing tuples of FQNs and their computational weights.
         """
         raise NotImplementedError("This method should be implemented by subclasses.")
+
+
+class GPT2LLMFQNsPerStageGenerator(FQNsPerStageGenerator):
+    def _get_potential_split_points(
+        self, num_layers: int, input_layer_equivalence: int = 1, output_layer_equivalence: int = 1
+    ) -> list[tuple[list[str], int]]:
+        """
+        Returns a list of potential split points for the GPT-2 model.
+
+        Args:
+            num_layers (int): Total number of layers in the model.
+            input_layer_equivalence (int): Number of layers corresponding to the input layer.
+            output_layer_equivalence (int): Number of layers corresponding to the output layer.
+
+        Returns:
+            list[tuple[list[str], int]]: A list containing tuples of FQNs and their computational weights.
+        """
+
+        # Potential split points for GPT-2 model with each potential split point
+        # listing the FQNs of the modules in that stage and the computational weight.
+        # The computational weight of the input and output modules are estimated
+        # based on the number of layers they correspond to.
+        potential_split_points = [
+            (["transformer.wte", "transformer.wpe"], input_layer_equivalence),
+            *[([f"transformer.h.{i}"], 1) for i in range(num_layers)],
+            (["transformer.lm_head_norm", "transformer.lm_head"], output_layer_equivalence),
+        ]
+
+        return potential_split_points
 
 
 class PipelineFactory:
