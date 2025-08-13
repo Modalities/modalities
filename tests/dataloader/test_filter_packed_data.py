@@ -11,17 +11,13 @@ from modalities.dataloader.filter_packed_data import filter_dataset
 
 def test_creates_output_file(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(
-        src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
-    )
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices)
     assert output_path.exists()
 
 
 def test_filtered_data_has_expected_length(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(
-        src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
-    )
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=accept_even_indices)
     original_data = PackedMemMapDatasetBase(packed_data_path, sample_key="input_ids")
     filtered_data = PackedMemMapDatasetBase(output_path, sample_key="input_ids")
     assert (
@@ -31,9 +27,7 @@ def test_filtered_data_has_expected_length(tmp_path: Path, packed_data_path: Pat
 
 def test_filtered_data_has_expected_content(tmp_path: Path, dummy_packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(
-        src_path=dummy_packed_data_path, dst_path=output_path, filter_func=accept_even_indices, sample_key="input_ids"
-    )
+    filter_dataset(src_path=dummy_packed_data_path, dst_path=output_path, filter_func=accept_even_indices)
     filtered_data = PackedMemMapDatasetBase(output_path, sample_key="input_ids")
     assert filtered_data[0]["input_ids"].tolist() == list(range(24 // 4))
     assert filtered_data[1]["input_ids"].tolist() == list(range(64 // 4, (64 + 12) // 4))
@@ -41,7 +35,7 @@ def test_filtered_data_has_expected_content(tmp_path: Path, dummy_packed_data_pa
 
 def test_always_true_filtered_data_has_identical_file_hash(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: True, sample_key="input_ids")
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: True)
     with open(packed_data_path, "rb") as f_in, open(output_path, "rb") as f_out:
         original_hash = hashlib.sha256(f_in.read()).hexdigest()
         filtered_hash = hashlib.sha256(f_out.read()).hexdigest()
@@ -52,7 +46,7 @@ def test_always_true_filtered_data_has_identical_file_hash(tmp_path: Path, packe
 
 def test_always_false_filtered_data_produces_valid_file(tmp_path: Path, packed_data_path: Path):
     output_path = Path(tmp_path, "output.pbin")
-    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: False, sample_key="input_ids")
+    filter_dataset(src_path=packed_data_path, dst_path=output_path, filter_func=lambda x: False)
     filtered_data = PackedMemMapDatasetBase(output_path, sample_key="input_ids")
     assert len(filtered_data) == 0, "Filtered data should be empty when all samples are filtered out."
     assert output_path.stat().st_size > 0, "Output file should not be empty even if no samples are included."
