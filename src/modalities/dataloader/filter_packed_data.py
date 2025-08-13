@@ -14,20 +14,19 @@ def filter_dataset(
     src_path: Path,
     dst_path: Path,
     filter_func: Callable[[tuple[int, dict[str, NDArray[np.int_]]]], bool],
-    sample_key: str = "input_ids",
 ) -> None:
     """
     Filters the dataset based on a given filter function and writes the filtered data to the destination path.
     Args:
-        dst_path (Path): The path where the filtered dataset will be written.
         src_path (Path): The path to the source dataset to filter.
+        dst_path (Path): The path where the filtered dataset will be written.
         filter_func (Callable[[tuple[int, dict[str, NDArray[np.int_]]]], bool]):
             A function that takes a sample index and its content and returns
             True if the sample should be included, False otherwise.
-        sample_key (str): The key in the dataset samples to filter on, default is "input_ids".
     Returns:
         None
     """
+    sample_key: str = "input_ids"
     index_list: list[tuple[int, int]] = []
     source_data = PackedMemMapDatasetBase(src_path, sample_key=sample_key, load_index=True)
     with dst_path.open("wb") as f_out:
