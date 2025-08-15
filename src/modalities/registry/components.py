@@ -86,6 +86,10 @@ from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
+from modalities.models.parallelism.pipeline_parallelism import PipelineFactory
+from modalities.models.parallelism.pipeline_parallelism_configs import PipelinedModelConfig
+from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator
+from modalities.models.parallelism.stages_generator_configs import GPT2LLMStagesGeneratorConfig
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
@@ -174,6 +178,9 @@ COMPONENTS = [
     ComponentEntity(
         "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
     ),
+    ComponentEntity("model", "pipelined", PipelineFactory.get_pipelined_model, PipelinedModelConfig),
+    # Pipeline Stages Generators
+    ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     # weight initializers
@@ -209,7 +216,6 @@ COMPONENTS = [
     # tokenizers
     ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
     ComponentEntity("tokenizer", "pretrained_sp_tokenizer", PreTrainedSPTokenizer, PreTrainedSPTokenizerConfig),
-    # ComponentEntity("tokenizer", "llama_tokenizer_fast", GPT2TokenizerFast, None),  # TODO
     # datasets
     ComponentEntity("dataset", "mem_map_dataset", DatasetFactory.get_mem_map_dataset, MemMapDatasetConfig),
     ComponentEntity(
