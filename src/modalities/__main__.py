@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import json
+import os
+import socket
+import traceback
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import click_pathlib
@@ -29,6 +32,8 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
+from modalities.utils.benchmarking.benchmarking_utils import get_updated_sweep_status
+from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
 
 
@@ -50,21 +55,71 @@ def main() -> None:
     default=False,
     help="If set, run a communication test before training.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
+@click.option(
+    "--experiment_id",
+    type=str,
+    default=None,
+    help="Optional experiment ID to use for this run. If not provided, it will be derived from the config file path.",
+)
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
+def CMD_entry_point_run_modalities(
+    config_file_path: Path,
+    test_comm: bool = False,
+    experiment_id: Optional[str] = None,
+    error_log_folder: Optional[Path] = None,
+):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
+        test_comm (bool): If set, run a communication test before training.
+        experiment_id (Optional[str]): Optional experiment ID to use for this run.
+            If not provided it will be generated. Default is None.
+        error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
     """
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        if test_comm:
-            print_rank_0("Running communication test...")
-            run_communication_test()
-            print_rank_0("Communication test succeeded.")
 
-        main_obj = Main(config_file_path)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    def format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+        """Format an exception into a structured JSON string with error message, type, and stack trace."""
+        error = {
+            "error": str(e),
+            "type": type(e).__name__,
+            "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
+        }
+
+        return json.dumps({"environment": environment, "error": error}, indent=2)
+
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            if test_comm:
+                print_rank_0("Running communication test...")
+                run_communication_test()
+                print_rank_0("Communication test succeeded.")
+
+            main_obj = Main(config_file_path, experiment_id=experiment_id)
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        if error_log_folder is not None:
+            environment = {
+                "rank": int(os.environ["RANK"]),
+                "local_rank": int(os.environ["LOCAL_RANK"]),
+                "world_size": int(os.environ["WORLD_SIZE"]),
+                "hostname": socket.gethostname(),
+            }
+            error_log_folder = (
+                error_log_folder.parent
+                / f"{error_log_folder.stem}_{environment['hostname']}_{environment['local_rank']}.log"
+            )
+            error_log_folder.parent.mkdir(parents=True, exist_ok=True)
+            with open(error_log_folder, "w", encoding="utf-8") as f:
+                f.write(format_exception_as_json(e, environment))
+
+        raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
 
 @main.command(name="warmstart")
@@ -520,6 +575,92 @@ def CMD_shuffle_jsonl_data(
         output_data_path=output_data_path,
         file_existence_policy=file_existence_policy,
         seed=seed,
+    )
+
+
+@main.group(name="benchmark")
+def benchmark():
+    """
+    Collection of utilities to prepare and run benchmarks.
+    """
+    pass
+
+
+@benchmark.command(name="prepare_sweep_configs")
+@click.option(
+    "--sweep_config_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to the sweep configuration YAML file.",
+)
+@click.option(
+    "--output_dir",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    required=True,
+    help="Directory to save the generated sweep configurations.",
+)
+@click.option(
+    "--world_sizes",
+    type=str,
+    default="2",
+    help="Comma-separated list of world sizes, e.g. --world_sizes '2,4,8'",
+)
+def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes: str):
+    """
+    Utility for preparing sweep configurations.
+    """
+    world_sizes = list(map(int, world_sizes.split(",")))
+    SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes)
+
+
+@benchmark.command(name="list_remaining_runs")
+@click.option(
+    "--experiment_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Path to the root directory of the experiment containing config files.",
+)
+@click.option(
+    "--file_list_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output file to store paths of configs to run.",
+)
+@click.option(
+    "--expected_steps",
+    type=int,
+    required=True,
+    help="Expected number of steps in evaluation_results.jsonl",
+)
+@click.option(
+    "--skip_exception_types",
+    type=str,
+    default="",
+    help="Exception types to skip when checking for successful runs. List of exceptions is comma-separated.",
+)
+@click.option(
+    "--new_folders_for_remaining",
+    is_flag=True,
+    default=False,
+    help="If set, create new folders for remaining runs.",
+)
+def entry_point_prepare_remaining_runs(
+    experiment_dir: Path,
+    file_list_path: Path,
+    expected_steps: int,
+    skip_exception_types: str = "",
+    new_folders_for_remaining: bool = False,
+):
+    """
+    Prepare a list of remaining runs from a grid search experiment directory.
+    """
+    skip_exception_types = skip_exception_types.split(",")
+    get_updated_sweep_status(
+        exp_root=experiment_dir,
+        expected_steps=expected_steps,
+        file_list_path=file_list_path,
+        skip_exception_types=skip_exception_types,
+        new_folders_for_remaining=new_folders_for_remaining,
     )
 
 

@@ -61,13 +61,13 @@ class TestTensorParallelism:
                 "gelu",
                 Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
-                22755,
+                22235,
             ),
             (
                 "swiglu",
                 Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
-                22756,
+                22246,
             ),
         ],
     )

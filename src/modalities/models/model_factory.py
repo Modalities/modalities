@@ -567,7 +567,8 @@ class GPT2ModelFactory:
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
-        seed: int = None,
+        seed: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -590,6 +591,7 @@ class GPT2ModelFactory:
             lm_head_norm_config=lm_head_norm_config,
             seed=seed,
             use_weight_tying=use_weight_tying,
+            enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
         )
         if use_meta_device and use_weight_tying:
             raise ValueError(
