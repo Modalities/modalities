@@ -3,6 +3,7 @@
 # licensed under the BSD 3-Clause License.
 
 import copy
+from enum import Enum
 from typing import Any, Optional, Type
 
 import torch
@@ -11,22 +12,72 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.pipelining import PipelineStage
 from torch.distributed.pipelining.schedules import PipelineScheduleSingle, get_schedule_class
 
+from modalities.loss_functions import Loss
 from modalities.models.parallelism.stages_generator import StagesGenerator
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(__name__)
+
+
+class Pipeline:
+    def __init__(
+        self,
+        stage: PipelineStage,
+        model: nn.Module,
+        schedule: Optional[PipelineScheduleSingle] = None,
+    ):
+        self._stage = stage
+        self._model = model
+        self._schedule = schedule
+
+    @property
+    def is_first_stage(self) -> bool:
+        return self._stage.is_first
+
+    @property
+    def is_last_stage(self) -> bool:
+        return self._stage.is_last
+
+    @property.setter
+    def schedule(self, schedule: PipelineScheduleSingle):
+        self._schedule = schedule
+
+
+class PipelineSelectionTypes(Enum):
+    """Enum for pipeline selection types."""
+
+    STAGE = "stage"
+    MODEL = "model"
+    SCHEDULE = "schedule"
+
+
+class ComponentSelectorFromPipeline:
+    @staticmethod
+    def select(pipeline: Pipeline, selection_type: PipelineSelectionTypes) -> Any:
+        """Selects a component from the pipeline based on the selection type."""
+        if selection_type == PipelineSelectionTypes.STAGE:
+            return pipeline._stage
+        elif selection_type == PipelineSelectionTypes.MODEL:
+            return pipeline._model
+        elif selection_type == PipelineSelectionTypes.SCHEDULE:
+            return pipeline._schedule
+        else:
+            raise ValueError(f"Unsupported selection type: {selection_type}")
 
 
 class PipelineFactory:
     """Pipeline factory class to create pipelined models."""
 
     @staticmethod
-    def get_pipelined_model(
+    def get_staged_pipeline(
         whole_model: nn.Module,
         stages_generator: StagesGenerator,
         device_mesh: DeviceMesh,
         local_rank: int,
         pp_schedule_name: str,
         num_layers_per_stage: int,
-    ) -> torch.nn.Module:
+    ) -> Pipeline:
         device = torch.device("cuda", local_rank)
         pp_dims = device_mesh[ParallelismDegrees.PP.value].size()
 
@@ -42,6 +93,10 @@ class PipelineFactory:
             raise ValueError(
                 f"Unsupported pipeline schedule: {pp_schedule_name}. We only support single-stage schedules."
             )
+        # torchtitan returns tuple of stages and models as depending on the schedule
+        # we might have multiple stages and model parts per rank.
+        # So far we don't support multi-stage schedules, which is why instead of tuples
+        # we work directly with the stage and model.
         stage, model = PipelineFactory._get_split_model(
             whole_model=whole_model,
             schedule_class=schedule_class,
@@ -49,7 +104,9 @@ class PipelineFactory:
             device=device,
             fqns_per_stage=fqns_per_stage,
         )
-        return whole_model  # TODO return pipelined model
+
+        pipeline = Pipeline(stage=stage, model=model)
+        return pipeline
 
     @staticmethod
     def _get_split_model(
@@ -171,4 +228,23 @@ class PipelineFactory:
             device=device,
             group=pp_mesh.get_group("pp"),
         )
-        return stage, whole_model
+        return stage, stage_modules
+
+    @staticmethod
+    def get_scheduled_pipeline(
+        loss_fn: Loss, pp_schedule_name: str, batch_size: int, microbatch_size: int, pp_degree: int, pipeline: Pipeline
+    ) -> Pipeline:
+        # TODO: Addd validation in config that batch_size is divisible by microbatch_size
+        n_microbatches = batch_size // microbatch_size
+        num_total_stages = pp_degree
+        schedule_class = get_schedule_class(pp_schedule_name)
+        schedule = schedule_class(
+            stage=pipeline.stage,
+            n_microbatches=n_microbatches,
+            loss_fn=loss_fn,
+        )
+        logger.info(
+            f"Using pipeline schedule {schedule} with {n_microbatches} microbatches and {num_total_stages} stages."
+        )
+        pipeline.schedule = schedule
+        return pipeline
