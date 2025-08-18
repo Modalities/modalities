@@ -86,8 +86,12 @@ from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
-from modalities.models.parallelism.pipeline_parallelism import PipelineFactory
-from modalities.models.parallelism.pipeline_parallelism_configs import PipelinedModelConfig
+from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
+from modalities.models.parallelism.pipeline_parallelism_configs import (
+    ComponentSelectorFromPipelineConfig,
+    ScheduledPipelineConfig,
+    StagedPipelineConfig,
+)
 from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator
 from modalities.models.parallelism.stages_generator_configs import GPT2LLMStagesGeneratorConfig
 from modalities.nn.model_initialization.composed_initialization import (
@@ -178,7 +182,9 @@ COMPONENTS = [
     ComponentEntity(
         "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
     ),
-    ComponentEntity("model", "pipelined", PipelineFactory.get_pipelined_model, PipelinedModelConfig),
+    ComponentEntity("pipeline", "staged", PipelineFactory.get_staged_pipeline, StagedPipelineConfig),
+    ComponentEntity("pipeline", "scheduled", PipelineFactory.get_scheduled_pipeline, ScheduledPipelineConfig),
+    ComponentEntity("pipeline", "selector", ComponentSelectorFromPipeline.select, ComponentSelectorFromPipelineConfig),
     # Pipeline Stages Generators
     ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
     # Device mesh
