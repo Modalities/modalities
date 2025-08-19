@@ -42,6 +42,7 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
     _check_conversion_criteria(config)
 
+    # For backwards compatibility, check for both old and new norm key.
     ffn_norm_key = "ffn_norm" if "ffn_norm" in config else "ffn_norm_config"
 
     return GPT2Config(
@@ -99,6 +100,7 @@ def _check_conversion_criteria(model_config: dict) -> None:
     assert model_config["activation_type"] == "swiglu"
     assert model_config["attention_implementation"] in ["pytorch_flash", "manual"]
 
+    # For backwards compatibility, check for both old and new norm keys.
     if "attention_norm" in model_config:
         norms = ["attention_norm", "ffn_norm", "lm_head_norm"]
         norm_type_key = "variant_key"
