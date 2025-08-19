@@ -24,7 +24,7 @@ def gpt2_config_path(
     shutil.copy(config_file_path, new_config_filename)
     state_dict = initialized_model.state_dict()
     if corrupt_model_head_key_in_state_dict:
-        # Rename the key model.transformer.lm_head to old_lm_head.lm_head
+        # Rename the key transformer.lm_head.weight to old_lm_head.weight
         # simulating the old format used in modalities' gpt2 models.
         state_dict["old_lm_head.weight"] = state_dict["transformer.lm_head.weight"]
         del state_dict["transformer.lm_head.weight"]
