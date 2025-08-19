@@ -24,7 +24,7 @@ settings:
     enforce_last_step_checkpointed: false
   step_profile:
     gradient_accumulation_steps: 1
-    local_train_micro_batch_size: 1
+    local_train_micro_batch_size: 2
     sequence_length: 256
   training_target:
     num_target_tokens:
@@ -190,13 +190,19 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
+
 initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: fsdp_model
-      pass_type: BY_REFERENCE
+      component_key: pipeline
+      variant_key: selector
+      config:
+        pipeline:
+          instance_key: scheduled_pipeline
+          pass_type: BY_REFERENCE
+        selection_type: MODEL
     model_initializer:
       component_key: model_initialization
       variant_key: composed
@@ -223,11 +229,21 @@ scheduled_pipeline:
      # If fsdp_model creates a copy then this is not in the scope of 
      # the staged pipeline. 
     pipeline:
-      instance_key: staged_pipeline
-      pass_type: BY_REFERENCE
-    
-  
-
+      component_key: pipeline
+      variant_key: builder
+      config:
+        stage:
+          component_key: pipeline
+          variant_key: selector
+          config:
+            pipeline:
+              instance_key: staged_pipeline
+              pass_type: BY_REFERENCE
+            selection_type: STAGE
+        model:
+          instance_key: fsdp_model
+          pass_type: BY_REFERENCE
+        
 fsdp_model:
   component_key: model
   variant_key: fsdp2_wrapped
@@ -254,7 +270,7 @@ model_part:
 
 
 staged_pipeline:
-  component_key: model
+  component_key: pipeline
   variant_key: staged
   config:
     whole_model:

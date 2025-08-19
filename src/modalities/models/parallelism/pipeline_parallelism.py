@@ -39,7 +39,19 @@ class Pipeline:
     def is_last_stage(self) -> bool:
         return self._stage.is_last
 
-    @property.setter
+    @property
+    def stage(self) -> PipelineStage:
+        return self._stage
+
+    @property
+    def model(self) -> nn.Module:
+        return self._model
+
+    @property
+    def schedule(self) -> Optional[PipelineScheduleSingle]:
+        return self._schedule
+
+    @schedule.setter
     def schedule(self, schedule: PipelineScheduleSingle):
         self._schedule = schedule
 
@@ -47,9 +59,9 @@ class Pipeline:
 class PipelineSelectionTypes(Enum):
     """Enum for pipeline selection types."""
 
-    STAGE = "stage"
-    MODEL = "model"
-    SCHEDULE = "schedule"
+    STAGE = "STAGE"
+    MODEL = "MODEL"
+    SCHEDULE = "SCHEDULE"
 
 
 class ComponentSelectorFromPipeline:
@@ -68,6 +80,12 @@ class ComponentSelectorFromPipeline:
 
 class PipelineFactory:
     """Pipeline factory class to create pipelined models."""
+
+    @staticmethod
+    def get_pipeline(
+        stage: PipelineStage, model: nn.Module, schedule: Optional[PipelineScheduleSingle] = None
+    ) -> Pipeline:
+        return Pipeline(stage=stage, model=model, schedule=schedule)
 
     @staticmethod
     def get_staged_pipeline(
@@ -235,6 +253,7 @@ class PipelineFactory:
         loss_fn: Loss, pp_schedule_name: str, batch_size: int, microbatch_size: int, pp_degree: int, pipeline: Pipeline
     ) -> Pipeline:
         # TODO: Addd validation in config that batch_size is divisible by microbatch_size
+        # and n_microbatches must be >= pp_degree
         n_microbatches = batch_size // microbatch_size
         num_total_stages = pp_degree
         schedule_class = get_schedule_class(pp_schedule_name)

@@ -3,7 +3,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 
-class FQNsPerStageGeneratorConfig(BaseModel):
+class FQNsPerStageGeneratorConfig(BaseModel):  # TODO duplicate
     pass
 
 

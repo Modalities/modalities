@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 from modalities.config.pydantic_if_types import (
     PydanticDeviceMeshIFType,
+    PydanticLossIFType,
+    PydanticPipelineStageType,
     PydanticPipelineType,
     PydanticPytorchModuleType,
     PydanticStagesGeneratorType,
@@ -11,7 +13,7 @@ from modalities.config.pydantic_if_types import (
 from modalities.models.parallelism.pipeline_parallelism import PipelineSelectionTypes
 
 
-class FQNsPerStageGeneratorConfig(BaseModel):
+class FQNsPerStageGeneratorConfig(BaseModel):  # TODO duplicate
     pass
 
 
@@ -25,7 +27,7 @@ class StagedPipelineConfig(BaseModel):
 
 
 class ScheduledPipelineConfig(BaseModel):
-    loss_fn: PydanticPytorchModuleType
+    loss_fn: PydanticLossIFType
     pp_schedule_name: str
     batch_size: Annotated[int, Field(strict=True, ge=1)]
     microbatch_size: Annotated[int, Field(strict=True, ge=1)]
@@ -36,3 +38,9 @@ class ScheduledPipelineConfig(BaseModel):
 class ComponentSelectorFromPipelineConfig(BaseModel):
     pipeline: PydanticPipelineType
     selection_type: PipelineSelectionTypes
+
+
+class PipelineConfig(BaseModel):
+    stage: PydanticPipelineStageType
+    model: PydanticPytorchModuleType
+    schedule: PydanticPipelineType | None = None

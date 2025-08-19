@@ -89,6 +89,7 @@ from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
 from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
 from modalities.models.parallelism.pipeline_parallelism_configs import (
     ComponentSelectorFromPipelineConfig,
+    PipelineConfig,
     ScheduledPipelineConfig,
     StagedPipelineConfig,
 )
@@ -185,6 +186,7 @@ COMPONENTS = [
     ComponentEntity("pipeline", "staged", PipelineFactory.get_staged_pipeline, StagedPipelineConfig),
     ComponentEntity("pipeline", "scheduled", PipelineFactory.get_scheduled_pipeline, ScheduledPipelineConfig),
     ComponentEntity("pipeline", "selector", ComponentSelectorFromPipeline.select, ComponentSelectorFromPipelineConfig),
+    ComponentEntity("pipeline", "builder", PipelineFactory.get_pipeline, PipelineConfig),
     # Pipeline Stages Generators
     ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
     # Device mesh
