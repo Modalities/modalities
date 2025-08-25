@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import torch
@@ -117,10 +120,13 @@ def update_model_state_dict(old_model_path: str, new_model_path: str):
             logging.error("The model state dictionary already seems to be in the updated format.")
 
 
-from contextlib import contextmanager
+def test_loading_config(new_config_path: str):
+    with temporary_environ({"LOCAL_RANK": "0", "RANK": "0"}):
+        load_app_config_dict(Path(new_config_path))
+
 
 @contextmanager
-def temporary_environ(env_vars):
+def temporary_environ(env_vars: dict[str, str]):
     old_env = {}
     for key, value in env_vars.items():
         old_env[key] = os.environ.get(key)
@@ -133,10 +139,6 @@ def temporary_environ(env_vars):
                 del os.environ[key]
             else:
                 os.environ[key] = value
-
-def test_loading_config(new_config_path: str):
-    with temporary_environ({"LOCAL_RANK": "0", "RANK": "0"}):
-        load_app_config_dict(Path(new_config_path))
 
 
 if __name__ == "__main__":
