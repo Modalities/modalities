@@ -10,6 +10,7 @@ from modalities.dataloader.dataset import (
     DummyDataset,
     DummySampleConfig,
     MemMapDataset,
+    PackedMemMapDatasetBase,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
 )
@@ -70,6 +71,23 @@ class DatasetFactory:
         with raw_index_path.open("rb") as f:
             index = pickle.load(f)
         return index
+
+    @staticmethod
+    def get_mem_map_dataset_iterative(raw_data_path: Path, sample_key: str) -> PackedMemMapDatasetBase:
+        """
+        Initializes a PackedMemMapDatasetBase object for iterative memory-mapped datasets.
+        In contrast to the packed version, this dataset always returns the respective sample for
+        a given index. The packed version returns a block of samples with a fixed sequence length.
+
+        Args:
+            raw_data_path (Path): The path to the raw data.
+            sample_key (str): The key used to retrieve the samples from the dataset.
+
+        Returns:
+            PackedMemMapDatasetBase: The iterative memory-mapped dataset.
+        """
+        dataset = PackedMemMapDatasetBase(raw_data_path=raw_data_path, sample_key=sample_key, load_index=True)
+        return dataset
 
     @staticmethod
     def get_packed_mem_map_dataset_continuous(
