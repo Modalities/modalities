@@ -1,0 +1,304 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.training.activation_checkpointing package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.training.gradient_clipping package" href="modalities.training.gradient_clipping.html" />
+    <link rel="prev" title="modalities.training package" href="modalities.training.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.api">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.evaluator">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.gym">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.main">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.trainer">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.training.html">modalities.training package</a></li>
+      <li class="breadcrumb-item active">modalities.training.activation_checkpointing package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.training.activation_checkpointing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-training-activation-checkpointing-package">
+<h1>modalities.training.activation_checkpointing package<a class="headerlink" href="#modalities-training-activation-checkpointing-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.training.activation_checkpointing.activation_checkpointing">
+<span id="modalities-training-activation-checkpointing-activation-checkpointing-module"></span><h2>modalities.training.activation_checkpointing.activation_checkpointing module<a class="headerlink" href="#module-modalities.training.activation_checkpointing.activation_checkpointing" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.training.activation_checkpointing.activation_checkpointing.</span></span><span class="sig-name descname"><span class="pre">ActivationCheckpointing</span></span><a class="reference internal" href="../_modules/modalities/training/activation_checkpointing/activation_checkpointing.html#ActivationCheckpointing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>In eager / normal mode, every module stores ALL activations in the forward pass and
+reuses the activations for gradient computation in the backward pass. Thus, the overall memory
+footprint of the activations accumulates during the forward pass and peaks before running the backward pass.
+During the backward pass, the activations are cleared once they are not needed anymore.</p>
+<p>With activation checkpointing, the regions that are ACed do only store the input and output activations, but
+no intermediate activations, thus, reducing the overall memory footprint. In the backward pass,
+the intermediate activations are recomputed, trading off a lower memory footprint with a higher compute cost.
+Typically, these ACed regions are the transformer blocks in the case of a GPT model.</p>
+<p>With selective AC, we add another AC variant, that allows for a more granular control over the AC process.
+This variant allows to only save the activations of certain, typically compute intensive operations, while
+recomputing the activations of all other operations. Thus, the overall memory footprint is reduced, while
+the compute cost is not increased too much.</p>
+<p>The implemenation is heavily inspired by the torch titan implementation:
+<a class="reference external" href="https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/models/llama/parallelize_llama.py#L294">https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/models/llama/parallelize_llama.py#L294</a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing.SAVE_DICT">
+<span class="sig-name descname"><span class="pre">SAVE_DICT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'ops._c10d_functional.reduce_scatter_tensor.default':</span> <span class="pre">&lt;OpOverload(op='_c10d_functional.reduce_scatter_tensor',</span> <span class="pre">overload='default')&gt;,</span> <span class="pre">'ops.aten._scaled_dot_product_efficient_attention.default':</span> <span class="pre">&lt;OpOverload(op='aten._scaled_dot_product_efficient_attention',</span> <span class="pre">overload='default')&gt;,</span> <span class="pre">'ops.aten._scaled_dot_product_flash_attention.default':</span> <span class="pre">&lt;OpOverload(op='aten._scaled_dot_product_flash_attention',</span> <span class="pre">overload='default')&gt;,</span> <span class="pre">'ops.aten.max.default':</span> <span class="pre">&lt;OpOverload(op='aten.max',</span> <span class="pre">overload='default')&gt;,</span> <span class="pre">'ops.aten.mm.default':</span> <span class="pre">&lt;OpOverload(op='aten.mm',</span> <span class="pre">overload='default')&gt;}</span></em><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing.SAVE_DICT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing.apply_activation_checkpointing_">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">apply_activation_checkpointing_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ac_variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layers_fqn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ac_fun_params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/training/activation_checkpointing/activation_checkpointing.html#ActivationCheckpointing.apply_activation_checkpointing_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing.ActivationCheckpointing.apply_activation_checkpointing_" title="Link to this definition"></a></dt>
+<dd><p>Applies activation checkpointing to a given model. There are three variants of activation checkpointing:
+1. FULL_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers. In thise case,</p>
+<blockquote>
+<div><p>only the inputs and outputs of each layer are saved, but not the intermediate activations.</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING: applies activation checkpointing to every <cite>ac_freq</cite> layer.
+It is similar to FULL_ACTIVATION_CHECKPOINTING, but only saves the inputs and outputs of every
+<cite>ac_freq</cite> layer.</p></li>
+<li><p>SELECTIVE_OP_ACTIVATION_CHECKPOINTING: applies activation checkpointing to all layers, but only
+saves the activations of certain operations. Usually these operations are compute intensive and
+their activations are saved and not recomputed in the backward pass. All the remaining operations
+are recomputed in the backward pass.</p></li>
+</ol>
+<dl>
+<dt>Args:</dt><dd><p>ac_variant (ActivationCheckpointingVariants): The activation checkpointing variant to use.
+layers_fqn (str): The fully qualified name (FQN) of the layers to apply activation checkpointing to.
+model (nn.Module): The model to apply activation checkpointing to (in place).
+ac_fun_params (ActivationCheckpointedModelConfig.*Params): The parameters for the activation</p>
+<blockquote>
+<div><p>checkpointing function.</p>
+</div></blockquote>
+</dd>
+<dt>Raises:</dt><dd><dl class="simple">
+<dt>ValueError: If the activation checkpointing variant is not recognized or if the layers_fqn does not</dt><dd><p>reference a ModuleList.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ac_variant</strong> (<a class="reference internal" href="#modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants" title="modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants"><em>ActivationCheckpointingVariants</em></a>)</p></li>
+<li><p><strong>layers_fqn</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p></li>
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.8)"><em>Module</em></a>)</p></li>
+<li><p><strong>ac_fun_params</strong> (<a class="reference internal" href="modalities.config.html#modalities.config.config.ActivationCheckpointedModelConfig.FullACParams" title="modalities.config.config.ActivationCheckpointedModelConfig.FullACParams"><em>FullACParams</em></a><em> | </em><a class="reference internal" href="modalities.config.html#modalities.config.config.ActivationCheckpointedModelConfig.SelectiveLayerACParams" title="modalities.config.config.ActivationCheckpointedModelConfig.SelectiveLayerACParams"><em>SelectiveLayerACParams</em></a><em> | </em><a class="reference internal" href="modalities.config.html#modalities.config.config.ActivationCheckpointedModelConfig.SelectiveOpACParams" title="modalities.config.config.ActivationCheckpointedModelConfig.SelectiveOpACParams"><em>SelectiveOpACParams</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing.apply_activation_checkpointing_fsdp1_inplace">
+<span class="sig-prename descclassname"><span class="pre">modalities.training.activation_checkpointing.activation_checkpointing.</span></span><span class="sig-name descname"><span class="pre">apply_activation_checkpointing_fsdp1_inplace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation_checkpointing_modules</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/training/activation_checkpointing/activation_checkpointing.html#apply_activation_checkpointing_fsdp1_inplace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing.apply_activation_checkpointing_fsdp1_inplace" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel" title="(in PyTorch v2.8)"><em>FullyShardedDataParallel</em></a>)</p></li>
+<li><p><strong>activation_checkpointing_modules</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing.is_module_to_apply_activation_checkpointing">
+<span class="sig-prename descclassname"><span class="pre">modalities.training.activation_checkpointing.activation_checkpointing.</span></span><span class="sig-name descname"><span class="pre">is_module_to_apply_activation_checkpointing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">submodule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation_checkpointing_modules</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/training/activation_checkpointing/activation_checkpointing.html#is_module_to_apply_activation_checkpointing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing.is_module_to_apply_activation_checkpointing" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>submodule</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.8)"><em>Module</em></a>)</p></li>
+<li><p><strong>activation_checkpointing_modules</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.13)"><em>type</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.training.activation_checkpointing.activation_checkpointing_variants">
+<span id="modalities-training-activation-checkpointing-activation-checkpointing-variants-module"></span><h2>modalities.training.activation_checkpointing.activation_checkpointing_variants module<a class="headerlink" href="#module-modalities.training.activation_checkpointing.activation_checkpointing_variants" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modalities.training.activation_checkpointing.activation_checkpointing_variants.</span></span><span class="sig-name descname"><span class="pre">ActivationCheckpointingVariants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/training/activation_checkpointing/activation_checkpointing_variants.html#ActivationCheckpointingVariants"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Enum for the different activation checkpointing variants.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.FULL_ACTIVATION_CHECKPOINTING">
+<span class="sig-name descname"><span class="pre">FULL_ACTIVATION_CHECKPOINTING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'full_activation_checkpointing'</span></em><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.FULL_ACTIVATION_CHECKPOINTING" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING">
+<span class="sig-name descname"><span class="pre">SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'selective_layer_activation_checkpointing'</span></em><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.SELECTIVE_LAYER_ACTIVATION_CHECKPOINTING" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING">
+<span class="sig-name descname"><span class="pre">SELECTIVE_OP_ACTIVATION_CHECKPOINTING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'selective_op_activation_checkpointing'</span></em><a class="headerlink" href="#modalities.training.activation_checkpointing.activation_checkpointing_variants.ActivationCheckpointingVariants.SELECTIVE_OP_ACTIVATION_CHECKPOINTING" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.training.activation_checkpointing">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.training.activation_checkpointing" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.training.html" class="btn btn-neutral float-left" title="modalities.training package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.training.gradient_clipping.html" class="btn btn-neutral float-right" title="modalities.training.gradient_clipping package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
