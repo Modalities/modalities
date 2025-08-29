@@ -202,7 +202,7 @@ initialized_model:
         pipeline:
           instance_key: scheduled_pipeline
           pass_type: BY_REFERENCE
-        selection_type: MODEL
+        selection_type: MODEL_PART
     model_initializer:
       component_key: model_initialization
       variant_key: composed
@@ -232,15 +232,15 @@ scheduled_pipeline:
       component_key: pipeline
       variant_key: builder
       config:
-        stage:
+        pp_stage:
           component_key: pipeline
           variant_key: selector
           config:
             pipeline:
               instance_key: staged_pipeline
               pass_type: BY_REFERENCE
-            selection_type: STAGE
-        model:
+            selection_type: PP_STAGE
+        model_part:
           instance_key: fsdp_model
           pass_type: BY_REFERENCE
         
@@ -266,7 +266,7 @@ model_part:
     pipeline:
       instance_key: staged_pipeline
       pass_type: BY_REFERENCE
-    selection_type: MODEL
+    selection_type: MODEL_PART
 
 
 staged_pipeline:
