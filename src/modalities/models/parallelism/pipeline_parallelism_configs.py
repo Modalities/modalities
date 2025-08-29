@@ -41,6 +41,6 @@ class ComponentSelectorFromPipelineConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    stage: PydanticPipelineStageType
-    model: PydanticPytorchModuleType
-    schedule: PydanticPipelineType | None = None
+    pp_stage: PydanticPipelineStageType
+    model_part: PydanticPytorchModuleType
+    pp_schedule: PydanticPipelineType | None = None

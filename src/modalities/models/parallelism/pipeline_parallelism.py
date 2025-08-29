@@ -23,57 +23,57 @@ logger = get_logger(__name__)
 class Pipeline:
     def __init__(
         self,
-        stage: PipelineStage,
-        model: nn.Module,
-        schedule: Optional[PipelineScheduleSingle] = None,
+        pp_stage: PipelineStage,
+        model_part: nn.Module,
+        pp_schedule: Optional[PipelineScheduleSingle] = None,
     ):
-        self._stage = stage
-        self._model = model
-        self._schedule = schedule
+        self._pp_stage = pp_stage
+        self._model_part = model_part
+        self._pp_schedule = pp_schedule
 
     @property
-    def is_first_stage(self) -> bool:
-        return self._stage.is_first
+    def is_first_pp_stage(self) -> bool:
+        return self._pp_stage.is_first
 
     @property
-    def is_last_stage(self) -> bool:
-        return self._stage.is_last
+    def is_last_pp_stage(self) -> bool:
+        return self._pp_stage.is_last
 
     @property
-    def stage(self) -> PipelineStage:
-        return self._stage
+    def pp_stage(self) -> PipelineStage:
+        return self._pp_stage
 
     @property
-    def model(self) -> nn.Module:
-        return self._model
+    def model_part(self) -> nn.Module:
+        return self._model_part
 
     @property
-    def schedule(self) -> Optional[PipelineScheduleSingle]:
-        return self._schedule
+    def pp_schedule(self) -> Optional[PipelineScheduleSingle]:
+        return self._pp_schedule
 
-    @schedule.setter
-    def schedule(self, schedule: PipelineScheduleSingle):
-        self._schedule = schedule
+    @pp_schedule.setter
+    def pp_schedule(self, schedule: PipelineScheduleSingle):
+        self._pp_schedule = schedule
 
 
 class PipelineSelectionTypes(Enum):
     """Enum for pipeline selection types."""
 
-    STAGE = "STAGE"
-    MODEL = "MODEL"
-    SCHEDULE = "SCHEDULE"
+    PP_STAGE = "PP_STAGE"
+    MODEL_PART = "MODEL_PART"
+    PP_SCHEDULE = "PP_SCHEDULE"
 
 
 class ComponentSelectorFromPipeline:
     @staticmethod
     def select(pipeline: Pipeline, selection_type: PipelineSelectionTypes) -> Any:
         """Selects a component from the pipeline based on the selection type."""
-        if selection_type == PipelineSelectionTypes.STAGE:
-            return pipeline._stage
-        elif selection_type == PipelineSelectionTypes.MODEL:
-            return pipeline._model
-        elif selection_type == PipelineSelectionTypes.SCHEDULE:
-            return pipeline._schedule
+        if selection_type == PipelineSelectionTypes.PP_STAGE:
+            return pipeline.pp_stage
+        elif selection_type == PipelineSelectionTypes.MODEL_PART:
+            return pipeline.model_part
+        elif selection_type == PipelineSelectionTypes.PP_SCHEDULE:
+            return pipeline.pp_schedule
         else:
             raise ValueError(f"Unsupported selection type: {selection_type}")
 
@@ -83,9 +83,9 @@ class PipelineFactory:
 
     @staticmethod
     def get_pipeline(
-        stage: PipelineStage, model: nn.Module, schedule: Optional[PipelineScheduleSingle] = None
+        pp_stage: PipelineStage, model_part: nn.Module, pp_schedule: Optional[PipelineScheduleSingle] = None
     ) -> Pipeline:
-        return Pipeline(stage=stage, model=model, schedule=schedule)
+        return Pipeline(pp_stage=pp_stage, model_part=model_part, pp_schedule=pp_schedule)
 
     @staticmethod
     def get_staged_pipeline(
@@ -115,7 +115,7 @@ class PipelineFactory:
         # we might have multiple stages and model parts per rank.
         # So far we don't support multi-stage schedules, which is why instead of tuples
         # we work directly with the stage and model.
-        stage, model = PipelineFactory._get_split_model(
+        pp_stage, model_part = PipelineFactory._get_split_model(
             whole_model=whole_model,
             schedule_class=schedule_class,
             pp_mesh=pp_mesh,
@@ -123,7 +123,7 @@ class PipelineFactory:
             fqns_per_stage=fqns_per_stage,
         )
 
-        pipeline = Pipeline(stage=stage, model=model)
+        pipeline = Pipeline(pp_stage=pp_stage, model_part=model_part)
         return pipeline
 
     @staticmethod
@@ -256,14 +256,14 @@ class PipelineFactory:
         # and n_microbatches must be >= pp_degree
         n_microbatches = batch_size // microbatch_size
         num_total_stages = pp_degree
-        schedule_class = get_schedule_class(pp_schedule_name)
-        schedule = schedule_class(
-            stage=pipeline.stage,
+        pp_schedule_class = get_schedule_class(pp_schedule_name)
+        pp_schedule = pp_schedule_class(
+            stage=pipeline.pp_stage,
             n_microbatches=n_microbatches,
             loss_fn=loss_fn,
         )
         logger.info(
-            f"Using pipeline schedule {schedule} with {n_microbatches} microbatches and {num_total_stages} stages."
+            f"Using pipeline schedule {pp_schedule} with {n_microbatches} microbatches and {num_total_stages} stages."
         )
-        pipeline.schedule = schedule
+        pipeline.pp_schedule = pp_schedule
         return pipeline
