@@ -83,7 +83,7 @@ def CMD_entry_point_run_modalities(
         error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
     """
 
-    def format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+    def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
         """Format an exception into a structured JSON string with error message, type, and stack trace."""
         error = {
             "error": str(e),
@@ -106,9 +106,9 @@ def CMD_entry_point_run_modalities(
     except Exception as e:
         if error_log_folder is not None:
             environment = {
-                "rank": int(os.environ["RANK"]),
-                "local_rank": int(os.environ["LOCAL_RANK"]),
-                "world_size": int(os.environ["WORLD_SIZE"]),
+                "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
+                "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
+                "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
                 "hostname": socket.gethostname(),
             }
             error_log_folder = (
@@ -117,7 +117,7 @@ def CMD_entry_point_run_modalities(
             )
             error_log_folder.parent.mkdir(parents=True, exist_ok=True)
             with open(error_log_folder, "w", encoding="utf-8") as f:
-                f.write(format_exception_as_json(e, environment))
+                f.write(_format_exception_as_json(e, environment))
 
         raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
@@ -609,8 +609,11 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     """
     Utility for preparing sweep configurations.
     """
-    world_sizes = list(map(int, world_sizes.split(",")))
-    SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes)
+    try:
+        world_sizes_list: list[int] = list(map(int, world_sizes.split(",")))
+    except ValueError as e:
+        raise ValueError("Invalid world_sizes format. Please provide a comma-separated list of integers.") from e
+    SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes_list)
 
 
 @benchmark.command(name="list_remaining_runs")

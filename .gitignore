@@ -169,5 +169,4 @@ tutorials/profiling/experiments
 tutorials/instruction_tuning/prepared_data
 config_files/instruction_tuning
 data/lorem_ipsum_instruct.jsonl
-tutorials/scaling_up/experiments*
 tutorials/scaling_up/logs*

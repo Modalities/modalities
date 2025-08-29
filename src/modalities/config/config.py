@@ -516,7 +516,10 @@ def load_app_config_dict(
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    modalities_env_kwargs = {"config_file_path": config_file_path, "config_folder_path": config_file_path.parent}
+    modalities_env_kwargs: dict[str, Any] = {
+        "config_file_path": config_file_path,
+        "config_folder_path": config_file_path.parent,
+    }
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(

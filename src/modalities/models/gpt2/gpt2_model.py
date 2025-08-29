@@ -319,7 +319,7 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-        seed: int = None: The random seed for reproducibility.
+        seed: Optional[int] = None: The random seed for reproducibility.
         enforce_swiglu_hidden_dim_multiple_of (Optional[int]): If specified, enforces the hidden dimension
             in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
             activation_type is SwiGLU. Defaults to None.

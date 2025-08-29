@@ -129,6 +129,7 @@ class EvaluationResultToDiscSubscriber(MessageSubscriberIF[EvaluationResultBatch
         """
 
         def shallow_asdict(obj):
+            # Converts a dataclass to a dictionary without deep recursion.
             if not is_dataclass(obj):
                 raise TypeError("shallow_asdict() should be called on dataclass instances")
             return {f.name: getattr(obj, f.name) for f in fields(obj)}

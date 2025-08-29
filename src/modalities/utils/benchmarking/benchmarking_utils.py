@@ -25,6 +25,7 @@ class FileNames(Enum):
 
 
 def _count_jsonl_lines(jsonl_path: Path) -> int:
+    # counts the number of lines in a jsonl file
     with jsonl_path.open() as f:
         return sum(1 for _ in f)
 
@@ -34,12 +35,14 @@ def _get_most_recent_configs(file_paths: list[Path]) -> list[Path]:
     latest_configs = {}
     for file_path in file_paths:
         experiment_folder = file_path.parent
-        hash, ts = experiment_folder.name.split("_", maxsplit=1)
+        hash_prefix, ts = experiment_folder.name.split("_", maxsplit=1)
         # assert file format: DDDDDDDD_YYYY-MM-DD__HH-MM-SS
         pattern = r"^[a-zA-Z0-9]+_\d{4}-\d{2}-\d{2}__\d{2}-\d{2}-\d{2}$"
         if not re.match(pattern, experiment_folder.name):
-            raise ValueError(f"Invalid file format in file path: {file_path}")
-        experiment_folder_hash = experiment_folder.parent / hash
+            raise ValueError(
+                f"Invalid file format in file path: {file_path}, Expected format: DDDDDDDD_YYYY-MM-DD__HH-MM-SS"
+            )
+        experiment_folder_hash = experiment_folder.parent / hash_prefix
         if experiment_folder_hash not in latest_configs or ts > latest_configs[experiment_folder_hash][1]:
             latest_configs[experiment_folder_hash] = (file_path, ts)
 
