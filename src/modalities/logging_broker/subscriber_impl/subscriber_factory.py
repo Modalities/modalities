@@ -57,12 +57,8 @@ class ResultsSubscriberFactory:
         return DummyResultSubscriber()
 
     @staticmethod
-    def get_evaluation_result_to_disc_subscriber(
-        output_folder_path: Path, experiment_id: str
-    ) -> EvaluationResultToDiscSubscriber:
-        return EvaluationResultToDiscSubscriber(
-            output_file_path=output_folder_path / experiment_id / "evaluation_results.jsonl"
-        )
+    def get_evaluation_result_to_disc_subscriber(output_file_path: Path) -> EvaluationResultToDiscSubscriber:
+        return EvaluationResultToDiscSubscriber(output_file_path=output_file_path)
 
     @staticmethod
     def get_wandb_result_subscriber(
