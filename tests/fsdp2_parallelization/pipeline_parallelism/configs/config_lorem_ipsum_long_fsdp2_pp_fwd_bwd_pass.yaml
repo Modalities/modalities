@@ -11,7 +11,7 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   step_profile:
     gradient_accumulation_steps: 1
-    local_train_micro_batch_size: 2
+    local_train_micro_batch_size: 4
     sequence_length: 256
 
 loss_fn:
@@ -42,7 +42,7 @@ initialized_model:
         pipeline:
           instance_key: scheduled_pipeline
           pass_type: BY_REFERENCE
-        selection_type: MODEL
+        selection_type: MODEL_PART
     model_initializer:
       component_key: model_initialization
       variant_key: composed
@@ -62,21 +62,21 @@ scheduled_pipeline:
       pass_type: BY_REFERENCE
     pp_schedule_name: gpipe
     batch_size: ${settings.step_profile.local_train_micro_batch_size}
-    microbatch_size: 1
+    microbatch_size: 2
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
     pipeline:
       component_key: pipeline
       variant_key: builder
       config:
-        stage:
+        pp_stage:
           component_key: pipeline
           variant_key: selector
           config:
             pipeline:
               instance_key: staged_pipeline
               pass_type: BY_REFERENCE
-            selection_type: STAGE
-        model:
+            selection_type: PP_STAGE
+        model_part:
           instance_key: fsdp_model
           pass_type: BY_REFERENCE
         
@@ -102,7 +102,7 @@ model_part:
     pipeline:
       instance_key: staged_pipeline
       pass_type: BY_REFERENCE
-    selection_type: MODEL
+    selection_type: MODEL_PART
 
 staged_pipeline:
   component_key: pipeline
@@ -123,7 +123,7 @@ staged_pipeline:
       pass_type: BY_REFERENCE
     local_rank: ${settings.cuda_env.local_rank}
     pp_schedule_name: gpipe
-    num_layers_per_stage: 2
+    num_layers_per_stage: 4
 
 model_raw:
   component_key: model
@@ -136,7 +136,7 @@ model_raw:
     sequence_length: ${settings.step_profile.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 2
+    n_layer: 6
     n_head_q: 8
     n_head_kv: 4
     ffn_hidden: 128

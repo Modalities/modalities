@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticFSDP2ModuleType, PydanticPipelineType
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
@@ -80,7 +81,7 @@ class TestPipelineParallelism:
         )
         mp.spawn(
             self._test_pp_impl,
-            args=(world_size, sharding_degree, tmp_sharding_config_path),
+            args=(world_size, tmp_sharding_config_path),
             nprocs=world_size,
             join=True,
         )
@@ -89,7 +90,6 @@ class TestPipelineParallelism:
         self,
         process_id: int,
         world_size: int,
-        sharding_degree: int,
         gpt2_model_config_path: Path,
     ):
         # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
@@ -100,5 +100,31 @@ class TestPipelineParallelism:
             world_size=world_size,
             rdvz_port=22356,
         ):
-            self._get_components(gpt2_model_config_path)
-            pass
+            components = self._get_components(gpt2_model_config_path)
+            scheduled_pipeline = components.scheduled_pipeline
+            vocab_size = 50304
+            sequence_length = 256
+            batch_size = 4
+            sequences = torch.randint(0, vocab_size, (batch_size, sequence_length))
+            targets = sequences[:, 1:].contiguous()
+            inputs = sequences[:, :-1].contiguous()
+            self._forward_step(scheduled_pipeline, inputs, targets)
+
+    def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor):
+        """Runs a forward step on the model."""
+        pp_schedule = scheduled_pipeline.pp_schedule
+        targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
+        if scheduled_pipeline.is_first_pp_stage:  # first stage
+            pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+        else:  # non-first stage
+            pp_schedule.step(target=targets, losses=losses, input_batch=inputs)
+
+        # accumulate losses across pipeline microbatches
+        # TODO: PP+FSDP unexpectedly puts the loss back to the CPU
+        (
+            torch.mean(torch.stack(losses)).to(self.device)
+            if self.pp_has_last_stage
+            else torch.tensor([-1.0], device=self.device)
+        )
+
+        # return output
