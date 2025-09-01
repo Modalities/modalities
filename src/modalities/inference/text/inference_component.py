@@ -128,9 +128,12 @@ class TextInferenceComponent:
                         print(f"\n\n{'🎯 GENERATION ' + str(i+1) + f' (Temperature: {temp})'.center(60, '=')}")
                     else:
                         print(f"\n\n{'🎯 GENERATING (Temperature: ' + str(temp) + ')'.center(60, '=')}")
-
                     self.temperature = temp
-                    self.generate_tokens(context=full_prompt)
+                    try:
+                        self.generate_tokens(context=full_prompt)
+                    except KeyboardInterrupt:
+                        print("\n\n👋 Generation interrupted by user.")
+                        continue
 
                 print("\n\n" + "🏁 ALL GENERATIONS COMPLETE".center(60, "="))
                 print("=" * 60)
