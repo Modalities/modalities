@@ -28,6 +28,7 @@ from modalities.config.config import ActivationCheckpointedModelConfig
 from modalities.exceptions import ModelStateError
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
+    GPT2LLMPP,
     AttentionConfig,
     AttentionImplementation,
     LayerNormWrapperConfig,
@@ -568,6 +569,7 @@ class GPT2ModelFactory:
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
         seed: int = None,
+        use_pp: Optional[bool] = False,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -597,11 +599,12 @@ class GPT2ModelFactory:
                 "Please set at least use_meta_device=False or use_weight_tying=False."
                 "https://github.com/Modalities/modalities/issues/357"
             )
+        gpt2_model_class = GPT2LLMPP if use_pp else GPT2LLM
         if use_meta_device:
             with torch.device("meta"):
-                model = GPT2LLM(**config)
+                model = gpt2_model_class(**config)
         else:
-            model = GPT2LLM(**config)
+            model = gpt2_model_class(**config)
         return model
 
     @staticmethod

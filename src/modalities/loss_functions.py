@@ -44,6 +44,14 @@ class CLMCrossEntropyLoss(Loss):
         return loss
 
 
+class CLMCrossEntropyLossPP(CLMCrossEntropyLoss):
+    def __call__(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        forward_batch = InferenceResultBatch(
+            predictions={self.prediction_key: outputs}, targets={self.target_key: targets}
+        )
+        return super().__call__(forward_batch)
+
+
 def nce_loss(
     embedding1: torch.Tensor, embedding2: torch.Tensor, device: torch.device, is_asymmetric: bool, temperature: float
 ) -> torch.Tensor:

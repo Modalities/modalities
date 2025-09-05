@@ -9,8 +9,9 @@ import yaml
 from pydantic import BaseModel
 
 from modalities.__main__ import Main
+from modalities.batch import InferenceResultBatch
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import PydanticFSDP2ModuleType, PydanticPipelineType
+from modalities.config.pydantic_if_types import PydanticFSDP2ModuleType, PydanticLossIFType, PydanticPipelineType
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
@@ -28,9 +29,14 @@ def temp_file_path() -> Path:
             os.remove(file_path)
 
 
-class ComponentsInstantiationModel(BaseModel):
+class ComponentsInstantiationPPModel(BaseModel):
     initialized_model: PydanticFSDP2ModuleType
     scheduled_pipeline: PydanticPipelineType
+
+
+class ComponentsInstantiationModel(BaseModel):
+    initialized_model: PydanticFSDP2ModuleType
+    loss_fn: PydanticLossIFType
 
 
 @pytest.mark.skipif(
@@ -57,11 +63,14 @@ class TestPipelineParallelism:
 
         return temp_file_path
 
-    def _get_components(self, config_file_path: Path) -> ComponentsInstantiationModel:
+    def _get_components(self, config_file_path: Path, use_pp: bool) -> ComponentsInstantiationPPModel:
+        torch.manual_seed(42)
         main_obj = Main(config_file_path)
-        components: ComponentsInstantiationModel = main_obj.build_components(
-            components_model_type=ComponentsInstantiationModel
-        )
+        if use_pp:
+            components_model_type = ComponentsInstantiationPPModel
+        else:
+            components_model_type = ComponentsInstantiationModel
+        components: components_model_type = main_obj.build_components(components_model_type=components_model_type)
         return components
 
     @pytest.mark.parametrize(
@@ -90,7 +99,7 @@ class TestPipelineParallelism:
         self,
         process_id: int,
         world_size: int,
-        gpt2_model_config_path: Path,
+        pp_model_config_path: Path,
     ):
         # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
         with MultiProcessingCudaEnv(
@@ -100,7 +109,7 @@ class TestPipelineParallelism:
             world_size=world_size,
             rdvz_port=22356,
         ):
-            components = self._get_components(gpt2_model_config_path)
+            components = self._get_components(pp_model_config_path, use_pp=True)
             scheduled_pipeline = components.scheduled_pipeline
             vocab_size = 50304
             sequence_length = 256
@@ -108,23 +117,38 @@ class TestPipelineParallelism:
             sequences = torch.randint(0, vocab_size, (batch_size, sequence_length))
             targets = sequences[:, 1:].contiguous()
             inputs = sequences[:, :-1].contiguous()
-            self._forward_step(scheduled_pipeline, inputs, targets)
+            loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
+
+            # if scheduled_pipeline.is_last_pp_stage:
+            working_dir = Path(os.path.dirname(__file__))
+            fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
+            fsdp2_components = self._get_components(fsdp2_model_config_path, use_pp=False)
+            fsdp2_model = fsdp2_components.initialized_model
+            fsdp2_loss_fn = fsdp2_components.loss_fn
+
+            input_dict = {"input_ids": inputs}
+            fsdp2_out = fsdp2_model(input_dict)
+            forward_batch = InferenceResultBatch(predictions=fsdp2_out, targets={fsdp2_loss_fn.target_key: targets})
+            fsdp2_loss = fsdp2_loss_fn(forward_batch)
+            if scheduled_pipeline.is_last_pp_stage:
+                assert torch.allclose(fsdp2_loss, loss_pp, atol=1e-6, rtol=1e-5), "Outputs do not match"
 
     def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor):
         """Runs a forward step on the model."""
         pp_schedule = scheduled_pipeline.pp_schedule
         targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
         if scheduled_pipeline.is_first_pp_stage:  # first stage
-            pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+            # pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+            pp_schedule.step(inputs, target=targets, losses=losses)
         else:  # non-first stage
-            pp_schedule.step(target=targets, losses=losses, input_batch=inputs)
+            # pp_schedule.step(target=targets, losses=losses, input_batch=inputs)
+            # pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+            pp_schedule.step(target=targets, losses=losses)
 
         # accumulate losses across pipeline microbatches
         # TODO: PP+FSDP unexpectedly puts the loss back to the CPU
-        (
-            torch.mean(torch.stack(losses)).to(self.device)
-            if self.pp_has_last_stage
-            else torch.tensor([-1.0], device=self.device)
+        return (
+            torch.mean(torch.stack(losses)).to(losses[0].device)
+            if scheduled_pipeline.is_last_pp_stage
+            else torch.tensor([-1.0], device=inputs.device)
         )
-
-        # return output

@@ -344,6 +344,7 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
+    use_pp: Optional[bool] = False
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -916,6 +917,60 @@ class GPT2LLM(NNModel):
         return {self.prediction_key: logits}
 
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        """
+        Forward pass of the GPT2LLM module.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+                - sample_key (str): Key for the input tensor containing token ids.
+
+        Returns:
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
+                - prediction_key (str): Key for the output tensor containing logits.
+        """
+        return self.forward_impl(inputs)
+
+
+class GPT2LLMPP(GPT2LLM):
+    """GPT2LLM class."""
+
+    def forward_impl(self, inputs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass implementation of the GPT2LLM module.
+
+        Args:
+            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+                - sample_key (str): Key for the input tensor containing token ids.
+
+        Returns:
+            dict[str, torch.Tensor]: A dictionary containing output tensors.
+                - prediction_key (str): Key for the output tensor containing logits.
+        """
+        device = inputs.device
+        t = inputs.size(1)  # batch size, sequence length
+        assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
+        f"input sequence length is only {self.sequence_length}"
+
+        # forward the GPT model itself
+        h = (
+            self.transformer.wte(inputs) if hasattr(self.transformer, "wte") else inputs
+        )  # token embeddings of shape (b, t, n_embd)
+
+        if self.poe_type is PositionTypes.ABSOLUTE and hasattr(self.transformer, "wpe"):
+            pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
+            pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
+            h = h + pos_emb
+
+        # TODO: use drop out also without absolute position embedding?
+        h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
+
+        for block in self.transformer.h:
+            h = block(h)
+        h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
+        h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
+        return h
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the GPT2LLM module.
 
