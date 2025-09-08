@@ -120,6 +120,7 @@ class TestPipelineParallelism:
             fsdp2_loss = self._forward_step_without_pp(inputs, targets)
 
             if is_last_pp_stage:
+                print(f"Loss with PP: {loss_pp.item()}, Loss without PP: {fsdp2_loss.item()}")
                 assert torch.allclose(loss_pp, fsdp2_loss, atol=1e-6, rtol=1e-5), "Losses do not match"
 
     def _forward_step_with_pp(
