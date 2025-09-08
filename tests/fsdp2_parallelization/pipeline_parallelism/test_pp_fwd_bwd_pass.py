@@ -109,40 +109,34 @@ class TestPipelineParallelism:
             world_size=world_size,
             rdvz_port=22356,
         ):
-            components = self._get_components(pp_model_config_path, use_pp=True)
-            scheduled_pipeline = components.scheduled_pipeline
             vocab_size = 50304
             sequence_length = 256
             batch_size = 4
             sequences = torch.randint(0, vocab_size, (batch_size, sequence_length))
             targets = sequences[:, 1:].contiguous()
             inputs = sequences[:, :-1].contiguous()
-            loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
 
-            # if scheduled_pipeline.is_last_pp_stage:
-            working_dir = Path(os.path.dirname(__file__))
-            fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
-            fsdp2_components = self._get_components(fsdp2_model_config_path, use_pp=False)
-            fsdp2_model = fsdp2_components.initialized_model
-            fsdp2_loss_fn = fsdp2_components.loss_fn
+            is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path, inputs, targets)
+            fsdp2_loss = self._forward_step_without_pp(inputs, targets)
 
-            input_dict = {"input_ids": inputs}
-            fsdp2_out = fsdp2_model(input_dict)
-            forward_batch = InferenceResultBatch(predictions=fsdp2_out, targets={fsdp2_loss_fn.target_key: targets})
-            fsdp2_loss = fsdp2_loss_fn(forward_batch)
-            if scheduled_pipeline.is_last_pp_stage:
-                assert torch.allclose(fsdp2_loss, loss_pp, atol=1e-6, rtol=1e-5), "Outputs do not match"
+            if is_last_pp_stage:
+                assert torch.allclose(loss_pp, fsdp2_loss, atol=1e-6, rtol=1e-5), "Losses do not match"
+
+    def _forward_step_with_pp(
+        self, pp_model_config_path: Path, inputs: torch.Tensor, targets: torch.Tensor
+    ) -> tuple[bool, torch.Tensor]:
+        components = self._get_components(pp_model_config_path, use_pp=True)
+        scheduled_pipeline = components.scheduled_pipeline
+        loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
+        return scheduled_pipeline.is_last_pp_stage, loss_pp
 
     def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor):
         """Runs a forward step on the model."""
         pp_schedule = scheduled_pipeline.pp_schedule
         targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
-        if scheduled_pipeline.is_first_pp_stage:  # first stage
-            # pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+        if scheduled_pipeline.is_first_pp_stage:
             pp_schedule.step(inputs, target=targets, losses=losses)
-        else:  # non-first stage
-            # pp_schedule.step(target=targets, losses=losses, input_batch=inputs)
-            # pp_schedule.step(inputs, target=targets, losses=losses, input_batch=inputs)
+        else:
             pp_schedule.step(target=targets, losses=losses)
 
         # accumulate losses across pipeline microbatches
@@ -152,3 +146,16 @@ class TestPipelineParallelism:
             if scheduled_pipeline.is_last_pp_stage
             else torch.tensor([-1.0], device=inputs.device)
         )
+
+    def _forward_step_without_pp(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        working_dir = Path(os.path.dirname(__file__))
+        fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
+        fsdp2_components = self._get_components(fsdp2_model_config_path, use_pp=False)
+        fsdp2_model = fsdp2_components.initialized_model
+        fsdp2_loss_fn = fsdp2_components.loss_fn
+
+        input_dict = {"input_ids": inputs}
+        fsdp2_out = fsdp2_model(input_dict)
+        forward_batch = InferenceResultBatch(predictions=fsdp2_out, targets={fsdp2_loss_fn.target_key: targets})
+        fsdp2_loss = fsdp2_loss_fn(forward_batch)
+        return fsdp2_loss
