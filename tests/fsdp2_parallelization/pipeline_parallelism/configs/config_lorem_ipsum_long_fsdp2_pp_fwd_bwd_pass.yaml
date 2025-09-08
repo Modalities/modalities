@@ -16,7 +16,7 @@ settings:
 
 loss_fn:
   component_key: loss
-  variant_key: clm_cross_entropy_loss_pp
+  variant_key: clm_cross_entropy_loss
   config:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
@@ -129,7 +129,6 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_pp: true
     use_meta_device: true
     use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
