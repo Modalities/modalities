@@ -24,7 +24,7 @@ settings:
     enforce_last_step_checkpointed: false
   step_profile:
     gradient_accumulation_steps: 1
-    local_train_micro_batch_size: 2
+    local_train_micro_batch_size: 4
     sequence_length: 256
   training_target:
     num_target_tokens:
@@ -222,7 +222,7 @@ scheduled_pipeline:
       pass_type: BY_REFERENCE
     pp_schedule_name: gpipe
     batch_size: ${settings.step_profile.local_train_micro_batch_size}
-    microbatch_size: 1
+    microbatch_size: 2
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
      # maybe better to use the fsdp model and the schedule here
      # instead of passing in the staged pipeline?
