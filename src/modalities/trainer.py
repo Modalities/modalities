@@ -95,6 +95,7 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
+        scheduled_pipeline=None,  # TODO set type
     ) -> tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
         """
         Conducts a training step on batch of data.
@@ -116,9 +117,27 @@ class Trainer:
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
-        result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
-        (loss / self.gradient_acc_steps).backward()
+        if scheduled_pipeline is not None:
+            pp_schedule = scheduled_pipeline.pp_schedule
+            # TODO: handle loss and backward in pp
+            # Pipeline Parallel forward / backward inside step() call
+            # with self.train_context(optional_context_parallel_ctx):
+            targets, losses = (
+                (batch.targets[loss_fun.target_key].contiguous(), [])
+                if scheduled_pipeline.is_last_pp_stage
+                else (None, None)
+            )
+
+            if scheduled_pipeline.is_first_pp_stage:
+                pp_schedule.step(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+            else:
+                pp_schedule.step(target=targets, losses=losses)
+            loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+        else:
+            # else continue with loss calculation
+            result_batch = model_predict_batch(model=model, batch=batch)
+            loss = loss_fun(result_batch)
+            (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:
             gradient_norm_score = self.gradient_clipper.clip_gradients()
@@ -143,6 +162,7 @@ class Trainer:
         training_log_interval_in_steps: int,
         evaluation_callback: Callable[[TrainingProgress], None],
         checkpointing_callback: Callable[[TrainingProgress], None],
+        scheduled_pipeline=None,  # TODO set type
     ):
         """
         Trains the model.
@@ -206,15 +226,17 @@ class Trainer:
                 scheduler=lr_scheduler,
                 loss_fun=loss_fun,
                 micro_batch_id=micro_batch_id,
+                scheduled_pipeline=scheduled_pipeline,
             )
             forward_backward_time_recorder.stop()
             training_progress.num_seen_steps_current_run = num_train_steps_done
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
-            # Save the batch loss
-            cumulated_losses[0] += batch_loss.item()
-            # This works, because we always drop the last batch in case it has less samples than the batch size
-            cumulated_losses[-1] += 1  # number of local batches
+            if batch_loss is not None:
+                # Save the batch loss
+                cumulated_losses[0] += batch_loss.item()
+                # This works, because we always drop the last batch in case it has less samples than the batch size
+                cumulated_losses[-1] += 1  # number of local batches
 
             # gradient norm is already synced across all ranks
             if gradient_norm_score is not None:
@@ -243,7 +265,8 @@ class Trainer:
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
-                cumulated_losses[1] = batch_loss.item()
+
+                cumulated_losses[1] = batch_loss.item() if batch_loss is not None else 0.0
 
                 reduced_losses = Reducer.reduce(
                     tensor=cumulated_losses,

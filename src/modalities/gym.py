@@ -40,6 +40,7 @@ class Gym:
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: list[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
+        scheduled_pipeline=None,  # TODO set type
     ):
         """Runs the model training, including evaluation and checkpointing.
 
@@ -57,6 +58,7 @@ class Gym:
             model=app_state.model,
             evaluation_data_loaders=evaluation_data_loaders,
             evaluation_interval_in_steps=evaluation_interval_in_steps,
+            scheduled_pipeline=scheduled_pipeline,
         )
 
         checkpointing_callback: Callable[[TrainingProgress], None] = partial(
@@ -74,6 +76,7 @@ class Gym:
             evaluation_callback=evaluation_callback,
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
+            scheduled_pipeline=scheduled_pipeline,
         )
         print_rank_0(f"Training done at {datetime.now()}.")
 
@@ -101,11 +104,13 @@ class Gym:
         num_train_steps_done: int,
         evaluation_data_loaders: list[LLMDataLoader],
         evaluation_interval_in_steps: int,
+        scheduled_pipeline=None,  # TODO set type
     ):
-        if num_train_steps_done % evaluation_interval_in_steps == 0:
+        if num_train_steps_done % evaluation_interval_in_steps == 0 and num_train_steps_done > 10:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
                 loss_fun=self.loss_fun,
                 num_train_steps_done=num_train_steps_done,
+                scheduled_pipeline=scheduled_pipeline,
             )
