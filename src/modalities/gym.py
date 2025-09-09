@@ -106,7 +106,7 @@ class Gym:
         evaluation_interval_in_steps: int,
         scheduled_pipeline=None,  # TODO set type
     ):
-        if num_train_steps_done % evaluation_interval_in_steps == 0 and num_train_steps_done > 10:
+        if num_train_steps_done % evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,
