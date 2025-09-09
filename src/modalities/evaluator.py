@@ -36,6 +36,7 @@ class Evaluator:
         batch: DatasetBatch,
         model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
+        scheduled_pipeline=None,  # TODO set type
     ) -> torch.Tensor:
         """Evaluate a single batch by forwarding it through the model and calculating the loss.
 
@@ -48,8 +49,26 @@ class Evaluator:
             torch.Tensor: The loss of the batch
         """
         with torch.no_grad():
-            result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
+            if scheduled_pipeline is not None:
+                pp_schedule = scheduled_pipeline.pp_schedule
+                targets, losses = (
+                    (batch.targets[loss_fun.target_key].contiguous(), [])
+                    if scheduled_pipeline.is_last_pp_stage
+                    else (None, None)
+                )
+
+                if scheduled_pipeline.is_first_pp_stage:
+                    pp_schedule.eval(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+                else:
+                    pp_schedule.eval(target=targets, losses=losses)
+                loss = (
+                    torch.mean(torch.stack(losses)).to(losses[0].device)
+                    if scheduled_pipeline.is_last_pp_stage
+                    else None
+                )
+            else:
+                result_batch = model_predict_batch(model=model, batch=batch)
+                loss = loss_fun(result_batch)
         return loss
 
     def evaluate(
@@ -58,6 +77,7 @@ class Evaluator:
         data_loaders: list[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
+        scheduled_pipeline=None,  # TODO set type
     ) -> dict[str, EvaluationResultBatch]:
         """Evaluate the model on a set of datasets.
 
@@ -90,10 +110,12 @@ class Evaluator:
                         batch=batch,
                         model=model,
                         loss_fun=loss_fun,
+                        scheduled_pipeline=scheduled_pipeline,
                     )
 
-                    cumulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cumulated_loss[1] += 1
+                    if batch_loss is not None:
+                        cumulated_loss[0] += batch_loss.item()  # sum up batch loss
+                        cumulated_loss[1] += 1
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
                     thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
