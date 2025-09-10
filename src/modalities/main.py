@@ -20,6 +20,7 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.fsdp.device_mesh import get_num_data_parallel_ranks
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 
@@ -116,6 +117,7 @@ class Main:
             * components.settings.step_profile.gradient_accumulation_steps
             * components.settings.cuda_env.world_size
         )
+        num_data_parallel_ranks = get_num_data_parallel_ranks(components.device_mesh)
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
             progress_publisher=progress_publisher,
@@ -128,6 +130,7 @@ class Main:
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
             mfu_calculator=components.mfu_calculator,
+            num_data_parallel_ranks=num_data_parallel_ranks,
         )
 
         # Evaluator

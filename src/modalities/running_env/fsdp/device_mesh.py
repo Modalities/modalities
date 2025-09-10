@@ -127,3 +127,25 @@ def get_device_mesh(
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
+
+
+def get_num_data_parallel_ranks(device_mesh: DeviceMesh) -> int:
+    """Gets the number of data parallel ranks from the device mesh.
+
+    Args:
+        device_mesh (DeviceMesh): The device mesh.
+
+    Returns:
+        int: The number of data parallel ranks.
+    """
+    world_size = device_mesh.size()
+    dp_size = world_size
+    for parallelism_degree in (
+        ParallelismDegrees.TP.value,
+        ParallelismDegrees.PP.value,
+        ParallelismDegrees.CP.value,
+    ):
+        if parallelism_degree in device_mesh.mesh_dim_names:
+            dp_size //= device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_degree))
+
+    return dp_size
