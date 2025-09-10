@@ -186,9 +186,11 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         # However, users can also provide their own sharding process groups (currently not supported in Modalities)
         # which would require to adapt the code.
         if model.sharding_strategy.name == "NO_SHARD":
-            sharding_factor = dist.get_world_size()
+            sharding_factor = dist.get_world_size()  # TODO Check if we should use number of data parallel ranks instead
         if model.sharding_strategy.name == "HYBRID_SHARD":
-            sharding_factor = dist.get_world_size() // torch.cuda.device_count()
+            sharding_factor = (
+                dist.get_world_size() // torch.cuda.device_count()
+            )  # TODO Check if we should use number of data parallel ranks instead
         elif model.sharding_strategy.name == "FULL_SHARD":
             sharding_factor = 1
         total_num_params = total_num_params // sharding_factor
