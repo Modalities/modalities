@@ -319,7 +319,7 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-
+        seed (int, optional): The seed for random number generation. Defaults to None.
     """
 
     sample_key: str
@@ -344,6 +344,7 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
+    seed: Optional[int] = None
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
