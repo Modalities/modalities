@@ -112,8 +112,10 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
 )
 from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     DummyGradientClipperConfig,
-    FSDPDummyGradientClipperConfig,
-    FSDPGradientClipperConfig,
+    FSDP1DummyGradientClipperConfig,
+    FSDP1GradientClipperConfig,
+    FSDP2DummyGradientClipperConfig,
+    FSDP2GradientClipperConfig,
 )
 from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
@@ -325,13 +327,13 @@ COMPONENTS = [
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
     # gradient clippers
-    ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDP1GradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp1_logging_only", FSDP1LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+        "gradient_clipper", "fsdp1_logging_only", FSDP1LoggingOnlyGradientClipper, FSDP1DummyGradientClipperConfig
     ),
-    ComponentEntity("gradient_clipper", "fsdp2", FSDP2GradientClipper, FSDPGradientClipperConfig),
+    ComponentEntity("gradient_clipper", "fsdp2", FSDP2GradientClipper, FSDP2GradientClipperConfig),
     ComponentEntity(
-        "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDPDummyGradientClipperConfig
+        "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDP2DummyGradientClipperConfig
     ),
     ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
     # MFU calculators
