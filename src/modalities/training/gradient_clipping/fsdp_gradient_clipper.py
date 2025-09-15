@@ -1,11 +1,15 @@
+import math
 from typing import Iterable, Optional
 
 import torch
+from torch import distributed as dist
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.tensor import DTensor
 
 from modalities.config.lookup_enum import LookupEnum
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 
@@ -91,7 +95,13 @@ class FSDP1LoggingOnlyGradientClipper(GradientClipperIF):
 class FSDP2GradientClipper(GradientClipperIF):
     """The FSDP2GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP."""
 
-    def __init__(self, wrapped_model: FSDP2, max_norm: float, norm_type=GradientClippingMode) -> None:
+    def __init__(
+        self,
+        wrapped_model: FSDP2,
+        max_norm: float,
+        norm_type=GradientClippingMode,
+        device_mesh: Optional[DeviceMesh] = None,
+    ) -> None:
         """
         Initialize the FSDP2GradientClipper object.
 
@@ -106,6 +116,7 @@ class FSDP2GradientClipper(GradientClipperIF):
         self.wrapped_model = wrapped_model
         self.max_norm = max_norm
         self.norm_type = norm_type
+        self.device_mesh = device_mesh
 
     @torch.no_grad()
     def clip_gradients(self) -> torch.Tensor:
@@ -121,6 +132,7 @@ class FSDP2GradientClipper(GradientClipperIF):
             norm_type=self.norm_type.value,
             error_if_nonfinite=True,
             foreach=True,
+            device_mesh=self.device_mesh,
         )
         return gradient_norm_score
 
@@ -131,16 +143,13 @@ class FSDP2GradientClipper(GradientClipperIF):
         norm_type: float = 2.0,
         error_if_nonfinite: bool = False,
         foreach: Optional[bool] = None,
+        device_mesh: Optional[DeviceMesh] = None,
     ) -> torch.Tensor:
         """
         Clip the gradient norm of an iterable of parameters.
 
         Gradient norm clipping requires computing the gradient norm over the entire model.
         `torch.nn.utils.clip_grad_norm_` only computes gradient norm along DP/FSDP/TP dimensions.
-
-        TODO: for pipeline parallelism, we need to implement it like here:
-        https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/utils.py#L245
-        I removed all the code w.r.t. pipeline parallelism for now.
 
         Args:
             parameters: an iterable of Tensors or a single Tensor that will have gradients normalized
@@ -154,6 +163,7 @@ class FSDP2GradientClipper(GradientClipperIF):
                 If ``None``, use the foreach implementation for CUDA and CPU native tensors and silently
                 fall back to the slow implementation for other device types.
                 Default: ``None``
+            device_mesh: device mesh
 
         Returns:
             Total norm of the parameter gradients (viewed as a single vector).
@@ -172,11 +182,23 @@ class FSDP2GradientClipper(GradientClipperIF):
         if isinstance(total_norm, DTensor):
             # Will reach here if any non-PP parallelism is used.
             # If only using PP, total_norm will be a local tensor.
+
             total_norm = total_norm.full_tensor()
 
-        torch.nn.utils.clip_grads_with_norm_(
-            parameters=parameters, max_norm=max_norm, total_norm=total_norm, foreach=foreach
+        pp_mesh = (
+            device_mesh[ParallelismDegrees.PP.value]
+            if device_mesh is not None and ParallelismDegrees.PP.value in device_mesh.mesh_dim_names
+            else None
         )
+        if pp_mesh is not None:
+            if math.isinf(norm_type):
+                dist.all_reduce(total_norm, op=dist.ReduceOp.MAX, group=pp_mesh.get_group())
+            else:
+                total_norm **= norm_type
+                dist.all_reduce(total_norm, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
+                total_norm **= 1.0 / norm_type
+
+        torch.nn.utils.clip_grads_with_norm_(parameters, max_norm, total_norm, foreach)
         return total_norm
 
 
@@ -184,7 +206,9 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
     """The FSDP2LoggingOnlyGradientClipper class that is responsible for logging the gradient
     norms without actually clipping the gradients."""
 
-    def __init__(self, wrapped_model: FSDP2, norm_type=GradientClippingMode) -> None:
+    def __init__(
+        self, wrapped_model: FSDP2, norm_type=GradientClippingMode, device_mesh: Optional[DeviceMesh] = None
+    ) -> None:
         """
         Initialize the FSDP2LoggingOnlyGradientClipper.
 
@@ -197,6 +221,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         """
         self.wrapped_model = wrapped_model
         self.norm_type = norm_type
+        self.device_mesh = device_mesh
 
     @torch.no_grad()
     def clip_gradients(self) -> torch.Tensor:
@@ -214,6 +239,19 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
             # Will reach here if any non-PP parallelism is used.
             # If only using PP, total_norm will be a local tensor.
             total_norm = total_norm.full_tensor()
+
+        pp_mesh = (
+            self.device_mesh[ParallelismDegrees.PP.value]
+            if self.device_mesh is not None and ParallelismDegrees.PP.value in self.device_mesh.mesh_dim_names
+            else None
+        )
+        if pp_mesh is not None:
+            if math.isinf(self.norm_type.value):
+                dist.all_reduce(total_norm, op=dist.ReduceOp.MAX, group=pp_mesh.get_group())
+            else:
+                total_norm **= self.norm_type.value
+                dist.all_reduce(total_norm, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
+                total_norm **= 1.0 / self.norm_type.value
         return total_norm
 
 
