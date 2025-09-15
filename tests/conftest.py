@@ -196,6 +196,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         global_num_seen_tokens=0,
         num_target_tokens=100,
         num_target_steps=10,
+        num_data_parallel_ranks=int(os.getenv("WORLD_SIZE")),
     )
 
 
