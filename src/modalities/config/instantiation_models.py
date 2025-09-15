@@ -181,7 +181,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     gradient_clipper: PydanticGradientClipperIFType
     mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
     scheduled_pipeline: Optional[PydanticPipelineType] = None
-    device_mesh: PydanticDeviceMeshIFType
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
     model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")

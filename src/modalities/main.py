@@ -117,7 +117,10 @@ class Main:
             * components.settings.step_profile.gradient_accumulation_steps
             * components.settings.cuda_env.world_size
         )
-        num_data_parallel_ranks = get_num_data_parallel_ranks(components.device_mesh)
+        if components.device_mesh is None:
+            num_data_parallel_ranks = 1
+        else:
+            num_data_parallel_ranks = get_num_data_parallel_ranks(components.device_mesh)
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
             progress_publisher=progress_publisher,
