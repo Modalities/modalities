@@ -18,15 +18,8 @@ from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 @pytest.fixture
 def temp_file_path() -> Path:
-    # Create a NamedTemporaryFile that persists after closing (delete=False)
-    with tempfile.NamedTemporaryFile(delete=False) as tf:
-        file_path = tf.name
-    try:
-        yield Path(file_path)
-    finally:
-        # Clean up the file after the test
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    with tempfile.NamedTemporaryFile() as tf:
+        yield tf.name
 
 
 class ComponentsInstantiationPPModel(BaseModel):
@@ -63,14 +56,14 @@ class TestPipelineParallelism:
 
         return temp_file_path
 
-    def _get_components(self, config_file_path: Path, use_pp: bool) -> ComponentsInstantiationPPModel:
+    def _get_components(
+        self, config_file_path: Path, use_pp: bool
+    ) -> ComponentsInstantiationPPModel | ComponentsInstantiationModel:
         torch.manual_seed(42)
         main_obj = Main(config_file_path)
-        if use_pp:
-            components_model_type = ComponentsInstantiationPPModel
-        else:
-            components_model_type = ComponentsInstantiationModel
-        components: components_model_type = main_obj.build_components(components_model_type=components_model_type)
+        components_model_type = ComponentsInstantiationPPModel if use_pp else ComponentsInstantiationModel
+        components = main_obj.build_components(components_model_type=components_model_type)
+        assert isinstance(components, components_model_type)
         return components
 
     @pytest.mark.parametrize(
@@ -141,8 +134,7 @@ class TestPipelineParallelism:
         else:
             pp_schedule.step(target=targets, losses=losses)
 
-        # accumulate losses across pipeline microbatches
-        # TODO: PP+FSDP unexpectedly puts the loss back to the CPU
+        # accumulate losses across pipeline microbatchess
         return (
             torch.mean(torch.stack(losses)).to(losses[0].device)
             if scheduled_pipeline.is_last_pp_stage

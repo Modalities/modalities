@@ -781,7 +781,7 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: int = None,
+        seed: int | None = None,
     ):
         """
         Initializes the GPT2LLM object.
@@ -805,8 +805,8 @@ class GPT2LLM(NNModel):
             attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
             ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
-            seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
+            seed (int, optional): The random seed. Defaults to None.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
