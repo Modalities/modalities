@@ -631,7 +631,7 @@ class GPT2ModelFactory:
             ),
         }
 
-        if isinstance(model.transformer.wpe, nn.Embedding):
+        if hasattr(model.transformer, "wpe") and isinstance(model.transformer.wpe, nn.Embedding):
             # If the position embedding is an nn.Embedding, we can shard it on the sequence dimension
             # to enable sequence parallelism in the downstream transformer blocks.
             # Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.
@@ -640,11 +640,14 @@ class GPT2ModelFactory:
                 output_layouts=Shard(0),
             )
 
-        parallelize_module(
-            module=model,
-            device_mesh=tp_mesh,
-            parallelize_plan=model_tp_plan,
-        )
+        # only keep the relevant parts of the model parallel plan
+        model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model.transformer, k.split(".")[1])}
+        if model_tp_plan:
+            parallelize_module(
+                module=model,
+                device_mesh=tp_mesh,
+                parallelize_plan=model_tp_plan,
+            )
 
         transformer_block_tp_plan = {
             "attention_norm": SequenceParallel(),
@@ -703,6 +706,16 @@ class GPT2ModelFactory:
                 )
             transformer_block.attn.n_head_q = transformer_block.attn.n_head_q // tp_mesh.size()
             transformer_block.attn.n_head_kv = transformer_block.attn.n_head_kv // tp_mesh.size()
+            # only keep the relevant parts of the model parallel plan
+            transformer_block_tp_plan = {
+                k: v
+                for k, v in transformer_block_tp_plan.items()
+                if (
+                    hasattr(transformer_block, k)
+                    or hasattr(transformer_block.attn, k.split(".")[1])
+                    or hasattr(transformer_block.mlp, k.split(".")[1])
+                )
+            }
             parallelize_module(
                 module=transformer_block,
                 device_mesh=tp_mesh,
