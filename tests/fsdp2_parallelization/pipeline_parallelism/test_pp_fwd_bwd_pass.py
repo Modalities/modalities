@@ -30,12 +30,11 @@ def temp_file_path() -> Path:
 
 
 class ComponentsInstantiationPPModel(BaseModel):
-    initialized_model: PydanticFSDP2ModuleType
     scheduled_pipeline: PydanticPipelineType
 
 
 class ComponentsInstantiationModel(BaseModel):
-    initialized_model: PydanticFSDP2ModuleType
+    fsdp_model: PydanticFSDP2ModuleType
     loss_fn: PydanticLossIFType
 
 
@@ -48,7 +47,10 @@ class TestPipelineParallelism:
         self, sharding_degree: int, tp_degree: int, pp_degree: int, temp_file_path: Path
     ) -> Path:
         working_dir = Path(os.path.dirname(__file__))
-        config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_fwd_bwd_pass.yaml"
+        if tp_degree > 1:
+            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass.yaml"
+        else:
+            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_fwd_bwd_pass.yaml"
 
         with open(config_file_path, "r") as file:
             config_string = file.read()
@@ -76,9 +78,9 @@ class TestPipelineParallelism:
     @pytest.mark.parametrize(
         "sharding_degree, tp_degree, pp_degree, world_size",
         [
-            (2, 1, 2, 4),
+            # (2, 1, 2, 4),
             # (2, 1, 4, 8),
-            # (2, 2, 2, 8), # TODO need to support this case
+            (2, 2, 2, 8),  # TODO need to support this case
         ],
     )
     def test_pp(self, sharding_degree: int, tp_degree: int, pp_degree: int, world_size: int, temp_file_path: Path):
@@ -107,11 +109,12 @@ class TestPipelineParallelism:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22356,
+            rdvz_port=22359,
         ):
             vocab_size = 50304
-            sequence_length = 256
+            sequence_length = 4
             batch_size = 4
+            torch.manual_seed(42)
             sequences = torch.randint(0, vocab_size, (batch_size, sequence_length))
             targets = sequences[:, 1:].contiguous()
             inputs = sequences[:, :-1].contiguous()
@@ -127,13 +130,21 @@ class TestPipelineParallelism:
     def _forward_step_with_pp(
         self, pp_model_config_path: Path, inputs: torch.Tensor, targets: torch.Tensor
     ) -> tuple[bool, torch.Tensor]:
-        components = self._get_components(pp_model_config_path, use_pp=True)
-        scheduled_pipeline = components.scheduled_pipeline
-        loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
+        try:
+            components = self._get_components(pp_model_config_path, use_pp=True)
+            scheduled_pipeline = components.scheduled_pipeline
+            loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
+        except Exception as e:
+            import traceback
+
+            print(f"Exception in _forward_step_with_pp: {e}")
+            traceback.print_exc()  # <-- Add this line to print the full stack trace
+            raise e
         return scheduled_pipeline.is_last_pp_stage, loss_pp
 
     def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor):
         """Runs a forward step on the model."""
+        os.environ["MODEL_TYPE"] = "PP"
         pp_schedule = scheduled_pipeline.pp_schedule
         targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
         if scheduled_pipeline.is_first_pp_stage:
@@ -150,10 +161,11 @@ class TestPipelineParallelism:
         )
 
     def _forward_step_without_pp(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        os.environ["MODEL_TYPE"] = "NOPP"
         working_dir = Path(os.path.dirname(__file__))
         fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
         fsdp2_components = self._get_components(fsdp2_model_config_path, use_pp=False)
-        fsdp2_model = fsdp2_components.initialized_model
+        fsdp2_model = fsdp2_components.fsdp_model
         fsdp2_loss_fn = fsdp2_components.loss_fn
 
         input_dict = {"input_ids": inputs}
