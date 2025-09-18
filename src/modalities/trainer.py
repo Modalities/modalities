@@ -14,6 +14,7 @@ from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, P
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
@@ -97,8 +98,8 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-        scheduled_pipeline=None,  # TODO set type
-    ) -> tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
+        scheduled_pipeline: Optional[Pipeline] = None,
+    ) -> tuple[bool, int, Optional[torch.Tensor], Optional[torch.Tensor]]:
         """
         Conducts a training step on batch of data.
 
@@ -109,13 +110,16 @@ class Trainer:
             scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
             micro_batch_id (int): The ID of the micro batch.
+            scheduled_pipeline (Optional[Pipeline], optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
                 A tuple containing the following:
                     - step_performed (bool): Indicates whether a training step was performed.
                     - num_train_steps_done (int): The number of training steps done.
-                    - loss (torch.Tensor): The computed loss.
+                    - loss (Optional[torch.Tensor]): The computed loss.
+                        None, if a non-last stage was processes in pipeline parallelism.
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
@@ -164,7 +168,7 @@ class Trainer:
         training_log_interval_in_steps: int,
         evaluation_callback: Callable[[TrainingProgress], None],
         checkpointing_callback: Callable[[TrainingProgress], None],
-        scheduled_pipeline=None,  # TODO set type
+        scheduled_pipeline: Pipeline | None = None,
     ):
         """
         Trains the model.
@@ -176,6 +180,8 @@ class Trainer:
             training_log_interval_in_steps (int): The interval at which training progress is logged.
             evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.
             checkpointing_callback (Callable[[TrainingProgress], None]): A callback function for checkpointing.
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             None
@@ -234,6 +240,7 @@ class Trainer:
             training_progress.num_seen_steps_current_run = num_train_steps_done
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
+            # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
             if batch_loss is not None:
                 # Save the batch loss
                 cumulated_losses[0] += batch_loss.item()

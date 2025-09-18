@@ -9,6 +9,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
 from modalities.util import Aggregator, TimeRecorder
@@ -36,17 +37,20 @@ class Evaluator:
         batch: DatasetBatch,
         model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-        scheduled_pipeline=None,  # TODO set type
-    ) -> torch.Tensor:
+        scheduled_pipeline: Pipeline | None = None,
+    ) -> torch.Tensor | None:
         """Evaluate a single batch by forwarding it through the model and calculating the loss.
 
         Args:
             batch (DatasetBatch): The batch to evaluate
             model (nn.Module): The model to evaluate
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
-            torch.Tensor: The loss of the batch
+            torch.Tensor | None: The loss of the batch
+                None, if a non-last stage was processed in pipeline parallelism
         """
         with torch.no_grad():
             if scheduled_pipeline is not None:
@@ -77,7 +81,7 @@ class Evaluator:
         data_loaders: list[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
-        scheduled_pipeline=None,  # TODO set type
+        scheduled_pipeline: Pipeline | None = None,
     ) -> dict[str, EvaluationResultBatch]:
         """Evaluate the model on a set of datasets.
 
@@ -86,6 +90,8 @@ class Evaluator:
             data_loaders (list[LLMDataLoader]): List of dataloaders to evaluate the model on
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
             num_train_steps_done (int): The number of training steps done so far for logging purposes
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
@@ -113,6 +119,7 @@ class Evaluator:
                         scheduled_pipeline=scheduled_pipeline,
                     )
 
+                    # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
                     if batch_loss is not None:
                         cumulated_loss[0] += batch_loss.item()  # sum up batch loss
                         cumulated_loss[1] += 1

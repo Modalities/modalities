@@ -567,7 +567,7 @@ class GPT2ModelFactory:
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
-        seed: int = None,
+        seed: int | None = None,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -716,10 +716,11 @@ class GPT2ModelFactory:
                     or hasattr(transformer_block.mlp, k.split(".")[1])
                 )
             }
-            parallelize_module(
-                module=transformer_block,
-                device_mesh=tp_mesh,
-                parallelize_plan=transformer_block_tp_plan,
-            )
+            if transformer_block_tp_plan:
+                parallelize_module(
+                    module=transformer_block,
+                    device_mesh=tp_mesh,
+                    parallelize_plan=transformer_block_tp_plan,
+                )
 
         return model

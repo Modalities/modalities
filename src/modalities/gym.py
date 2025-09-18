@@ -9,6 +9,7 @@ from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.loss_functions import Loss
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.trainer import Trainer
 from modalities.training.training_progress import TrainingProgress
 from modalities.util import print_rank_0
@@ -40,7 +41,7 @@ class Gym:
         train_data_loader: LLMDataLoader,
         evaluation_data_loaders: list[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
-        scheduled_pipeline=None,  # TODO set type
+        scheduled_pipeline: Pipeline | None = None,
     ):
         """Runs the model training, including evaluation and checkpointing.
 
@@ -52,6 +53,8 @@ class Gym:
             train_data_loader (LLMDataLoader): Data loader with the training data.
             evaluation_data_loaders (list[LLMDataLoader]): List of data loaders with the evaluation data.
             checkpoint_saving (CheckpointSaving): Routine for saving checkpoints.
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
         """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
@@ -104,7 +107,7 @@ class Gym:
         num_train_steps_done: int,
         evaluation_data_loaders: list[LLMDataLoader],
         evaluation_interval_in_steps: int,
-        scheduled_pipeline=None,  # TODO set type
+        scheduled_pipeline: Pipeline | None = None,
     ):
         if num_train_steps_done > 0 and num_train_steps_done % evaluation_interval_in_steps == 0:
             self.evaluator.evaluate(
