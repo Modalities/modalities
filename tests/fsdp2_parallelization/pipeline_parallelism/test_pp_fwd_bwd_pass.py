@@ -71,9 +71,9 @@ class TestPipelineParallelism:
     @pytest.mark.parametrize(
         "sharding_degree, tp_degree, pp_degree, world_size",
         [
-            # (2, 1, 2, 4),
-            # (2, 1, 4, 8),
-            (2, 2, 2, 8),  # TODO need to support this case
+            (2, 1, 2, 4),
+            (2, 1, 4, 8),
+            (2, 2, 2, 8),
         ],
     )
     def test_pp(self, sharding_degree: int, tp_degree: int, pp_degree: int, world_size: int, temp_file_path: Path):
@@ -105,10 +105,10 @@ class TestPipelineParallelism:
             rdvz_port=22359,
         ):
             vocab_size = 50304
-            sequence_length = 4
+            sequence_length = 256
             batch_size = 4
             torch.manual_seed(42)
-            sequences = torch.randint(0, vocab_size, (batch_size, sequence_length))
+            sequences = torch.randint(0, vocab_size, (batch_size, sequence_length + 1))
             targets = sequences[:, 1:].contiguous()
             inputs = sequences[:, :-1].contiguous()
 
