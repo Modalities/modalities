@@ -282,9 +282,7 @@ class Trainer:
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
                     # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack(
-                        [t[0] / t[-1], t[1] / self.num_data_parallel_ranks, t[-1]]
-                    ),
+                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / self.num_data_parallel_ranks]),
                 )
 
                 train_loss_avg, train_loss_last_batch = (
