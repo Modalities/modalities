@@ -706,21 +706,10 @@ class GPT2ModelFactory:
                 )
             transformer_block.attn.n_head_q = transformer_block.attn.n_head_q // tp_mesh.size()
             transformer_block.attn.n_head_kv = transformer_block.attn.n_head_kv // tp_mesh.size()
-            # only keep the relevant parts of the model parallel plan
-            transformer_block_tp_plan = {
-                k: v
-                for k, v in transformer_block_tp_plan.items()
-                if (
-                    hasattr(transformer_block, k)
-                    or hasattr(transformer_block.attn, k.split(".")[1])
-                    or hasattr(transformer_block.mlp, k.split(".")[1])
-                )
-            }
-            if transformer_block_tp_plan:
-                parallelize_module(
-                    module=transformer_block,
-                    device_mesh=tp_mesh,
-                    parallelize_plan=transformer_block_tp_plan,
-                )
+            parallelize_module(
+                module=transformer_block,
+                device_mesh=tp_mesh,
+                parallelize_plan=transformer_block_tp_plan,
+            )
 
         return model
