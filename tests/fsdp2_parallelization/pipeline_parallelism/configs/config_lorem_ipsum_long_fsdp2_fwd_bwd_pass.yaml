@@ -59,7 +59,7 @@ initialized_model:
         model_type: gpt2
         weight_init_type: scaled
         mean: 0.0
-        std: 1.02
+        std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
 model_raw:
