@@ -29,30 +29,13 @@ device_mesh:
     data_parallel_replicate_degree: 1
     data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
-
-initialized_model:
-  component_key: model
-  variant_key: model_initialized
-  config:
-    model:
-      instance_key: fsdp_model
-      pass_type: BY_REFERENCE
-    model_initializer:
-      component_key: model_initialization
-      variant_key: composed
-      config:
-        model_type: gpt2
-        weight_init_type: scaled
-        mean: 0.0
-        std: 0.02
-        num_layers: ${model_raw.config.n_layer}
         
 fsdp_model:
   component_key: model
   variant_key: fsdp2_wrapped
   config:
     model:
-      instance_key: model_raw
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -61,6 +44,23 @@ fsdp_model:
       param_dtype: BF_16
       reduce_dtype: BF_16
     block_names: [GPT2Block]
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 1.02
+        num_layers: ${model_raw.config.n_layer}
 
 model_raw:
   component_key: model

@@ -63,7 +63,7 @@ fsdp_model:
   variant_key: fsdp2_wrapped
   config:
     model:
-      instance_key: model_part
+      instance_key: gpt2_tp_model
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -72,6 +72,17 @@ fsdp_model:
       param_dtype: BF_16
       reduce_dtype: BF_16
     block_names: [GPT2Block]
+
+gpt2_tp_model:
+  component_key: model
+  variant_key: gpt2_tp
+  config:
+    model:
+      instance_key: model_part
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 model_part:
   component_key: pipeline
@@ -117,7 +128,7 @@ initialized_model:
         model_type: gpt2
         weight_init_type: scaled
         mean: 0.0
-        std: 1.02
+        std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
 model_raw:
