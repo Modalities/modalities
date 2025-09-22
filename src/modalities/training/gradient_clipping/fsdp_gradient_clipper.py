@@ -109,6 +109,7 @@ class FSDP2GradientClipper(GradientClipperIF):
             wrapped_model (FSDP2): The wrapped model.
             max_norm (float): The maximum norm value for gradient clipping.
             norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
+            device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.
 
         Returns:
             None
@@ -215,6 +216,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Args:
             wrapped_model (FSDP2): The wrapped FSDP2 model.
             norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.
+            device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.
 
         Returns:
             None

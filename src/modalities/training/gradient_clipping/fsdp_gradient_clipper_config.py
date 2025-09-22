@@ -34,11 +34,13 @@ class FSDP2GradientClipperConfig(FSDP1GradientClipperConfig):
         max_norm (float): The maximum norm value for gradient clipping.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
         wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
 
     Attributes:
         max_norm (float): The maximum norm value for gradient clipping.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
         wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
     device_mesh: PydanticDeviceMeshIFType | None = None
@@ -68,10 +70,12 @@ class FSDP2DummyGradientClipperConfig(FSDP1DummyGradientClipperConfig):
     Args:
         wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
 
     Attributes:
         wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
     wrapped_model: PydanticPytorchModuleType
