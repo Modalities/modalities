@@ -31,7 +31,7 @@ class Trainer:
     def __init__(
         self,
         global_rank: int,
-        num_data_parallel_ranks: int,
+        num_pipeline_parallel_ranks: int,
         progress_publisher: MessagePublisher[ProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
@@ -64,7 +64,7 @@ class Trainer:
             None
         """
         self.global_rank = global_rank
-        self.num_data_parallel_ranks = num_data_parallel_ranks
+        self.num_pipeline_parallel_ranks = num_pipeline_parallel_ranks
         self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
@@ -281,8 +281,10 @@ class Trainer:
                     tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
-                    # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / self.num_data_parallel_ranks]),
+                    # 2.) last batch loss / (world size / num_pipeline_parallel_ranks)
+                    post_processing_fun=lambda t: torch.stack(
+                        [t[0] / t[-1], t[1] / dist.get_world_size() * self.num_pipeline_parallel_ranks]
+                    ),
                 )
 
                 train_loss_avg, train_loss_last_batch = (

@@ -129,23 +129,14 @@ def get_device_mesh(
     return device_mesh
 
 
-def get_num_data_parallel_ranks(device_mesh: DeviceMesh) -> int:
-    """Gets the number of data parallel ranks from the device mesh.
+def get_num_parallel_ranks(device_mesh: DeviceMesh, parallelism_method: ParallelismDegrees) -> int:
+    """Gets the number of parallel ranks from the device mesh for a specific parallelism method.
 
     Args:
         device_mesh (DeviceMesh): The device mesh.
+        parallelism_method (ParallelismDegrees): The parallelism method.
 
     Returns:
-        int: The number of data parallel ranks.
+        int: The number of parallel ranks for the specified parallelism method.
     """
-    world_size = device_mesh.size()
-    dp_size = world_size
-    for parallelism_degree in (
-        ParallelismDegrees.TP.value,
-        ParallelismDegrees.PP.value,
-        ParallelismDegrees.CP.value,
-    ):
-        if parallelism_degree in device_mesh.mesh_dim_names:
-            dp_size //= device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_degree))
-
-    return dp_size
+    return device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_method.value))
