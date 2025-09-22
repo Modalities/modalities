@@ -140,4 +140,7 @@ def get_num_parallel_ranks(device_mesh: DeviceMesh, parallelism_method: Parallel
     Returns:
         int: The number of parallel ranks for the specified parallelism method.
     """
-    return device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_method.value))
+    if parallelism_method.value not in device_mesh.mesh_dim_names:
+        return 1
+    else:
+        return device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_method.value))
