@@ -58,6 +58,15 @@ class ModelFactory:
 
     @staticmethod
     def _is_model_on_meta_device(model: nn.Module) -> bool:
+        """
+        Checks if all parameters and buffers of the model are on the meta device.
+
+        Args:
+            model (nn.Module): The model to check.
+
+        Returns:
+            bool: True if all parameters and buffers are on meta device, False otherwise.
+        """
         meta_counter = 0
         param_counter = 0
         for _, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):

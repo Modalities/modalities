@@ -84,7 +84,8 @@ def get_device_mesh(
     enable_loss_parallel: bool,
     world_size: int,
 ) -> DeviceMesh:
-    """Gets the device mesh for the specified parallelism degrees.
+    """
+    Gets the device mesh for the specified parallelism degrees.
 
     Args:
         device_type (str): The device type.

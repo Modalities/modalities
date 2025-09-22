@@ -806,7 +806,7 @@ class GPT2LLM(NNModel):
             ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             use_weight_tying (bool): Whether to use weight tying.
-            seed (int, optional): The random seed. Defaults to None.
+            seed (Optional[int]): The random seed. Defaults to None.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
@@ -910,6 +910,15 @@ class GPT2LLM(NNModel):
         ...
 
     def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+        """
+        Forward pass of the GPT2LLM module.
+
+        Args:
+            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.
+
+        Returns:
+            dict[str, torch.Tensor] | torch.Tensor: Model output.
+        """
         if isinstance(inputs, dict):
             return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
         else:
