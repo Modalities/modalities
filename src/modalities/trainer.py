@@ -28,24 +28,6 @@ class ThroughputAggregationKeys(Enum):
 
 
 class Trainer:
-    """
-    Trainer class for model training.
-
-    Args:
-        global_rank (int): The global rank.
-        num_pipeline_parallel_ranks (int): Number of pipeline parallel ranks.
-        progress_publisher (MessagePublisher[ProgressUpdate]): Progress publisher.
-        evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Evaluation result publisher.
-        gradient_acc_steps (int): Gradient accumulation steps.
-        global_num_tokens_per_train_step (int): Global number of tokens per train step.
-        num_seen_train_steps (int): Number of seen train steps.
-        global_num_seen_tokens (int): Global number of seen tokens.
-        num_target_steps (int): Number of target steps.
-        num_target_tokens (int): Number of target tokens.
-        gradient_clipper (GradientClipperIF): Gradient clipper.
-        mfu_calculator (Optional[MFUCalculatorABC]): MFU calculator.
-    """
-
     def __init__(
         self,
         global_rank: int,
@@ -65,18 +47,18 @@ class Trainer:
         Initializes the Trainer object.
 
         Args:
-            global_rank (int): The global rank to which operates the trainer object.
-            progress_publisher (MessagePublisher[ProgressUpdate]): The publisher for progress updates.
-            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):
-                The publisher for evaluation result batches.
-            gradient_acc_steps (int): The number of gradient accumulation steps.
-            global_num_tokens_per_train_step (int): The number of global tokens per training step.
-            num_seen_train_steps (int): The number of training steps already seen.
-            global_num_seen_tokens (int): The number of tokens already seen.
-            num_target_steps (int): The target number of training steps.
-            num_target_tokens (int): The target number of tokens.
-            gradient_clipper (GradientClipperIF): The gradient clipper.
-            mfu_calculator (Optional[MFUCalculatorABC]): The MFU calculator.
+            global_rank (int): The global rank.
+            num_pipeline_parallel_ranks (int): Number of pipeline parallel ranks.
+            progress_publisher (MessagePublisher[ProgressUpdate]): Progress publisher.
+            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Evaluation result publisher.
+            gradient_acc_steps (int): Gradient accumulation steps.
+            global_num_tokens_per_train_step (int): Global number of tokens per train step.
+            num_seen_train_steps (int): Number of seen train steps.
+            global_num_seen_tokens (int): Global number of seen tokens.
+            num_target_steps (int): Number of target steps.
+            num_target_tokens (int): Number of target tokens.
+            gradient_clipper (GradientClipperIF): Gradient clipper.
+            mfu_calculator (Optional[MFUCalculatorABC]): MFU calculator.
 
         Returns:
             None
