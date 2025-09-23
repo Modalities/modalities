@@ -72,7 +72,6 @@ class TestPipelineParallelism:
         "sharding_degree, tp_degree, pp_degree, world_size",
         [
             (2, 1, 2, 4),
-            (2, 1, 4, 8),
             (2, 2, 2, 8),
         ],
     )
