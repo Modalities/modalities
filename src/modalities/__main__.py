@@ -32,7 +32,7 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
-from modalities.utils.benchmarking.benchmarking_utils import get_updated_sweep_status
+from modalities.utils.benchmarking.benchmarking_utils import SweepSets, get_updated_sweep_status
 from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
 
@@ -84,7 +84,7 @@ def CMD_entry_point_run_modalities(
     """
 
     def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
-        """Format an exception into a structured JSON string with error message, type, and stack trace."""
+        # Format an exception into a structured JSON string with error message, type, and stack trace.
         error = {
             "error": str(e),
             "type": type(e).__name__,
@@ -655,16 +655,18 @@ def entry_point_prepare_remaining_runs(
     new_folders_for_remaining: bool = False,
 ):
     """
-    Prepare a list of remaining runs from a grid search experiment directory.
+    Prepare a file list of remaining runs from a grid search experiment directory.
     """
-    skip_exception_types = skip_exception_types.split(",")
-    get_updated_sweep_status(
+    skip_exception_types_list = skip_exception_types.split(",")
+    file_list_dict = get_updated_sweep_status(
         exp_root=experiment_dir,
         expected_steps=expected_steps,
-        file_list_path=file_list_path,
-        skip_exception_types=skip_exception_types,
+        skip_exception_types=skip_exception_types_list,
         new_folders_for_remaining=new_folders_for_remaining,
     )
+    with file_list_path.open("w", encoding="utf-8") as f:
+        for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
+            f.write(f"{cfg}\n")
 
 
 if __name__ == "__main__":

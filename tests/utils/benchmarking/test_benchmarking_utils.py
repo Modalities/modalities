@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from modalities.utils.benchmarking.benchmarking_utils import SweepSets, _count_jsonl_lines, get_updated_sweep_status
 
-EXPPECTED_STEPS = 10
+EXPECTED_STEPS = 10
 
 
 class FileStructure:
@@ -22,17 +22,17 @@ class FileStructure:
             },
             "abcd0001_2025-07-27__18-00-10": {  # successful run
                 "config.yaml": True,
-                "evaluation_results.jsonl": EXPPECTED_STEPS,
+                "evaluation_results.jsonl": EXPECTED_STEPS,
             },
         },
         "8": {
             "abcd0000_2025-07-27__18-00-00": {  # successful run
                 "config.yaml": True,
-                "evaluation_results.jsonl": EXPPECTED_STEPS,
+                "evaluation_results.jsonl": EXPECTED_STEPS,
             },
             "abcd0001_2025-07-27__18-00-00": {  # unsuccessful run (not enough steps)
                 "config.yaml": True,
-                "evaluation_results.jsonl": EXPPECTED_STEPS // 2,
+                "evaluation_results.jsonl": EXPECTED_STEPS // 2,
             },
         },
         "16": {
@@ -125,14 +125,12 @@ def test_count_jsonl_lines():
 
 def test_get_updated_sweep_status(tmp_path):
     experiments_path = tmp_path / "experiments"
-    file_list_path = tmp_path / "remaining_runs.txt"
     create_test_sweep_structure(experiments_path)
     with patch("modalities.utils.benchmarking.benchmarking_utils.datetime") as mock_datetime:
         mock_datetime.now.return_value.strftime.return_value = "x"
         file_list_dict = get_updated_sweep_status(
             exp_root=experiments_path,
-            file_list_path=file_list_path,
-            expected_steps=EXPPECTED_STEPS,
+            expected_steps=EXPECTED_STEPS,
             skip_exception_types=["OutOfMemoryError"],
         )
 

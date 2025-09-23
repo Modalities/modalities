@@ -4,7 +4,6 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 from modalities.utils.logger_utils import get_logger
 
@@ -36,7 +35,7 @@ def _get_most_recent_configs(file_paths: list[Path]) -> list[Path]:
     for file_path in file_paths:
         experiment_folder = file_path.parent
         hash_prefix, ts = experiment_folder.name.split("_", maxsplit=1)
-        # assert file format: DDDDDDDD_YYYY-MM-DD__HH-MM-SS
+        # assert file format: <hash_prefix>_YYYY-MM-DD__HH-MM-SS
         pattern = r"^[a-zA-Z0-9]+_\d{4}-\d{2}-\d{2}__\d{2}-\d{2}-\d{2}$"
         if not re.match(pattern, experiment_folder.name):
             raise ValueError(
@@ -49,8 +48,10 @@ def _get_most_recent_configs(file_paths: list[Path]) -> list[Path]:
     return [config[0] for config in latest_configs.values()]
 
 
-def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_exception_types: list[str] = None) -> bool:
-    """Check if the experiment is done based on the number of steps in the results file and potential error types."""
+def _is_experiment_done(
+    config_file_path: Path, expected_steps: int, skip_exception_types: list[str] | None = None
+) -> bool:
+    # Check if the experiment is done based on the number of steps in the results file and potential error types.
     results_path = config_file_path.parent / FileNames.RESULTS_FILE.value
     # Check if results file exists and has the expected number of steps
     if results_path.exists():
@@ -77,7 +78,7 @@ def _is_experiment_done(config_file_path: Path, expected_steps: int, skip_except
     return False
 
 
-def update_experiment_folder(config_file_path: Path) -> Path:
+def _update_experiment_folder(config_file_path: Path) -> Path:
     """Create a new folder for the experiment based on the config file path.
     The new folder will have the same hash as the original folder, but with a timestamp appended.
 
@@ -140,8 +141,7 @@ def get_current_sweep_status(
 def get_updated_sweep_status(
     exp_root: Path,
     expected_steps: int,
-    file_list_path: Optional[Path] = None,
-    skip_exception_types: Optional[list[str]] = None,
+    skip_exception_types: list[str],
     new_folders_for_remaining: bool = False,
 ) -> dict[str, list[Path]]:
     """List all remaining runs in the experiment root directory and optionally write them to a file.
@@ -161,20 +161,20 @@ def get_updated_sweep_status(
     if not new_folders_for_remaining or set(file_list_dict[SweepSets.REMAINING_CONFIGS.value]) == set(
         file_list_dict[SweepSets.ALL_CONFIGS.value]
     ):
-        logger.info("No runs executed so far. Returning the list of all configs without creating new folders.")
+        logger.info(
+            "No runs executed so far or `new_folders_for_remaining==False`. "
+            "Returning the list of all configs without creating new folders."
+        )
         file_list_dict[SweepSets.UPDATED_CONFIGS.value] = file_list_dict[SweepSets.REMAINING_CONFIGS.value]
     else:
-        logger.info("Some runs have been executed. Creating new folders for remaining configs.")
+        logger.info(
+            "Some runs have been executed or `new_folders_for_remaining==True`. "
+            "Creating new folders for remaining configs."
+        )
         # create new experiment folders for all remaining configs
         updated_configs = [
-            update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
+            _update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]
         ]
         file_list_dict[SweepSets.UPDATED_CONFIGS.value] = updated_configs
 
-    # Write the config list
-    if file_list_path is not None:
-        with file_list_path.open("w", encoding="utf-8") as f:
-            for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
-                f.write(str(cfg) + "\n")
-
-        return file_list_dict
+    return file_list_dict

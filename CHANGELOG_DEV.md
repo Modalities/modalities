@@ -186,3 +186,11 @@ There are now three AC variants:
 * adds support for Tensor Parallelism (including Sequence Parallelism). 
 * adds a debugging toolkit to track the input and output tensors during a forward pass, gradients during the backward pass and weight tensors.
 Tensors can be either normal Tensors or DTensors.  
+
+
+## PR #389 Benchmark Tooling 
+* adds benchmarking tooling to modalities and allows for scaling benchmarks across varying number of nodes and the cartesian product of configurable hyper parameters.
+
+**Breaking Changes**
+* Renaming: EvaluationResultToDiscSubscriberConfig.output_path -> EvaluationResultToDiscSubscriberConfig.output_file_path
+

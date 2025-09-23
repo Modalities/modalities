@@ -3,7 +3,7 @@ from copy import deepcopy
 from datetime import datetime
 from itertools import product
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, FilePath
@@ -14,8 +14,8 @@ logger = get_logger(name=__file__)
 
 
 class SweepConfig(BaseModel):
-    sweep: Dict[str, Any]
-    paired: List[List[str]] = []
+    sweep: dict[str, Any]
+    paired: list[list[str]] = []
 
 
 class SweepGenerator:
@@ -25,7 +25,7 @@ class SweepGenerator:
         output_dir: Path,
     ) -> None:
         """
-        Initialize the SBatchArrayJobGenerator with cluster configuration, script configuration,
+        Initialize the SweepGenerator with cluster configuration, script configuration,
         sweep configuration, and script template.
         """
         self.sweep_config: SweepConfig = sweep_config
@@ -33,7 +33,7 @@ class SweepGenerator:
         self.sweep_output_dir_path.mkdir(exist_ok=True, parents=True)
 
     @staticmethod
-    def _load_yaml_file(file_path: FilePath) -> Dict[str, Any]:
+    def _load_yaml_file(file_path: FilePath) -> dict[str, Any]:
         """
         Load a YAML file and return its content as a dictionary.
         """
@@ -41,7 +41,7 @@ class SweepGenerator:
             return yaml.safe_load(file)
 
     @staticmethod
-    def _get_config_hash(config: Dict[str, Any]) -> str:
+    def _get_config_hash(config: dict[str, Any], hash_length: int = 16) -> str:
         """
         Generate a hash for the given configuration dictionary while preserving the key order.
         """
@@ -49,7 +49,7 @@ class SweepGenerator:
         config_str = yaml.dump(config, sort_keys=False, default_flow_style=False)
 
         # Compute the hash using SHA256
-        config_hash = hashlib.md5(config_str.encode("utf-8")).hexdigest()[:8]
+        config_hash = hashlib.md5(config_str.encode("utf-8")).hexdigest()[:hash_length]
         return config_hash
 
     @staticmethod
@@ -78,7 +78,7 @@ class SweepGenerator:
                     yaml.dump(sweep_combination, file, sort_keys=False)
 
     @staticmethod
-    def _generate_nested_combinations(sweep: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _generate_nested_combinations(sweep: dict[str, Any]) -> list[dict[str, Any]]:
         def expand(sweep_dict):
             if isinstance(sweep_dict, dict):
                 keys, values = zip(*((k, expand(v)) for k, v in sweep_dict.items()))
