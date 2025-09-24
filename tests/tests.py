@@ -310,7 +310,7 @@ def main(
         )
         assert isfile(run_scaling_up_example_script), f"ERROR! {run_scaling_up_example_script} does not exist."
         command_scaling_up_example = f"cd {run_scaling_up_example_directory}; "
-        command_scaling_up_example += "bash scripts/run_scaling_up_example_single_node.sh"
+        command_scaling_up_example += "bash scripts/run_scaling_up_example_single_node.sh -c"
         subprocess_run(command_scaling_up_example)
 
     print("\n=== DONE ===")

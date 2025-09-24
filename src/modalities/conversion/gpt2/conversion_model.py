@@ -51,7 +51,9 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         num_hidden_layers=config["n_layer"],
         num_key_value_heads=config["n_head_kv"],
         num_attention_heads=config["n_head_q"],
-        intermediate_size=SwiGLU._get_hidden_dim(ffn_hidden=config["ffn_hidden"]),
+        intermediate_size=SwiGLU._get_hidden_dim(
+            ffn_hidden=config["ffn_hidden"], enforce_swiglu_hidden_dim_multiple_of=256
+        ),
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",

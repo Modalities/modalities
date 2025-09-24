@@ -794,7 +794,7 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: int = None,
+        seed: Optional[int] = None,
         enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None,
     ):
         """

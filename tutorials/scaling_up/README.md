@@ -1,8 +1,8 @@
 # Conducting Scaling Experiments with Modalities
-In this tutorial, we explain how to conduct scaling experiments with Modalities, i.e., how to scale up the number of ranks while varying hyperparameters to maximize throughput. The goals are twofold. Firstly, we want to showcase linear scalability up to a targeted number of ranks and secondly, we want to find the optimal hyperparameters that maximize the throughput for a given number of ranks. The latter one is the configuration we typically select for the final model training.
+In this tutorial, we explain how to conduct scaling experiments with Modalities, i.e., how to scale up the number of ranks while varying hyperparameters to maximize throughput. The goals are twofold. Firstly, we want to showcase linear scalability up to a targeted number of ranks and secondly, we want to find the optimal hyperparameters that maximize the throughput for a given number of ranks and a fixed model architecture. The latter one is the configuration we typically select for the final model training.
 
 This tutorial follows the file structure below.
-The `scripts` folder contains scripts to run the benchmarks on a single node or on a cluster, while the `configs` folder contains the respective sweep configurations. The `data` folder contains the  training data used for the experiments, and the `analysis` folder contains Jupyter notebooks for analyzing the results. The `experiments` folder contains the configs and respective results of the experiments. The folder follows a nested file structure with the convention `YYYY-MM-DD__HH-MM-SS_<sweep_hash>/<rank>/<experiment_hash__YYYY-MM-DD__HH-MM-SS>`, where `<sweep_hash>` is the hash of the sweep configuration, `<rank>` is the number of ranks used in the experiment, and `<experiment_hash>` is the config file hash of the individual experiment.
+The `scripts` folder contains scripts to run the benchmarks on a single node or on a cluster, while the `configs` folder contains the respective sweep configurations. The `data` folder contains the  training data used for the experiments, and the `analysis` folder contains Jupyter notebooks for analyzing the results. The `experiments` folder contains the experiment configs (instances of the sweep) and respective results of the experiments. The folder follows a nested file structure with the convention `YYYY-MM-DD__HH-MM-SS_<sweep_hash>/<rank>/<experiment_hash__YYYY-MM-DD__HH-MM-SS>`, where `<sweep_hash>` is the hash of the sweep configuration, `<rank>` is the number of ranks used in the experiment, and `<experiment_hash>` is the config file hash of the individual experiment.
 The config file hash is also used as the name for the experiment config. 
 
 ```txt
@@ -77,8 +77,8 @@ To create the experiment configs from the sweep configuration, we execute the `c
 ```sh
 sh scripts/create_sweep_configs.sh
 ```
-Note that the script has the sweep config hardcoded and if you want to use a different sweep config, you need to modify the script accordingly.
-Alternatively you can run the experiment config creation via modalities directly, e.g., 
+Note that the script has the sweep config hardcoded for simplicity and if you want to use a different sweep config, you need to modify the script accordingly.
+Alternatively, you can run the experiment config creation via modalities directly, e.g., 
 
 ```sh
 modalities benchmark prepare_sweep_configs --sweep_config_path ../configs/sweep_config.yaml --output_dir ../experiments --world_sizes 2,4,8
@@ -98,9 +98,9 @@ This script will run all configs sequentially on the specified number of ranks a
 For an end to end script, also see `scripts/run_scaling_up_single_node.sh`. 
 
 ### HPC Cluster Benchmarking
-To run the experiments on a SLURM cluster, you can use the script `scripts/hpc/leonardo/submit_sweep.sh`, which submits an sbatch job to the cluster for each node configuration. Each sbatch job will run all the experiments on the specified number of ranks and the specified sweep configuration.
+To run the experiments on a SLURM cluster, you can use the script `scripts/hpc/leonardo/submit_sweep.sh`, which submits an sbatch job to the cluster for each node configuration. Each sbatch job will run all the experiments on the specified number of ranks and the specified sweep configuration. Theoretically, instead of running one job per sweep and rank configuration, one could also parallelize the sweep of a given node configuration as well. However, this adds a source of error and misinterpretion as the node allocation will be different, potentially influencing the throughput.
 
-The sbatch job is defined in the file `scripts/hpc/leonardo/job.sbatch`. Note that both the `submit_sweep.sh` and the `job.sbatch` are dedicated to the Leonardo HPC cluster, so you will need to adapt environmental setttings (e.g., python env path  or slurm partition) to your specific HPC cluster. Respective hints are given by "TODO" comments in both scripts. 
+The sbatch job is defined in the file `scripts/hpc/leonardo/job.sbatch`. Note that both the `submit_sweep.sh` and the `job.sbatch` are dedicated to the Leonardo HPC cluster, so you will need to adapt environmental settings (e.g., python env path, slurm partition, etc.) to your specific HPC cluster. Respective hints are given by "TODO" comments in both scripts. 
 
 ## Evaluation 
 To evaluate the results of the experiments, you can use the Jupyter notebook `analysis/throughput_analysis.ipynb`.

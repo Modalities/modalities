@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 from modalities.utils.logger_utils import get_logger
 
@@ -11,9 +12,14 @@ logger = get_logger(name="main")
 
 
 class SweepSets(Enum):
+    # all configs found in the experiment root directory
     ALL_CONFIGS = "all_configs"
+    # If a job failed then the very same config can be rerun in a new subfolder by copying over the config file.
+    # That's why, we only consider the most recent configs to determine the remaining configs.
     MOST_RECENT_CONFIGS = "most_recent_configs"
+    # Configs for which we don't have any results yet.
     REMAINING_CONFIGS = "remaining_configs"
+    # Configs that have to be run and for which we created new subfolders
     UPDATED_CONFIGS = "updated_configs"
 
 
@@ -100,7 +106,7 @@ def _update_experiment_folder(config_file_path: Path) -> Path:
 
 
 def get_current_sweep_status(
-    exp_root: Path, expected_steps: int, skip_exception_types: list[str] = None
+    exp_root: Path, expected_steps: int, skip_exception_types: Optional[list[str]] = None
 ) -> dict[str, list[Path]]:
     """Get the status of the sweep by assigning the config file paths to categories
     'all', 'most_recent', and 'remaining'.
@@ -128,7 +134,7 @@ def get_current_sweep_status(
 
     # filter non-successful experiments, i.e., those that do not have the
     # expected number of steps in evaluation_results.jsonl
-    # we can also skip certain exception types if specified
+    # we can also skip certain exception types if specified (e.g., OOM errors)
     candidate_configs = [
         yaml_path
         for yaml_path in candidate_configs
@@ -156,10 +162,10 @@ def get_updated_sweep_status(
         exp_root=exp_root, expected_steps=expected_steps, skip_exception_types=skip_exception_types
     )
     if set(file_list_dict[SweepSets.REMAINING_CONFIGS.value]) == set(file_list_dict[SweepSets.ALL_CONFIGS.value]):
-        logger.info("No runs executed so far. " "Returning the list of all configs without creating new sub folders.")
+        logger.info("No runs executed so far. Returning the list of all configs without creating new sub folders.")
         file_list_dict[SweepSets.UPDATED_CONFIGS.value] = file_list_dict[SweepSets.REMAINING_CONFIGS.value]
     else:
-        logger.info("Some runs have been executed. " "Creating new sub folders for remaining configs.")
+        logger.info("Some runs have been executed. Creating new sub folders for remaining configs.")
         # create new experiment folders for all remaining configs
         updated_configs = [
             _update_experiment_folder(yaml_path) for yaml_path in file_list_dict[SweepSets.REMAINING_CONFIGS.value]

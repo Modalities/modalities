@@ -50,8 +50,7 @@ modalities benchmark list_remaining_runs \
   --experiment_dir "$EXPERIMENT_ROOT/$NUM_RANKS" \
   --file_list_path "$CONFIG_LIST_FILE" \
   --expected_steps "$EXPECTED_STEPS" \
-  --skip_exception_types "OutOfMemoryError,ValueError" \
-  --new_folders_for_remaining
+  --skip_exception_types "OutOfMemoryError,ValueError"
 
 
 # Step 2: Read configs into Bash array and loop

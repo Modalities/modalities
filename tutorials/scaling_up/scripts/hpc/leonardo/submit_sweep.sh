@@ -7,11 +7,11 @@ cd "$(dirname "$0")" || exit 1
 
 
 # --- Config ---
-EXPERIMENT_ROOT="../../experiments/2025-07-30__21-50-11_fca0790e"
+EXPERIMENT_ROOT="../../experiments/2025-07-30__21-50-11_fca0790e"   # TODO: Change to your experiment root
 EXPECTED_STEPS=20
 CONFIG_LIST_FILE="global_file_list.txt"
 
-ACCOUNT=EUHPC_E05_119
+ACCOUNT=EUHPC_E05_119   # TODO: Change to your account
 TIME_LIMIT=03:00:00
 GPUS_PER_NODE=4
 
@@ -25,9 +25,9 @@ for ws in $worldsizes; do
     NODES=$(( (ws + GPUS_PER_NODE - 1) / GPUS_PER_NODE ))
     # select the appropriate QOS based on the number of nodes
     if [ "$NODES" -gt 64 ]; then
-        QOS="boost_qos_bprod"
+        QOS="boost_qos_bprod"   # TODO: change to the correct partition
     else
-        QOS="normal" # "boost_qos_dbg" # normal
+        QOS="normal"            # TODO: change to the correct partition
     fi
     # submit the job for the current world size
     sbatch --account=$ACCOUNT \

@@ -17,7 +17,7 @@ def gpt2_config_path(
     initialized_model: GPT2LLM,
     config_file_path: str,
     corrupt_model_head_key_in_state_dict: bool,
-) -> str:
+) -> Path:
     tmp_path = tmpdir_factory.mktemp("gpt2_model")
     new_config_filename = tmp_path / "gpt2_config_test.yaml"
     model_path = tmp_path / "model.pth"
@@ -34,7 +34,7 @@ def gpt2_config_path(
     content = content.replace("checkpoint_path: null", f"checkpoint_path: {model_path}")
     with open(new_config_filename, "w") as file:
         file.write(content)
-    return str(new_config_filename)
+    return Path(new_config_filename)
 
 
 @pytest.fixture(params=[False])

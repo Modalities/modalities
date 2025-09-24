@@ -185,7 +185,7 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         # which would require to adapt the code.
         if model.sharding_strategy.name == "NO_SHARD":
             sharding_factor = dist.get_world_size()
-        if model.sharding_strategy.name == "HYBRID_SHARD":
+        elif model.sharding_strategy.name == "HYBRID_SHARD":
             sharding_factor = dist.get_world_size() // torch.cuda.device_count()
         elif model.sharding_strategy.name == "FULL_SHARD":
             sharding_factor = 1
