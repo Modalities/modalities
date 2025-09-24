@@ -144,3 +144,10 @@ def get_num_parallel_ranks(device_mesh: DeviceMesh, parallelism_method: Parallel
         return 1
     else:
         return device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_method.value))
+
+
+def get_mesh_for_parallelism_method(device_mesh: DeviceMesh | None, parallelism_method: ParallelismDegrees):
+    if device_mesh is not None and parallelism_method.value in device_mesh.mesh_dim_names:
+        return device_mesh[parallelism_method.value]
+    else:
+        return None

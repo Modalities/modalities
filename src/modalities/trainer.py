@@ -125,7 +125,6 @@ class Trainer:
         """
         if scheduled_pipeline is not None:
             pp_schedule = scheduled_pipeline.pp_schedule
-            # TODO: handle loss and backward in pp
             # Pipeline Parallel forward / backward inside step() call
             # with self.train_context(optional_context_parallel_ctx):
             targets, losses = (
