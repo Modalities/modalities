@@ -42,6 +42,8 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
     _check_conversion_criteria(config)
 
+    ffn_norm_key = "ffn_norm_config"
+
     return GPT2Config(
         vocab_size=config["vocab_size"],
         hidden_size=config["n_embd"],
@@ -53,9 +55,9 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
-        layer_norm_eps=_get_layer_norm_value(config["ffn_norm_config"]["config"], "eps"),
-        layer_norm_elementwise_affine=_get_layer_norm_value(config["ffn_norm_config"]["config"], "elementwise_affine"),
-        layer_norm_bias=_get_layer_norm_value(config["ffn_norm_config"]["config"], "bias"),
+        layer_norm_eps=_get_layer_norm_value(config[ffn_norm_key]["config"], "eps"),
+        layer_norm_elementwise_affine=_get_layer_norm_value(config[ffn_norm_key]["config"], "elementwise_affine"),
+        layer_norm_bias=_get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation=_map_attention_type(config),
