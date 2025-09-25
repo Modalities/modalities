@@ -110,13 +110,15 @@ class Main:
             present_files = list(experiment_path.iterdir())
             if len(present_files) == 1 and expected_config_file_path not in present_files:
                 raise RunningEnvError(
-                    f"The experiment folder is non-empty and contains a file {present_files[0].name} that "
+                    f"The experiment folder {experiment_path} is non-empty and "
+                    f"contains a file {present_files[0].name} that "
                     f"is not the config file. Please ensure that the config file is the only file present "
                     "in the experiment folder."
                 )
             elif len(present_files) > 1:
                 raise RunningEnvError(
-                    f"The experiment folder is non-empty and contains multiple files: {present_files}. "
+                    f"The experiment folder {experiment_path} is non-empty and "
+                    f"contains multiple files: {present_files}. "
                     f"Please ensure that the config file is the only file present."
                 )
         dist.barrier()
