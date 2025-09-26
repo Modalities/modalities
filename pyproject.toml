@@ -5,7 +5,6 @@ description = "Modalities, a PyTorch-native framework for distributed and reprod
 readme = "README.md"
 dependencies = [
     "numpy<2.0",
-    "torch==2.6.0",
     "packaging",
     "tqdm",
     "pyyaml",
