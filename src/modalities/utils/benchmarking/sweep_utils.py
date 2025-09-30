@@ -48,7 +48,7 @@ class SweepGenerator:
         # Serialize the dictionary to a YAML string while keeping the key order
         config_str = yaml.dump(config, sort_keys=False, default_flow_style=False)
 
-        # Compute the hash using SHA256
+        # Compute the hash using md5
         config_hash = hashlib.md5(config_str.encode("utf-8")).hexdigest()[:hash_length]
         return config_hash
 
@@ -61,6 +61,12 @@ class SweepGenerator:
         config_part.pop(sweep_field, None)
 
         sweep_combinations = SweepGenerator._generate_nested_combinations(sweep_part)
+        logger.info(
+            "Prepared %d sweep combinations for each of the world sizes %s (sweep file: %s)",
+            len(sweep_combinations),
+            world_sizes,
+            sweep_config_path.name,
+        )
 
         if len(sweep_combinations) == 1:
             logger.warning("Sweep combinations are less than 2. This is not a sweep, but a single configuration. ")

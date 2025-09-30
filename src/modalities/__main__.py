@@ -603,7 +603,7 @@ def benchmark():
     "--world_sizes",
     type=str,
     default="2",
-    help="Comma-separated list of world sizes, e.g. --world_sizes '2,4,8'",
+    help="Comma-separated list of world sizes (must not have spaces), e.g. --world_sizes '2,4,8'",
 )
 def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes: str):
     """
@@ -641,7 +641,7 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     default="",
     help="Exception types to skip when checking for successful runs. List of exceptions is comma-separated.",
 )
-def entry_point_prepare_remaining_runs(
+def CMD_entry_point_prepare_remaining_runs(
     experiment_dir: Path,
     file_list_path: Path,
     expected_steps: int,
@@ -650,7 +650,7 @@ def entry_point_prepare_remaining_runs(
     """
     Prepare a file list of remaining runs from a grid search experiment directory.
     """
-    skip_exception_types_list = skip_exception_types.split(",")
+    skip_exception_types_list = skip_exception_types.split(",") if skip_exception_types != "" else []
     file_list_dict = get_updated_sweep_status(
         exp_root=experiment_dir,
         expected_steps=expected_steps,
