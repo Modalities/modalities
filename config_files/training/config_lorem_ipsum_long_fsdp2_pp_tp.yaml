@@ -8,10 +8,10 @@ settings:
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
-    world_size: 8
+    world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: /raid/s3/opengptx/user/richard-rutmann/data/modalities/gpt2_tokenized/000_00000.pbin
+    train_dataset_path: ./data/lorem_ipsum.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
   intervals:
     training_log_interval_in_steps: 2
@@ -29,20 +29,27 @@ settings:
   training_target:
     num_target_tokens:
       component_key: number_conversion
-      variant_key: num_tokens_from_num_steps
+      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
       config:
+        dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
         num_ranks: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-        num_steps: ${settings.training_target.num_target_steps}
-    num_target_steps:  20
+    num_target_steps:  # for the batch progress subscriber
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        num_ranks: ${settings.cuda_env.world_size}
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training_target.num_target_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
   training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0
     last_step: -1
-
 collate_fn:
   component_key: collate_fn
   variant_key: gpt_2_llm_collator
@@ -178,7 +185,7 @@ app_state:
   component_key: app_state
   variant_key: raw
   config:
-    model: 
+    model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
@@ -223,8 +230,8 @@ scheduled_pipeline:
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
      # maybe better to use the fsdp model and the schedule here
      # instead of passing in the staged pipeline?
-     # If fsdp_model creates a copy then this is not in the scope of 
-     # the staged pipeline. 
+     # If fsdp_model creates a copy then this is not in the scope of
+     # the staged pipeline.
     pipeline:
       component_key: pipeline
       variant_key: builder
@@ -240,7 +247,7 @@ scheduled_pipeline:
         model_part:
           instance_key: fsdp_model
           pass_type: BY_REFERENCE
-        
+
 fsdp_model:
   component_key: model
   variant_key: fsdp2_wrapped
@@ -366,7 +373,7 @@ optimizer:
     eps: 1e-8
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
-    wrapped_model: 
+    wrapped_model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
 
