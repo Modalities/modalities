@@ -282,66 +282,117 @@ class PipelineFactory:
 
         module_names = fqns_per_stage[stage_idx]
 
-        # Collect all module names once
+        ############################################################
+        # NEW: Explicit stage assembly (no destructive pruning)
+        ############################################################
         all_fqns = {n for n, _ in whole_model.named_modules()}
-
-        # Direct matches
-        direct = [n for n in module_names if n in all_fqns]
-        missing = [n for n in module_names if n not in all_fqns]
-
-        # Heuristic corrections (strip leading 'transformer.' or add it)
-        corrected = []
-        for miss in list(missing):
-            if miss.startswith("transformer."):
-                tail = miss.split("transformer.", 1)[1]
-                if tail in all_fqns:
-                    corrected.append((miss, tail))
-                    direct.append(tail)
-                    missing.remove(miss)
-                    continue
-            pref = f"transformer.{miss}"
-            if pref in all_fqns:
-                corrected.append((miss, pref))
-                direct.append(pref)
-                missing.remove(miss)
 
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
             r = dist.get_rank()
             print(f"[PP-DEBUG] rank={r} stage={stage_idx} requested={module_names}", flush=True)
-            print(f"[PP-DEBUG] rank={r} stage={stage_idx} direct_or_corrected={direct}", flush=True)
-            if corrected:
-                print(f"[PP-DEBUG] rank={r} stage={stage_idx} corrected={corrected}", flush=True)
-            if missing:
-                print(f"[PP-DEBUG] rank={r} stage={stage_idx} STILL_MISSING={missing}", flush=True)
 
-        if not direct:
-            raise RuntimeError(f"Stage {stage_idx}: no valid FQNs. requested={module_names} missing={missing}")
+        resolved: list[tuple[str, nn.Module]] = []
+        missing: list[str] = []
+        for fqn in module_names:
+            if fqn in all_fqns:
+                # Resolve
+                cur = model_root
+                if fqn:  # empty string means root
+                    for part in fqn.split("."):
+                        cur = getattr(cur, part)
+                resolved.append((fqn, cur))
+            else:
+                # Try heuristic strip/add 'transformer.'
+                candidate = fqn
+                if candidate.startswith("transformer."):
+                    tail = candidate.split("transformer.", 1)[1]
+                    if tail in all_fqns:
+                        cur = model_root
+                        for part in tail.split("."):
+                            cur = getattr(cur, part)
+                        resolved.append((tail, cur))
+                        if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+                            print(f"[PP-DEBUG] rank={dist.get_rank()} corrected {fqn} -> {tail}", flush=True)
+                        continue
+                else:
+                    pref = f"transformer.{candidate}"
+                    if pref in all_fqns:
+                        cur = model_root
+                        for part in pref.split("."):
+                            cur = getattr(cur, part)
+                        resolved.append((pref, cur))
+                        if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+                            print(f"[PP-DEBUG] rank={dist.get_rank()} corrected {fqn} -> {pref}", flush=True)
+                        continue
+                missing.append(fqn)
 
-        # Build tree only from resolved names
-        fqn_tree = _get_fqn_tree(direct)
-        stage_modules = _build_stage_from_modules(fqn_tree, model_root)
+        if missing and os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+            print(f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} missing={missing}", flush=True)
 
-        # --- detailed param debug BEFORE enforcing non-zero ---
+        if not resolved:
+            raise RuntimeError(f"Stage {stage_idx} has no resolvable modules. requested={module_names}")
+
+        # Build minimal container preserving order & avoid duplicates of shared parents
+        class StageContainer(nn.Module):
+            def __init__(self, named_submods: list[tuple[str, nn.Module]]):
+                super().__init__()
+                # If multiple FQNs share high prefixes (e.g. transformer.wte / transformer.h.0),
+                # just expose the top-level 'transformer' once; internal routing stays intact.
+                # Detect if all belong under a common first segment.
+                first_levels = {n.split(".", 1)[0] for n, _ in named_submods if n}
+                expose_whole_parent = False
+                if "transformer" in first_levels:
+                    # If any requested item starts with transformer. and we have more than one child inside it,
+                    # safer to attach full transformer once.
+                    transformer_children = [n for n, _ in named_submods if n.startswith("transformer.")]
+                    if len(transformer_children) > 1:
+                        expose_whole_parent = True
+                added = set()
+                if expose_whole_parent:
+                    self.transformer = getattr(model_root, "transformer")
+                    added.add("transformer")
+                    # Add any non-transformer roots separately (e.g. lm_head_norm, lm_head)
+                    for n, m in named_submods:
+                        top = n.split(".", 1)[0]
+                        if top != "transformer" and top not in added:
+                            setattr(self, top, getattr(model_root, top))
+                            added.add(top)
+                else:
+                    # Attach each requested leaf (or its immediate top-level) once
+                    for n, m in named_submods:
+                        top = n.split(".", 1)[0]
+                        if top not in added:
+                            # If leaf has no dot just attach; else attach its top container
+                            if "." not in n:
+                                setattr(self, top, m)
+                            else:
+                                setattr(self, top, getattr(model_root, top))
+                            added.add(top)
+
+            def forward(self, *args, **kwargs):
+                raise RuntimeError("StageContainer forward is not used directly. PipelineStage handles execution.")
+
+        stage_modules = StageContainer(resolved)
+
+        # Count parameters (meta or real)
+        pruned_params = sum(p.numel() for p in stage_modules.parameters() if p.requires_grad)
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
-            param_list = [(n, tuple(p.shape), p.numel()) for n, p in stage_modules.named_parameters(recurse=True)]
-            total = sum(nel for _, _, nel in param_list)
             print(
-                f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} pruned_param_total={total} "
-                f"param_examples={param_list[:6]}",
+                f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} assembled_params={pruned_params} "
+                f"tops={[n for n,_ in stage_modules.named_children()]}",
                 flush=True,
             )
-
-        pruned_params = sum(p.numel() for p in stage_modules.parameters() if p.requires_grad)
         if pruned_params == 0:
-            # Lazy / meta init case: allow, only warn
+            # Still allow (lazy init), but warn once
             if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
                 print(
-                    f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} has 0 params after pruning "
-                    f"(likely lazy init). resolved_module_names={direct}",
+                    f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} has 0 params (lazy/meta?). "
+                    f"resolved={[n for n,_ in resolved]}",
                     flush=True,
                 )
-            # Do NOT raise; continue
-
+        ############################################################
+        # END NEW ASSEMBLY
+        ############################################################
         # Obtain PP group
         pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
         stage = PipelineStage(
@@ -352,7 +403,7 @@ class PipelineFactory:
             group=pp_group,
         )
         if not list(stage_modules.named_modules()):
-            raise RuntimeError("Stage pruning produced no modules at all.")
+            raise RuntimeError("Stage assembly produced no modules at all.")
         return stage, stage_modules
 
     @staticmethod
