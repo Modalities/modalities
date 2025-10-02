@@ -108,15 +108,32 @@ class PipelineFactory:
         local_rank: int,
         pp_schedule_name: str,
         num_layers_per_stage: int,
-        copy_model: bool = True,  # allow disabling deep copy for debugging
+        copy_model: bool = True,
     ) -> Pipeline:
         device = torch.device("cuda", local_rank)
-        pp_dims = device_mesh[ParallelismDegrees.PP.value].size()
+
+        # Derive pipeline degree from mesh (global, not local submesh)
+        if ParallelismDegrees.PP.value not in device_mesh.mesh_dim_names:
+            raise RuntimeError("Device mesh lacks 'pp' dimension for pipeline parallelism.")
+        _pp_axis = list(device_mesh.mesh_dim_names).index(ParallelismDegrees.PP.value)
+        pp_degree = device_mesh.mesh.shape[_pp_axis]
 
         fqns_per_stage = stages_generator.get_stages(
             num_layers_per_stage=num_layers_per_stage,
-            pp_dims=pp_dims,
+            pp_dims=pp_degree,
         )
+
+        # Validate stages output
+        if not fqns_per_stage or len(fqns_per_stage) != pp_degree:
+            raise ValueError(
+                f"Stages generator returned {len(fqns_per_stage)} stage lists, expected {pp_degree}. "
+                f"Lists: {fqns_per_stage}"
+            )
+        if any(len(lst) == 0 for lst in fqns_per_stage):
+            raise ValueError(
+                f"Empty FQN list detected in pipeline stages: "
+                f"{[ (i,len(s)) for i,s in enumerate(fqns_per_stage) ]} | Raw={fqns_per_stage}"
+            )
 
         schedule_class = get_schedule_class(pp_schedule_name)
         if not issubclass(schedule_class, PipelineScheduleSingle):
@@ -127,11 +144,33 @@ class PipelineFactory:
         pp_stage, model_part = PipelineFactory._get_split_model(
             whole_model=whole_model,
             schedule_class=schedule_class,
-            device_mesh=device_mesh,  # pass full mesh
+            device_mesh=device_mesh,
             device=device,
             fqns_per_stage=fqns_per_stage,
             copy_model=copy_model,
         )
+
+        # Defensive: ensure model_part has parameters
+        num_params = sum(p.numel() for p in model_part.parameters() if p.requires_grad)
+        if num_params == 0:
+            # Fallback: do not proceed with empty stage (would break later logic)
+            if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+                print(
+                    f"[PP-DEBUG] rank={dist.get_rank()} produced empty stage "
+                    f"(stage_idx={pp_stage.stage_index}) fqns={fqns_per_stage[pp_stage.stage_index]} – "
+                    f"falling back to whole_model copy",
+                    flush=True,
+                )
+            # Use the un-pruned whole model (copy to avoid in-place edits across ranks)
+            model_part = copy.deepcopy(whole_model) if copy_model else whole_model
+            # Rebuild stage wrapper around full model (acts like single-stage degenerate split)
+            pp_stage = PipelineStage(
+                submodule=model_part,
+                stage_index=pp_stage.stage_index,
+                num_stages=len(fqns_per_stage),
+                device=device,
+                group=device_mesh.get_group(ParallelismDegrees.PP.value),
+            )
 
         _mark_pipeline_built()
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
@@ -140,6 +179,7 @@ class PipelineFactory:
             debug_msg = (
                 f"[PP-DEBUG] rank={dist.get_rank()} coord={coord} "
                 f"stage_idx={pp_stage.stage_index} "
+                f"params={num_params} "
                 f"fqns={fqns_this_stage}"
             )
             print(debug_msg, flush=True)
