@@ -87,23 +87,30 @@ def _debug_log_device_mesh(device_mesh: DeviceMesh) -> None:
     if os.environ.get("MODALITIES_DEBUG_MESH", "0") != "1":
         return
 
+    def _coord_for_rank(mesh: DeviceMesh, rank: int):
+        # Prefer explicit API if available
+        if hasattr(mesh, "get_rank_coordinate"):
+            return tuple(mesh.get_rank_coordinate(rank))
+        # Fallback: own rank uses get_coordinate(); others search mesh.mesh tensor
+        if rank == dist.get_rank():
+            return tuple(mesh.get_coordinate())
+        idx = (mesh.mesh == rank).nonzero(as_tuple=False)
+        return tuple(idx[0].tolist())
+
     rank = dist.get_rank()
     world = dist.get_world_size()
     names = device_mesh.mesh_dim_names  # tuple
-    coord = device_mesh.get_coordinate(rank)  # tuple aligned with names
+    coord = _coord_for_rank(device_mesh, rank)
 
-    # Per-rank coordinate
     print(f"[MESH-DEBUG] rank={rank}/{world} coord={dict(zip(names, coord, strict=True))}", flush=True)
 
-    # Only rank 0 enumerates stage membership
     if rank == 0 and "pp" in names:
         pp_idx = names.index("pp")
         pp_degree = device_mesh.size(pp_idx)
         print(f"[MESH-DEBUG] pipeline degree={pp_degree}", flush=True)
-        # Build reverse map: stage -> member ranks
         stage_members = {s: [] for s in range(pp_degree)}
         for r in range(world):
-            c = device_mesh.get_coordinate(r)
+            c = _coord_for_rank(device_mesh, r)
             stage_members[c[pp_idx]].append(r)
         for s, members in stage_members.items():
             print(f"[MESH-DEBUG] pipeline_stage={s} ranks={members}", flush=True)
