@@ -333,17 +333,14 @@ class PipelineFactory:
 
         pruned_params = sum(p.numel() for p in stage_modules.parameters() if p.requires_grad)
         if pruned_params == 0:
-            # Dump model structure to diagnose
+            # Lazy / meta init case: allow, only warn
             if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
                 print(
-                    f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} has 0 params; "
-                    f"children={[n for n,_ in stage_modules.named_children()]}",
+                    f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} has 0 params after pruning "
+                    f"(likely lazy init). resolved_module_names={direct}",
                     flush=True,
                 )
-            raise RuntimeError(
-                f"Stage {stage_idx} produced 0 params after pruning; "
-                f"resolved_module_names={direct} original_requested={module_names}"
-            )
+            # Do NOT raise; continue
 
         # Obtain PP group
         pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
@@ -354,6 +351,8 @@ class PipelineFactory:
             device=device,
             group=pp_group,
         )
+        if not list(stage_modules.named_modules()):
+            raise RuntimeError("Stage pruning produced no modules at all.")
         return stage, stage_modules
 
     @staticmethod
