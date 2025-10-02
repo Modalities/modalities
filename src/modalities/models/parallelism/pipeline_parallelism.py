@@ -282,33 +282,43 @@ class PipelineFactory:
 
         module_names = fqns_per_stage[stage_idx]
 
-        # --- sanitize / validate FQNs (adjust head names) ---
+        # Collect all module names once
         all_fqns = {n for n, _ in whole_model.named_modules()}
-        # Heads often live at root: fix transformer.lm_head_norm -> lm_head_norm, etc.
-        fixed = []
-        for n in module_names:
-            if n not in all_fqns and n.startswith("transformer."):
-                tail = n.split("transformer.", 1)[1]
-                if tail in all_fqns:
-                    fixed.append(tail)
-                    continue
-            fixed.append(n)
-        module_names = fixed
 
-        sanitized = [n for n in module_names if n in all_fqns]
+        # Direct matches
+        direct = [n for n in module_names if n in all_fqns]
         missing = [n for n in module_names if n not in all_fqns]
+
+        # Heuristic corrections (strip leading 'transformer.' or add it)
+        corrected = []
+        for miss in list(missing):
+            if miss.startswith("transformer."):
+                tail = miss.split("transformer.", 1)[1]
+                if tail in all_fqns:
+                    corrected.append((miss, tail))
+                    direct.append(tail)
+                    missing.remove(miss)
+                    continue
+            pref = f"transformer.{miss}"
+            if pref in all_fqns:
+                corrected.append((miss, pref))
+                direct.append(pref)
+                missing.remove(miss)
 
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
             r = dist.get_rank()
+            print(f"[PP-DEBUG] rank={r} stage={stage_idx} requested={module_names}", flush=True)
+            print(f"[PP-DEBUG] rank={r} stage={stage_idx} direct_or_corrected={direct}", flush=True)
+            if corrected:
+                print(f"[PP-DEBUG] rank={r} stage={stage_idx} corrected={corrected}", flush=True)
             if missing:
-                print(f"[PP-DEBUG] rank={r} missing FQNs (will drop): {missing}", flush=True)
-            print(f"[PP-DEBUG] rank={r} stage={stage_idx} using FQNs: {sanitized}", flush=True)
+                print(f"[PP-DEBUG] rank={r} stage={stage_idx} STILL_MISSING={missing}", flush=True)
 
-        if not sanitized:
-            raise RuntimeError(f"Stage {stage_idx} resolved to zero valid FQNs (requested={module_names})")
+        if not direct:
+            raise RuntimeError(f"Stage {stage_idx}: no valid FQNs. requested={module_names} missing={missing}")
 
-        # Build tree from sanitized FQNs
-        fqn_tree = _get_fqn_tree(sanitized)
+        # Build tree only from resolved names
+        fqn_tree = _get_fqn_tree(direct)
         stage_modules = _build_stage_from_modules(fqn_tree, model_root)
 
         # --- detailed param debug BEFORE enforcing non-zero ---
@@ -330,7 +340,10 @@ class PipelineFactory:
                     f"children={[n for n,_ in stage_modules.named_children()]}",
                     flush=True,
                 )
-            raise RuntimeError(f"Stage {stage_idx} produced 0 params after pruning; module_names={sanitized}")
+            raise RuntimeError(
+                f"Stage {stage_idx} produced 0 params after pruning; "
+                f"resolved_module_names={direct} original_requested={module_names}"
+            )
 
         # Obtain PP group
         pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
