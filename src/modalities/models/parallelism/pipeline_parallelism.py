@@ -404,6 +404,16 @@ class PipelineFactory:
         )
         if not list(stage_modules.named_modules()):
             raise RuntimeError("Stage assembly produced no modules at all.")
+
+        # Delegate optimizer grouping attributes if present on the original model
+        if hasattr(model_root, "weight_decay_groups") and not hasattr(stage_modules, "weight_decay_groups"):
+            # Simple attribute passthrough (optimizer code only reads it)
+            stage_modules.weight_decay_groups = model_root.weight_decay_groups
+        if hasattr(model_root, "no_weight_decay_param_names") and not hasattr(
+            stage_modules, "no_weight_decay_param_names"
+        ):
+            stage_modules.no_weight_decay_param_names = getattr(model_root, "no_weight_decay_param_names")
+
         return stage, stage_modules
 
     @staticmethod
