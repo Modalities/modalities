@@ -129,7 +129,8 @@ def seed_by_pipeline_stage(device_mesh: DeviceMesh, base_seed: int = 1234) -> No
     if "pp" not in names:
         return
     pp_idx = names.index("pp")
-    stage = device_mesh.get_coordinate(dist.get_rank())[pp_idx]
+    # get_coordinate() returns this rank's coordinate tuple
+    stage = device_mesh.get_coordinate()[pp_idx]
     torch.manual_seed(base_seed + stage)
     if dist.get_rank() == 0:
         print(f"[MESH-DEBUG] Seeding pipeline stages with base_seed={base_seed}", flush=True)
