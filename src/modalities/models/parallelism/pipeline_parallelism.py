@@ -282,85 +282,57 @@ class PipelineFactory:
 
         module_names = fqns_per_stage[stage_idx]
 
-        # --- sanitize / validate FQNs ---
+        # --- sanitize / validate FQNs (adjust head names) ---
         all_fqns = {n for n, _ in whole_model.named_modules()}
-        # Collect transformer child names (direct) if it exists
-        transformer_children = set()
-        if hasattr(whole_model, "transformer"):
-            transformer_children = {cn for cn, _ in whole_model.transformer.named_children()}
-
-        sanitized, corrected, dropped, lifted = [], [], [], []
-        for name in module_names:
-            if name in all_fqns:
-                sanitized.append(name)
-                continue
-
-            if name.startswith("transformer."):
-                after = name.split("transformer.", 1)[1]
-
-                # Case 1: after is a valid direct transformer child (keep original)
-                if after.split(".", 1)[0] in transformer_children:
-                    # If the full original FQN (with transformer.) isn’t registered (it usually isn’t),
-                    # we still want to work with the original pattern for tree building, so keep it.
-                    sanitized.append(name)
+        # Heads often live at root: fix transformer.lm_head_norm -> lm_head_norm, etc.
+        fixed = []
+        for n in module_names:
+            if n not in all_fqns and n.startswith("transformer."):
+                tail = n.split("transformer.", 1)[1]
+                if tail in all_fqns:
+                    fixed.append(tail)
                     continue
+            fixed.append(n)
+        module_names = fixed
 
-                # Case 2: the token after transformer.* is actually a ROOT module (lift it)
-                if after in all_fqns and after.split(".", 1)[0] not in transformer_children:
-                    sanitized.append(after)
-                    lifted.append((name, after))
-                    continue
-
-                # Case 3: try previously used alt corrections
-                alt = after
-                if alt in all_fqns:
-                    sanitized.append(alt)
-                    corrected.append((name, alt))
-                    continue
-                alt2 = f"transformer.{after}"
-                if alt2 in all_fqns:
-                    sanitized.append(alt2)
-                    corrected.append((name, alt2))
-                    continue
-
-                dropped.append(name)
-                continue
-
-            # Try adding transformer. prefix
-            pref = f"transformer.{name}"
-            if pref in all_fqns:
-                sanitized.append(pref)
-                corrected.append((name, pref))
-                continue
-
-            dropped.append(name)
+        sanitized = [n for n in module_names if n in all_fqns]
+        missing = [n for n in module_names if n not in all_fqns]
 
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
             r = dist.get_rank()
-            if lifted:
-                print(f"[PP-DEBUG] rank={r} lifted (root-level) {lifted}", flush=True)
-            if corrected:
-                print(f"[PP-DEBUG] rank={r} corrected FQNs {corrected}", flush=True)
-            if dropped:
-                print(f"[PP-DEBUG] rank={r} dropped unknown FQNs {dropped}", flush=True)
+            if missing:
+                print(f"[PP-DEBUG] rank={r} missing FQNs (will drop): {missing}", flush=True)
+            print(f"[PP-DEBUG] rank={r} stage={stage_idx} using FQNs: {sanitized}", flush=True)
 
         if not sanitized:
-            raise RuntimeError(
-                f"Stage {stage_idx} resolved to zero valid FQNs; requested={module_names} " f"(dropped={dropped})"
-            )
+            raise RuntimeError(f"Stage {stage_idx} resolved to zero valid FQNs (requested={module_names})")
 
-        module_names = sanitized
-        # --- end sanitize ---
-
-        fqn_tree = _get_fqn_tree(module_names)
+        # Build tree from sanitized FQNs
+        fqn_tree = _get_fqn_tree(sanitized)
         stage_modules = _build_stage_from_modules(fqn_tree, model_root)
 
-        # Param count after pruning
+        # --- detailed param debug BEFORE enforcing non-zero ---
+        if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+            param_list = [(n, tuple(p.shape), p.numel()) for n, p in stage_modules.named_parameters(recurse=True)]
+            total = sum(nel for _, _, nel in param_list)
+            print(
+                f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} pruned_param_total={total} "
+                f"param_examples={param_list[:6]}",
+                flush=True,
+            )
+
         pruned_params = sum(p.numel() for p in stage_modules.parameters() if p.requires_grad)
         if pruned_params == 0:
-            raise RuntimeError(f"Stage {stage_idx} produced 0 params after pruning; module_names={module_names}")
+            # Dump model structure to diagnose
+            if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+                print(
+                    f"[PP-DEBUG] rank={dist.get_rank()} stage={stage_idx} has 0 params; "
+                    f"children={[n for n,_ in stage_modules.named_children()]}",
+                    flush=True,
+                )
+            raise RuntimeError(f"Stage {stage_idx} produced 0 params after pruning; module_names={sanitized}")
 
-        # Obtain proper PP group
+        # Obtain PP group
         pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
         stage = PipelineStage(
             submodule=stage_modules,
