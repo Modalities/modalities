@@ -281,12 +281,49 @@ class PipelineFactory:
                     return module
 
         module_names = fqns_per_stage[stage_idx]
+
+        # --- sanitize / validate FQNs ---
+        all_fqns = {n for n, _ in whole_model.named_modules()}
+        sanitized, corrected, dropped = [], [], []
+        for name in module_names:
+            if name in all_fqns:
+                sanitized.append(name)
+                continue
+            if name.startswith("transformer."):
+                alt = name.split("transformer.", 1)[1]
+                if alt in all_fqns:
+                    sanitized.append(alt)
+                    corrected.append((name, alt))
+                    continue
+            alt2 = f"transformer.{name}"
+            if alt2 in all_fqns:
+                sanitized.append(alt2)
+                corrected.append((name, alt2))
+                continue
+            dropped.append(name)
+
+        if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+            if corrected:
+                print(f"[PP-DEBUG] rank={dist.get_rank()} corrected FQNs {corrected}", flush=True)
+            if dropped:
+                print(f"[PP-DEBUG] rank={dist.get_rank()} dropped unknown FQNs {dropped}", flush=True)
+
+        if not sanitized:
+            raise RuntimeError(f"Stage {stage_idx} resolved to zero valid FQNs; requested={module_names}")
+
+        module_names = sanitized
+        # --- end sanitize ---
+
         fqn_tree = _get_fqn_tree(module_names)
         stage_modules = _build_stage_from_modules(fqn_tree, model_root)
 
-        # Obtain proper PP communication group from full mesh
-        pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
+        # Param count after pruning
+        pruned_params = sum(p.numel() for p in stage_modules.parameters() if p.requires_grad)
+        if pruned_params == 0:
+            raise RuntimeError(f"Stage {stage_idx} produced 0 params after pruning; module_names={module_names}")
 
+        # Obtain proper PP group
+        pp_group = device_mesh.get_group(ParallelismDegrees.PP.value)
         stage = PipelineStage(
             submodule=stage_modules,
             stage_index=stage_idx,
