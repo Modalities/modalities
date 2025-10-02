@@ -284,32 +284,70 @@ class PipelineFactory:
 
         # --- sanitize / validate FQNs ---
         all_fqns = {n for n, _ in whole_model.named_modules()}
-        sanitized, corrected, dropped = [], [], []
+        # Collect transformer child names (direct) if it exists
+        transformer_children = set()
+        if hasattr(whole_model, "transformer"):
+            transformer_children = {cn for cn, _ in whole_model.transformer.named_children()}
+
+        sanitized, corrected, dropped, lifted = [], [], [], []
         for name in module_names:
             if name in all_fqns:
                 sanitized.append(name)
                 continue
+
             if name.startswith("transformer."):
-                alt = name.split("transformer.", 1)[1]
+                after = name.split("transformer.", 1)[1]
+
+                # Case 1: after is a valid direct transformer child (keep original)
+                if after.split(".", 1)[0] in transformer_children:
+                    # If the full original FQN (with transformer.) isn’t registered (it usually isn’t),
+                    # we still want to work with the original pattern for tree building, so keep it.
+                    sanitized.append(name)
+                    continue
+
+                # Case 2: the token after transformer.* is actually a ROOT module (lift it)
+                if after in all_fqns and after.split(".", 1)[0] not in transformer_children:
+                    sanitized.append(after)
+                    lifted.append((name, after))
+                    continue
+
+                # Case 3: try previously used alt corrections
+                alt = after
                 if alt in all_fqns:
                     sanitized.append(alt)
                     corrected.append((name, alt))
                     continue
-            alt2 = f"transformer.{name}"
-            if alt2 in all_fqns:
-                sanitized.append(alt2)
-                corrected.append((name, alt2))
+                alt2 = f"transformer.{after}"
+                if alt2 in all_fqns:
+                    sanitized.append(alt2)
+                    corrected.append((name, alt2))
+                    continue
+
+                dropped.append(name)
                 continue
+
+            # Try adding transformer. prefix
+            pref = f"transformer.{name}"
+            if pref in all_fqns:
+                sanitized.append(pref)
+                corrected.append((name, pref))
+                continue
+
             dropped.append(name)
 
         if os.environ.get("MODALITIES_DEBUG_PIPELINE", "0") == "1":
+            r = dist.get_rank()
+            if lifted:
+                print(f"[PP-DEBUG] rank={r} lifted (root-level) {lifted}", flush=True)
             if corrected:
-                print(f"[PP-DEBUG] rank={dist.get_rank()} corrected FQNs {corrected}", flush=True)
+                print(f"[PP-DEBUG] rank={r} corrected FQNs {corrected}", flush=True)
             if dropped:
-                print(f"[PP-DEBUG] rank={dist.get_rank()} dropped unknown FQNs {dropped}", flush=True)
+                print(f"[PP-DEBUG] rank={r} dropped unknown FQNs {dropped}", flush=True)
 
         if not sanitized:
-            raise RuntimeError(f"Stage {stage_idx} resolved to zero valid FQNs; requested={module_names}")
+            raise RuntimeError(
+                f"Stage {stage_idx} resolved to zero valid FQNs; requested={module_names} " f"(dropped={dropped})"
+            )
 
         module_names = sanitized
         # --- end sanitize ---
