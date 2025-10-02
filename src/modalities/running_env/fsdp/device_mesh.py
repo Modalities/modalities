@@ -1,6 +1,9 @@
+import os
 from enum import Enum
 from typing import Annotated, Optional
 
+import torch
+import torch.distributed as dist
 from pydantic import BaseModel, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
@@ -74,6 +77,57 @@ class ParallelismDegrees(Enum):
     PP = "pp"
 
 
+def _debug_log_device_mesh(device_mesh: DeviceMesh) -> None:
+    """
+    Prints (per rank) the coordinate in the logical mesh and lists pipeline stage ranks.
+    Enabled when MODALITIES_DEBUG_MESH=1.
+    """
+    if not dist.is_initialized():
+        return
+    if os.environ.get("MODALITIES_DEBUG_MESH", "0") != "1":
+        return
+
+    rank = dist.get_rank()
+    world = dist.get_world_size()
+    names = device_mesh.mesh_dim_names  # tuple
+    coord = device_mesh.get_coordinate(rank)  # tuple aligned with names
+
+    # Per-rank coordinate
+    print(f"[MESH-DEBUG] rank={rank}/{world} coord={dict(zip(names, coord, strict=True))}", flush=True)
+
+    # Only rank 0 enumerates stage membership
+    if rank == 0 and "pp" in names:
+        pp_idx = names.index("pp")
+        pp_degree = device_mesh.size(pp_idx)
+        print(f"[MESH-DEBUG] pipeline degree={pp_degree}", flush=True)
+        # Build reverse map: stage -> member ranks
+        stage_members = {s: [] for s in range(pp_degree)}
+        for r in range(world):
+            c = device_mesh.get_coordinate(r)
+            stage_members[c[pp_idx]].append(r)
+        for s, members in stage_members.items():
+            print(f"[MESH-DEBUG] pipeline_stage={s} ranks={members}", flush=True)
+
+
+def seed_by_pipeline_stage(device_mesh: DeviceMesh, base_seed: int = 1234) -> None:
+    """
+    Deterministically seed all ranks in a pipeline stage with same seed = base_seed + stage_id.
+    (Optional) Activate by setting MODALITIES_STAGE_SEED=1.
+    """
+    if os.environ.get("MODALITIES_STAGE_SEED", "0") != "1":
+        return
+    if not dist.is_initialized():
+        return
+    names = device_mesh.mesh_dim_names
+    if "pp" not in names:
+        return
+    pp_idx = names.index("pp")
+    stage = device_mesh.get_coordinate(dist.get_rank())[pp_idx]
+    torch.manual_seed(base_seed + stage)
+    if dist.get_rank() == 0:
+        print(f"[MESH-DEBUG] Seeding pipeline stages with base_seed={base_seed}", flush=True)
+
+
 def get_device_mesh(
     device_type: str,
     data_parallel_replicate_degree: int,
@@ -125,8 +179,9 @@ def get_device_mesh(
     names = tuple(names)
     device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
     print_rank_0(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
-    # TODO: Torch Titan had some more checks here. We need to check if we also need those:
-    # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
+    # NEW: optional debug + stage seeding
+    _debug_log_device_mesh(device_mesh)
+    seed_by_pipeline_stage(device_mesh)
     return device_mesh
 
 
