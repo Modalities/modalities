@@ -123,7 +123,7 @@ class Trainer:
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
-        print("DEBUG: Trainer._train_batch called")
+        print(f"DEBUG rank {self.global_rank}: Trainer._train_batch called")
         if scheduled_pipeline is not None:
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
@@ -135,9 +135,12 @@ class Trainer:
             )
 
             if scheduled_pipeline.is_first_pp_stage:
+                print(f"DEBUG rank {self.global_rank}: Trainer._train_batch first pp stage")
                 pp_schedule.step(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
             else:
+                print(f"DEBUG rank {self.global_rank}: Trainer._train_batch non-first pp stage")
                 pp_schedule.step(target=targets, losses=losses)
+            print(f"DEBUG rank {self.global_rank}: Trainer._train_batch after pp_schedule.step")
             loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
         else:
             # else continue with loss calculation
@@ -186,7 +189,7 @@ class Trainer:
         Returns:
             None
         """
-        print("DEBUG: Trainer.train called")
+        print(f"DEBUG rank {self.global_rank}: Trainer.train called")
         model = app_state.model
         optimizer = app_state.optimizer
         lr_scheduler = app_state.lr_scheduler
