@@ -934,6 +934,7 @@ class GPT2LLM(NNModel):
         Returns:
             torch.Tensor: A tensor containing output logits.
         """
+        print(f"DEBUG rank {torch.distributed.get_rank()}: GPT2LLM.forward_impl called")
         device = inputs.device
         seq_len = inputs.size(1)
         assert seq_len <= self.sequence_length, f"Cannot forward sequence of length {seq_len}, the model's maximum "
