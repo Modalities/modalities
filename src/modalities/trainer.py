@@ -123,6 +123,7 @@ class Trainer:
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
+        print("DEBUG: Trainer._train_batch called")
         if scheduled_pipeline is not None:
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
@@ -185,6 +186,7 @@ class Trainer:
         Returns:
             None
         """
+        print("DEBUG: Trainer.train called")
         model = app_state.model
         optimizer = app_state.optimizer
         lr_scheduler = app_state.lr_scheduler
