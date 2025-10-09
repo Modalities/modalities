@@ -9,6 +9,9 @@ import click
 import click_pathlib
 from omegaconf import DictConfig
 from pydantic import FilePath
+import torch
+import logging
+torch._logging.set_logs(all=logging.DEBUG, graph_code=True)
 
 from modalities.api import (
     FileExistencePolicy,
