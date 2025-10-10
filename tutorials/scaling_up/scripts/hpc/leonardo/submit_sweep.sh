@@ -7,7 +7,7 @@ cd "$(dirname "$0")" || exit 1
 
 
 # --- Config ---
-EXPERIMENT_ROOT="../../experiments/2025-07-30__21-50-11_fca0790e"   # TODO: Change to your experiment root
+EXPERIMENT_ROOT="../../../experiments/2025-09-25__16-30-29_9a5c69962be24784"   # TODO: Change to your experiment root
 EXPECTED_STEPS=20
 CONFIG_LIST_FILE="global_file_list.txt"
 

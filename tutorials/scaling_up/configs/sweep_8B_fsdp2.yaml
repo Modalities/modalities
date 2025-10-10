@@ -1,7 +1,7 @@
 sweep:
   local_train_micro_batch_size: [1,2,3,4]
-  sequence_length: [2048, 4096, 8192]
-  attention_implementation: [dao_flash, pytorch_flash, manual]
+  sequence_length: [2048, 4096] # [2048, 4096, 8192]
+  attention_implementation: [pytorch_flash]
   fsdp2_input_model: [model_raw]
   num_target_steps: [20]
 
