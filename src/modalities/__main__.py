@@ -618,7 +618,7 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
 
 @benchmark.command(name="list_remaining_runs")
 @click.option(
-    "--experiment_dir",
+    "--exp_root",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     required=True,
     help="Path to the root directory of the experiment containing config files.",
@@ -639,10 +639,12 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     "--skip_exception_types",
     type=str,
     default="",
-    help="Exception types to skip when checking for successful runs. List of exceptions is comma-separated.",
+    help="Exception types to skip when checking for successful runs. "
+    "Typically, we would add 'OutOfMemoryError', as rerunning the experiment would result in the same error. "
+    " List of exceptions is comma-separated.",
 )
 def CMD_entry_point_prepare_remaining_runs(
-    experiment_dir: Path,
+    exp_root: Path,
     file_list_path: Path,
     expected_steps: int,
     skip_exception_types: str = "",
@@ -652,7 +654,7 @@ def CMD_entry_point_prepare_remaining_runs(
     """
     skip_exception_types_list = skip_exception_types.split(",") if skip_exception_types != "" else []
     file_list_dict = get_updated_sweep_status(
-        exp_root=experiment_dir,
+        exp_root=exp_root,
         expected_steps=expected_steps,
         skip_exception_types=skip_exception_types_list,
     )

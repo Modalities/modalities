@@ -85,13 +85,13 @@ class SweepGenerator:
 
     @staticmethod
     def _generate_nested_combinations(sweep: dict[str, Any]) -> list[dict[str, Any]]:
-        def expand(sweep_dict):
-            if isinstance(sweep_dict, dict):
-                keys, values = zip(*((k, expand(v)) for k, v in sweep_dict.items()))
+        def expand(sub_sweep: dict | list) -> list[Any]:
+            if isinstance(sub_sweep, dict):
+                keys, values = zip(*((k, expand(v)) for k, v in sub_sweep.items()))
                 return [dict(zip(keys, combo)) for combo in product(*values)]
-            elif isinstance(sweep_dict, list):
-                return sweep_dict
+            elif isinstance(sub_sweep, list):
+                return sub_sweep
             else:
-                return [sweep_dict]
+                return [sub_sweep]
 
         return expand(sweep)

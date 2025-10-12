@@ -75,9 +75,7 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU class to define the SwiGLU activation function."""
 
-    def __init__(
-        self, n_embd: int, ffn_hidden: int, bias: bool, enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None
-    ):
+    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, enforce_swiglu_hidden_dim_multiple_of: int = 256):
         """
         Initializes the SwiGLU object.
 
@@ -86,15 +84,13 @@ class SwiGLU(nn.Module):
             ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
             Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
             bias (bool): Whether to include bias terms in the linear layers.
-            enforce_swiglu_hidden_dim_multiple_of (Optional[int]): The multiple of which the hidden
-                dimension should be enforced.
+            enforce_swiglu_hidden_dim_multiple_of (int): The multiple of which the hidden
+                dimension should be enforced. Defaults to 256.
                 This is required for FSDP + TP as the combincation does not support uneven sharding (yet).
                 Defaults to 256 if not provided.
         """
 
         super().__init__()
-        if enforce_swiglu_hidden_dim_multiple_of is None:
-            enforce_swiglu_hidden_dim_multiple_of = 256
         hidden_dim = SwiGLU._get_hidden_dim(
             ffn_hidden=ffn_hidden, enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of
         )

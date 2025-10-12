@@ -24,7 +24,6 @@ class SweepSets(Enum):
 
 
 class FileNames(Enum):
-    CONFIG_FILE = "config.yaml"
     RESULTS_FILE = "evaluation_results.jsonl"
     ERRORS_FILE_REGEX = "error_logs_*.log"  # Format: errors_logs_<hostname>_<local_rank>.log
 
@@ -45,7 +44,8 @@ def _get_most_recent_configs(file_paths: list[Path]) -> list[Path]:
         pattern = r"^[a-zA-Z0-9]+_\d{4}-\d{2}-\d{2}__\d{2}-\d{2}-\d{2}$"
         if not re.match(pattern, experiment_folder.name):
             raise ValueError(
-                f"Invalid file format in file path: {file_path}, Expected format: DDDDDDDD_YYYY-MM-DD__HH-MM-SS"
+                f"Invalid file format in file path: {file_path}, Expected format in parent directory "
+                f"{experiment_folder.name}: DDDDDDDD_YYYY-MM-DD__HH-MM-SS"
             )
         experiment_folder_hash = experiment_folder.parent / hash_prefix
         if experiment_folder_hash not in latest_configs or ts > latest_configs[experiment_folder_hash][1]:
@@ -78,6 +78,8 @@ def _is_experiment_done(
                     error_type = "ErrorFileParsingError"
             error_types.append(error_type)
         # Check if any of the error types are in the skip list
+        # E.g., if we want to skip OOM errors (i.e., not rerun such experiments),
+        # then we can add "OutOfMemoryError" to the skip_exception_types list
         if len(set(skip_exception_types).intersection(set(error_types))) > 0:
             return True
 

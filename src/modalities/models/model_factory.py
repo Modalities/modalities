@@ -568,7 +568,7 @@ class GPT2ModelFactory:
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
         seed: Optional[int] = None,
-        enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,

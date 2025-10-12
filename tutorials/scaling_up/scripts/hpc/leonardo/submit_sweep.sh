@@ -16,11 +16,19 @@ TIME_LIMIT=03:00:00
 GPUS_PER_NODE=4
 
 # Retrieve the list of configs to run
-modalities benchmark list_remaining_runs --experiment_dir "$EXPERIMENT_ROOT" --file_list_path "$CONFIG_LIST_FILE" --expected_steps "$EXPECTED_STEPS" --skip_exception_types "OutOfMemoryError,ValueError"
+modalities benchmark list_remaining_runs --exp_root "$EXPERIMENT_ROOT" --file_list_path "$CONFIG_LIST_FILE" --expected_steps "$EXPECTED_STEPS" --skip_exception_types "OutOfMemoryError,ValueError"
 
 
 worldsizes=$(awk -F'/' '{print $(NF-2)}' $CONFIG_LIST_FILE | sort -u)
 for ws in $worldsizes; do
+
+    # make sure that the world size is a multiple of GPUs per node
+    if [ $(( ws % GPUS_PER_NODE )) -ne 0 ]; then
+        echo "Error: world size ($ws) must be a multiple of GPUs per node ($GPUS_PER_NODE)." >&2
+        exit 1
+    fi
+
+
     # Calculate the number of nodes needed for the current world size
     NODES=$(( (ws + GPUS_PER_NODE - 1) / GPUS_PER_NODE ))
     # select the appropriate QOS based on the number of nodes
