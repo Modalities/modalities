@@ -212,7 +212,7 @@ class Trainer:
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
             # Save the batch loss
-            cumulated_losses[0] += batch_loss.item()
+            cumulated_losses[0] += batch_loss.detach().item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
             cumulated_losses[-1] += 1  # number of local batches
 

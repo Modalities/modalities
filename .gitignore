@@ -164,9 +164,11 @@ tests/tmp/*
 *wandb_storage*
 .coverage/*
 *.pbin
+tutorials/scaling_up2/experiments
 tutorials/scaling_up/experiments
 tutorials/profiling/experiments
 tutorials/instruction_tuning/prepared_data
 config_files/instruction_tuning
 data/lorem_ipsum_instruct.jsonl
 tutorials/scaling_up/logs*
+tutorials/scaling_up/experiments_old/*
