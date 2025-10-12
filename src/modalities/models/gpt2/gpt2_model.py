@@ -320,9 +320,9 @@ class GPT2LLMConfig(BaseModel):
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
         seed: Optional[int] = None: The random seed for reproducibility.
-        enforce_swiglu_hidden_dim_multiple_of (Optional[int]): If specified, enforces the hidden dimension
+        enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
             in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
-            activation_type is SwiGLU. Defaults to None.
+            activation_type is SwiGLU. Defaults to 256.
     """
 
     sample_key: str
@@ -348,7 +348,7 @@ class GPT2LLMConfig(BaseModel):
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
     seed: Optional[int] = None
-    enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None
+    enforce_swiglu_hidden_dim_multiple_of: int = 256
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -700,7 +700,7 @@ class GPT2Block(nn.Module):
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
-        enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int,
     ):
         """
         Initializes the GPT2Block.
@@ -717,7 +717,7 @@ class GPT2Block(nn.Module):
             ffn_hidden (int): The size of the hidden layer in the feed-forward network.
             attention_norm (nn.Module): The normalization layer for attention.
             ffn_norm (nn.Module): The normalization layer for feed-forward network.
-            enforce_swiglu_hidden_dim_multiple_of (Optional[int]): If specified, enforces the
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces the
                 hidden dimension in the SwiGLU layer to be a multiple of this value. Note that this
                 is only relevant if the activation_type is SwiGLU. Defaults to None.
         """
@@ -795,7 +795,7 @@ class GPT2LLM(NNModel):
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         seed: Optional[int] = None,
-        enforce_swiglu_hidden_dim_multiple_of: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ):
         """
         Initializes the GPT2LLM object.
@@ -821,9 +821,9 @@ class GPT2LLM(NNModel):
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
-            enforce_swiglu_hidden_dim_multiple_of (Optional[int]): If specified, enforces
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
-                Note that this is only relevant if the activation_type is SwiGLU. Defaults to None.
+                Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
