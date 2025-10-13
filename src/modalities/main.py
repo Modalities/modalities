@@ -144,7 +144,7 @@ class Main:
             components.settings.step_profile.local_train_micro_batch_size
             * components.settings.step_profile.sequence_length
             * components.settings.step_profile.gradient_accumulation_steps
-            * components.settings.cuda_env.world_size
+            * components.settings.mesh_definition.dp_degree
         )
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
@@ -157,6 +157,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
+            dp_degree=components.settings.mesh_definition.dp_degree,
             mfu_calculator=components.mfu_calculator,
         )
 

@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Callable, Optional
 
@@ -34,6 +35,7 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
+        dp_degree: int,
         num_seen_train_steps: int,
         global_num_seen_tokens: int,
         num_target_steps: int,
@@ -66,6 +68,7 @@ class Trainer:
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
+        self.dp_degree = dp_degree
         self.num_seen_train_steps = num_seen_train_steps
         self.num_target_steps = num_target_steps
         self.num_target_tokens = num_target_tokens
@@ -236,7 +239,9 @@ class Trainer:
                 thoughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
                 )
-                synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+                synced_num_samples = (
+                    thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES) / self.dp_degree
+                )
                 synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
                     ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
                 )
@@ -289,7 +294,7 @@ class Trainer:
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,
                 )
-                print_rank_0(training_metrics)
+                print_rank_0(f"{datetime.now().isoformat(timespec='seconds')} | {training_metrics}")
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,

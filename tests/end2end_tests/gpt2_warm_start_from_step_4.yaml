@@ -9,6 +9,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  mesh_definition:
+    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: tmp/checkpoints
     train_dataset_path: tests/end2end_tests/lorem_ipsum.pbin

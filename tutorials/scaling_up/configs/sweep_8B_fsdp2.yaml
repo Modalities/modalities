@@ -17,6 +17,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  mesh_definition:
+    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: ${modalities_env:config_folder_path}
   intervals:
@@ -55,7 +57,7 @@ train_dataset:
     - component_key: dataset
       variant_key: packed_mem_map_dataset_continuous
       config:
-        raw_data_path: /leonardo_scratch/fast/EUHPC_D21_101/max_lue/data/gpt2_tokenized/000_00000.pbin
+        raw_data_path: ../../data/lorem_ipsum_long.pbin
         sequence_length: ${settings.step_profile.sequence_length}
         sample_key: ${settings.referencing_keys.sample_key}  
 

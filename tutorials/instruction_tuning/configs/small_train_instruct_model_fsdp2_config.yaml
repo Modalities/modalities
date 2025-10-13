@@ -9,6 +9,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  mesh_definition:
+    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: ./checkpoints
     train_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_train.d91ea04.pbin

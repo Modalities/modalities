@@ -103,7 +103,7 @@ def test_get_num_tokens_from_num_steps(
     assert (
         NumberConversion.get_num_tokens_from_num_steps(
             num_steps=num_steps,
-            num_ranks=num_ranks,
+            dp_degree=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             sequence_length=sequence_length,
             gradient_accumulation_steps=gradient_accumulation_steps,
@@ -339,7 +339,7 @@ def test_get_num_tokens_from_packed_mem_map_dataset_continuous(
         NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous(
             dataset_path=dataset_path,
             sequence_length=sequence_length,
-            num_ranks=num_ranks,
+            dp_degree=num_ranks,
             local_micro_batch_size=local_micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
             sample_key=dataset.sample_key,
