@@ -194,3 +194,11 @@ Tensors can be either normal Tensors or DTensors.
 **Breaking Changes**
 * Renaming: EvaluationResultToDiscSubscriberConfig.output_path -> EvaluationResultToDiscSubscriberConfig.output_file_path
 
+
+
+## PR #410 MFU incorporates dp_degree now instead of world_size
+
+This PR fixes the MFU and throughput calculations by taking the dp degree into account instead of the world size. When we use parallelization strategies on top of FSDP, then the world size is different from the  data parallel degree. This needs to be reflected in throughput and MFU metric calculations, as done by this PR. 
+
+**Breaking Changes**
+* Existing configs need to be adapted to correctly use dp degree rather than world size. 
