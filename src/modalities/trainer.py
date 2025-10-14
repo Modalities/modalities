@@ -239,9 +239,11 @@ class Trainer:
                 thoughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
                 )
-                synced_num_samples = (
-                    thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES) / self.dp_degree
-                )
+                # we only want to sync the num samples across data parallel ranks
+                # so we divide the world size by the dp degree
+                synced_num_samples = thoughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.NUM_SAMPLES
+                ) / (dist.get_world_size() / self.dp_degree)
                 synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
                     ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
                 )
