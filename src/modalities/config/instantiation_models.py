@@ -36,7 +36,7 @@ class StepProfile(BaseModel):
 
 
 class MeshDefinition(BaseModel):
-    dp_degree: Annotated[int, Field(strict=True, gt=0)]
+    dp_degree: int
     tp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     pp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     cp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
