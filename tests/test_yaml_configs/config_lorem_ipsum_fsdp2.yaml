@@ -198,7 +198,7 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    data_parallel_shard_degree: ${settings.mesh_definition.dp_degree} # i.e., fully sharded
     world_size: ${settings.cuda_env.world_size}
 
 app_state:
