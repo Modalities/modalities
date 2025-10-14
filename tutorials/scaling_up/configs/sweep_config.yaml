@@ -16,6 +16,8 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  mesh_definition:
+    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: ${modalities_env:config_folder_path}
     train_dataset_path: ../../data/lorem_ipsum_long.pbin
@@ -39,7 +41,7 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.mesh_definition.dp_degree}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps: 20
@@ -129,7 +131,7 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: -1
+    data_parallel_shard_degree: ${settings.mesh_definition.dp_degree}
     world_size: ${settings.cuda_env.world_size}
 
 app_state:
