@@ -68,7 +68,7 @@ class TestWarmstart:
             gpt2_8_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_8_steps_config_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
+            gpt2_8_steps_config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpoint_path
             loss_values_experiment_0_path = checkpoint_path + "/experiment_0_loss_scores.txt"
 
             # config for one step model
@@ -88,7 +88,7 @@ class TestWarmstart:
             gpt2_warm_start_after_4_steps_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
                 "checkpoint_path"
             ] = checkpoint_path
-            gpt2_warm_start_after_4_steps_dict["settings"]["paths"]["checkpointing_path"] = checkpoint_path
+            gpt2_warm_start_after_4_steps_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpoint_path
             loss_values_experiment_1_path = checkpoint_path + "/experiment_1_loss_scores.txt"
 
             # # adopt dataset path

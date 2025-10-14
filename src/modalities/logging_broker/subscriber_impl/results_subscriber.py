@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +10,7 @@ import yaml
 from rich.console import Group
 from rich.panel import Panel
 
-from modalities.batch import EvaluationResultBatch
+from modalities.batch import EvaluationResultBatch, ResultItem
 from modalities.config.config import WandbMode
 from modalities.logging_broker.messages import Message
 from modalities.logging_broker.subscriber import MessageSubscriberIF
@@ -115,34 +115,41 @@ class EvaluationResultToDiscSubscriber(MessageSubscriberIF[EvaluationResultBatch
     def __init__(self, output_file_path: Path) -> None:
         super().__init__()
         self.output_file_path = output_file_path
+        self.output_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     def consume_dict(self, message_dict: dict[str, Any]):
         """Optional: log config data if needed (here: no-op)."""
         pass
 
     @staticmethod
-    def _convert_evaluation_result_batch(eval_result_batch: EvaluationResultBatch) -> dict[str, Any]:
+    def _convert_evaluation_result_batch(obj: EvaluationResultBatch) -> dict[str, Any]:
         """
         Recursively convert EvaluationResultBatch structure to JSON-serializable format.
         Handles dataclasses and torch.Tensor.
         """
-        if is_dataclass(eval_result_batch):
+
+        def shallow_asdict(obj):
+            # Converts a dataclass to a dictionary without deep recursion.
+            if not is_dataclass(obj):
+                raise TypeError("shallow_asdict() should be called on dataclass instances")
+            return {f.name: getattr(obj, f.name) for f in fields(obj)}
+
+        if isinstance(obj, ResultItem):
+            return obj.value.item() if obj.value.ndim == 0 else obj.value.tolist()
+        elif is_dataclass(obj):
             result_dict = {}
-            for k, v in asdict(eval_result_batch).items():
+            for k, v in shallow_asdict(obj).items():
                 result_dict[k] = EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v)
             return result_dict
 
-        elif isinstance(eval_result_batch, dict):
-            return {
-                k: EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v)
-                for k, v in eval_result_batch.items()
-            }
-        elif isinstance(eval_result_batch, list):
-            return [EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v) for v in eval_result_batch]
-        elif isinstance(eval_result_batch, torch.Tensor):
-            return eval_result_batch.item() if eval_result_batch.ndim == 0 else eval_result_batch.tolist()
+        elif isinstance(obj, dict):
+            return {k: EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [EvaluationResultToDiscSubscriber._convert_evaluation_result_batch(v) for v in obj]
+        elif isinstance(obj, torch.Tensor):
+            return obj.item() if obj.ndim == 0 else obj.tolist()
         else:
-            return eval_result_batch
+            return obj
 
     def consume_message(self, message: Message[EvaluationResultBatch]):
         """Writes the evaluation result to the JSONL file if rank 0."""

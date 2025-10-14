@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Callable, Optional
 
@@ -34,6 +35,7 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
+        dp_degree: int,
         num_seen_train_steps: int,
         global_num_seen_tokens: int,
         num_target_steps: int,
@@ -66,6 +68,7 @@ class Trainer:
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
+        self.dp_degree = dp_degree
         self.num_seen_train_steps = num_seen_train_steps
         self.num_target_steps = num_target_steps
         self.num_target_tokens = num_target_tokens
@@ -212,7 +215,7 @@ class Trainer:
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
             # Save the batch loss
-            cumulated_losses[0] += batch_loss.item()
+            cumulated_losses[0] += batch_loss.detach().item()
             # This works, because we always drop the last batch in case it has less samples than the batch size
             cumulated_losses[-1] += 1  # number of local batches
 
@@ -236,7 +239,11 @@ class Trainer:
                 thoughput_aggregator.add_value(
                     key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
                 )
-                synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+                # we only want to sync the num samples across data parallel ranks
+                # so we divide the world size by the dp degree
+                synced_num_samples = thoughput_aggregator.get_all_reduced_value(
+                    ThroughputAggregationKeys.NUM_SAMPLES
+                ) / (dist.get_world_size() / self.dp_degree)
                 synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
                     ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
                 )
@@ -262,7 +269,7 @@ class Trainer:
                     "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
                 }
 
-                consumed_tokens = torch.Tensor([training_progress.num_seen_tokens_total])
+                consumed_tokens = torch.tensor(training_progress.num_seen_tokens_total)
                 metrics = {
                     "consumed tokens": ResultItem(consumed_tokens, 0),
                     "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
@@ -272,6 +279,10 @@ class Trainer:
                 mfu_score = torch.tensor(-1.0)
                 if self.mfu_calculator is not None:
                     mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
+
+                peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                torch.cuda.reset_peak_memory_stats(device)
+
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
                     metrics=metrics,
@@ -280,11 +291,12 @@ class Trainer:
                         "train samples/s": ResultItem(synced_num_samples_per_second, 1),
                         "train mfu (16-bit)": ResultItem(mfu_score, 2),
                         "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
+                        "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
                     },
                     dataloader_tag=train_loader.dataloader_tag,
                     num_train_steps_done=training_progress.num_seen_steps_total,
                 )
-                print_rank_0(training_metrics)
+                print_rank_0(f"{datetime.now().isoformat(timespec='seconds')} | {training_metrics}")
                 self._publish_evaluation_result(
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,

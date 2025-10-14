@@ -319,7 +319,10 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-
+        seed: Optional[int] = None: The random seed for reproducibility.
+        enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
+            in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
+            activation_type is SwiGLU. Defaults to 256.
     """
 
     sample_key: str
@@ -344,6 +347,8 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
+    seed: Optional[int] = None
+    enforce_swiglu_hidden_dim_multiple_of: int = 256
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -695,6 +700,7 @@ class GPT2Block(nn.Module):
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
+        enforce_swiglu_hidden_dim_multiple_of: int,
     ):
         """
         Initializes the GPT2Block.
@@ -711,6 +717,9 @@ class GPT2Block(nn.Module):
             ffn_hidden (int): The size of the hidden layer in the feed-forward network.
             attention_norm (nn.Module): The normalization layer for attention.
             ffn_norm (nn.Module): The normalization layer for feed-forward network.
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces the
+                hidden dimension in the SwiGLU layer to be a multiple of this value. Note that this
+                is only relevant if the activation_type is SwiGLU. Defaults to None.
         """
         super().__init__()
         self.attention_norm = attention_norm
@@ -728,7 +737,12 @@ class GPT2Block(nn.Module):
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation_type == ActivationType.SWIGLU:
-            self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
+            self.mlp = SwiGLU(
+                n_embd=n_embd,
+                ffn_hidden=ffn_hidden,
+                bias=bias,
+                enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
+            )
         else:
             raise NotImplementedError("unimplemented activation")
 
@@ -780,7 +794,8 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: int = None,
+        seed: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ):
         """
         Initializes the GPT2LLM object.
@@ -806,6 +821,9 @@ class GPT2LLM(NNModel):
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces
+                the hidden dimension in the SwiGLU layer to be a multiple of this value.
+                Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
@@ -861,6 +879,7 @@ class GPT2LLM(NNModel):
                             # a meta device!
                             attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
                             ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
+                            enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
                         )
                         for _ in range(n_layer)
                     ]
