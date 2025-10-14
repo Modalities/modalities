@@ -643,7 +643,7 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     "Typically, we would add 'OutOfMemoryError', as rerunning the experiment would result in the same error. "
     " List of exceptions is comma-separated.",
 )
-def CMD_entry_point_prepare_remaining_runs(
+def CMD_entry_point_list_remaining_runs(
     exp_root: Path,
     file_list_path: Path,
     expected_steps: int,
