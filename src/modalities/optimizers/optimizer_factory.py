@@ -12,6 +12,7 @@ from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
+from modalities.utils.logger_utils import get_logger
 from modalities.utils.typing_utils import FSDPX
 
 OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
@@ -80,7 +81,7 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
         optimizer_groups_names = ["all"]
     else:
         # there will be N optimizer groups, i.e. one for each model parameter group
-        _assert_existence_of_weight_decay_groups_excluded(model, weight_decay_groups_excluded)
+        _check_existence_of_weight_decay_groups_excluded(model, weight_decay_groups_excluded)
         optimizer_groups, optimizer_groups_names = _create_optimizer_groups(
             model, weight_decay, weight_decay_groups_excluded
         )
@@ -90,9 +91,7 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(
-    model: nn.Module, weight_decay_groups_excluded: list[str]
-) -> None:
+def _check_existence_of_weight_decay_groups_excluded(model: nn.Module, weight_decay_groups_excluded: list[str]) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -113,9 +112,10 @@ def _assert_existence_of_weight_decay_groups_excluded(
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
         if group not in weight_decay_groups.keys():
-            raise OptimizerError(
+            get_logger(name="optimizer_factory").warning(
                 f"group = {group} specified in weight_decay_groups_excluded is not "
-                + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}"
+                + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}. "
+                + "(This might be due to pipeline parallelism and is not necessarily an error.)"
             )
 
 

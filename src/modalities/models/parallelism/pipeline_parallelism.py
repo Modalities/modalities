@@ -3,8 +3,9 @@
 # licensed under the BSD 3-Clause License.
 
 import copy
+import re
 from enum import Enum
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, cast
 
 import torch
 import torch.nn as nn
@@ -13,6 +14,7 @@ from torch.distributed.pipelining import PipelineStage
 from torch.distributed.pipelining.schedules import PipelineScheduleSingle, get_schedule_class
 
 from modalities.loss_functions import Loss
+from modalities.models.model import NNModel
 from modalities.models.parallelism.stages_generator import StagesGenerator
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.utils.logger_utils import get_logger
@@ -83,13 +85,13 @@ class PipelineFactory:
 
     @staticmethod
     def get_pipeline(
-        pp_stage: PipelineStage, model_part: nn.Module, pp_schedule: Optional[PipelineScheduleSingle] = None
+        pp_stage: PipelineStage, model_part: NNModel, pp_schedule: Optional[PipelineScheduleSingle] = None
     ) -> Pipeline:
         return Pipeline(pp_stage=pp_stage, model_part=model_part, pp_schedule=pp_schedule)
 
     @staticmethod
     def get_staged_pipeline(
-        whole_model: nn.Module,
+        whole_model: NNModel,
         stages_generator: StagesGenerator,
         device_mesh: DeviceMesh,
         local_rank: int,
@@ -128,12 +130,12 @@ class PipelineFactory:
 
     @staticmethod
     def _get_split_model(
-        whole_model: nn.Module,
+        whole_model: NNModel,
         schedule_class: Type[PipelineScheduleSingle],
         pp_mesh: DeviceMesh,
         device: torch.device,
         fqns_per_stage: list[list[str]],
-    ) -> tuple[PipelineStage, nn.Module]:
+    ) -> tuple[PipelineStage, NNModel]:
         def get_stage_id_of_pp_rank(pp_mesh: DeviceMesh):
             # NOTE: torch titan a more complicated way to get the stage id of pp rank
             # since they also allow for multi-stage schedules
@@ -164,7 +166,7 @@ class PipelineFactory:
 
         def _build_stage_from_modules(
             fqn_tree: dict[str, Any], module: nn.Module, module_name: Optional[str] = None
-        ) -> tuple[PipelineStage, nn.Module]:
+        ) -> nn.Module:
             if isinstance(module, nn.ModuleDict):
                 if module_name not in fqn_tree:
                     dict_modules = nn.ModuleDict({})
@@ -239,6 +241,8 @@ class PipelineFactory:
         whole_model = copy.deepcopy(whole_model)
         fqn_tree = _get_fqn_tree(module_names)
         stage_modules = _build_stage_from_modules(fqn_tree, whole_model)
+        stage_modules = cast(NNModel, stage_modules)
+        PipelineFactory._filter_weight_decay_groups_(stage_modules)
         stage = PipelineStage(
             submodule=stage_modules,
             stage_index=stage_idx,
@@ -247,6 +251,21 @@ class PipelineFactory:
             group=pp_mesh.get_group("pp"),
         )
         return stage, stage_modules
+
+    @staticmethod
+    def _filter_weight_decay_groups_(stage_modules: NNModel):
+        params = {name for name, parameter in stage_modules.named_parameters() if parameter.requires_grad}
+        for group_list in stage_modules.weight_decay_groups.values():
+            remove_from_group = [
+                group_entry
+                for group_entry in group_list
+                if all([not bool(re.search(group_entry, name)) for name in params])
+            ]
+            for remove in remove_from_group:
+                group_list.remove(remove)
+        empty_group_keys = [k for k, v in stage_modules.weight_decay_groups.items() if len(v) == 0]
+        for key in empty_group_keys:
+            del stage_modules.weight_decay_groups[key]
 
     @staticmethod
     def get_scheduled_pipeline(
