@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import traceback
 from copy import deepcopy
 from pathlib import Path
 
@@ -16,7 +17,8 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointL
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
-from modalities.config.pydantic_if_types import PydanticAppStateType
+from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticPipelineType
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.training.training_progress import TrainingProgress
 from tests.checkpointing.checkpointing_test_utils import CheckpointingTestUtils
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
@@ -41,8 +43,8 @@ def get_gpt2_model_config_dict(gpt2_model_config_path: Path) -> dict:
 
 
 @pytest.mark.skipif(
-    torch.cuda.device_count() < 2,
-    reason="This e2e test requires 2 GPUs",
+    torch.cuda.device_count() < 4,
+    reason="This e2e test requires 4 GPUs",
 )
 class TestFSDP2DCPCheckpointing:
     @staticmethod
@@ -57,11 +59,32 @@ class TestFSDP2DCPCheckpointing:
         return components.app_state
 
     @staticmethod
-    def test_save_checkpoint_after_backward_pass(temporary_checkpoint_folder_path: Path, gpt2_model_config_path: Path):
-        world_size = 2
+    def _get_scheduled_pipeline(config_file_path: Path) -> Pipeline:
+        class ComponentsInstantiationModel(BaseModel):
+            scheduled_pipeline: PydanticPipelineType
+
+        main_obj = Main(config_file_path)
+        components: ComponentsInstantiationModel = main_obj.build_components(
+            components_model_type=ComponentsInstantiationModel
+        )
+        return components.scheduled_pipeline
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "config_filename,world_size,use_pp",
+        [
+            ("fsdp2_gpt2_config.yaml", 2, False),
+            ("fsdp2_pp_gpt2_config.yaml", 2, True),
+        ],
+    )
+    def test_save_checkpoint_after_backward_pass(
+        temporary_checkpoint_folder_path: Path, config_filename: str, world_size: int, use_pp: bool
+    ):
+        working_dir = Path(os.path.dirname(__file__))
+        config_file_path = working_dir / config_filename
         mp.spawn(
             TestFSDP2DCPCheckpointing._test_save_checkpoint_after_backward_pass_impl_wrapper,
-            args=(world_size, temporary_checkpoint_folder_path, gpt2_model_config_path),
+            args=(world_size, temporary_checkpoint_folder_path, config_file_path, use_pp),
             nprocs=world_size,
             join=True,
         )
@@ -72,6 +95,7 @@ class TestFSDP2DCPCheckpointing:
         world_size: int,
         temporary_checkpoint_folder_path: Path,
         gpt2_model_config_path: Path,
+        use_pp: bool,
     ):
         # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
         with MultiProcessingCudaEnv(
@@ -79,31 +103,44 @@ class TestFSDP2DCPCheckpointing:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22356,
+            rdvz_port=22358,
         ):
-            # build all the components for the test
-            app_state1 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
-            app_state2 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
+            try:
+                # build all the components for the test
+                app_state1 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
+                app_state2 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
 
-            gpt2_model_config_dict = get_gpt2_model_config_dict(gpt2_model_config_path=gpt2_model_config_path)
-            experiment_id = "0"
-            checkpoint_loading = DCPCheckpointLoading(global_rank=process_id)
-            checkpoint_saving = DCPCheckpointSaving(
-                checkpoint_path=temporary_checkpoint_folder_path,
-                experiment_id=experiment_id,
-                global_rank=process_id,
-            )
+                if use_pp:
+                    app_state1.scheduled_pipeline = TestFSDP2DCPCheckpointing._get_scheduled_pipeline(
+                        config_file_path=gpt2_model_config_path
+                    )
+                    app_state2.scheduled_pipeline = TestFSDP2DCPCheckpointing._get_scheduled_pipeline(
+                        config_file_path=gpt2_model_config_path
+                    )
 
-            # run the test
-            TestFSDP2DCPCheckpointing._test_save_checkpoint_after_backward_pass_impl(
-                app_state1=app_state1,
-                app_state2=app_state2,
-                gpt2_model_config_dict=gpt2_model_config_dict,
-                checkpoint_loading=checkpoint_loading,
-                checkpoint_saving=checkpoint_saving,
-                temporary_checkpoint_folder_path=temporary_checkpoint_folder_path,
-                experiment_id=experiment_id,
-            )
+                gpt2_model_config_dict = get_gpt2_model_config_dict(gpt2_model_config_path=gpt2_model_config_path)
+                experiment_id = "0"
+                checkpoint_loading = DCPCheckpointLoading(global_rank=process_id)
+                checkpoint_saving = DCPCheckpointSaving(
+                    checkpoint_path=temporary_checkpoint_folder_path,
+                    experiment_id=experiment_id,
+                    global_rank=process_id,
+                )
+
+                # run the test
+                TestFSDP2DCPCheckpointing._test_save_checkpoint_after_backward_pass_impl(
+                    app_state1=app_state1,
+                    app_state2=app_state2,
+                    gpt2_model_config_dict=gpt2_model_config_dict,
+                    checkpoint_loading=checkpoint_loading,
+                    checkpoint_saving=checkpoint_saving,
+                    temporary_checkpoint_folder_path=temporary_checkpoint_folder_path,
+                    experiment_id=experiment_id,
+                )
+            except Exception as e:
+                print(f"Exception in _forward_step_with_pp: {e}")
+                traceback.print_exc()  # <-- Add this line to print the full stack trace
+                raise e
 
     @staticmethod
     def _test_save_checkpoint_after_backward_pass_impl(
@@ -139,13 +176,21 @@ class TestFSDP2DCPCheckpointing:
 
         # run backward pass
         batch_input_ids_dict, batch_target_ids = CheckpointingTestUtils.generate_batch(gpt2_model_config_dict)
-        loss_0 = CheckpointingTestUtils.forward_backward_pass(
-            prediction_key=prediction_key,
-            model=app_state1.model,
-            optimizer=app_state1.optimizer,
-            batch_input_ids_dict=batch_input_ids_dict,
-            batch_target_ids=batch_target_ids,
-        )
+        if hasattr(app_state1, "scheduled_pipeline"):
+            loss_0 = CheckpointingTestUtils.forward_backward_pp_pass(
+                scheduled_pipeline=app_state1.scheduled_pipeline,
+                optimizer=app_state1.optimizer,
+                batch_input_ids_dict=batch_input_ids_dict,
+                batch_target_ids=batch_target_ids,
+            )
+        else:
+            loss_0 = CheckpointingTestUtils.forward_backward_pass(
+                prediction_key=prediction_key,
+                model=app_state1.model,
+                optimizer=app_state1.optimizer,
+                batch_input_ids_dict=batch_input_ids_dict,
+                batch_target_ids=batch_target_ids,
+            )
 
         # save the updated model and optimizer states for later comparisons
         updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
@@ -198,21 +243,40 @@ class TestFSDP2DCPCheckpointing:
         loaded_and_updated_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
 
         # perform another forward pass and backward pass for the previous and the loaded model
-        loss_1 = CheckpointingTestUtils.forward_backward_pass(
-            prediction_key=prediction_key,
-            model=app_state1.model,
-            optimizer=app_state1.optimizer,
-            batch_input_ids_dict=batch_input_ids_dict,
-            batch_target_ids=batch_target_ids,
-        )
+        if hasattr(app_state1, "scheduled_pipeline"):
+            try:
+                # loss_1 = CheckpointingTestUtils.forward_backward_pp_pass(
+                #     scheduled_pipeline=app_state1.scheduled_pipeline,
+                #     optimizer=app_state1.optimizer,
+                #     batch_input_ids_dict=batch_input_ids_dict,
+                #     batch_target_ids=batch_target_ids,
+                # )
+                loss_2 = CheckpointingTestUtils.forward_backward_pp_pass(
+                    scheduled_pipeline=app_state2.scheduled_pipeline,
+                    optimizer=app_state2.optimizer,
+                    batch_input_ids_dict=batch_input_ids_dict,
+                    batch_target_ids=batch_target_ids,
+                )
+            except Exception as e:
+                print(f"Exception in _forward_step_with_pp: {e}")
+                traceback.print_exc()  # <-- Add this line to print the full stack trace
+                raise e
+        else:
+            loss_1 = CheckpointingTestUtils.forward_backward_pass(
+                prediction_key=prediction_key,
+                model=app_state1.model,
+                optimizer=app_state1.optimizer,
+                batch_input_ids_dict=batch_input_ids_dict,
+                batch_target_ids=batch_target_ids,
+            )
 
-        loss_2 = CheckpointingTestUtils.forward_backward_pass(
-            prediction_key=prediction_key,
-            model=app_state2.model,
-            optimizer=app_state2.optimizer,
-            batch_input_ids_dict=batch_input_ids_dict,
-            batch_target_ids=batch_target_ids,
-        )
+            loss_2 = CheckpointingTestUtils.forward_backward_pass(
+                prediction_key=prediction_key,
+                model=app_state2.model,
+                optimizer=app_state2.optimizer,
+                batch_input_ids_dict=batch_input_ids_dict,
+                batch_target_ids=batch_target_ids,
+            )
         assert loss_1 == loss_2, f"loss_1 = {loss_1} does not equal loss_2 = {loss_2}"
         assert loss_1 < loss_0, f"loss_1 = {loss_1} is not less than loss_0 = {loss_0}"
 

@@ -15,10 +15,17 @@ class CheckpointingTestUtils:
     @staticmethod
     def generate_batch(gpt2_model_config: dict):
         # prepare input and targets
+        if "settings" in gpt2_model_config:
+            batch_size = gpt2_model_config["settings"]["step_profile"]["local_train_micro_batch_size"]
+        else:
+            batch_size = 8
         data = torch.randint(
             0,  # lowest token_id
             gpt2_model_config["model_raw"]["config"]["vocab_size"],  # highest token_id + 1, i.e. vocab_size
-            (8, gpt2_model_config["model_raw"]["config"]["sequence_length"] + 1),  # (batch_size, sequence_length + 1)
+            (
+                batch_size,
+                gpt2_model_config["model_raw"]["config"]["sequence_length"] + 1,
+            ),  # (batch_size, sequence_length + 1)
         ).cuda()
         batch_input_ids_dict = {gpt2_model_config["model_raw"]["config"]["sample_key"]: data[:, :-1]}
         batch_target_ids = data[:, 1:]
@@ -47,6 +54,33 @@ class CheckpointingTestUtils:
 
         # update the weights based on the gradients
         optimizer.step()
+        return loss
+
+    @staticmethod
+    def forward_backward_pp_pass(
+        scheduled_pipeline,
+        optimizer: Optimizer,
+        batch_input_ids_dict: dict,
+        batch_target_ids: torch.Tensor,
+    ):
+        pp_schedule = scheduled_pipeline.pp_schedule
+        # Pipeline Parallel forward / backward inside step() call
+        # with self.train_context(optional_context_parallel_ctx):
+        targets, losses = (batch_target_ids.contiguous(), []) if scheduled_pipeline.is_last_pp_stage else (None, None)
+
+        if scheduled_pipeline.is_first_pp_stage:
+            pp_schedule.step(
+                batch_input_ids_dict[scheduled_pipeline.model_part.sample_key].contiguous(),
+                target=targets,
+                losses=losses,
+            )
+        else:
+            pp_schedule.step(target=targets, losses=losses)
+        loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+        optimizer.step()
+        # clear the gradients
+        optimizer.zero_grad()
+
         return loss
 
     @staticmethod
