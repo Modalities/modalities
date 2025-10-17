@@ -119,7 +119,7 @@ def get_device_mesh(
         ],
         strict=True,
     ):
-        if dim > 1:
+        if dim > 1 or name == ParallelismDegrees.DP_SHARD.value:
             dims.append(dim)
             names.append(name)
     names = tuple(names)
