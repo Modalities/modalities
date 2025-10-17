@@ -18,7 +18,6 @@ from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSa
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticPipelineType
-from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.training.training_progress import TrainingProgress
 from tests.checkpointing.checkpointing_test_utils import CheckpointingTestUtils
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
@@ -48,26 +47,26 @@ def get_gpt2_model_config_dict(gpt2_model_config_path: Path) -> dict:
 )
 class TestFSDP2DCPCheckpointing:
     @staticmethod
-    def _get_app_state(config_file_path: Path) -> AppState:
-        class ComponentsInstantiationModel(BaseModel):
-            app_state: PydanticAppStateType
+    def _get_app_state(config_file_path: Path, use_pp: bool = False) -> AppState:
+        if use_pp:
+
+            class ComponentsInstantiationModel(BaseModel):
+                app_state: PydanticAppStateType
+                scheduled_pipeline: PydanticPipelineType
+
+        else:
+
+            class ComponentsInstantiationModel(BaseModel):
+                app_state: PydanticAppStateType
 
         main_obj = Main(config_file_path)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )
-        return components.app_state
-
-    @staticmethod
-    def _get_scheduled_pipeline(config_file_path: Path) -> Pipeline:
-        class ComponentsInstantiationModel(BaseModel):
-            scheduled_pipeline: PydanticPipelineType
-
-        main_obj = Main(config_file_path)
-        components: ComponentsInstantiationModel = main_obj.build_components(
-            components_model_type=ComponentsInstantiationModel
-        )
-        return components.scheduled_pipeline
+        app_state = components.app_state
+        if use_pp:
+            app_state.scheduled_pipeline = components.scheduled_pipeline
+        return app_state
 
     @staticmethod
     @pytest.mark.parametrize(
@@ -103,20 +102,12 @@ class TestFSDP2DCPCheckpointing:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22358,
+            rdvz_port=22355,
         ):
             try:
                 # build all the components for the test
-                app_state1 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
-                app_state2 = TestFSDP2DCPCheckpointing._get_app_state(config_file_path=gpt2_model_config_path)
-
-                if use_pp:
-                    app_state1.scheduled_pipeline = TestFSDP2DCPCheckpointing._get_scheduled_pipeline(
-                        config_file_path=gpt2_model_config_path
-                    )
-                    app_state2.scheduled_pipeline = TestFSDP2DCPCheckpointing._get_scheduled_pipeline(
-                        config_file_path=gpt2_model_config_path
-                    )
+                app_state1 = TestFSDP2DCPCheckpointing._get_app_state(gpt2_model_config_path, use_pp)
+                app_state2 = TestFSDP2DCPCheckpointing._get_app_state(gpt2_model_config_path, use_pp)
 
                 gpt2_model_config_dict = get_gpt2_model_config_dict(gpt2_model_config_path=gpt2_model_config_path)
                 experiment_id = "0"
@@ -245,12 +236,12 @@ class TestFSDP2DCPCheckpointing:
         # perform another forward pass and backward pass for the previous and the loaded model
         if hasattr(app_state1, "scheduled_pipeline"):
             try:
-                # loss_1 = CheckpointingTestUtils.forward_backward_pp_pass(
-                #     scheduled_pipeline=app_state1.scheduled_pipeline,
-                #     optimizer=app_state1.optimizer,
-                #     batch_input_ids_dict=batch_input_ids_dict,
-                #     batch_target_ids=batch_target_ids,
-                # )
+                loss_1 = CheckpointingTestUtils.forward_backward_pp_pass(
+                    scheduled_pipeline=app_state1.scheduled_pipeline,
+                    optimizer=app_state1.optimizer,
+                    batch_input_ids_dict=batch_input_ids_dict,
+                    batch_target_ids=batch_target_ids,
+                )
                 loss_2 = CheckpointingTestUtils.forward_backward_pp_pass(
                     scheduled_pipeline=app_state2.scheduled_pipeline,
                     optimizer=app_state2.optimizer,
@@ -278,7 +269,8 @@ class TestFSDP2DCPCheckpointing:
                 batch_target_ids=batch_target_ids,
             )
         assert loss_1 == loss_2, f"loss_1 = {loss_1} does not equal loss_2 = {loss_2}"
-        assert loss_1 < loss_0, f"loss_1 = {loss_1} is not less than loss_0 = {loss_0}"
+        if loss_1 is not None:
+            assert loss_1 < loss_0, f"loss_1 = {loss_1} is not less than loss_0 = {loss_0}"
 
         # check that the model and optimizer states after each backward pass are as expected
         # model weights
