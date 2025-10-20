@@ -1,6 +1,9 @@
 import json
+import logging
+import multiprocessing as py_mp
 import os
 import tempfile
+import time
 import traceback
 from copy import deepcopy
 from pathlib import Path
@@ -81,12 +84,20 @@ class TestFSDP2DCPCheckpointing:
     ):
         working_dir = Path(os.path.dirname(__file__))
         config_file_path = working_dir / config_filename
-        mp.spawn(
+        # Use a Manager queue so child processes can report exceptions to the parent.
+        manager = py_mp.Manager()
+        error_queue = manager.Queue()
+
+        # Start child processes without joining so the parent can monitor a shared queue
+        # and terminate remaining workers immediately if any child fails.
+        proc_ctx = mp.spawn(
             TestFSDP2DCPCheckpointing._test_save_checkpoint_after_backward_pass_impl_wrapper,
-            args=(world_size, temporary_checkpoint_folder_path, config_file_path, use_pp),
+            args=(world_size, temporary_checkpoint_folder_path, config_file_path, use_pp, error_queue),
             nprocs=world_size,
-            join=True,
+            join=False,
         )
+
+        TestFSDP2DCPCheckpointing._monitor_child_processes(manager, error_queue, proc_ctx)
 
     @staticmethod
     def _test_save_checkpoint_after_backward_pass_impl_wrapper(
@@ -95,6 +106,7 @@ class TestFSDP2DCPCheckpointing:
         temporary_checkpoint_folder_path: Path,
         gpt2_model_config_path: Path,
         use_pp: bool,
+        error_queue: "py_mp.managers.SyncManager.Queue",
     ):
         # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
         with MultiProcessingCudaEnv(
@@ -102,7 +114,7 @@ class TestFSDP2DCPCheckpointing:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22355,
+            rdvz_port=22353,
         ):
             try:
                 # build all the components for the test
@@ -129,9 +141,14 @@ class TestFSDP2DCPCheckpointing:
                     experiment_id=experiment_id,
                 )
             except Exception as e:
-                print(f"Exception in _forward_step_with_pp: {e}")
-                traceback.print_exc()  # <-- Add this line to print the full stack trace
-                raise e
+                tb = traceback.format_exc()
+                logging.error(f"Process {process_id} encountered an error:\n{e}")
+                logging.error(tb)
+                try:
+                    error_queue.put((process_id, tb))
+                except Exception:
+                    logging.error("Failed to put exception info into error queue.")
+                os._exit(1)
 
     @staticmethod
     def _test_save_checkpoint_after_backward_pass_impl(
@@ -250,8 +267,8 @@ class TestFSDP2DCPCheckpointing:
                 )
             except Exception as e:
                 print(f"Exception in _forward_step_with_pp: {e}")
-                traceback.print_exc()  # <-- Add this line to print the full stack trace
-                raise e
+                traceback.print_exc()
+                raise
         else:
             loss_1 = CheckpointingTestUtils.forward_backward_pass(
                 prediction_key=prediction_key,
@@ -307,3 +324,104 @@ class TestFSDP2DCPCheckpointing:
         CheckpointingTestUtils.assert_equality_optimizer_state(
             app_state1.optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False
         )
+
+    @staticmethod
+    def _monitor_child_processes(manager, error_queue, proc_ctx):
+        # Normalize the return value from mp.spawn. When join=False it often
+        # returns a ProcessContext-like object that may expose a `processes`
+        # attribute. Other implementations may return an iterable of Process
+        # objects. Build a `processes` list defensively so we can monitor and
+        # terminate child processes below without assuming a particular type.
+        processes = []
+        if proc_ctx is None:
+            processes = []
+        else:
+            # common attribute names that might hold the list of processes
+            candidate_attrs = ["processes", "_processes", "workers", "process_list", "processes_"]
+            found = False
+            for attr in candidate_attrs:
+                if hasattr(proc_ctx, attr):
+                    ps = getattr(proc_ctx, attr)
+                    try:
+                        processes = list(ps)
+                    except Exception:
+                        processes = [ps]
+                    found = True
+                    break
+            if not found:
+                # If proc_ctx itself is iterable, exhaust it into a list
+                try:
+                    processes = list(proc_ctx)
+                except Exception:
+                    # Fallback: if proc_ctx behaves like a single process-like
+                    # object (has terminate/is_alive/join), wrap it in a list.
+                    if hasattr(proc_ctx, "terminate") or hasattr(proc_ctx, "is_alive") or hasattr(proc_ctx, "join"):
+                        processes = [proc_ctx]
+                    else:
+                        processes = []
+
+        # Monitor the error queue and child processes. If any child reports an exception,
+        # terminate the other workers and raise the error in the parent to fail the test fast.
+        try:
+            # Loop until all processes finished or an error is reported
+            while True:
+                # If an error was reported by any child process, terminate remaining children
+                if not error_queue.empty():
+                    proc_id, tb = error_queue.get()
+                    # terminate and join all processes (or the proc_ctx wrapper)
+                    for p in processes:
+                        try:
+                            if hasattr(p, "is_alive"):
+                                alive = p.is_alive()
+                            elif hasattr(p, "exitcode"):
+                                alive = getattr(p, "exitcode") is None
+                            else:
+                                alive = True
+                            if alive and hasattr(p, "terminate"):
+                                p.terminate()
+                        except Exception:
+                            pass
+                    # If we didn't find individual process objects but proc_ctx
+                    # exposes a terminate method, call it as a fallback.
+                    try:
+                        if not processes and hasattr(proc_ctx, "terminate"):
+                            proc_ctx.terminate()
+                    except Exception:
+                        pass
+
+                    for p in processes:
+                        try:
+                            if hasattr(p, "join"):
+                                p.join(timeout=5)
+                        except Exception:
+                            pass
+                    try:
+                        if hasattr(proc_ctx, "join"):
+                            proc_ctx.join(timeout=1)
+                    except Exception:
+                        pass
+                    raise AssertionError(f"Child process {proc_id} raised an exception:\n{tb}")
+
+                # If all processes have finished, break
+                all_finished = all((not p.is_alive()) for p in processes)
+                if all_finished:
+                    # join them to collect exitcodes
+                    for p in processes:
+                        try:
+                            p.join()
+                        except Exception:
+                            pass
+                    # If we have a ProcessContext, call its join to clean up as well
+                    try:
+                        if hasattr(proc_ctx, "join"):
+                            proc_ctx.join(timeout=1)
+                    except Exception:
+                        pass
+                    break
+
+                time.sleep(0.05)
+        finally:
+            try:
+                manager.shutdown()
+            except Exception:
+                pass
