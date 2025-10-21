@@ -1,5 +1,6 @@
 import torch
 from pydantic import BaseModel
+from torch.distributed.tensor import DTensor
 from torch.nn import CrossEntropyLoss
 from torch.optim import Optimizer
 
@@ -128,19 +129,32 @@ class CheckpointingTestUtils:
             state_2 = optimizer_2_state[param_group_id]
             assert set(state_1.keys()) == set(state_2.keys())
             for state_key in state_1.keys():
-                if must_be_equal:
-                    assert torch.equal(
-                        state_1[state_key], state_2[state_key]
-                    ), "_assert_equality_optimizer_state failed (must_be_equal = True)"
-                else:
-                    assert not torch.equal(
-                        state_1[state_key], state_2[state_key]
-                    ), "_assert_equality_optimizer_state failed (must_be_equal = False)"
+                CheckpointingTestUtils.assert_equality_two_tensors(
+                    tensor_1=state_1[state_key],
+                    tensor_2=state_2[state_key],
+                    must_be_equal=must_be_equal,
+                    msg_on_failure="_assert_equality_optimizer_state failed",
+                )
 
     @staticmethod
     def assert_equality_two_models(params_1: list[torch.Tensor], params_2: list[torch.Tensor], must_be_equal: bool):
         for p1, p2 in zip(params_1, params_2):
-            if must_be_equal:
-                assert torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = True)"
-            else:
-                assert not torch.equal(p1, p2), "_assert_equality_two_models failed (must_be_equal = False)"
+            CheckpointingTestUtils.assert_equality_two_tensors(
+                tensor_1=p1,
+                tensor_2=p2,
+                must_be_equal=must_be_equal,
+                msg_on_failure="_assert_equality_two_models failed",
+            )
+
+    @staticmethod
+    def assert_equality_two_tensors(
+        tensor_1: torch.Tensor, tensor_2: torch.Tensor, must_be_equal: bool, msg_on_failure: str = ""
+    ):
+        if isinstance(tensor_1, DTensor):
+            assert isinstance(tensor_2, DTensor), f"{msg_on_failure} (type mismatch with DTensor)"
+            tensor_1 = tensor_1.to_local()
+            tensor_2 = tensor_2.to_local()
+        if must_be_equal:
+            assert torch.equal(tensor_1, tensor_2), f"{msg_on_failure} (must_be_equal = True)"
+        else:
+            assert not torch.equal(tensor_1, tensor_2), f"{msg_on_failure} (must_be_equal = False)"
