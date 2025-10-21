@@ -114,7 +114,7 @@ class TestFSDP2DCPCheckpointing:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22353,
+            rdvz_port=22354,
         ):
             try:
                 # build all the components for the test
@@ -248,8 +248,8 @@ class TestFSDP2DCPCheckpointing:
         )
 
         loaded_and_updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
-        loaded_and_updated_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
-
+        loaded_and_updated_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())     
+        
         # perform another forward pass and backward pass for the previous and the loaded model
         if hasattr(app_state1, "scheduled_pipeline"):
             try:
