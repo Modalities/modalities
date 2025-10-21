@@ -683,13 +683,13 @@ class GPT2ModelFactory:
                 desired_input_layouts=(Replicate(),),
             ),
         }
-        if isinstance(model.transformer.h[0].mlp, SwiGLU):
+        if isinstance(list(model.transformer.h.values())[0].mlp, SwiGLU):
             mlp_plan = {
                 "mlp.W": ColwiseParallel(),
                 "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
                 "mlp.V": ColwiseParallel(),
             }
-        elif isinstance(model.transformer.h[0].mlp, TransformerMLP):
+        elif isinstance(list(model.transformer.h.values())[0].mlp, TransformerMLP):
             mlp_plan = {
                 "mlp.c_fc": ColwiseParallel(),
                 "mlp.c_proj": RowwiseParallel(output_layouts=Shard(1)),
@@ -701,7 +701,7 @@ class GPT2ModelFactory:
             )
         transformer_block_tp_plan.update(mlp_plan)
 
-        for transformer_block in model.transformer.h:
+        for transformer_block in model.transformer.h.values():
             # override the number of q and kv heads
             if transformer_block.attn.n_head_q % tp_mesh.size() != 0:
                 raise ValueError(
