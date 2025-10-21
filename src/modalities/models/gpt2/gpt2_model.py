@@ -845,9 +845,9 @@ class GPT2LLM(NNModel):
                 wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
                 wpe=wpe,
                 drop=nn.Dropout(dropout),
-                h=nn.ModuleList(
-                    [
-                        GPT2Block(
+                h=nn.ModuleDict(
+                    {
+                        str(layer_id): GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
                             n_head_q=n_head_q,
@@ -863,8 +863,8 @@ class GPT2LLM(NNModel):
                             attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
                             ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
                         )
-                        for _ in range(n_layer)
-                    ]
+                        for layer_id in range(n_layer)
+                    }
                 ),
                 lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
                 # NOTE: If we make the bias configurable, we must update the number of parameters calculation
@@ -952,8 +952,8 @@ class GPT2LLM(NNModel):
         # TODO: use drop out also without absolute position embedding?
         h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
 
-        for block in self.transformer.h:
-            h = block(h)
+        for layer_id in self.transformer.h:
+            h = self.transformer.h[layer_id](h)
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
         h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
         return h
