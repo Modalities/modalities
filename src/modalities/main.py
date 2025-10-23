@@ -13,7 +13,6 @@ from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel, TrainingReportGenerator
 from modalities.evaluator import Evaluator
-from modalities.exceptions import RunningEnvError
 from modalities.gym import Gym
 from modalities.logging_broker.message_broker import MessageBroker
 from modalities.logging_broker.messages import MessageTypes, ProgressUpdate
@@ -110,14 +109,14 @@ class Main:
         if experiment_path.is_dir():
             present_files = list(experiment_path.iterdir())
             if len(present_files) == 1 and expected_config_file_path not in present_files:
-                raise RunningEnvError(
+                logger.warning(
                     f"The experiment folder {experiment_path} is non-empty and "
                     f"contains a file {present_files[0].name} that "
                     f"is not the config file. Please ensure that the config file is the only file present "
-                    "in the experiment folder."
+                    "in the experiment folder to alleviate side-effects."
                 )
             elif len(present_files) > 1:
-                raise RunningEnvError(
+                logger.warning(
                     f"The experiment folder {experiment_path} is non-empty and "
                     f"contains multiple files: {present_files}. "
                     f"Please ensure that the config file is the only file present."
