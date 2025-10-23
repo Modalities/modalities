@@ -292,6 +292,8 @@ class AttentionConfig(BaseModel):
         config: RotaryTransformConfig | IdentityTransformConfig
 
     qkv_transforms: list[QueryKeyValueTransformConfig]
+    use_qk_norm: bool = False
+    qk_norm_config: Optional[LayerNormWrapperConfig] = None
 
 
 class GPT2LLMConfig(BaseModel):
@@ -385,99 +387,6 @@ class GPT2LLMConfig(BaseModel):
         return self
 
 
-class CausalSelfAttentionQKNorm(nn.Module):
-    def __init__(
-        self,
-        *,
-        n_embd: int,
-        n_head_q: int,
-        n_head_kv: int,
-        dropout: float,
-        bias: bool,
-        attention_impl: AttentionImplementation,
-        attention_config: AttentionConfig,
-    ):
-        super().__init__()
-        assert n_embd % n_head_q == 0
-        self.n_head_q = n_head_q
-        self.n_head_kv = n_head_kv
-        self.n_embd = n_embd
-        self.head_dim = n_embd // n_head_q
-        self.dropout = dropout
-
-        self.n_query_groups = n_head_q // n_head_kv
-        self.c_attn = nn.Linear(n_embd, (n_head_q + 2 * n_head_kv) * self.head_dim, bias=bias)
-        self.c_proj = nn.Linear(n_embd, n_embd, bias=bias)
-        self.attn_dropout = nn.Dropout(dropout)
-        self.resid_dropout = nn.Dropout(dropout)
-
-        self.qkv_transforms = self._setup_qkv_transforms(attention_config)
-
-        self.attention_impl = attention_impl
-        if self.attention_impl is AttentionImplementation.FLASH_ATTENTION and flash_attn_func is None:
-            raise ValueError("FlashAttention is not available. Please install it to use this attention implementation.")
-        
-        self.q_norm = RMSLayerNorm(dim=self.head_dim)
-        self.k_norm = RMSLayerNorm(dim=self.head_dim)
-
-    def _setup_qkv_transforms(self, attention_config: AttentionConfig) -> nn.ModuleList:
-        qkv_transforms = []
-        for transform_config in attention_config.qkv_transforms:
-            type_hint = transform_config.type_hint
-            config_dict = convert_base_model_config_to_dict(transform_config.config)
-            transform = type_hint.value(**config_dict)
-            qkv_transforms.append(transform)
-        return nn.ModuleList(qkv_transforms)
-
-    def _apply_qkv_transforms(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        for transform in self.qkv_transforms:
-            q, k, v = transform(q, k, v)
-        return q, k, v
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, C = x.size()
-        
-        qkv = self.c_attn(x)
-        q, k, v = qkv.split([self.n_head_q * self.head_dim, self.n_head_kv * self.head_dim, self.n_head_kv * self.head_dim], dim=2)
-        
-        q = q.view(B, T, self.n_head_q, self.head_dim)
-        k = k.view(B, T, self.n_head_kv, self.head_dim)
-        v = v.view(B, T, self.n_head_kv, self.head_dim)
-
-        q, k, v = self._apply_qkv_transforms(q, k, v)
-
-        q = self.q_norm(q)
-        k = self.k_norm(k)
-
-        if self.n_head_kv != self.n_head_q:
-            k = k.repeat_interleave(self.n_query_groups, dim=2)
-            v = v.repeat_interleave(self.n_query_groups, dim=2)
-
-        if self.attention_impl is AttentionImplementation.FLASH_ATTENTION:
-            y = flash_attn_func(q, k, v, dropout_p=self.dropout if self.training else 0.0, causal=True)
-        else:
-            q = q.transpose(1, 2)
-            k = k.transpose(1, 2)
-            v = v.transpose(1, 2)
-
-            if self.attention_impl is AttentionImplementation.PYTORCH:
-                y = torch.nn.functional.scaled_dot_product_attention(
-                    q, k, v, attn_mask=None, dropout_p=self.dropout if self.training else 0.0, is_causal=True
-                )
-            else:
-                y = manual_scaled_dot_product_attention(
-                    q, k, v, attn_mask=None, dropout_p=self.dropout if self.training else 0.0, is_causal=True
-                )
-
-            y = y.transpose(1, 2).contiguous()
-
-        y = y.view(B, T, C)
-        y = self.resid_dropout(self.c_proj(y))
-        return y
-
-
 class CausalSelfAttention(nn.Module):
     """Causal Self Attention class."""
 
@@ -558,10 +467,22 @@ class CausalSelfAttention(nn.Module):
         # QK Norm - helpful for models >1B to stabilize training
         # Baseline logits w/o qk norm: (Q @ K^T) / sqrt(d_h)
         # with geometric form of dot product: (||q_i|| * ||k_j|| * cos(θ_ij)) / sqrt(d_h)
-        # so if the model wants to increase the distance between logits it needs to scale q or k OR adjust the angle between them
+        # so if the model wants to increase the distance between logits
+        # it needs to scale q or k OR adjust the angle between them
         # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
-        self.q_norm = RMSLayerNorm(dim=self.head_dim) # Normalize across head dimension
+        self.q_norm = RMSLayerNorm(dim=self.head_dim)  # Normalize across head dimension
         self.k_norm = RMSLayerNorm(dim=self.head_dim)
+
+        if attention_config.use_qk_norm:
+            self.q_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+            self.k_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+        else:
+            self.q_norm = None
+            self.k_norm = None
 
     def projection(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -734,8 +655,9 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
-        q = self.q_norm(q)
-        k = self.k_norm(k)
+        if self.q_norm is not None and self.k_norm is not None:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
