@@ -156,14 +156,45 @@ def _create_optimizer_groups(
             f"model {type(model)} has no parameters with requires_grad=True (i.e., no traininable parameters)."
         )
 
-    optimizer_groups = [
+    optimizer_groups = _built_optimizer_groups_via_weight_decay_split(
+        weight_decay, weight_decay_groups_excluded, weight_decay_groups, params
+    )
+    return optimizer_groups, ["with_weight_decay", "without_weight_decay"]
+
+
+def _built_optimizer_groups_via_weight_decay_split(
+    weight_decay: float,
+    weight_decay_groups_excluded: list[str],
+    weight_decay_groups: dict[str, list[str]],
+    params: dict[str, nn.Parameter],
+) -> OptimizerGroups:
+    params_per_weight_decay_groups: list[dict[str, object]] = [
         {
             "params": _filter_params_for_weight_decay_group(params, regex_expressions=weight_decay_groups[group]),
-            "weight_decay": weight_decay if group not in weight_decay_groups_excluded else 0.0,
+            "exclude": group not in weight_decay_groups_excluded,
         }
         for group in weight_decay_groups.keys()
     ]
-    return optimizer_groups, weight_decay_groups.keys()
+
+    optimizer_groups: OptimizerGroups = [
+        {
+            "params": sum((p["params"] for p in params_per_weight_decay_groups if not p["exclude"]), []),
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": sum((p["params"] for p in params_per_weight_decay_groups if p["exclude"]), []),
+            "weight_decay": 0.0,
+        },
+    ]
+
+    if len(optimizer_groups[0]["params"]) == 0 or len(optimizer_groups[1]["params"]) == 0:
+        raise OptimizerError(
+            "One of the optimizer groups has zero parameters. "
+            "This indicates that the weight_decay_groups_excluded configuration is not compatible "
+            "with the configured pipeline stages."
+        )
+
+    return optimizer_groups
 
 
 def _filter_params_for_weight_decay_group(
