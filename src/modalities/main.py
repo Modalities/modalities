@@ -111,16 +111,21 @@ class Main:
         )
 
         # Trainer
+        # FIXME replace by get_parallel_degree
+        if components.device_mesh is None:
+            num_pipeline_parallel_ranks = 1
+            num_data_parallel_ranks = 1
+        else:
+            num_pipeline_parallel_ranks = get_num_parallel_ranks(components.device_mesh, ParallelismDegrees.PP)
+            num_data_parallel_ranks = get_num_parallel_ranks(
+                components.device_mesh, ParallelismDegrees.DP_SHARD
+            ) * get_num_parallel_ranks(components.device_mesh, ParallelismDegrees.DP_REPLICATE)
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size
             * components.settings.step_profile.sequence_length
             * components.settings.step_profile.gradient_accumulation_steps
-            * components.settings.cuda_env.world_size
+            * num_data_parallel_ranks
         )
-        if components.device_mesh is None:
-            num_pipeline_parallel_ranks = 1
-        else:
-            num_pipeline_parallel_ranks = get_num_parallel_ranks(components.device_mesh, ParallelismDegrees.PP)
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
             progress_publisher=progress_publisher,
