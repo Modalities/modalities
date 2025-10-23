@@ -112,8 +112,7 @@ def CMD_entry_point_run_modalities(
                 "hostname": socket.gethostname(),
             }
             error_log_folder = (
-                error_log_folder.parent
-                / f"{error_log_folder.stem}_{environment['hostname']}_{environment['local_rank']}.log"
+                error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
             )
             error_log_folder.parent.mkdir(parents=True, exist_ok=True)
             with open(error_log_folder, "w", encoding="utf-8") as f:
@@ -624,6 +623,13 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     help="Path to the root directory of the experiment containing config files.",
 )
 @click.option(
+    "--world_size",
+    type=int,
+    required=False,
+    default=None,
+    help="Number of ranks (world size) to filter the configs for.",
+)
+@click.option(
     "--file_list_path",
     type=click.Path(path_type=Path),
     required=True,
@@ -634,6 +640,12 @@ def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes
     type=int,
     required=True,
     help="Expected number of steps in evaluation_results.jsonl",
+)
+@click.option(
+    "--create_new_folders_if_partially_done",
+    is_flag=True,
+    default=False,
+    help="Create new experiment folders for remaining configs if some runs already exist.",
 )
 @click.option(
     "--skip_exception_types",
@@ -647,6 +659,8 @@ def CMD_entry_point_list_remaining_runs(
     exp_root: Path,
     file_list_path: Path,
     expected_steps: int,
+    create_new_folders_if_partially_done: bool,
+    world_size: int | None = None,
     skip_exception_types: str = "",
 ):
     """
@@ -655,12 +669,15 @@ def CMD_entry_point_list_remaining_runs(
     skip_exception_types_list = skip_exception_types.split(",") if skip_exception_types != "" else []
     file_list_dict = get_updated_sweep_status(
         exp_root=exp_root,
+        world_size=world_size,
         expected_steps=expected_steps,
         skip_exception_types=skip_exception_types_list,
+        create_new_folders_if_partially_done=create_new_folders_if_partially_done,
     )
-    with file_list_path.open("w", encoding="utf-8") as f:
-        for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
-            f.write(f"{cfg}\n")
+    if SweepSets.UPDATED_CONFIGS.value in file_list_dict:
+        with file_list_path.open("w", encoding="utf-8") as f:
+            for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
+                f.write(f"{cfg}\n")
 
 
 if __name__ == "__main__":
