@@ -141,7 +141,8 @@ class Main:
 
         # Trainer
         dp_degree = get_parallel_degree(
-            device_mesh=components.device_mesh, parallelism_method=ParallelismDegrees.DP_SHARD
+            device_mesh=components.device_mesh,
+            parallelism_methods=[ParallelismDegrees.DP_SHARD, ParallelismDegrees.DP_REPLICATE],
         )
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size

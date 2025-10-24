@@ -485,7 +485,7 @@ class GPT2MFUCalculatorConfig(BaseModel):
 
 class ParallelDegreeConfig(BaseModel):
     device_mesh: PydanticDeviceMeshIFType
-    parallelism_method: ParallelismDegrees
+    parallelism_methods: list[ParallelismDegrees]
 
 
 def load_app_config_dict(

@@ -1,4 +1,5 @@
 from enum import Enum
+from math import prod
 from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -129,19 +130,20 @@ def get_device_mesh(
     return device_mesh
 
 
-def get_parallel_degree(device_mesh: DeviceMesh, parallelism_method: ParallelismDegrees) -> int:
+def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[ParallelismDegrees]) -> int:
     """Gets the number of parallel ranks (i.e., the parallelism degree)
     from the device mesh for a specific parallelism method.
     Args:
         device_mesh (DeviceMesh): The device mesh.
-        parallelism_method (ParallelismDegrees): The parallelism method.
+        parallelism_methods (list[ParallelismDegrees]): The parallelism methods.
     Returns:
         int: The number of parallel ranks for the specified parallelism method.
     """
     if device_mesh.mesh_dim_names is None:
         raise ValueError("device_mesh.mesh_dim_names is None")
 
-    if parallelism_method.value not in device_mesh.mesh_dim_names:
-        return 1
-    else:
-        return device_mesh.size(device_mesh.mesh_dim_names.index(parallelism_method.value))
+    return prod(
+        device_mesh.size(device_mesh.mesh_dim_names.index(method.value))
+        for method in parallelism_methods
+        if method.value in device_mesh.mesh_dim_names
+    )

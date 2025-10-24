@@ -183,13 +183,13 @@ device_mesh:
     world_size: ${settings.cuda_env.world_size}
 
 dp_degree:
-  component_key: device_mesh
+  component_key: number_conversion
   variant_key: parallel_degree
   config: # get the parallel degree from the device mesh
     device_mesh:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
-    parallelism_method: dp_shard
+    parallelism_methods: [dp_shard, dp_replicate]
 
 app_state:
   component_key: app_state

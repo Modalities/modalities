@@ -177,7 +177,7 @@ COMPONENTS = [
     ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
-    ComponentEntity("device_mesh", "parallel_degree", get_parallel_degree, ParallelDegreeConfig),
+    ComponentEntity("number_conversion", "parallel_degree", get_parallel_degree, ParallelDegreeConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
