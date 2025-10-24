@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
 from modalities.exceptions import ConfigError
-from modalities.util import print_rank_0
 from modalities.utils.logger_utils import get_logger
 
 logger = get_logger("model_factory")
@@ -124,7 +123,7 @@ def get_device_mesh(
             names.append(name)
     names = tuple(names)
     device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
-    print_rank_0(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
+    logger.info(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
