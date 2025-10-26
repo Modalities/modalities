@@ -8,7 +8,6 @@ from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
-    PydanticDeviceMeshIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
@@ -181,7 +180,6 @@ class TrainingComponentsInstantiationModel(BaseModel):
     gradient_clipper: PydanticGradientClipperIFType
     mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
     model_raw: PydanticPytorchModuleType
-    device_mesh: PydanticDeviceMeshIFType
 
     @model_validator(mode="after")
     def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel.Settings":

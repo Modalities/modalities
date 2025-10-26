@@ -25,9 +25,7 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
-    dp_degree:
-      instance_key: dp_degree
-      pass_type: BY_REFERENCE
+    dp_degree: ${settings.cuda_env.world_size}
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -35,18 +33,14 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        dp_degree:
-          instance_key: dp_degree
-          pass_type: BY_REFERENCE
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        dp_degree:
-          instance_key: dp_degree
-          pass_type: BY_REFERENCE
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
@@ -219,24 +213,6 @@ model_raw:
         bias: true
         epsilon: 1e-5
     use_weight_tying: true
-
-device_mesh:
-  component_key: device_mesh
-  variant_key: default
-  config:
-    device_type: cuda
-    data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: -1
-    world_size: ${settings.cuda_env.world_size}
-
-dp_degree:
-  component_key: number_conversion
-  variant_key: parallel_degree
-  config: # get the parallel degree from the device mesh
-    device_mesh:
-      instance_key: device_mesh
-      pass_type: BY_REFERENCE
-    parallelism_methods: [dp_shard, dp_replicate]
 
 lr_scheduler:
   component_key: scheduler

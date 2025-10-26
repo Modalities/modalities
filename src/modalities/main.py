@@ -20,7 +20,6 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 from modalities.utils.logger_utils import get_logger
@@ -140,15 +139,11 @@ class Main:
         )
 
         # Trainer
-        dp_degree = get_parallel_degree(
-            device_mesh=components.device_mesh,
-            parallelism_methods=[ParallelismDegrees.DP_SHARD, ParallelismDegrees.DP_REPLICATE],
-        )
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size
             * components.settings.step_profile.sequence_length
             * components.settings.step_profile.gradient_accumulation_steps
-            * dp_degree
+            * components.settings.step_profile.dp_degree
         )
 
         trainer = Trainer(
@@ -162,7 +157,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
-            dp_degree=dp_degree,
+            dp_degree=components.settings.step_profile.dp_degree,
             mfu_calculator=components.mfu_calculator,
         )
 
