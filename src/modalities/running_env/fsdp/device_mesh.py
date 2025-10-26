@@ -1,4 +1,5 @@
 from enum import Enum
+from math import prod
 from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -127,3 +128,22 @@ def get_device_mesh(
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
+
+
+def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[ParallelismDegrees]) -> int:
+    """Gets the number of parallel ranks (i.e., the parallelism degree)
+    from the device mesh for a specific parallelism method.
+    Args:
+        device_mesh (DeviceMesh): The device mesh.
+        parallelism_methods (list[ParallelismDegrees]): The parallelism methods.
+    Returns:
+        int: The number of parallel ranks for the specified parallelism method.
+    """
+    if device_mesh.mesh_dim_names is None:
+        raise ValueError("device_mesh.mesh_dim_names is None")
+
+    return prod(
+        device_mesh.size(device_mesh.mesh_dim_names.index(method.value))
+        for method in parallelism_methods
+        if method.value in device_mesh.mesh_dim_names
+    )

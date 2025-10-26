@@ -17,8 +17,6 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
-  mesh_definition:
-    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: ${modalities_env:config_folder_path}
   intervals:
@@ -34,6 +32,9 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: ${sweep.local_train_micro_batch_size}
     sequence_length: ${sweep.sequence_length}
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens: 3744129024
     num_target_steps: ${sweep.num_target_steps}
@@ -126,8 +127,17 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.mesh_definition.dp_degree}
+    data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
 
 app_state:
   component_key: app_state

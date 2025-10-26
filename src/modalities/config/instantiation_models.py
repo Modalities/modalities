@@ -33,13 +33,7 @@ class StepProfile(BaseModel):
     gradient_accumulation_steps: Annotated[int, Field(strict=True, ge=1)]
     local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
     sequence_length: Annotated[int, Field(strict=True, ge=1)]
-
-
-class MeshDefinition(BaseModel):
-    dp_degree: Annotated[int, Field(strict=True, gt=0)]
-    tp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
-    pp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
-    cp_degree: Annotated[int, Field(strict=True, gt=0)] = 1
+    dp_degree: Annotated[int, Field(strict=True, ge=1)]
 
 
 class ConsistencyEnforcement(BaseModel):
@@ -99,7 +93,6 @@ class TrainingComponentsInstantiationModel(BaseModel):
         intervals: Intervals
         consistency_enforcement: ConsistencyEnforcement
         step_profile: StepProfile
-        mesh_definition: MeshDefinition
         training_target: TrainingTarget
         training_progress: TrainingProgress
         warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
@@ -114,7 +107,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
                 self.step_profile.local_train_micro_batch_size
                 * self.step_profile.sequence_length
                 * self.step_profile.gradient_accumulation_steps
-                * self.mesh_definition.dp_degree
+                * self.step_profile.dp_degree
             )
             if required_num_tokens_per_step != step_profile_num_tokens_per_step:
                 warning_message = (
