@@ -51,6 +51,7 @@ from modalities.config.config import (
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
+    ParallelDegreeConfig,
     PreTrainedHFTokenizerConfig,
     PreTrainedSPTokenizerConfig,
     RawAppStateConfig,
@@ -101,7 +102,7 @@ from modalities.nn.model_initialization.composed_initialization import (
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
-from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh
+from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh, get_parallel_degree
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     FSDP1GradientClipper,
@@ -191,6 +192,7 @@ COMPONENTS = [
     ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
+    ComponentEntity("number_conversion", "parallel_degree", get_parallel_degree, ParallelDegreeConfig),
     # weight initializers
     ComponentEntity(
         "model_initialization",
