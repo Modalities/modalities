@@ -11,7 +11,7 @@ settings:
     world_size: 8
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: /raid/s3/opengptx/user/richard-rutmann/data/modalities/gpt2_tokenized/000_00000.pbin
+    train_dataset_path: ./data/lorem_ipsum_long.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
   intervals:
     training_log_interval_in_steps: 2
