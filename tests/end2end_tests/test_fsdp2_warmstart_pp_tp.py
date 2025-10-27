@@ -215,21 +215,21 @@ class TestWarmstart:
 
     def test_warmstart_dataloader(self):
         # non-skipped config
-        gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
+        gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_7_pp_tp.yaml"
         gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path, experiment_id="0")
 
         # skipped config
-        gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
-        gpt2_warm_start_from_step_1_dict = load_app_config_dict(
-            gpt2_warm_start_from_step_1_config_file_path, experiment_id="1"
+        gpt2_warm_start_from_step_4_config_file_path = working_dir / "gpt2_warm_start_from_step_4_pp_tp.yaml"
+        gpt2_warm_start_from_step_4_dict = load_app_config_dict(
+            gpt2_warm_start_from_step_4_config_file_path, experiment_id="1"
         )
 
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
             main_obj_1 = Main(gpt2_two_steps_config_file_path)
             main_obj_1.config_dict = gpt2_two_steps_config_dict
 
-            main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
-            main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
+            main_obj_2 = Main(gpt2_warm_start_from_step_4_config_file_path)
+            main_obj_2.config_dict = gpt2_warm_start_from_step_4_dict
 
             main_obj_1.add_custom_component(
                 component_key="results_subscriber",
