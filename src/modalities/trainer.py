@@ -319,8 +319,17 @@ class Trainer:
                 if self.mfu_calculator is not None:
                     mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
 
-                peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
-                torch.cuda.reset_peak_memory_stats(device)
+                # Collect peak memory depending on device type. On CPU we fall back to RSS (if available) or -1.
+                if device.type == "cuda":
+                    peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                    torch.cuda.reset_peak_memory_stats(device)
+                else:
+                    # ru_maxrss is in kilobytes on Linux; convert to MB. Use -1.0 if resource unavailable.
+                    try:
+                        import resource  # Standard lib (POSIX). Not available on some platforms.
+                        peak_memory_MB = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+                    except Exception:
+                        peak_memory_MB = -1.0
 
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
