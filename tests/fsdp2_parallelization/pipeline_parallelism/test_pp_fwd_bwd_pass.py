@@ -19,7 +19,7 @@ from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 @pytest.fixture
 def temp_file_path() -> Path:
     with tempfile.NamedTemporaryFile() as tf:
-        yield tf.name
+        yield Path(tf.name)
 
 
 class ComponentsInstantiationPPModel(BaseModel):
