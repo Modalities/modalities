@@ -25,6 +25,9 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 2
     sequence_length: 256
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -156,6 +159,15 @@ device_mesh:
     tensor_parallel_degree: 2
     data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
 
 app_state:
   component_key: app_state
