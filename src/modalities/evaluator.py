@@ -109,7 +109,7 @@ class Evaluator:
                 num_eval_steps_done=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
-            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+            throughput_aggregator = Aggregator[ThroughputAggregationKeys]()
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
                     batch_loss = self.evaluate_batch(
@@ -124,7 +124,7 @@ class Evaluator:
                         cumulated_loss[0] += batch_loss.item()  # sum up batch loss
                         cumulated_loss[1] += 1
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+                    throughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
 
                     Evaluator._publish_progress(
                         progress_publisher=self.progress_publisher,
@@ -139,11 +139,11 @@ class Evaluator:
             )
 
             forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
-            thoughput_aggregator.add_value(
+            throughput_aggregator.add_value(
                 key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
             )
-            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-            synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
+            synced_num_samples = throughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+            synced_forward_backward_time = throughput_aggregator.get_all_reduced_value(
                 ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
             )
             num_samples_per_second = synced_num_samples / synced_forward_backward_time
