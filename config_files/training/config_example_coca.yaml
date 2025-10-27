@@ -25,13 +25,14 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
+    dp_degree: ${settings.cuda_env.world_size}
   training_target:
     num_target_tokens:      
       component_key: number_conversion
       variant_key: num_tokens_from_num_steps
       config:
         num_steps: ${settings.training_target.num_target_steps}
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
@@ -39,7 +40,7 @@ settings:
       component_key: number_conversion
       variant_key: num_steps_from_num_samples
       config:
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_samples: ${settings.coca_example_settings.train_num_samples}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
