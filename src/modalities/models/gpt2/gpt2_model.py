@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNormConfig
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
@@ -36,8 +36,9 @@ class LayerNorms(LookupEnum):
         PyTorchRMSNorm: nn.RMSNorm class.
     """
 
-    rms_norm = nn.RMSNorm
+    rms_norm = RMSLayerNorm
     layer_norm = nn.LayerNorm
+    pytorch_rms_norm = nn.RMSNorm
 
 
 class LayerNormWrapperConfig(BaseModel):
