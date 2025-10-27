@@ -75,7 +75,7 @@ class NNModel(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU class to define the SwiGLU activation function."""
 
-    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool):
+    def __init__(self, n_embd: int, ffn_hidden: int, bias: bool, enforce_swiglu_hidden_dim_multiple_of: int = 256):
         """
         Initializes the SwiGLU object.
 
@@ -84,11 +84,16 @@ class SwiGLU(nn.Module):
             ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
             Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
             bias (bool): Whether to include bias terms in the linear layers.
+            enforce_swiglu_hidden_dim_multiple_of (int): The multiple of which the hidden
+                dimension should be enforced. Defaults to 256.
+                This is required for FSDP + TP as the combincation does not support uneven sharding (yet).
+                Defaults to 256 if not provided.
         """
 
         super().__init__()
-
-        hidden_dim = SwiGLU._get_hidden_dim(ffn_hidden=ffn_hidden)
+        hidden_dim = SwiGLU._get_hidden_dim(
+            ffn_hidden=ffn_hidden, enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of
+        )
 
         self.W = nn.Linear(
             in_features=n_embd,
@@ -108,16 +113,30 @@ class SwiGLU(nn.Module):
         )
 
     @staticmethod
-    def _get_hidden_dim(ffn_hidden: int) -> int:
-        # Calculate the hidden dimension for the SwiGLU module based on the provided embedding dimension.
+    def _get_hidden_dim(ffn_hidden: int, enforce_swiglu_hidden_dim_multiple_of: int) -> int:
+        # Calculates the hidden dimension for a SwiGLU activation layer.
 
-        # Best practice: 4 * n_embd (https://arxiv.org/pdf/1706.03762)
-        # To ensure that the number of parameters in the SwiGLU module with its additional
-        # linear layer are equivalent to the TransformerMLP, we need to adapt the SwiGLU hidden dimension as follows:
-        # 2 * (n_embd * hidden_dim) == 3 * (n_embd * 2/3 * hidden_dim)
-        # Besides, we ensure that hidden_dim is the smallest multiple of
-        # 256 that is greater than or equal the provided hidden_dim
-        return 256 * ((int(2 * ffn_hidden / 3) + 256 - 1) // 256)
+        # This involves two steps:
+        # 1. Scaling the dimension down to ~2/3 to match the parameter count of a standard MLP.
+        # 2. Rounding the result up to the nearest multiple of `enforce_swiglu_hidden_dim_multiple_of`
+        # to ensure compatibility with distributed training setups (FSDP + TP).
+
+        # 1. Adjust the dimension to be approximately 2/3 of the standard FFN hidden size
+        #    to maintain a similar parameter count.
+        adjusted_hidden_dim = int(2 * ffn_hidden / 3)
+
+        # Alias for clarity
+        multiple = enforce_swiglu_hidden_dim_multiple_of
+
+        # 2. Round the adjusted dimension up to the nearest multiple of the enforcement value.
+        #    This uses a common integer arithmetic trick for ceiling division: ceil(a/b) = (a + b - 1) // b.
+        #    This is crucial for preventing uneven tensor sharding in distributed training.
+        rounded_up_hidden_dim = ((adjusted_hidden_dim + multiple - 1) // multiple) * multiple
+
+        # NOTE:  In case of TP, we must set `rounded_up_hidden_dim` to be at least of
+        # world size as FSDP + TP does not uneven sharding.
+        # FSDP itself without TP support it already however.
+        return rounded_up_hidden_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

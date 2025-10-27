@@ -198,6 +198,12 @@ Even though Modalities significantly simplifies LLM training, there is still som
 - [Library Usage](tutorials/library_usage/README.md)</br>
   How to use Modalities as a library and register custom components with Modalities.
 
+- [Instruction Tuning](tutorials/instruction_tuning/README.md)</br>
+  Teaches you how to apply instruction tuning on a pre-trained model.
+
+- [Scaling Up](tutorials/scaling_up/README.md)</br>
+  When scaling up your training to hundreds or thousands of GPUs, you want to maintain linear scalability. 
+  This tutorial teaches you how to find the optimal throughput setting for various hyperparameter settings at different scales. 
 
 
 

@@ -15,7 +15,7 @@ class DeviceMeshConfig(BaseModel):
     # inspired by ParallelDims class in
     # https://github.com/pytorch/torchtitan/blob/cfc0f4e08dc71685cdcb394464187d2eeedd1a5f/torchtitan/parallelisms/parallel_dims.py#L15
     device_type: str = "cuda"
-    data_parallel_replicate_degree: Annotated[int, Field(strict=True, gt=0)]
+    data_parallel_replicate_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     # if -1, we will calculate the shard degree based on the world size and other parallel degrees
     data_parallel_shard_degree: Annotated[int, Field(strict=True, ge=-1)]
     tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
