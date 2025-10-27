@@ -91,13 +91,15 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: resumable_distributed_sampler
+          variant_key: resumable_distributed_multi_dim_sampler
           config:
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
+            device_mesh:
+              instance_key: device_mesh
+              pass_type: BY_REFERENCE
+            data_parallel_key: dp_shard
             shuffle: true
             seed: 42
             drop_last: true
@@ -132,15 +134,18 @@ test_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_multi_dim_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            drop_last: true
             dataset:
               instance_key: test_dataset
               pass_type: BY_REFERENCE
+            device_mesh:
+              instance_key: device_mesh
+              pass_type: BY_REFERENCE
+            data_parallel_key: dp_shard
+            shuffle: true
+            seed: 42
+            drop_last: true
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
