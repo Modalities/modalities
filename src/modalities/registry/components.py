@@ -104,14 +104,12 @@ from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
-    DummyGradientClipper,
     FSDP1GradientClipper,
     FSDP1LoggingOnlyGradientClipper,
     FSDP2GradientClipper,
     FSDP2LoggingOnlyGradientClipper,
 )
 from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
-    DummyGradientClipperConfig,
     FSDP1DummyGradientClipperConfig,
     FSDP1GradientClipperConfig,
     FSDP2DummyGradientClipperConfig,
@@ -335,7 +333,6 @@ COMPONENTS = [
     ComponentEntity(
         "gradient_clipper", "fsdp2_logging_only", FSDP2LoggingOnlyGradientClipper, FSDP2DummyGradientClipperConfig
     ),
-    ComponentEntity("gradient_clipper", "dummy", DummyGradientClipper, DummyGradientClipperConfig),
     # MFU calculators
     ComponentEntity("mfu_calculator", "gpt2", GPT2MFUCalculator, GPT2MFUCalculatorConfig),
     # Number conversion

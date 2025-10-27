@@ -81,19 +81,3 @@ class FSDP2DummyGradientClipperConfig(FSDP1DummyGradientClipperConfig):
     wrapped_model: PydanticPytorchModuleType
     norm_type: GradientClippingMode
     device_mesh: PydanticDeviceMeshIFType | None = None
-
-
-class DummyGradientClipperConfig(BaseModel):
-    """
-    Configuration class for dummy gradient clipper.
-
-    This class is a placeholder and does not have any specific functionality.
-
-    Attributes:
-        None
-
-    Methods:
-        None
-    """
-
-    pass
