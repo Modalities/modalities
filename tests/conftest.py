@@ -213,7 +213,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         global_num_seen_tokens=0,
         num_target_tokens=100,
         num_target_steps=10,
-        num_pipeline_parallel_ranks=1,
+        pp_degree=1,
     )
 
 

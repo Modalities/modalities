@@ -5,18 +5,19 @@ from typing import Callable, Optional
 import torch
 import torch.distributed as dist
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.device_mesh import DeviceMesh
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, ResultItem
 from modalities.checkpointing.stateful.app_state import AppState
-from modalities.config.instantiation_models import MeshDefinition
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
@@ -37,7 +38,7 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
-        mesh_definition: MeshDefinition,
+        device_mesh: DeviceMesh | None,
         num_seen_train_steps: int,
         global_num_seen_tokens: int,
         num_target_steps: int,
@@ -54,7 +55,8 @@ class Trainer:
             evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Evaluation result publisher.
             gradient_acc_steps (int): Gradient accumulation steps.
             global_num_tokens_per_train_step (int): Global number of tokens per train step.
-            mesh_definition (MeshDefinition): Mesh definition.
+            dp_degree (int): Data parallelism degree.
+            pp_degree (int): Pipeline parallelism degree.
             num_seen_train_steps (int): Number of seen train steps.
             global_num_seen_tokens (int): Global number of seen tokens.
             num_target_steps (int): Number of target steps.
@@ -66,12 +68,16 @@ class Trainer:
             None
         """
         self.global_rank = global_rank
-        self.pp_degree = mesh_definition.pp_degree
+        if device_mesh is not None:
+            self.dp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD])
+            self.pp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.PP])
+        else:
+            self.dp_degree = dist.get_world_size()
+            self.pp_degree = 1
         self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
-        self.dp_degree = mesh_definition.dp_degree
         self.num_seen_train_steps = num_seen_train_steps
         self.num_target_steps = num_target_steps
         self.num_target_tokens = num_target_tokens
@@ -287,9 +293,9 @@ class Trainer:
                     tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
                     # 1.) summed batch loss / (num batches * world size)
-                    # 2.) last batch loss / (world size / num_pipeline_parallel_ranks)
+                    # 2.) last batch loss / (world size / pp_degree)
                     post_processing_fun=lambda t: torch.stack(
-                        [t[0] / t[-1], t[1] / dist.get_world_size() * self.num_pipeline_parallel_ranks]
+                        [t[0] / t[-1], t[1] / dist.get_world_size() * self.pp_degree]
                     ),
                 )
 
