@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
+from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNormConfig
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
@@ -33,15 +33,16 @@ class LayerNorms(LookupEnum):
     Attributes:
         RMSNorm: RMSLayerNorm class.
         LayerNorm: nn.LayerNorm class.
+        PyTorchRMSNorm: nn.RMSNorm class.
     """
 
-    rms_norm = RMSLayerNorm
+    rms_norm = nn.RMSNorm
     layer_norm = nn.LayerNorm
 
 
 class LayerNormWrapperConfig(BaseModel):
     norm_type: LayerNorms
-    config: LayerNormConfig | RMSLayerNormConfig
+    config: RMSLayerNormConfig | LayerNormConfig
 
 
 class PositionTypes(str, Enum):
@@ -470,9 +471,6 @@ class CausalSelfAttention(nn.Module):
         # so if the model wants to increase the distance between logits
         # it needs to scale q or k OR adjust the angle between them
         # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
-        self.q_norm = RMSLayerNorm(dim=self.head_dim)  # Normalize across head dimension
-        self.k_norm = RMSLayerNorm(dim=self.head_dim)
-
         if attention_config.use_qk_norm:
             self.q_norm = attention_config.qk_norm_config.norm_type.value(
                 **dict(attention_config.qk_norm_config.config)
