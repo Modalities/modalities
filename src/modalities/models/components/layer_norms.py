@@ -88,5 +88,20 @@ class RMSLayerNormConfig(BaseModel):
         bias (bool, optional): Whether to include a bias term. Defaults to True.
     """
 
+    ndim: Annotated[int, Field(strict=True, ge=1)]
+    epsilon: Annotated[float, Field(gt=0, default=1e-6)]
+    bias: Annotated[bool, Field(strict=True, default=True)]
+
+
+class PytorchRMSLayerNormConfig(BaseModel):
+    """
+    Configuration class for RMSLayerNorm.
+
+    Args:
+        ndim (int): Number of dimensions for the input tensor. Must be greater than or equal to 1.
+        epsilon (float, optional): Small value added to the input to avoid division by zero. Defaults to 1e-6.
+        bias (bool, optional): Whether to include a bias term. Defaults to True.
+    """
+
     normalized_shape: Annotated[int, Field(strict=True, ge=1)]
     eps: Annotated[float, Field(strict=True, gt=0, default=1e-5)]

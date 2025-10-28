@@ -12,7 +12,7 @@ from modalities.models.gpt2.gpt2_model import (
     CausalSelfAttention,
     LayerNorms,
     LayerNormWrapperConfig,
-    RMSLayerNormConfig,
+    PytorchRMSLayerNormConfig,
 )
 
 torch.manual_seed(0)
@@ -254,7 +254,7 @@ def test_qk_norm(n_head_q, n_head_kv, n_embd, attention_impl):
         qkv_transforms=[],
         use_qk_norm=True,
         qk_norm_config=LayerNormWrapperConfig(
-            norm_type=LayerNorms.pytorch_rms_norm, config=RMSLayerNormConfig(normalized_shape=head_dim)
+            norm_type=LayerNorms.pytorch_rms_norm, config=PytorchRMSLayerNormConfig(normalized_shape=head_dim)
         ),
     )
 
