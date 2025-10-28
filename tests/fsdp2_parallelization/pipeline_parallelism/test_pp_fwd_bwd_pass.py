@@ -144,7 +144,7 @@ class TestPipelineParallelism:
         else:
             pp_schedule.step(target=targets, losses=losses)
 
-        # accumulate losses across pipeline microbatchess
+        # accumulate losses across pipeline microbatches
         return (
             torch.mean(torch.stack(losses)).to(losses[0].device)
             if scheduled_pipeline.is_last_pp_stage
