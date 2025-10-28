@@ -157,7 +157,7 @@ class PipelineFactory:
                     current_level = current_level[part]
                 if parts[-1] in current_level:
                     raise ValueError(
-                        f" Leaf of {fqn} has already been defined in the tree as an intermediadate node or leaf! "
+                        f" Leaf of {fqn} has already been defined in the tree as an intermediate node or leaf! "
                         "Cannot replace the existing node as a leaf."
                     )
                 current_level[parts[-1]] = {}
