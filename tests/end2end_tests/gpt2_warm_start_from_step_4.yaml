@@ -9,8 +9,6 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
-  mesh_definition:
-    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: tmp/checkpoints
     train_dataset_path: tests/end2end_tests/lorem_ipsum.pbin
@@ -27,6 +25,7 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
+    dp_degree: ${settings.cuda_env.world_size}
   training_target:
     num_target_tokens:
       component_key: number_conversion

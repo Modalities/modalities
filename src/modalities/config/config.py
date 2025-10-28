@@ -483,6 +483,11 @@ class GPT2MFUCalculatorConfig(BaseModel):
     wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
 
 
+class ParallelDegreeConfig(BaseModel):
+    device_mesh: PydanticDeviceMeshIFType
+    parallelism_methods: list[ParallelismDegrees]
+
+
 def load_app_config_dict(
     config_file_path: Path,
     experiment_id: Optional[str] = None,

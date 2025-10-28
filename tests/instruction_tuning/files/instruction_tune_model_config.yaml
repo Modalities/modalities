@@ -9,8 +9,6 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
-  mesh_definition:
-    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: "replace by train temp path" # will be overridden in the test
@@ -28,6 +26,9 @@ settings:
     gradient_accumulation_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 2048
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -35,7 +36,9 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        dp_degree: ${settings.mesh_definition.dp_degree}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
         sample_key: chat
@@ -44,7 +47,9 @@ settings:
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        dp_degree: ${settings.mesh_definition.dp_degree}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
@@ -190,8 +195,17 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.mesh_definition.dp_degree} # i.e., fully sharded
+    data_parallel_shard_degree: -1 # i.e., fully sharded
     world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
 
 app_state:
   component_key: app_state
