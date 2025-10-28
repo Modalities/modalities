@@ -9,14 +9,16 @@ settings:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
+  mesh_definition:
+    dp_degree: ${settings.cuda_env.world_size}
   paths:
     checkpoint_saving_path: /raid/s3/opengptx/mfrey/fineweb-30B/checkpoints
-    train_dataset_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/deu_Latn_train.pbin
-    val_dataset_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/deu_Latn_val.pbin
+    train_dataset_path: /raid/s3/opengptx/behzad_shomali/markus_multilingual_data/eng_Latn_train.pbin
+    val_dataset_path: /raid/s3/opengptx/behzad_shomali/markus_multilingual_data/eng_Latn_val.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 10000
-    evaluation_interval_in_steps: 100
+    evaluation_interval_in_steps: 1000
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
@@ -33,14 +35,14 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
@@ -66,39 +68,9 @@ train_dataset:
       - component_key: dataset
         variant_key: packed_mem_map_dataset_continuous
         config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/deu_Latn_train.pbin
+          raw_data_path: /raid/s3/opengptx/behzad_shomali/markus_multilingual_data/eng_Latn_train.pbin
           sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/eng_Latn_train.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/fra_Latn_train.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/ita_Latn_train.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/spa_Latn_train.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/nob_Latn_train.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
+          sample_key:  ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -141,37 +113,7 @@ val_dataset:
       - component_key: dataset
         variant_key: packed_mem_map_dataset_continuous
         config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/deu_Latn_val.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/eng_Latn_val.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/fra_Latn_val.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/ita_Latn_val.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/spa_Latn_val.pbin
-          sequence_length: ${settings.step_profile.sequence_length}
-          sample_key: ${settings.referencing_keys.sample_key}
-      - component_key: dataset
-        variant_key: packed_mem_map_dataset_continuous
-        config:
-          raw_data_path: /raid/s3/opengptx/mfrey/fineweb-30B/packed/nob_Latn_val.pbin
+          raw_data_path: /raid/s3/opengptx/behzad_shomali/markus_multilingual_data/eng_Latn_val.pbin
           sequence_length: ${settings.step_profile.sequence_length}
           sample_key: ${settings.referencing_keys.sample_key}
 
@@ -249,17 +191,57 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
+    # model:
+    #   instance_key: compiled_model
+    #   pass_type: BY_REFERENCE
+    # sync_module_states: true
+    # mixed_precision_settings: BF_16
+    # sharding_strategy: FULL_SHARD
+    # block_names: [GPT2Block]
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    world_size: ${settings.cuda_env.world_size}
+
+
 wrapped_model:
   component_key: model
   variant_key: fsdp1_wrapped
   config:
     model:
-      instance_key: model
+      instance_key: compiled_model
       pass_type: BY_REFERENCE
-    sync_module_states: true
+    # device_mesh:
+    #   instance_key: device_mesh
+    #   pass_type: BY_REFERENCE
+    # mixed_precision_settings:
+    #   param_dtype: BF_16
+    #   reduce_dtype: BF_16
     mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
     block_names: [GPT2Block]
+    sync_module_states: true
+    sharding_strategy: FULL_SHARD
+
+
+# wrapped_model:
+#   component_key: model
+#   variant_key: fsdp2_wrapped
+#   config:
+#     model:
+#       instance_key: compiled_model
+#       pass_type: BY_REFERENCE
+#     device_mesh:
+#       instance_key: device_mesh
+#       pass_type: BY_REFERENCE
+#     mixed_precision_settings:
+#       param_dtype: BF_16
+#       reduce_dtype: BF_16
+#     block_names: [GPT2Block]
 
 model:
   component_key: model
@@ -277,6 +259,15 @@ model:
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
+
+compiled_model:
+  component_key: model
+  variant_key: compiled
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    block_names: [GPT2Block]
 
 model_raw:
   component_key: model
@@ -306,7 +297,7 @@ model_raw:
             seq_length_dim: -2
             base_freq: 10000
       use_qk_norm: false
-    attention_implementation: manual
+    attention_implementation: pytorch_flash
     activation_type: swiglu
     attention_norm_config:
       norm_type: layer_norm
@@ -380,7 +371,7 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: 2b_config
+    project: qknorm
     mode: ONLINE
     experiment_id: ${settings.experiment_id}
     directory: data/wandb_storage
