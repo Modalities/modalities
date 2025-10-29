@@ -157,7 +157,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
-            dp_degree=components.settings.step_profile.dp_degree,
+            device_mesh=components.device_mesh,
             mfu_calculator=components.mfu_calculator,
         )
 
@@ -174,7 +174,7 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        num_params = get_total_number_of_trainable_parameters(components.app_state.model)
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model, components.device_mesh)
         components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
         logger.info(f"Training model with {num_params} parameters.")
 
@@ -200,6 +200,7 @@ class Main:
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
+            scheduled_pipeline=components.scheduled_pipeline if components.scheduled_pipeline else None,
         )
 
     def get_logging_publishers(

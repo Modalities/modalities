@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
 from modalities.exceptions import ConfigError
-from modalities.util import print_rank_0
 from modalities.utils.logger_utils import get_logger
 
 logger = get_logger("model_factory")
@@ -85,7 +84,8 @@ def get_device_mesh(
     enable_loss_parallel: bool,
     world_size: int,
 ) -> DeviceMesh:
-    """Gets the device mesh for the specified parallelism degrees.
+    """
+    Gets the device mesh for the specified parallelism degrees.
 
     Args:
         device_type (str): The device type.
@@ -119,12 +119,12 @@ def get_device_mesh(
         ],
         strict=True,
     ):
-        if dim > 1:
+        if dim > 1 or name == ParallelismDegrees.DP_SHARD.value:
             dims.append(dim)
             names.append(name)
     names = tuple(names)
     device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
-    print_rank_0(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
+    logger.info(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
@@ -147,3 +147,9 @@ def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[Paral
         for method in parallelism_methods
         if method.value in device_mesh.mesh_dim_names
     )
+    
+def get_mesh_for_parallelism_method(device_mesh: DeviceMesh | None, parallelism_method: ParallelismDegrees):
+    if device_mesh is not None and parallelism_method.value in device_mesh.mesh_dim_names:
+        return device_mesh[parallelism_method.value]
+    else:
+        return None

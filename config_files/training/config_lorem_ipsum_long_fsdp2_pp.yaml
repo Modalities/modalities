@@ -23,10 +23,12 @@ settings:
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
   step_profile:
-    gradient_accumulation_steps: 2
-    local_train_micro_batch_size: 1
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 4
     sequence_length: 256
-    dp_degree: ${settings.cuda_env.world_size}
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -34,41 +36,27 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        dp_degree: ${settings.cuda_env.world_size}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        dp_degree: ${settings.cuda_env.world_size}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
   training_progress:
-    global_num_seen_tokens:   # used below
-      component_key: number_conversion
-      variant_key: global_num_seen_tokens_from_checkpoint_path
-      config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
-    num_seen_steps:  # for the batch progress subscriber
-      component_key: number_conversion
-      variant_key: num_seen_steps_from_checkpoint_path
-      config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
-    num_seen_samples:
-      component_key: number_conversion
-      variant_key: num_samples_from_num_tokens
-      config:
-        num_tokens: ${settings.training_progress.global_num_seen_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
-    last_step:  # for the scheduler
-      component_key: number_conversion
-      variant_key: last_step_from_checkpoint_path
-      config:
-        checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
-  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    num_seen_samples: 0
+    last_step: -1
 
 collate_fn:
   component_key: collate_fn
@@ -103,13 +91,15 @@ train_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: resumable_distributed_sampler
+          variant_key: resumable_distributed_multi_dim_sampler
           config:
             dataset:
               instance_key: train_dataset
               pass_type: BY_REFERENCE
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
+            device_mesh:
+              instance_key: device_mesh
+              pass_type: BY_REFERENCE
+            data_parallel_key: dp_shard
             shuffle: true
             seed: 42
             drop_last: true
@@ -144,15 +134,18 @@ test_dataloader:
         drop_last: true
         sampler:
           component_key: sampler
-          variant_key: distributed_sampler
+          variant_key: resumable_distributed_multi_dim_sampler
           config:
-            rank: ${settings.cuda_env.global_rank}
-            num_replicas: ${settings.cuda_env.world_size}
-            shuffle: false
-            drop_last: true
             dataset:
               instance_key: test_dataset
               pass_type: BY_REFERENCE
+            device_mesh:
+              instance_key: device_mesh
+              pass_type: BY_REFERENCE
+            data_parallel_key: dp_shard
+            shuffle: true
+            seed: 42
+            drop_last: true
     collate_fn:
       instance_key: collate_fn
       pass_type: BY_REFERENCE
@@ -160,15 +153,6 @@ test_dataloader:
 eval_dataloaders:
   - instance_key: test_dataloader
     pass_type: BY_REFERENCE
-
-checkpoint_loading:
-  component_key: checkpoint_loading
-  variant_key: fsdp1
-  config:
-    global_rank: ${settings.cuda_env.global_rank}
-    block_names: [GPT2Block]
-    mixed_precision_settings: BF_16
-    sharding_strategy: FULL_SHARD
 
 checkpoint_saving:
   component_key: checkpoint_saving
@@ -181,7 +165,7 @@ checkpoint_saving:
         k: -1   # -1 to save all checkpoints
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
-      variant_key: fsdp1
+      variant_key: dcp
       config:
         checkpoint_path: ${settings.paths.checkpoint_saving_path}
         global_rank: ${settings.cuda_env.global_rank}
@@ -194,12 +178,31 @@ loss_fn:
     target_key: ${settings.referencing_keys.target_key}
     prediction_key: ${settings.referencing_keys.prediction_key}
 
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    pipeline_parallel_degree: 2
+    data_parallel_shard_degree: -1
+    world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+
 app_state:
   component_key: app_state
   variant_key: raw
   config:
-    model:
-      instance_key: wrapped_model
+    model: 
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
       instance_key: optimizer
@@ -208,25 +211,19 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-wrapped_model:
-  component_key: model
-  variant_key: fsdp1_checkpointed
-  config:
-    model:
-      instance_key: initialized_model
-      pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
-      pass_type: BY_REFERENCE
-    checkpoint_path: ${settings.warmstart_checkpoint_paths.model_checkpoint_path}
 
 initialized_model:
   component_key: model
   variant_key: model_initialized
   config:
     model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
+      component_key: pipeline
+      variant_key: selector
+      config:
+        pipeline:
+          instance_key: scheduled_pipeline
+          pass_type: BY_REFERENCE
+        selection_type: MODEL_PART
     model_initializer:
       component_key: model_initialization
       variant_key: composed
@@ -237,11 +234,88 @@ initialized_model:
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
 
+scheduled_pipeline:
+  component_key: pipeline
+  variant_key: scheduled
+  config:
+    loss_fn:
+      instance_key: loss_fn
+      pass_type: BY_REFERENCE
+    pp_schedule_name: gpipe
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    microbatch_size: 2
+    pp_degree: ${device_mesh.config.pipeline_parallel_degree}
+     # maybe better to use the fsdp model and the schedule here
+     # instead of passing in the staged pipeline?
+     # If fsdp_model creates a copy then this is not in the scope of 
+     # the staged pipeline. 
+    pipeline:
+      component_key: pipeline
+      variant_key: builder
+      config:
+        pp_stage:
+          component_key: pipeline
+          variant_key: selector
+          config:
+            pipeline:
+              instance_key: staged_pipeline
+              pass_type: BY_REFERENCE
+            selection_type: PP_STAGE
+        model_part:
+          instance_key: fsdp_model
+          pass_type: BY_REFERENCE
+        
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_part
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+model_part:
+  component_key: pipeline
+  variant_key: selector
+  config:
+    pipeline:
+      instance_key: staged_pipeline
+      pass_type: BY_REFERENCE
+    selection_type: MODEL_PART
+
+
+staged_pipeline:
+  component_key: pipeline
+  variant_key: staged
+  config:
+    whole_model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    stages_generator:
+      component_key: stages_generator
+      variant_key: gpt2_stages_generator
+      config:
+        num_model_layers: ${model_raw.config.n_layer}
+        input_layer_equivalence: 1
+        output_layer_equivalence: 1
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    local_rank: ${settings.cuda_env.local_rank}
+    pp_schedule_name: gpipe
+    num_layers_per_stage: 2
+
 model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    use_meta_device: false
+    use_meta_device: true
     use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
@@ -298,21 +372,6 @@ lr_scheduler:
 
 optimizer:
   component_key: optimizer
-  variant_key: fsdp1_checkpointed
-  config:
-    optimizer:
-      instance_key: optimizer_initial
-      pass_type: BY_REFERENCE
-    wrapped_model:
-      instance_key: wrapped_model
-      pass_type: BY_REFERENCE
-    checkpoint_loading:
-      instance_key: checkpoint_loading
-      pass_type: BY_REFERENCE
-    checkpoint_path: ${settings.warmstart_checkpoint_paths.optimizer_checkpoint_path}
-
-optimizer_initial:
-  component_key: optimizer
   variant_key: adam_w
   config:
     lr: 0.0001
@@ -321,15 +380,15 @@ optimizer_initial:
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
     wrapped_model: 
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
 
 gradient_clipper:
   component_key: gradient_clipper
-  variant_key: fsdp1
+  variant_key: fsdp2
   config:
     wrapped_model:
-      instance_key: wrapped_model
+      instance_key: initialized_model
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
@@ -356,3 +415,18 @@ evaluation_subscriber:
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
+
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
+  config:
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    world_size: ${settings.cuda_env.world_size}
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import PydanticAppStateType
+from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticDeviceMeshIFType
 from modalities.util import get_total_number_of_trainable_parameters
 from modalities.utils.typing_utils import FSDPX
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
@@ -113,6 +113,7 @@ class TestUtils:
     ):
         class CustomComponentInstantiationModel(BaseModel):
             app_state: PydanticAppStateType
+            device_mesh: PydanticDeviceMeshIFType | None = None
 
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
@@ -129,9 +130,14 @@ class TestUtils:
 
             TestUtils._assert_correct_total_number_of_trainable_parameters(
                 wrapped_model=wrapped_model,
+                device_mesh=components.device_mesh,
                 expected_nr_parameters=expected_nr_parameters,
             )
 
-    def _assert_correct_total_number_of_trainable_parameters(wrapped_model: FSDPX, expected_nr_parameters: int):
-        nr_parameters = get_total_number_of_trainable_parameters(wrapped_model)
+    def _assert_correct_total_number_of_trainable_parameters(
+        wrapped_model: FSDPX,
+        expected_nr_parameters: int,
+        device_mesh: PydanticDeviceMeshIFType | None
+    ):
+        nr_parameters = get_total_number_of_trainable_parameters(model=wrapped_model, device_mesh=device_mesh)
         assert nr_parameters == expected_nr_parameters
