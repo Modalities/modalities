@@ -16,7 +16,7 @@ from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingExecutionIFType,
     PydanticCheckpointSavingStrategyIFType,
-    PydanticCollateFnIFType,
+    PydanticCollatorIFType,
     PydanticDatasetIFType,
     PydanticDeviceMeshIFType,
     PydanticFSDP1CheckpointLoadingIFType,
@@ -358,6 +358,9 @@ class RawAppStateConfig(BaseModel):
 class DCPAppStateConfig(BaseModel):
     raw_app_state: PydanticAppStateType
     checkpoint_dir_path: Path
+    load_model_checkpoint: bool = True
+    load_optimizer_checkpoint: bool = True
+    load_lr_scheduler_checkpoint: bool = True
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
@@ -411,6 +414,11 @@ class PackedMemMapDatasetContinuousConfig(BaseModel):
     reuse_last_target: bool = Field(default=True)
 
 
+class MemMapDatasetIterativeConfig(BaseModel):
+    raw_data_path: Path
+    sample_key: str
+
+
 class PackedMemMapDatasetMegatronConfig(BaseModel):
     raw_data_path: Path
     block_size: Annotated[int, Field(strict=True, gt=1)]
@@ -427,16 +435,11 @@ class BatchSamplerConfig(BaseModel):
     drop_last: Literal[True] = True
 
 
-class GPT2LLMCollateFnConfig(BaseModel):
-    sample_key: str
-    target_key: str
-
-
 class LLMDataLoaderConfig(BaseModel):
     dataloader_tag: str
     dataset: PydanticDatasetIFType
     batch_sampler: PydanticSamplerIFType
-    collate_fn: Optional[PydanticCollateFnIFType] = None
+    collator: Optional[PydanticCollatorIFType] = None
     num_workers: Annotated[int, Field(strict=True, ge=0)]
     pin_memory: bool
 

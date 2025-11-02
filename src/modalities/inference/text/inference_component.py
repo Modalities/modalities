@@ -74,11 +74,16 @@ class TextInferenceComponent:
         print("\n max tokens reached", end="")
 
     def run(self):
-        prompt = TextInferenceComponent._get_prompt(self.prompt_template)
-        try:
-            self.generate_tokens(context=prompt)
-        except KeyboardInterrupt:
-            print("closing app...")
+        round = 1
+        while True:
+            print(f"\n\n--------------------ROUND-{round}--------------------")
+            prompt = TextInferenceComponent._get_prompt(self.prompt_template)
+            try:
+                self.generate_tokens(context=prompt)
+            except KeyboardInterrupt:
+                print("closing app...")
+                break
+            round += 1
 
     @staticmethod
     def _get_prompt(template: str) -> str:

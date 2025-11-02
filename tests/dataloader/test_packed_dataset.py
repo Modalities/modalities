@@ -10,7 +10,7 @@ from modalities.dataloader.dataset import (
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
 )
-from modalities.models.gpt2.collator import GPT2LLMCollateFn
+from modalities.models.gpt2.collator import AutoregressiveCollateFn
 
 
 @pytest.mark.parametrize("block_size, expected_length", [(1, 4), (2, 3), (3, 3), (10, 2), (6, 2), (20, 1), (25, 0)])
@@ -231,7 +231,7 @@ def test_conversion_tokens_represented_as_unsigned_ints(tmpdir, token_size_in_by
     )
     assert list(ds)
 
-    collator = GPT2LLMCollateFn(sample_key=sample_key, target_key="abc")
+    collator = AutoregressiveCollateFn(sample_key=sample_key, target_key="abc")
     for batch in zip(ds, ds):
         collator(list(batch))
 

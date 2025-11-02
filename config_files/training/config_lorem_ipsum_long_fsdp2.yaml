@@ -58,12 +58,22 @@ settings:
     num_seen_samples: 0
     last_step: -1
 
-collate_fn:
-  component_key: collate_fn
-  variant_key: gpt_2_llm_collator
+collator:
+  component_key: collator
+  variant_key: default_wrapping_collator
   config:
-    sample_key: ${settings.referencing_keys.sample_key}
-    target_key: ${settings.referencing_keys.target_key}
+    input_keys:
+      - ${settings.referencing_keys.sample_key}
+    sample_keys: 
+      - ${settings.referencing_keys.sample_key}
+    target_keys: 
+      - ${settings.referencing_keys.target_key}
+    collate_fns:
+      - component_key: collate_fn
+        variant_key: autoregressive
+        config:
+          sample_key: ${settings.referencing_keys.sample_key}
+          target_key: ${settings.referencing_keys.target_key}
 
 train_dataset:
   component_key: dataset
@@ -102,8 +112,8 @@ train_dataloader:
             seed: 42
             drop_last: true
             skip_num_global_samples: ${settings.training_progress.num_seen_samples}
-    collate_fn:
-      instance_key: collate_fn
+    collator:
+      instance_key: collator
       pass_type: BY_REFERENCE
 
 test_dataset:
@@ -141,8 +151,8 @@ test_dataloader:
             dataset:
               instance_key: test_dataset
               pass_type: BY_REFERENCE
-    collate_fn:
-      instance_key: collate_fn
+    collator:
+      instance_key: collator
       pass_type: BY_REFERENCE
 
 eval_dataloaders:
