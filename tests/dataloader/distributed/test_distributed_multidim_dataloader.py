@@ -35,19 +35,19 @@ def test_distributed_multidim_dataloader_produces_different_data_on_different_dp
             ), f"Data samples on different data parallel ranks {dp_rank1} and {dp_rank2} should be disjoint."
 
 
-def _build_batch_for_each_rank_combination(world_size: int, dp_degree: int):
+def _build_batch_for_each_rank_combination(world_size: int, dp_degree: int) -> dict[tuple[int, int], list[list[int]]]:
     return {
         (dp_rank, other_rank): _load_data_for_ranks(dp_rank, other_rank, world_size, dp_degree)
         for dp_rank, other_rank in _get_rank_combinations(world_size, dp_degree)
     }
 
 
-def _get_rank_combinations(world_size: int, dp_degree: int):
+def _get_rank_combinations(world_size: int, dp_degree: int) -> list[tuple[int, int]]:
     other_degree = world_size // dp_degree
     return [(dp_rank, other_rank) for dp_rank in range(dp_degree) for other_rank in range(other_degree)]
 
 
-def _load_data_for_ranks(dp_rank: int, other_rank: int, world_size: int, dp_degree: int):
+def _load_data_for_ranks(dp_rank: int, other_rank: int, world_size: int, dp_degree: int) -> list[list[int]]:
     global_rank = dp_rank * 2 + other_rank
     with MultiProcessingCudaEnvMock(
         global_rank=global_rank,
@@ -72,7 +72,7 @@ def _load_data_for_ranks(dp_rank: int, other_rank: int, world_size: int, dp_degr
         return [batch.tolist() for batch in train_dataloader]
 
 
-def _build_device_mesh_mock(world_size: int, dp_degree: int, dp_rank: int, other_rank: int):
+def _build_device_mesh_mock(world_size: int, dp_degree: int, dp_rank: int, other_rank: int) -> dict[str, MagicMock]:
     dp_device_mesh = MagicMock()
     dp_device_mesh.size.return_value = dp_degree
     dp_device_mesh.get_coordinate.return_value = [dp_rank]
