@@ -42,13 +42,17 @@ def _build_batch_for_each_rank_combination(world_size: int, dp_degree: int) -> d
     }
 
 
+def _get_other_degree(world_size: int, dp_degree: int) -> int:
+    return world_size // dp_degree
+
+
 def _get_rank_combinations(world_size: int, dp_degree: int) -> list[tuple[int, int]]:
-    other_degree = world_size // dp_degree
+    other_degree = _get_other_degree(world_size, dp_degree)
     return [(dp_rank, other_rank) for dp_rank in range(dp_degree) for other_rank in range(other_degree)]
 
 
 def _load_data_for_ranks(dp_rank: int, other_rank: int, world_size: int, dp_degree: int) -> list[list[int]]:
-    global_rank = dp_rank * 2 + other_rank
+    global_rank = dp_rank * _get_other_degree(world_size, dp_degree) + other_rank
     with MultiProcessingCudaEnvMock(
         global_rank=global_rank,
         local_rank=other_rank,
