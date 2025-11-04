@@ -176,6 +176,7 @@ def _build_optimizer_groups_via_weight_decay_split(
         for group in weight_decay_groups.keys()
     ]
 
+    # combine all parameter lists into two optimizer groups, one with and one without weight decay
     optimizer_groups: OptimizerGroups = [
         {
             "params": sum((p["params"] for p in params_per_weight_decay_groups if not p["exclude"]), []),
