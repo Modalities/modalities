@@ -156,13 +156,13 @@ def _create_optimizer_groups(
             f"model {type(model)} has no parameters with requires_grad=True (i.e., no traininable parameters)."
         )
 
-    optimizer_groups = _built_optimizer_groups_via_weight_decay_split(
+    optimizer_groups = _build_optimizer_groups_via_weight_decay_split(
         weight_decay, weight_decay_groups_excluded, weight_decay_groups, params
     )
     return optimizer_groups, ["with_weight_decay", "without_weight_decay"]
 
 
-def _built_optimizer_groups_via_weight_decay_split(
+def _build_optimizer_groups_via_weight_decay_split(
     weight_decay: float,
     weight_decay_groups_excluded: list[str],
     weight_decay_groups: dict[str, list[str]],
