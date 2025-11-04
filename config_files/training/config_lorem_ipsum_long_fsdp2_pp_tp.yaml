@@ -8,7 +8,7 @@ settings:
   cuda_env:
     local_rank: ${cuda_env:LOCAL_RANK}
     global_rank: ${cuda_env:RANK}
-    world_size: 8
+    world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: ./data/lorem_ipsum_long.pbin
@@ -420,17 +420,17 @@ evaluation_subscriber:
     directory: wandb_storage
     config_file_path: ${settings.config_file_path}
 
-# mfu_calculator:
-#   component_key: mfu_calculator
-#   variant_key: gpt2
-#   config:
-#     n_layer: ${model_raw.config.n_layer}
-#     sequence_length: ${settings.step_profile.sequence_length}
-#     n_embd: ${model_raw.config.n_embd}
-#     world_size: ${settings.cuda_env.world_size}
-#     raw_model:
-#       instance_key: model_raw
-#       pass_type: BY_REFERENCE
-#     wrapped_model:
-#       instance_key: initialized_model
-#       pass_type: BY_REFERENCE
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
+  config:
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    world_size: ${settings.cuda_env.world_size}
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
