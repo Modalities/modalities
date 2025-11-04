@@ -4,8 +4,8 @@ from typing import Callable, Optional
 
 import torch
 import torch.distributed as dist
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.device_mesh import DeviceMesh
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -69,7 +69,9 @@ class Trainer:
         """
         self.global_rank = global_rank
         if device_mesh is not None:
-            self.dp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD])
+            self.dp_degree = get_parallel_degree(
+                device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD]
+            )
             self.pp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.PP])
         else:
             self.dp_degree = dist.get_world_size()
@@ -292,7 +294,7 @@ class Trainer:
                 reduced_losses = Reducer.reduce(
                     tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
-                    # 1.) summed batch loss / (num batches * world size)
+                    # 1.) summed batch loss / (num batches * (world size / dp_degree))
                     # 2.) last batch loss / (world size / pp_degree)
                     post_processing_fun=lambda t: torch.stack(
                         [t[0] / t[-1], t[1] / dist.get_world_size() * self.pp_degree]
@@ -327,6 +329,7 @@ class Trainer:
                     # ru_maxrss is in kilobytes on Linux; convert to MB. Use -1.0 if resource unavailable.
                     try:
                         import resource  # Standard lib (POSIX). Not available on some platforms.
+
                         peak_memory_MB = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
                     except Exception:
                         peak_memory_MB = -1.0
