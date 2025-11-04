@@ -26,7 +26,7 @@ class FSDP1GradientClipperConfig(BaseModel):
     wrapped_model: PydanticPytorchModuleType
 
 
-class FSDP2GradientClipperConfig(FSDP1GradientClipperConfig):
+class FSDP2GradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP gradient clipper.
 
@@ -43,7 +43,10 @@ class FSDP2GradientClipperConfig(FSDP1GradientClipperConfig):
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
-    device_mesh: PydanticDeviceMeshIFType | None = None
+    max_norm: Annotated[float, Field(strict=True, gt=0)]
+    norm_type: GradientClippingMode
+    wrapped_model: PydanticPytorchModuleType
+    device_mesh: PydanticDeviceMeshIFType
 
 
 class FSDP1DummyGradientClipperConfig(BaseModel):
@@ -63,7 +66,7 @@ class FSDP1DummyGradientClipperConfig(BaseModel):
     norm_type: GradientClippingMode
 
 
-class FSDP2DummyGradientClipperConfig(FSDP1DummyGradientClipperConfig):
+class FSDP2DummyGradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP dummy gradient clipper.
 
@@ -80,4 +83,4 @@ class FSDP2DummyGradientClipperConfig(FSDP1DummyGradientClipperConfig):
 
     wrapped_model: PydanticPytorchModuleType
     norm_type: GradientClippingMode
-    device_mesh: PydanticDeviceMeshIFType | None = None
+    device_mesh: PydanticDeviceMeshIFType
