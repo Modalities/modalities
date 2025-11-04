@@ -200,7 +200,7 @@ class Main:
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
-            scheduled_pipeline=components.scheduled_pipeline if components.scheduled_pipeline else None,
+            scheduled_pipeline=components.scheduled_pipeline,
         )
 
     def get_logging_publishers(

@@ -147,9 +147,34 @@ def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[Paral
         for method in parallelism_methods
         if method.value in device_mesh.mesh_dim_names
     )
-    
-def get_mesh_for_parallelism_method(device_mesh: DeviceMesh | None, parallelism_method: ParallelismDegrees):
-    if device_mesh is not None and parallelism_method.value in device_mesh.mesh_dim_names:
-        return device_mesh[parallelism_method.value]
-    else:
-        return None
+
+
+def has_parallelism_method(device_mesh: DeviceMesh | None, parallelism_method: ParallelismDegrees) -> bool:
+    """Checks if the device mesh has the specified parallelism method.
+
+    Args:
+        device_mesh (DeviceMesh | None): The device mesh.
+        parallelism_method (ParallelismDegrees): The parallelism method.
+
+    Returns:
+        bool: True if the device mesh has the specified parallelism method, False otherwise.
+    """
+    return (
+        device_mesh is not None
+        and (mesh_dim_names := device_mesh.mesh_dim_names) is not None
+        and parallelism_method.value in mesh_dim_names
+    )
+
+
+def get_mesh_for_parallelism_method(device_mesh: DeviceMesh, parallelism_method: ParallelismDegrees) -> DeviceMesh:
+    """Gets the sub-mesh for the specified parallelism method.
+
+    Args:
+        device_mesh (DeviceMesh): The device mesh.
+        parallelism_method (ParallelismDegrees): The parallelism method.
+
+    Returns:
+        DeviceMesh: The sub-mesh for the specified parallelism method.
+    """
+    assert has_parallelism_method(device_mesh, parallelism_method)
+    return device_mesh[parallelism_method.value]
