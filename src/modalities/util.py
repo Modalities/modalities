@@ -197,6 +197,7 @@ def get_total_number_of_trainable_parameters(model: FSDPX, device_mesh: DeviceMe
         total_num_params = total_num_params // sharding_factor
         return total_num_params
     elif isinstance(model, FSDP2):
+        assert device_mesh is not None, "Device should be available for FSDP2 models."
         # model.parameters() returns an iterable of distributed tensors (i.e., DTensor).
         # Running numel() on DTensor, returns the unsharded number of weights.
         #
