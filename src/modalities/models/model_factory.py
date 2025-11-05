@@ -652,6 +652,7 @@ class GPT2ModelFactory:
             )
 
         # only keep the relevant parts of the model parallel plan
+        # (e.g. when using pipeline parallelism and not all modules are present)
         model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model.transformer, k.split(".")[1])}
         if model_tp_plan:
             parallelize_module(
