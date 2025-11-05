@@ -1,8 +1,12 @@
 import os
 import socket
+import time
+from multiprocessing import Queue
+from multiprocessing.managers import SyncManager
 
 import debugpy
 import torch
+from torch.multiprocessing.spawn import ProcessContext
 
 from modalities.batch import DatasetBatch
 
@@ -65,3 +69,108 @@ def configure_dataloader_mock(
     llm_data_loader_mock.__len__ = lambda _: num_batches
 
     return llm_data_loader_mock, batches
+
+
+def monitor_child_processes(
+    manager: SyncManager,
+    error_queue: Queue,
+    proc_ctx: ProcessContext,
+) -> None:
+    # Normalize the return value from mp.spawn. When join=False it often
+    # returns a ProcessContext-like object that may expose a `processes`
+    # attribute. Other implementations may return an iterable of Process
+    # objects. Build a `processes` list defensively so we can monitor and
+    # terminate child processes below without assuming a particular type.
+    processes = []
+    if proc_ctx is None:
+        processes = []
+    else:
+        # common attribute names that might hold the list of processes
+        candidate_attrs = ["processes", "_processes", "workers", "process_list", "processes_"]
+        found = False
+        for attr in candidate_attrs:
+            if hasattr(proc_ctx, attr):
+                ps = getattr(proc_ctx, attr)
+                try:
+                    processes = list(ps)
+                except Exception:
+                    processes = [ps]
+                found = True
+                break
+        if not found:
+            # If proc_ctx itself is iterable, exhaust it into a list
+            try:
+                processes = list(proc_ctx)
+            except Exception:
+                # Fallback: if proc_ctx behaves like a single process-like
+                # object (has terminate/is_alive/join), wrap it in a list.
+                if hasattr(proc_ctx, "terminate") or hasattr(proc_ctx, "is_alive") or hasattr(proc_ctx, "join"):
+                    processes = [proc_ctx]
+                else:
+                    processes = []
+
+    # Monitor the error queue and child processes. If any child reports an exception,
+    # terminate the other workers and raise the error in the parent to fail the test fast.
+    try:
+        # Loop until all processes finished or an error is reported
+        while True:
+            # If an error was reported by any child process, terminate remaining children
+            if not error_queue.empty():
+                proc_id, tb = error_queue.get()
+                # terminate and join all processes (or the proc_ctx wrapper)
+                for p in processes:
+                    try:
+                        if hasattr(p, "is_alive"):
+                            alive = p.is_alive()
+                        elif hasattr(p, "exitcode"):
+                            alive = getattr(p, "exitcode") is None
+                        else:
+                            alive = True
+                        if alive and hasattr(p, "terminate"):
+                            p.terminate()
+                    except Exception:
+                        pass
+                # If we didn't find individual process objects but proc_ctx
+                # exposes a terminate method, call it as a fallback.
+                try:
+                    if not processes and hasattr(proc_ctx, "terminate"):
+                        proc_ctx.terminate()
+                except Exception:
+                    pass
+
+                for p in processes:
+                    try:
+                        if hasattr(p, "join"):
+                            p.join(timeout=5)
+                    except Exception:
+                        pass
+                try:
+                    if hasattr(proc_ctx, "join"):
+                        proc_ctx.join(timeout=1)
+                except Exception:
+                    pass
+                raise AssertionError(f"Child process {proc_id} raised an exception:\n{tb}")
+
+            # If all processes have finished, break
+            all_finished = all((not p.is_alive()) for p in processes)
+            if all_finished:
+                # join them to collect exitcodes
+                for p in processes:
+                    try:
+                        p.join()
+                    except Exception:
+                        pass
+                # If we have a ProcessContext, call its join to clean up as well
+                try:
+                    if hasattr(proc_ctx, "join"):
+                        proc_ctx.join(timeout=1)
+                except Exception:
+                    pass
+                break
+
+            time.sleep(0.05)
+    finally:
+        try:
+            manager.shutdown()
+        except Exception:
+            pass

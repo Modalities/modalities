@@ -4,7 +4,6 @@ import multiprocessing as py_mp
 import os
 import re
 import shutil
-import time
 import traceback
 from pathlib import Path
 from typing import Any
@@ -27,6 +26,7 @@ from tests.end2end_tests.custom_components import (
     SaveAllResultSubscriber,
     SaveAllResultSubscriberConfig,
 )
+from tests.utility import monitor_child_processes
 
 working_dir = Path(os.path.dirname(__file__))
 tmp_folder = working_dir / "../tmp/fsdp2_warmstart_pp_tp"
@@ -43,7 +43,6 @@ class TrainDataloaderInstantiationModel(BaseModel):
     reason="This e2e test requires 8 GPUs.",
 )
 class TestWarmstart:
-
     @pytest.mark.parametrize(
         "first_config,second_config,world_size_first,world_size_second",
         [
@@ -69,7 +68,7 @@ class TestWarmstart:
                 nprocs=world_size_first,
                 join=False,
             )
-            TestWarmstart._monitor_child_processes(manager_first, error_queue_first, proc_ctx_first)
+            monitor_child_processes(manager_first, error_queue_first, proc_ctx_first)
 
             # ---- Second (warmstart) training phase ----
             manager_second = py_mp.Manager()
@@ -80,7 +79,7 @@ class TestWarmstart:
                 nprocs=world_size_second,
                 join=False,
             )
-            TestWarmstart._monitor_child_processes(manager_second, error_queue_second, proc_ctx_second)
+            monitor_child_processes(manager_second, error_queue_second, proc_ctx_second)
         finally:
             try:
                 if tmp_folder.exists():
@@ -307,7 +306,7 @@ class TestWarmstart:
             nprocs=world_size,
             join=False,
         )
-        TestWarmstart._monitor_child_processes(manager, error_queue, proc_ctx)
+        monitor_child_processes(manager, error_queue, proc_ctx)
 
     @staticmethod
     def _dataloader_test_impl_wrapper(process_id: int, world_size: int, error_queue: Any):
@@ -381,87 +380,6 @@ class TestWarmstart:
             assert (
                 not dl_1_samples[i + num_skip_steps].samples["input_ids"].equal(dl_2_samples[i].samples["input_ids"])
             ), "Mutation should have broken tensor equality"
-
-    # -------- Multiprocessing helpers ---------
-
-    @staticmethod
-    def _monitor_child_processes(manager: Any, error_queue: Any, proc_ctx: Any) -> None:
-        """Monitors spawned child processes and terminates remaining workers early if any child reports an exception.
-
-        Copied (with tiny adaptations) from other multiprocessing test utilities in the repository.
-        """
-        processes = []
-        if proc_ctx is None:
-            processes = []
-        else:
-            candidate_attrs = ["processes", "_processes", "workers", "process_list", "processes_"]
-            found = False
-            for attr in candidate_attrs:
-                if hasattr(proc_ctx, attr):
-                    ps = getattr(proc_ctx, attr)
-                    try:
-                        processes = list(ps)
-                    except Exception:
-                        processes = [ps]
-                    found = True
-                    break
-            if not found:
-                try:
-                    processes = list(proc_ctx)
-                except Exception:
-                    if hasattr(proc_ctx, "terminate") or hasattr(proc_ctx, "is_alive") or hasattr(proc_ctx, "join"):
-                        processes = [proc_ctx]
-                    else:
-                        processes = []
-
-        try:
-            while True:
-                if not error_queue.empty():
-                    proc_id, tb = error_queue.get()
-                    for p in processes:
-                        try:
-                            alive = p.is_alive() if hasattr(p, "is_alive") else True
-                            if alive and hasattr(p, "terminate"):
-                                p.terminate()
-                        except Exception:
-                            pass
-                    try:
-                        if not processes and hasattr(proc_ctx, "terminate"):
-                            proc_ctx.terminate()
-                    except Exception:
-                        pass
-                    for p in processes:
-                        try:
-                            if hasattr(p, "join"):
-                                p.join(timeout=5)
-                        except Exception:
-                            pass
-                    try:
-                        if hasattr(proc_ctx, "join"):
-                            proc_ctx.join(timeout=1)
-                    except Exception:
-                        pass
-                    raise AssertionError(f"Child process {proc_id} raised an exception:\n{tb}")
-
-                all_finished = all((not p.is_alive()) for p in processes)
-                if all_finished:
-                    for p in processes:
-                        try:
-                            p.join()
-                        except Exception:
-                            pass
-                    try:
-                        if hasattr(proc_ctx, "join"):
-                            proc_ctx.join(timeout=1)
-                    except Exception:
-                        pass
-                    break
-                time.sleep(0.05)
-        finally:
-            try:
-                manager.shutdown()
-            except Exception:
-                pass
 
 
 def _get_loss_scores(messages: list[Message[EvaluationResultBatch]], loss_key: str) -> list[float]:
