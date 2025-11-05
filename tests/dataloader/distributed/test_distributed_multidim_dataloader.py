@@ -60,7 +60,7 @@ def _load_data_for_ranks(dp_rank: int, other_rank: int, world_size: int, dp_degr
         rdvz_port=22350,
     ):
         device_mesh = _build_device_mesh_mock(world_size, dp_degree, dp_rank, other_rank)
-        dataset = TestDataset(8)
+        dataset = TestDataset(16)
         sampler = SamplerFactory.create_resumable_distributed_multi_dim_sampler(
             dataset=dataset, device_mesh=device_mesh, data_parallel_key=ParallelismDegrees.DP_SHARD
         )
