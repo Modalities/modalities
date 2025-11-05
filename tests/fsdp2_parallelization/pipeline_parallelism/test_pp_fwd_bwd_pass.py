@@ -1,5 +1,4 @@
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -16,12 +15,6 @@ from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
-@pytest.fixture
-def temp_file_path() -> Path:
-    with tempfile.NamedTemporaryFile() as tf:
-        yield Path(tf.name)
-
-
 class ComponentsInstantiationPPModel(BaseModel):
     scheduled_pipeline: PydanticPipelineType
 
@@ -36,51 +29,18 @@ class ComponentsInstantiationModel(BaseModel):
     reason="This test requires 8 GPUs",
 )
 class TestPipelineParallelism:
-    def _get_tmp_sharding_config_path(
-        self, sharding_degree: int, tp_degree: int, pp_degree: int, temp_file_path: Path
-    ) -> Path:
-        working_dir = Path(os.path.dirname(__file__))
-        if tp_degree > 1:
-            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass.yaml"
-        else:
-            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_fwd_bwd_pass.yaml"
-
-        with open(config_file_path, "r") as file:
-            config_string = file.read()
-            config_dict = yaml.safe_load(config_string)
-            config_dict["device_mesh"]["config"]["data_parallel_shard_degree"] = sharding_degree
-            config_dict["device_mesh"]["config"]["tensor_parallel_degree"] = tp_degree
-            config_dict["device_mesh"]["config"]["pipeline_parallel_degree"] = pp_degree
-
-        # save to temporary file
-        with open(temp_file_path, "w") as file:
-            yaml.dump(config_dict, file)
-
-        return temp_file_path
-
-    def _get_components(
-        self, config_file_path: Path, use_pp: bool
-    ) -> ComponentsInstantiationPPModel | ComponentsInstantiationModel:
-        torch.manual_seed(42)
-        main_obj = Main(config_file_path)
-        components_model_type = ComponentsInstantiationPPModel if use_pp else ComponentsInstantiationModel
-        components = main_obj.build_components(components_model_type=components_model_type)
-        assert isinstance(components, components_model_type)
-        return components
-
     @pytest.mark.parametrize(
-        "sharding_degree, tp_degree, pp_degree, world_size",
+        "fsdp_degree, tp_degree, pp_degree, world_size",
         [
             (2, 1, 2, 4),
             (2, 2, 2, 8),
         ],
     )
-    def test_pp(self, sharding_degree: int, tp_degree: int, pp_degree: int, world_size: int, temp_file_path: Path):
+    def test_compare_pp_step_with_fsdp2_only_forward_backward_step(
+        self, fsdp_degree: int, tp_degree: int, pp_degree: int, world_size: int, tmp_path: Path
+    ):
         tmp_sharding_config_path = self._get_tmp_sharding_config_path(
-            sharding_degree=sharding_degree,
-            tp_degree=tp_degree,
-            pp_degree=pp_degree,
-            temp_file_path=temp_file_path,
+            fsdp_degree=fsdp_degree, tp_degree=tp_degree, pp_degree=pp_degree, tmp_path=tmp_path
         )
         mp.spawn(
             self._test_pp_impl,
@@ -95,7 +55,7 @@ class TestPipelineParallelism:
         world_size: int,
         pp_model_config_path: Path,
     ):
-        # wraps the actual test function to be able to run it in a distributed  multiprocessing setup
+        # wraps the actual test function to be able to run it in a distributed multiprocessing setup
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
             global_rank=process_id,
@@ -130,7 +90,7 @@ class TestPipelineParallelism:
             import traceback
 
             print(f"Exception in _forward_step_with_pp: {e}")
-            traceback.print_exc()  # <-- Add this line to print the full stack trace
+            traceback.print_exc()
             raise e
         return scheduled_pipeline.is_last_pp_stage, loss_pp
 
@@ -164,3 +124,34 @@ class TestPipelineParallelism:
         forward_batch = InferenceResultBatch(predictions=fsdp2_out, targets={fsdp2_loss_fn.target_key: targets})
         fsdp2_loss = fsdp2_loss_fn(forward_batch)
         return fsdp2_loss
+
+    def _get_tmp_sharding_config_path(self, fsdp_degree: int, tp_degree: int, pp_degree: int, tmp_path: Path) -> Path:
+        temp_file_path = tmp_path / "pp_sharding_config.yaml"
+        working_dir = Path(os.path.dirname(__file__))
+        if tp_degree > 1:
+            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass.yaml"
+        else:
+            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_fwd_bwd_pass.yaml"
+
+        with open(config_file_path, "r") as file:
+            config_string = file.read()
+            config_dict = yaml.safe_load(config_string)
+            config_dict["device_mesh"]["config"]["data_parallel_shard_degree"] = fsdp_degree
+            config_dict["device_mesh"]["config"]["tensor_parallel_degree"] = tp_degree
+            config_dict["device_mesh"]["config"]["pipeline_parallel_degree"] = pp_degree
+
+        # save to temporary file
+        with open(temp_file_path, "w") as file:
+            yaml.dump(config_dict, file)
+
+        return temp_file_path
+
+    def _get_components(
+        self, config_file_path: Path, use_pp: bool
+    ) -> ComponentsInstantiationPPModel | ComponentsInstantiationModel:
+        torch.manual_seed(42)
+        main_obj = Main(config_file_path)
+        components_model_type = ComponentsInstantiationPPModel if use_pp else ComponentsInstantiationModel
+        components = main_obj.build_components(components_model_type=components_model_type)
+        assert isinstance(components, components_model_type)
+        return components
