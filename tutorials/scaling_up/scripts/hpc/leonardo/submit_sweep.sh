@@ -42,7 +42,7 @@ for ws in $worldsizes; do
         --qos=$QOS \
         --nodes=$NODES \
         --time=$TIME_LIMIT \
-        --export=EXPERIMENT_ROOT=$EXPERIMENT_ROOT,EXPECTED_STEPS=$EXPECTED_STEPS  \
+        --export=EXPERIMENT_ROOT=ALL,$EXPERIMENT_ROOT,EXPECTED_STEPS=$EXPECTED_STEPS  \
         job.sbatch
 done
 

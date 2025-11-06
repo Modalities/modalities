@@ -14,7 +14,7 @@ authors:
   - family-names: Rutmann
     given-names: Richard
 title: 'Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.'
-version: 0.3.2
+version: 0.4.0
 url: https://github.com/Modalities/modalities
 date-released: '2024-12-02'
 preferred-citation:
