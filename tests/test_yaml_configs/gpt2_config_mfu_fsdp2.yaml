@@ -91,3 +91,6 @@ mfu_calculator:
     wrapped_model:
       instance_key: test_model
       pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
