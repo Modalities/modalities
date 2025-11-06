@@ -6,6 +6,8 @@ from multiprocessing.managers import SyncManager
 
 import debugpy
 import torch
+import torch.distributed as dist
+from torch.distributed._tensor import DeviceMesh
 from torch.multiprocessing.spawn import ProcessContext
 
 from modalities.batch import DatasetBatch
@@ -174,3 +176,30 @@ def monitor_child_processes(
             manager.shutdown()
         except Exception:
             pass
+
+
+def tensors_equal_across_mesh(tensor: torch.Tensor, device_mesh: DeviceMesh) -> bool:
+    """Check if tensors are equal across all ranks in the mesh"""
+    process_group = device_mesh.get_group()
+    device = tensor.device
+
+    gathered_tensors = [torch.zeros_like(tensor, device=device) for _ in range(process_group.size())]
+    dist.all_gather(gathered_tensors, tensor, group=process_group)
+
+    reference = gathered_tensors[0]
+    return all(torch.equal(reference, t) for t in gathered_tensors)
+
+
+def tensors_pairwise_not_equal_across_mesh(tensor: torch.Tensor, device_mesh: DeviceMesh) -> bool:
+    """Check if tensors are pairwise not equal across all ranks in the mesh"""
+    process_group = device_mesh.get_group()
+    device = tensor.device
+
+    gathered_tensors = [torch.zeros_like(tensor, device=device) for _ in range(process_group.size())]
+    dist.all_gather(gathered_tensors, tensor, group=process_group)
+
+    for i in range(len(gathered_tensors)):
+        for j in range(i + 1, len(gathered_tensors)):
+            if torch.equal(gathered_tensors[i], gathered_tensors[j]):
+                return False
+    return True
