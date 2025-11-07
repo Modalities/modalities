@@ -27,6 +27,7 @@ from modalities.config.pydantic_if_types import (
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
+    PydanticPytorchModuleOrListType,
     PydanticPytorchModuleType,
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
@@ -145,7 +146,7 @@ class CheckpointSavingConfig(BaseModel):
 
 class AdamOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
@@ -154,7 +155,7 @@ class AdamOptimizerConfig(BaseModel):
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
@@ -264,7 +265,7 @@ class FSDPWrappedModelConfig(BaseModel):
 
 
 class FSDP2WrappedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
@@ -287,7 +288,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 
 
 class DebuggingEnrichedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     logging_dir_path: Path
     tracked_ranks: Optional[Set[int]] = None
     log_interval_steps: Optional[int] = 1
@@ -300,7 +301,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
 
 
 class GPT2ModelTPConfig(BaseModel):
-    model: PydanticPytorchModuleType  # TODO set proper type
+    model: PydanticPytorchModuleOrListType  # TODO set proper type
     device_mesh: PydanticDeviceMeshIFType
 
     @model_validator(mode="after")
@@ -320,7 +321,7 @@ class CompiledModelConfig(BaseModel):
 
 
 class WeightInitializedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     model_initializer: PydanticModelInitializationIFType
 
     # avoid warning about protected namespace 'model_', see
@@ -345,12 +346,12 @@ class ActivationCheckpointedModelConfig(BaseModel):
 
     ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
 
@@ -480,7 +481,9 @@ class GPT2MFUCalculatorConfig(BaseModel):
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
-    wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    wrapped_model_or_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType] = Field(
+        alias="wrapped_model"
+    )
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
 

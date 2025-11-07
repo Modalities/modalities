@@ -58,7 +58,7 @@ class Gym:
         """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
-            model=app_state.model,
+            model=app_state.model_parts,
             evaluation_data_loaders=evaluation_data_loaders,
             evaluation_interval_in_steps=evaluation_interval_in_steps,
             scheduled_pipeline=scheduled_pipeline,
@@ -103,7 +103,7 @@ class Gym:
 
     def _run_evaluation(
         self,
-        model: nn.Module,
+        model: list[nn.Module] | nn.Module,
         num_train_steps_done: int,
         evaluation_data_loaders: list[LLMDataLoader],
         evaluation_interval_in_steps: int,

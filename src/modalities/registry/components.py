@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import Callable, Type
+from typing import Any, Callable, Type
 
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import BatchSampler, DistributedSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
@@ -102,6 +103,8 @@ from modalities.nn.model_initialization.composed_initialization import (
 )
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.optimizers.optimizer_list import OptimizersList
+from modalities.optimizers.scheduler_list import SchedulerList
 from modalities.running_env.fsdp.device_mesh import DeviceMeshConfig, get_device_mesh, get_parallel_degree
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer, PreTrainedSPTokenizer
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
@@ -116,6 +119,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDP2DummyGradientClipperConfig,
     FSDP2GradientClipperConfig,
 )
+from modalities.utils.maybe_list_parameter import MaybeListDecorator, maybe_list_parameter
 from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
@@ -130,6 +134,12 @@ from modalities.utils.number_conversion import (
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+
+maybe_model_list: MaybeListDecorator[nn.Module, ..., Any, None] = maybe_list_parameter("model")
+maybe_model_list_for_optimizer = maybe_list_parameter("wrapped_model", apply_to_list_input_and_result=OptimizersList)
+maybe_optimizer_list: MaybeListDecorator[nn.Module, ..., LRScheduler, SchedulerList] = maybe_list_parameter(
+    "optimizer", apply_to_list_result=SchedulerList
+)
 
 
 @dataclass
@@ -148,14 +158,16 @@ class ComponentEntity:
 
     component_key: str
     variant_key: str
-    component_type: Type | Callable
+    component_type: Type[Any] | Callable[..., Any]
     component_config_type: Type[BaseModel]
 
 
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
-    ComponentEntity("model", "gpt2_tp", GPT2ModelFactory.get_gpt2_tensor_parallelized_model, GPT2ModelTPConfig),
+    ComponentEntity(
+        "model", "gpt2_tp", maybe_model_list(GPT2ModelFactory.get_gpt2_tensor_parallelized_model), GPT2ModelTPConfig
+    ),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
     ),
@@ -163,9 +175,14 @@ COMPONENTS = [
         "model", "fsdp1_checkpointed", ModelFactory.get_fsdp1_checkpointed_model, FSDP1CheckpointedModelConfig
     ),
     ComponentEntity("model", "fsdp1_wrapped", ModelFactory.get_fsdp1_wrapped_model, FSDPWrappedModelConfig),
-    ComponentEntity("model", "fsdp2_wrapped", ModelFactory.get_fsdp2_wrapped_model, FSDP2WrappedModelConfig),
     ComponentEntity(
-        "model", "model_initialized", ModelFactory.get_weight_initialized_model, WeightInitializedModelConfig
+        "model", "fsdp2_wrapped", maybe_model_list(ModelFactory.get_fsdp2_wrapped_model), FSDP2WrappedModelConfig
+    ),
+    ComponentEntity(
+        "model",
+        "model_initialized",
+        maybe_model_list(ModelFactory.get_weight_initialized_model),
+        WeightInitializedModelConfig,
     ),
     ComponentEntity(
         "model",
@@ -176,13 +193,16 @@ COMPONENTS = [
     ComponentEntity(
         "model",
         "activation_checkpointed",
-        ModelFactory.get_activation_checkpointed_fsdp2_model_,
+        maybe_model_list(ModelFactory.get_activation_checkpointed_fsdp2_model_),
         ActivationCheckpointedModelConfig,
     ),
     ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     ComponentEntity(
-        "model", "debugging_enriched", ModelFactory.get_debugging_enriched_model, DebuggingEnrichedModelConfig
+        "model",
+        "debugging_enriched",
+        maybe_model_list(ModelFactory.get_debugging_enriched_model),
+        DebuggingEnrichedModelConfig,
     ),
     ComponentEntity("pipeline", "staged", PipelineFactory.get_staged_pipeline, StagedPipelineConfig),
     ComponentEntity("pipeline", "scheduled", PipelineFactory.get_scheduled_pipeline, ScheduledPipelineConfig),
@@ -202,9 +222,13 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
-    # optmizers
-    ComponentEntity("optimizer", "adam", OptimizerFactory.get_adam, AdamOptimizerConfig),
-    ComponentEntity("optimizer", "adam_w", OptimizerFactory.get_adam_w, AdamWOptimizerConfig),
+    # optimizers
+    ComponentEntity(
+        "optimizer", "adam", maybe_model_list_for_optimizer(OptimizerFactory.get_adam), AdamOptimizerConfig
+    ),
+    ComponentEntity(
+        "optimizer", "adam_w", maybe_model_list_for_optimizer(OptimizerFactory.get_adam_w), AdamWOptimizerConfig
+    ),
     ComponentEntity(
         "optimizer",
         "fsdp1_checkpointed",
@@ -215,13 +239,24 @@ COMPONENTS = [
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),
     ComponentEntity("app_state", "dcp", AppStateFactory.get_dcp_checkpointed_app_state_, DCPAppStateConfig),
     # schedulers
-    ComponentEntity("scheduler", "dummy_lr", DummyLRScheduler, DummyLRSchedulerConfig),
-    ComponentEntity("scheduler", "step_lr", torch.optim.lr_scheduler.StepLR, StepLRSchedulerConfig),
-    ComponentEntity("scheduler", "constant_lr", torch.optim.lr_scheduler.ConstantLR, ConstantLRSchedulerConfig),
-    ComponentEntity("scheduler", "linear_lr", torch.optim.lr_scheduler.LinearLR, LinearLRSchedulerConfig),
-    ComponentEntity("scheduler", "onecycle_lr", torch.optim.lr_scheduler.OneCycleLR, OneCycleLRSchedulerConfig),
+    ComponentEntity("scheduler", "dummy_lr", maybe_optimizer_list(DummyLRScheduler), DummyLRSchedulerConfig),
     ComponentEntity(
-        "scheduler", "cosine_annealing_lr", torch.optim.lr_scheduler.CosineAnnealingLR, CosineAnnealingLRSchedulerConfig
+        "scheduler", "step_lr", maybe_optimizer_list(torch.optim.lr_scheduler.StepLR), StepLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler", "constant_lr", maybe_optimizer_list(torch.optim.lr_scheduler.ConstantLR), ConstantLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler", "linear_lr", maybe_optimizer_list(torch.optim.lr_scheduler.LinearLR), LinearLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler", "onecycle_lr", maybe_optimizer_list(torch.optim.lr_scheduler.OneCycleLR), OneCycleLRSchedulerConfig
+    ),
+    ComponentEntity(
+        "scheduler",
+        "cosine_annealing_lr",
+        maybe_optimizer_list(torch.optim.lr_scheduler.CosineAnnealingLR),
+        CosineAnnealingLRSchedulerConfig,
     ),
     # tokenizers
     ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),

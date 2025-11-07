@@ -270,9 +270,10 @@ class TestWarmstart:
 
             with open(checkpoint_root_path / "experiment_0_loss_scores.txt", "r") as f:
                 loaded_loss_values_0 = json.load(f)
-            assert loaded_loss_values_0[4:] == pytest.approx(
-                loss_scores_1, abs=1e-16
-            ), "Warmstart loss trajectory mismatch with from-scratch continuation."
+            assert loaded_loss_values_0[4:] == pytest.approx(loss_scores_1, abs=1e-16), (
+                "Warmstart loss trajectory mismatch with from-scratch continuation.\n"
+                f"Expected {loaded_loss_values_0[4:]}, got {loss_scores_1}."
+            )
 
             # Additionally assert checkpoint info integrity from first run still present
             checkpoint_info_file_path = checkpoint_root_path / "0" / "last_checkpoint_info.json"

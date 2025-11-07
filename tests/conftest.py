@@ -125,22 +125,22 @@ def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
 
 
 @pytest.fixture(scope="function")
-def checkpoint_saving_mock():
+def checkpoint_saving_mock() -> CheckpointSaving:
     return MagicMock(spec=CheckpointSaving)
 
 
 @pytest.fixture(scope="function")
-def evaluator_mock():
+def evaluator_mock() -> Evaluator:
     return MagicMock(spec=Evaluator)
 
 
 @pytest.fixture(scope="function")
-def nn_model_mock():
+def nn_model_mock() -> NNModel:
     return MagicMock(spec=NNModel)
 
 
 @pytest.fixture(scope="function")
-def optimizer_mock():
+def optimizer_mock() -> Optimizer:
     return MagicMock(spec=Optimizer)
 
 
@@ -166,41 +166,43 @@ def optimizer_with_param_groups_mock():
 
 
 @pytest.fixture(scope="function")
-def scheduler_mock():
+def scheduler_mock() -> LRScheduler:
     mocked_lr_scheduler = MagicMock(spec=LRScheduler)
     mocked_lr_scheduler.get_last_lr = lambda: [0.0]
     return mocked_lr_scheduler
 
 
 @pytest.fixture(scope="function")
-def app_state_mock():
-    return MagicMock(spec=AppState)
+def app_state_mock() -> AppState:
+    app_state = MagicMock(spec=AppState)
+    app_state.model_parts = [MagicMock()]
+    return app_state
 
 
 @pytest.fixture(scope="function")
-def gradient_clipper_mock():
+def gradient_clipper_mock() -> GradientClipperIF:
     gradient_clipper = MagicMock(spec=GradientClipperIF)
     gradient_clipper.clip_gradients = lambda: torch.Tensor([0.0])
     return gradient_clipper
 
 
 @pytest.fixture(scope="function")
-def loss_mock():
+def loss_mock() -> Loss:
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
 
 
 @pytest.fixture(scope="function")
-def llm_data_loader_mock():
+def llm_data_loader_mock() -> LLMDataLoader:
     return MagicMock(spec=LLMDataLoader)
 
 
 @pytest.fixture(scope="function")
-def progress_publisher_mock():
+def progress_publisher_mock() -> MessagePublisher:
     return MagicMock(spec=MessagePublisher)
 
 
 @pytest.fixture(scope="function")
-def trainer(progress_publisher_mock, gradient_clipper_mock):
+def trainer(progress_publisher_mock: MessagePublisher, gradient_clipper_mock: GradientClipperIF) -> Trainer:
     return Trainer(
         global_rank=int(os.getenv("RANK")),
         progress_publisher=progress_publisher_mock,

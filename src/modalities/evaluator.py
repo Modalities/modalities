@@ -35,7 +35,7 @@ class Evaluator:
     def evaluate_batch(
         self,
         batch: DatasetBatch,
-        model: nn.Module,
+        model: list[nn.Module],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         scheduled_pipeline: Pipeline | None = None,
     ) -> torch.Tensor | None:
@@ -43,7 +43,7 @@ class Evaluator:
 
         Args:
             batch (DatasetBatch): The batch to evaluate
-            model (nn.Module): The model to evaluate
+            model (list[nn.Module]): The model (parts) to evaluate
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
             scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
                 operate the model. Defaults to None.
@@ -57,27 +57,27 @@ class Evaluator:
                 pp_schedule = scheduled_pipeline.pp_schedule
                 targets, losses = (
                     (batch.targets[loss_fun.target_key].contiguous(), [])
-                    if scheduled_pipeline.is_last_pp_stage
+                    if scheduled_pipeline.has_last_pp_stage
                     else (None, None)
                 )
 
-                if scheduled_pipeline.is_first_pp_stage:
-                    pp_schedule.eval(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+                if scheduled_pipeline.has_first_pp_stage:
+                    pp_schedule.eval(batch.samples[model[0].sample_key].contiguous(), target=targets, losses=losses)
                 else:
                     pp_schedule.eval(target=targets, losses=losses)
                 loss = (
                     torch.mean(torch.stack(losses)).to(losses[0].device)
-                    if scheduled_pipeline.is_last_pp_stage
+                    if scheduled_pipeline.has_last_pp_stage
                     else None
                 )
             else:
-                result_batch = model_predict_batch(model=model, batch=batch)
+                result_batch = model_predict_batch(model=model[0], batch=batch)
                 loss = loss_fun(result_batch)
         return loss
 
     def evaluate(
         self,
-        model: nn.Module,
+        model: list[nn.Module] | nn.Module,
         data_loaders: list[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
@@ -86,7 +86,7 @@ class Evaluator:
         """Evaluate the model on a set of datasets.
 
         Args:
-            model (nn.Module): The model to evaluate
+            model (list[nn.Module] | nn.Module): The model or model parts to evaluate
             data_loaders (list[LLMDataLoader]): List of dataloaders to evaluate the model on
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
             num_train_steps_done (int): The number of training steps done so far for logging purposes
@@ -97,7 +97,12 @@ class Evaluator:
             dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
         """
         result_dict: dict[str, EvaluationResultBatch] = {}
-        model.eval()
+        if not isinstance(model, list):
+            assert scheduled_pipeline is None, "A non-scheduled pipeline should be processed with a single model."
+        if not isinstance(model, list):
+            model = [model]
+        for m in model:
+            m.eval()
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -124,7 +129,9 @@ class Evaluator:
                         cumulated_loss[0] += batch_loss.item()  # sum up batch loss
                         cumulated_loss[1] += 1
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    throughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+                    throughput_aggregator.add_value(
+                        key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor
+                    )
 
                     Evaluator._publish_progress(
                         progress_publisher=self.progress_publisher,
@@ -163,7 +170,8 @@ class Evaluator:
             )
             result_dict[data_loader.dataloader_tag] = evaluation_result
 
-        model.train()
+        for m in model:
+            m.train()
 
         return result_dict
 
