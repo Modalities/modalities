@@ -1,6 +1,3 @@
-import os
-from unittest.mock import MagicMock
-
 import pytest
 import torch
 import torch.multiprocessing as mp
@@ -15,6 +12,7 @@ from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_devi
 from tests.dataloader.distributed.mocks import MultiProcessingCudaEnvMock
 from tests.dataloader.dummy_sequential_dataset import TestDataset
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
+from tests.mocks import MockDeviceMesh
 from tests.utility import find_free_port, tensors_equal_across_mesh, tensors_pairwise_not_equal_across_mesh
 
 
@@ -179,13 +177,7 @@ def _build_dataloader_for_mesh(dataset_len: int, device_mesh: DeviceMesh) -> LLM
     return train_dataloader
 
 
-def _build_device_mesh_mock(world_size: int, dp_degree: int, dp_rank: int, other_rank: int) -> dict[str, MagicMock]:
-    dp_device_mesh = MagicMock()
-    dp_device_mesh.size.return_value = dp_degree
-    dp_device_mesh.get_coordinate.return_value = [dp_rank]
-    other_device_mesh = MagicMock()
+def _build_device_mesh_mock(world_size: int, dp_degree: int, dp_rank: int, other_rank: int) -> MockDeviceMesh:
     other_degree = world_size // dp_degree
-    other_device_mesh.size.return_value = int(os.environ["WORLD_SIZE"]) // other_degree
-    other_device_mesh.get_coordinate.return_value = [other_rank]
-    device_mesh_mock = {ParallelismDegrees.DP_SHARD.value: dp_device_mesh, "other": other_device_mesh}
-    return device_mesh_mock
+    device_mesh_setup = {ParallelismDegrees.DP_SHARD.value: (dp_rank, dp_degree), "other": (other_rank, other_degree)}
+    return MockDeviceMesh(device_mesh_setup)

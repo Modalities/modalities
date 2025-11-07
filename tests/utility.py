@@ -7,7 +7,7 @@ from multiprocessing.managers import SyncManager
 import debugpy
 import torch
 import torch.distributed as dist
-from torch.distributed._tensor import DeviceMesh
+from torch.distributed.device_mesh import DeviceMesh
 from torch.multiprocessing.spawn import ProcessContext
 
 from modalities.batch import DatasetBatch
