@@ -10,18 +10,26 @@ from pydantic import BaseModel
 from modalities.__main__ import Main
 from modalities.batch import InferenceResultBatch
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import PydanticFSDP2ModuleType, PydanticLossIFType, PydanticPipelineType
+from modalities.config.pydantic_if_types import (
+    PydanticDeviceMeshIFType,
+    PydanticFSDP2ModuleType,
+    PydanticLossIFType,
+    PydanticPipelineType,
+)
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 class ComponentsInstantiationPPModel(BaseModel):
     scheduled_pipeline: PydanticPipelineType
+    device_mesh: PydanticDeviceMeshIFType
 
 
 class ComponentsInstantiationModel(BaseModel):
     fsdp_model: PydanticFSDP2ModuleType
     loss_fn: PydanticLossIFType
+    device_mesh: PydanticDeviceMeshIFType
 
 
 @pytest.mark.skipif(
@@ -49,6 +57,17 @@ class TestPipelineParallelism:
             join=True,
         )
 
+    def _get_data(self, dp_rank: int):
+        vocab_size = 50304
+        sequence_length = 256
+        batch_size = 4
+        # since we compare runs with different dp_degrees 2 and 4, ensure that every second dp rank gets the same data
+        torch.manual_seed(dp_rank % 2)
+        sequences = torch.randint(0, vocab_size, (batch_size, sequence_length + 1))
+        targets = sequences[:, 1:].contiguous()
+        inputs = sequences[:, :-1].contiguous()
+        return inputs, targets
+
     def _test_pp_impl(
         self,
         process_id: int,
@@ -63,16 +82,8 @@ class TestPipelineParallelism:
             world_size=world_size,
             rdvz_port=22359,
         ):
-            vocab_size = 50304
-            sequence_length = 256
-            batch_size = 4
-            torch.manual_seed(42)
-            sequences = torch.randint(0, vocab_size, (batch_size, sequence_length + 1))
-            targets = sequences[:, 1:].contiguous()
-            inputs = sequences[:, :-1].contiguous()
-
-            is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path, inputs, targets)
-            fsdp2_loss = self._forward_step_without_pp(inputs, targets)
+            is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path)
+            fsdp2_loss = self._forward_step_without_pp()
 
             if is_last_pp_stage:
                 assert torch.allclose(
@@ -80,10 +91,13 @@ class TestPipelineParallelism:
                 ), f"Losses do not match.\nLoss with PP: {loss_pp.item()}, Loss without PP: {fsdp2_loss.item()}"
 
     def _forward_step_with_pp(
-        self, pp_model_config_path: Path, inputs: torch.Tensor, targets: torch.Tensor
+        self,
+        pp_model_config_path: Path,
     ) -> tuple[bool, torch.Tensor]:
         try:
             components = self._get_components(pp_model_config_path, use_pp=True)
+            dp_rank = get_parallel_rank(components.device_mesh, ParallelismDegrees.DP_SHARD)
+            inputs, targets = self._get_data(dp_rank=dp_rank)
             scheduled_pipeline = components.scheduled_pipeline
             loss_pp = self._forward_step(scheduled_pipeline, inputs, targets)
         except Exception as e:
@@ -94,9 +108,8 @@ class TestPipelineParallelism:
             raise e
         return scheduled_pipeline.is_last_pp_stage, loss_pp
 
-    def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor):
+    def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Runs a forward step on the model."""
-        os.environ["MODEL_TYPE"] = "PP"
         pp_schedule = scheduled_pipeline.pp_schedule
         targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
         if scheduled_pipeline.is_first_pp_stage:
@@ -111,13 +124,14 @@ class TestPipelineParallelism:
             else torch.tensor([-1.0], device=inputs.device)
         )
 
-    def _forward_step_without_pp(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        os.environ["MODEL_TYPE"] = "NOPP"
+    def _forward_step_without_pp(self) -> torch.Tensor:
         working_dir = Path(os.path.dirname(__file__))
         fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
-        fsdp2_components = self._get_components(fsdp2_model_config_path, use_pp=False)
-        fsdp2_model = fsdp2_components.fsdp_model
-        fsdp2_loss_fn = fsdp2_components.loss_fn
+        components = self._get_components(fsdp2_model_config_path, use_pp=False)
+        dp_rank = get_parallel_rank(components.device_mesh, ParallelismDegrees.DP_SHARD)
+        inputs, targets = self._get_data(dp_rank=dp_rank)
+        fsdp2_model = components.fsdp_model
+        fsdp2_loss_fn = components.loss_fn
 
         input_dict = {"input_ids": inputs}
         fsdp2_out = fsdp2_model(input_dict)
