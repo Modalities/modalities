@@ -19,6 +19,7 @@ OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
 
 
 class OptimizerFactory:
+    @staticmethod
     def get_adam(
         lr: float,
         betas: tuple[float, float],
@@ -31,6 +32,7 @@ class OptimizerFactory:
         optimizer = Adam(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
         return optimizer
 
+    @staticmethod
     def get_adam_w(
         lr: float,
         betas: tuple[float, float],
@@ -171,7 +173,7 @@ def _build_optimizer_groups_via_weight_decay_split(
     params_per_weight_decay_groups: list[dict[str, object]] = [
         {
             "params": _filter_params_for_weight_decay_group(params, regex_expressions=weight_decay_groups[group]),
-            "exclude": group not in weight_decay_groups_excluded,
+            "exclude": group in weight_decay_groups_excluded,
         }
         for group in weight_decay_groups.keys()
     ]
