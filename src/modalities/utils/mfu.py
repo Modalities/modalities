@@ -156,10 +156,7 @@ class GPT2MFUCalculator(MFUCalculatorABC):
         wrapped_model: FSDPX,
         device_mesh: Optional[torch.distributed.device_mesh.DeviceMesh] = None,
     ):
-        self._num_params = get_total_number_of_trainable_parameters(
-            model=wrapped_model,
-            device_mesh=device_mesh
-        )
+        self._num_params = get_total_number_of_trainable_parameters(model=wrapped_model, device_mesh=device_mesh)
         self._n_layer = n_layer
         self._sequence_length = sequence_length
         self._n_embd = n_embd
