@@ -20,6 +20,12 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_parallel_degree,
+    get_parallel_rank,
+    has_parallelism_method,
+)
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 from modalities.utils.logger_utils import get_logger
@@ -138,6 +144,21 @@ class Main:
             local_rank=components.settings.cuda_env.local_rank,
         )
 
+        # log parallel ranks
+        log_str = (
+            f"Rank info for current rank:\n"
+            f"global_rank={components.settings.cuda_env.global_rank}\n"
+            f"world_size={components.settings.cuda_env.world_size}\n"
+            f"local_rank={components.settings.cuda_env.local_rank}\n"
+        )
+
+        for pm in ParallelismDegrees:
+            if has_parallelism_method(components.device_mesh, pm):
+                log_str += (
+                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\n"
+                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\n"
+                )
+        get_logger(name="main").info(log_str.strip())
         # Trainer
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size
