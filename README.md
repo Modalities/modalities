@@ -30,7 +30,7 @@ For training and evaluation of a model, feel free to checkout [this](https://git
 
 ## Installation
 
-There are two ways to install Modalities. If you want to use the latest nightly version, or if you want to modify the code base itself, we recommend installing Modalities directly from source. 
+There are multiple ways to install Modalities. If you want to use the latest nightly version, or if you want to modify the code base itself, we recommend installing Modalities directly from source. 
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
@@ -89,6 +89,58 @@ uv pip install --no-build-isolation flash-attn==2.7.4.post1
 uv pip install -e .[tests,linting]
 pre-commit install --install-hooks
 ```
+
+### Option 4: Containerized Setup via Singularity / Apptainer
+
+If you prefer an isolated, reproducible environment or you are deploying to an HPC center that already supports Apptainer / Singularity, you can build and run Modalities using the provided `modalities.def` file in the container folder.
+
+Note: Commands shown with singularity work the same with apptainer. Substitute the command name (e.g. apptainer build ..., apptainer exec ..., apptainer test ...). If both are installed, choose one consistently.
+
+#### 1. Build the image
+
+Use `--fakeroot` if you don't have root but your system enables user namespaces; otherwise omit it.
+
+```sh
+singularity build modalities.sif modalities.def            # standard build
+# or (if allowed / required on your system)
+singularity build --fakeroot modalities.sif modalities.def
+```
+
+This will:
+* Pull the base image `nvcr.io/nvidia/nemo:25.09`.
+* Install nightly PyTorch (per the definition file) and flash-attention.
+* Clone and install `modalities` inside the container.
+
+#### 2. Run the built-in smoke test
+
+Your `%test` section is executed with:
+
+```sh
+singularity test modalities.sif
+```
+
+Expected output contains lines similar to:
+
+```
+Torch import OK
+Modalities import OK
+```
+
+If this step fails, the container is not usable yet—inspect the earlier build logs.
+
+#### 3. Launch training inside the container
+
+```sh
+singularity exec --nv modalities.sif bash -lc '\
+  cd /opt/repos/modalities && \
+  torchrun --nnodes 1 --nproc_per_node 1 --rdzv-endpoint=0.0.0.0:29503 \
+           src/modalities/__main__.py run \
+           --config_file_path config_files/training/config_lorem_ipsum_long_fsdp2_pp_tp.yaml --test_comm'
+```
+
+To iterate on local code without rebuilding the image, bind‑mount your checkout: e.g. `singularity exec --nv --bind $PWD:/opt/repos/modalities modalities.sif bash` (the host repo then overrides the cloned one inside the container).
+
+For a multinode training with slurm, see the example sbatch-file container/slurm_singularity.sbatch.
 
 ## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
