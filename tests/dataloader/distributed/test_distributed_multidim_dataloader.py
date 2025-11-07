@@ -96,7 +96,7 @@ def _test_dataloader_produces_different_samples_in_different_dp_ranks(process_id
             enable_loss_parallel=False,
             world_size=world_size,
         )
-        dataloader = _build_dataload_for_mesh(32, device_mesh)
+        dataloader = _build_dataloader_for_mesh(32, device_mesh)
         dp_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.DP_SHARD)
         for batch in dataloader:
             assert tensors_pairwise_not_equal_across_mesh(batch.to("cuda"), dp_mesh)
@@ -120,7 +120,7 @@ def _test_dataloader_produces_same_samples_in_connected_non_dp_ranks(process_id:
             enable_loss_parallel=False,
             world_size=world_size,
         )
-        dataloader = _build_dataload_for_mesh(32, device_mesh)
+        dataloader = _build_dataloader_for_mesh(32, device_mesh)
         pp_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.PP)
         for batch in dataloader:
             assert tensors_equal_across_mesh(batch.to("cuda"), pp_mesh)
@@ -158,11 +158,11 @@ def _load_data_for_ranks(
         rdvz_port=22350,
     ):
         device_mesh_mock = _build_device_mesh_mock(world_size, dp_degree, dp_rank, other_rank)
-        train_dataloader = _build_dataload_for_mesh(dataset_len, device_mesh_mock)
+        train_dataloader = _build_dataloader_for_mesh(dataset_len, device_mesh_mock)
         return [batch.tolist() for batch in train_dataloader]
 
 
-def _build_dataload_for_mesh(dataset_len: int, device_mesh: DeviceMesh) -> LLMDataLoader:
+def _build_dataloader_for_mesh(dataset_len: int, device_mesh: DeviceMesh) -> LLMDataLoader:
     dataset = TestDataset(dataset_len)
     sampler = SamplerFactory.create_resumable_distributed_multi_dim_sampler(
         dataset=dataset, device_mesh=device_mesh, data_parallel_key=ParallelismDegrees.DP_SHARD

@@ -119,12 +119,6 @@ train_dataloader:
 
 eval_dataloaders: []
 
-# checkpoint_loading:
-#   component_key: checkpoint_loading
-#   variant_key: dcp
-#   config:
-#     global_rank: ${settings.cuda_env.global_rank}
-
 checkpoint_saving:
   component_key: checkpoint_saving
   variant_key: default
