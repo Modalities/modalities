@@ -88,18 +88,20 @@ uv pip install -e .[tests,linting]
 pre-commit install --install-hooks
 ```
 
-### Option 4: Containerized Setup via Apptainer (Singularity)
+### Option 4: Containerized Setup via Singularity / Apptainer
 
-If you prefer an isolated, reproducible environment or you are deploying to an HPC center that already supports Apptainer / Singularity, you can build and run Modalities using the provided `apptainer.def` file in the repository root.
+If you prefer an isolated, reproducible environment or you are deploying to an HPC center that already supports Apptainer / Singularity, you can build and run Modalities using the provided `modalities.def` file in the container folder.
+
+Note: Commands shown with singularity work the same with apptainer. Substitute the command name (e.g. apptainer build ..., apptainer exec ..., apptainer test ...). If both are installed, choose one consistently.
 
 #### 1. Build the image
 
 Use `--fakeroot` if you don't have root but your system enables user namespaces; otherwise omit it.
 
 ```sh
-apptainer build modalities.sif apptainer.def            # standard build
+singularity build modalities.sif modalities.def            # standard build
 # or (if allowed / required on your system)
-apptainer build --fakeroot modalities.sif apptainer.def
+singularity build --fakeroot modalities.sif modalities.def
 ```
 
 This will:
@@ -112,7 +114,7 @@ This will:
 Your `%test` section is executed with:
 
 ```sh
-apptainer test modalities.sif
+singularity test modalities.sif
 ```
 
 Expected output contains lines similar to:
@@ -127,14 +129,16 @@ If this step fails, the container is not usable yet—inspect the earlier build 
 #### 3. Launch training inside the container
 
 ```sh
-apptainer exec --nv modalities.sif bash -lc '\
+singularity exec --nv modalities.sif bash -lc '\
   cd /opt/repos/modalities && \
   torchrun --nnodes 1 --nproc_per_node 1 --rdzv-endpoint=0.0.0.0:29503 \
            src/modalities/__main__.py run \
            --config_file_path config_files/training/config_lorem_ipsum_long_fsdp2_pp_tp.yaml --test_comm'
 ```
 
-To iterate on local code without rebuilding the image, bind‑mount your checkout: e.g. `apptainer exec --nv --bind $PWD:/opt/repos/modalities modalities.sif bash` (the host repo then overrides the cloned one inside the container).
+To iterate on local code without rebuilding the image, bind‑mount your checkout: e.g. `singularity exec --nv --bind $PWD:/opt/repos/modalities modalities.sif bash` (the host repo then overrides the cloned one inside the container).
+
+For a multinode training with slurm, see the example sbatch-file container/slurm_singularity.sbatch.
 
 ## Usage
 Modalities provides several entry points to interact with the framework. The following section lists the available entry points and their respective functionalities.
