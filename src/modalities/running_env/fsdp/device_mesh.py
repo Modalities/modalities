@@ -176,7 +176,8 @@ def get_mesh_for_parallelism_method(device_mesh: DeviceMesh, parallelism_method:
     Returns:
         DeviceMesh: The sub-mesh for the specified parallelism method.
     """
-    assert has_parallelism_method(device_mesh, parallelism_method)
+    if not has_parallelism_method(device_mesh, parallelism_method):
+        raise ValueError(f"Device mesh does not have parallelism method {parallelism_method}.")
     return device_mesh[parallelism_method.value]
 
 
@@ -192,5 +193,8 @@ def get_parallel_rank(device_mesh: DeviceMesh, parallelism_method: ParallelismDe
     """
     sub_mesh = get_mesh_for_parallelism_method(device_mesh=device_mesh, parallelism_method=parallelism_method)
     coordinate = sub_mesh.get_coordinate()
-    assert coordinate is not None, f"Current rank is not part of the sub-mesh for {parallelism_method}"
+    if coordinate is None:
+        raise ValueError(f"Current rank is not part of the sub-mesh for {parallelism_method}.")
+    if len(coordinate) != 1:
+        raise ValueError(f"Expected coordinate length 1 for {parallelism_method}, got {len(coordinate)}.")
     return coordinate[0]
