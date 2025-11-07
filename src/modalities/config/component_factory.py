@@ -170,22 +170,33 @@ class ComponentFactory:
     def _assert_valid_config_keys(
         self, component_key: str, variant_key: str, config_dict: dict, component_config_type: Type[BaseModelChild]
     ) -> None:
-        required_keys = []
-        optional_keys = []
-        for key, field in component_config_type.model_fields.items():
-            if field.is_required():
-                required_keys.append(key)
-            else:
-                optional_keys.append(key)
+        # Collect required and optional keys, including aliases if defined.
+        required_keys: list[str] = []
+        optional_keys: list[str] = []
+        # Map aliases to canonical field names for clearer error messages.
+        alias_to_field: dict[str, str] = {}
 
-        invalid_keys = []
-        for key in config_dict.keys():
-            if key not in required_keys and key not in optional_keys:
-                invalid_keys.append(key)
+        for field_name, field in component_config_type.model_fields.items():
+            names_for_field = {field_name}
+            if field.alias and field.alias != field_name:
+                names_for_field.add(field.alias)
+                alias_to_field[field.alias] = field_name
+
+            if field.is_required():
+                required_keys.extend(names_for_field)
+            else:
+                optional_keys.extend(names_for_field)
+
+        all_valid_keys = set(required_keys) | set(optional_keys)
+
+        invalid_keys = [key for key in config_dict.keys() if key not in all_valid_keys]
         if len(invalid_keys) > 0:
             message = f"Invalid keys {invalid_keys} for config `{component_key}.{variant_key}`"
             message += f" of type {component_config_type}:\n{config_dict}\n"
-            message += f"Required keys: {required_keys}\nOptional keys: {optional_keys}"
+            if alias_to_field:
+                message += f"Alias to field mapping: {alias_to_field}\n"
+            message += f"Required keys (including aliases): {required_keys}\n"
+            message += f"Optional keys (including aliases): {optional_keys}\n"
             raise ValueError(message)
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
