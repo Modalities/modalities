@@ -135,8 +135,8 @@ class ActivationCheckpointing:
             raise ValueError(f"Unknown activation checkpointing variant: {ac_variant}")
 
         layers = model.get_submodule(layers_fqn)
-        if not isinstance(layers, nn.ModuleList):
-            raise ValueError(f"layers_fqn {layers_fqn} does not reference a ModuleList")
+        if not isinstance(layers, nn.ModuleDict):
+            raise ValueError(f"layers_fqn {layers_fqn} does not reference a ModuleDict")
 
         print_rank_0(f"Applying activation checkpointing to {len(list(layers.named_children()))} layers...")
 

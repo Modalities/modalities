@@ -20,6 +20,12 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_parallel_degree,
+    get_parallel_rank,
+    has_parallelism_method,
+)
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
 from modalities.utils.logger_utils import get_logger
@@ -138,6 +144,21 @@ class Main:
             local_rank=components.settings.cuda_env.local_rank,
         )
 
+        # log parallel ranks
+        log_str = (
+            f"Rank info for current rank:\n"
+            f"global_rank={components.settings.cuda_env.global_rank}\n"
+            f"world_size={components.settings.cuda_env.world_size}\n"
+            f"local_rank={components.settings.cuda_env.local_rank}\n"
+        )
+
+        for pm in ParallelismDegrees:
+            if has_parallelism_method(components.device_mesh, pm):
+                log_str += (
+                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\n"
+                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\n"
+                )
+        get_logger(name="main").info(log_str.strip())
         # Trainer
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size
@@ -157,7 +178,7 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
-            dp_degree=components.settings.step_profile.dp_degree,
+            device_mesh=components.device_mesh,
             mfu_calculator=components.mfu_calculator,
         )
 
@@ -174,7 +195,7 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        num_params = get_total_number_of_trainable_parameters(components.app_state.model)
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model, components.device_mesh)
         components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
         logger.info(f"Training model with {num_params} parameters.")
 
@@ -200,6 +221,7 @@ class Main:
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
+            scheduled_pipeline=components.scheduled_pipeline,
         )
 
     def get_logging_publishers(

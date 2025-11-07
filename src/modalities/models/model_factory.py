@@ -58,6 +58,15 @@ class ModelFactory:
 
     @staticmethod
     def _is_model_on_meta_device(model: nn.Module) -> bool:
+        """
+        Checks if all parameters and buffers of the model are on the meta device.
+
+        Args:
+            model (nn.Module): The model to check.
+
+        Returns:
+            bool: True if all parameters and buffers are on meta device, False otherwise.
+        """
         meta_counter = 0
         param_counter = 0
         for _, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
@@ -633,7 +642,7 @@ class GPT2ModelFactory:
             ),
         }
 
-        if isinstance(model.transformer.wpe, nn.Embedding):
+        if hasattr(model.transformer, "wpe") and isinstance(model.transformer.wpe, nn.Embedding):
             # If the position embedding is an nn.Embedding, we can shard it on the sequence dimension
             # to enable sequence parallelism in the downstream transformer blocks.
             # Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.
@@ -642,11 +651,15 @@ class GPT2ModelFactory:
                 output_layouts=Shard(0),
             )
 
-        parallelize_module(
-            module=model,
-            device_mesh=tp_mesh,
-            parallelize_plan=model_tp_plan,
-        )
+        # only keep the relevant parts of the model parallel plan
+        # (e.g. when using pipeline parallelism and not all modules are present)
+        model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model.transformer, k.split(".")[1])}
+        if model_tp_plan:
+            parallelize_module(
+                module=model,
+                device_mesh=tp_mesh,
+                parallelize_plan=model_tp_plan,
+            )
 
         transformer_block_tp_plan = {
             "attention_norm": SequenceParallel(),
@@ -673,13 +686,13 @@ class GPT2ModelFactory:
                 desired_input_layouts=(Replicate(),),
             ),
         }
-        if isinstance(model.transformer.h[0].mlp, SwiGLU):
+        if isinstance(list(model.transformer.h.values())[0].mlp, SwiGLU):
             mlp_plan = {
                 "mlp.W": ColwiseParallel(),
                 "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
                 "mlp.V": ColwiseParallel(),
             }
-        elif isinstance(model.transformer.h[0].mlp, TransformerMLP):
+        elif isinstance(list(model.transformer.h.values())[0].mlp, TransformerMLP):
             mlp_plan = {
                 "mlp.c_fc": ColwiseParallel(),
                 "mlp.c_proj": RowwiseParallel(output_layouts=Shard(1)),
@@ -691,7 +704,7 @@ class GPT2ModelFactory:
             )
         transformer_block_tp_plan.update(mlp_plan)
 
-        for transformer_block in model.transformer.h:
+        for transformer_block in model.transformer.h.values():
             # override the number of q and kv heads
             if transformer_block.attn.n_head_q % tp_mesh.size() != 0:
                 raise ValueError(

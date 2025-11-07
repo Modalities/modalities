@@ -1,7 +1,7 @@
 from unittest.mock import call
 
 from modalities.gym import Gym
-from tests.test_utils import configure_dataloader_mock
+from tests.utility import configure_dataloader_mock
 
 
 def test_run_cpu_only(

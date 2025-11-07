@@ -2,11 +2,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from modalities.config.pydantic_if_types import PydanticPytorchModuleType
+from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticPytorchModuleType
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import GradientClippingMode
 
 
-class FSDPGradientClipperConfig(BaseModel):
+class FSDP1GradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP gradient clipper.
 
@@ -26,7 +26,30 @@ class FSDPGradientClipperConfig(BaseModel):
     wrapped_model: PydanticPytorchModuleType
 
 
-class FSDPDummyGradientClipperConfig(BaseModel):
+class FSDP2GradientClipperConfig(BaseModel):
+    """
+    Configuration class for FSDP gradient clipper.
+
+    Args:
+        max_norm (float): The maximum norm value for gradient clipping.
+        norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
+
+    Attributes:
+        max_norm (float): The maximum norm value for gradient clipping.
+        norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
+    """
+
+    max_norm: Annotated[float, Field(strict=True, gt=0)]
+    norm_type: GradientClippingMode
+    wrapped_model: PydanticPytorchModuleType
+    device_mesh: PydanticDeviceMeshIFType
+
+
+class FSDP1DummyGradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP dummy gradient clipper.
 
@@ -43,17 +66,21 @@ class FSDPDummyGradientClipperConfig(BaseModel):
     norm_type: GradientClippingMode
 
 
-class DummyGradientClipperConfig(BaseModel):
+class FSDP2DummyGradientClipperConfig(BaseModel):
     """
-    Configuration class for dummy gradient clipper.
+    Configuration class for FSDP dummy gradient clipper.
 
-    This class is a placeholder and does not have any specific functionality.
+    Args:
+        wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
 
     Attributes:
-        None
-
-    Methods:
-        None
+        wrapped_model (PydanticPytorchModuleType): The wrapped PyTorch model.
+        norm_type (GradientClippingMode): The type of gradient clipping to be applied.
+        device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
-    pass
+    wrapped_model: PydanticPytorchModuleType
+    norm_type: GradientClippingMode
+    device_mesh: PydanticDeviceMeshIFType

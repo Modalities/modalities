@@ -11,12 +11,14 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 from pydantic import ValidationError
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.tensor import DTensor
 from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, has_parallelism_method
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.utils.typing_utils import FSDPX
 
@@ -162,12 +164,13 @@ def get_local_number_of_trainable_parameters(model: nn.Module) -> int:
     return num_params
 
 
-def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
+def get_total_number_of_trainable_parameters(model: FSDPX, device_mesh: DeviceMesh | None) -> Number:
     """Returns the total number of trainable parameters across all ranks.
     The model must be sharded with FSDP1 or FSDP2.
 
     Args:
         model (FSDPX): The model for which to calculate the number of trainable parameters.
+        device_mesh (DeviceMesh | None): The device mesh used for distributed training.
 
     Returns:
         Number: The total number of trainable parameters across all ranks.
@@ -194,6 +197,8 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         total_num_params = total_num_params // sharding_factor
         return total_num_params
     elif isinstance(model, FSDP2):
+        if device_mesh is None:
+            raise ValueError("Device mesh must be provided for FSDP2 models.")
         # model.parameters() returns an iterable of distributed tensors (i.e., DTensor).
         # Running numel() on DTensor, returns the unsharded number of weights.
         #
@@ -214,8 +219,13 @@ def get_total_number_of_trainable_parameters(model: FSDPX) -> Number:
         # >>> parameter_tensor.shape[0] * parameter_tensor.shape[1]
         # 6438912
 
-        total_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        return total_num_params
+        num_params_tensor = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        if has_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP):
+            num_params_tensor = torch.tensor(num_params_tensor).cuda()
+            pp_mesh = device_mesh[ParallelismDegrees.PP.value]
+            dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
+            return num_params_tensor.item()
+        return num_params_tensor
     else:
         raise ValueError(
             f"Model type {type(model)} is not supported. "

@@ -8,11 +8,13 @@ from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
+    PydanticDeviceMeshIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
     PydanticMessageSubscriberIFType,
     PydanticMFUCalculatorABCType,
+    PydanticPipelineType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
@@ -179,6 +181,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
     mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
+    scheduled_pipeline: Optional[PydanticPipelineType] = None
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
     model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")

@@ -481,6 +481,7 @@ class GPT2MFUCalculatorConfig(BaseModel):
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
     wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
 
 class ParallelDegreeConfig(BaseModel):

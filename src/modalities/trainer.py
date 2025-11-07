@@ -4,6 +4,7 @@ from typing import Callable, Optional
 
 import torch
 import torch.distributed as dist
+from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -15,6 +16,8 @@ from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, P
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
@@ -35,7 +38,7 @@ class Trainer:
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
         gradient_acc_steps: int,
         global_num_tokens_per_train_step: int,
-        dp_degree: int,
+        device_mesh: DeviceMesh | None,
         num_seen_train_steps: int,
         global_num_seen_tokens: int,
         num_target_steps: int,
@@ -47,28 +50,36 @@ class Trainer:
         Initializes the Trainer object.
 
         Args:
-            global_rank (int): The global rank to which operates the trainer object.
-            progress_publisher (MessagePublisher[ProgressUpdate]): The publisher for progress updates.
-            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]):
-                The publisher for evaluation result batches.
-            gradient_acc_steps (int): The number of gradient accumulation steps.
-            global_num_tokens_per_train_step (int): The number of global tokens per training step.
-            num_seen_train_steps (int): The number of training steps already seen.
-            global_num_seen_tokens (int): The number of tokens already seen.
-            num_target_steps (int): The target number of training steps.
-            num_target_tokens (int): The target number of tokens.
-            gradient_clipper (GradientClipperIF): The gradient clipper.
-            mfu_calculator (Optional[MFUCalculatorABC]): The MFU calculator.
+            global_rank (int): The global rank.
+            progress_publisher (MessagePublisher[ProgressUpdate]): Progress publisher.
+            evaluation_result_publisher (MessagePublisher[EvaluationResultBatch]): Evaluation result publisher.
+            gradient_acc_steps (int): Gradient accumulation steps.
+            global_num_tokens_per_train_step (int): Global number of tokens per train step.
+            dp_degree (int): Data parallelism degree.
+            pp_degree (int): Pipeline parallelism degree.
+            num_seen_train_steps (int): Number of seen train steps.
+            global_num_seen_tokens (int): Global number of seen tokens.
+            num_target_steps (int): Number of target steps.
+            num_target_tokens (int): Number of target tokens.
+            gradient_clipper (GradientClipperIF): Gradient clipper.
+            mfu_calculator (Optional[MFUCalculatorABC]): MFU calculator.
 
         Returns:
             None
         """
         self.global_rank = global_rank
+        if device_mesh is not None:
+            self.dp_degree = get_parallel_degree(
+                device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD]
+            )
+            self.pp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.PP])
+        else:
+            self.dp_degree = dist.get_world_size()
+            self.pp_degree = 1
         self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
         self.gradient_acc_steps = gradient_acc_steps
         self.global_num_tokens_per_train_step = global_num_tokens_per_train_step
-        self.dp_degree = dp_degree
         self.num_seen_train_steps = num_seen_train_steps
         self.num_target_steps = num_target_steps
         self.num_target_tokens = num_target_tokens
@@ -98,7 +109,8 @@ class Trainer:
         scheduler: LRScheduler,
         loss_fun: Loss,
         micro_batch_id: int,
-    ) -> tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
+        scheduled_pipeline: Optional[Pipeline] = None,
+    ) -> tuple[bool, int, Optional[torch.Tensor], Optional[torch.Tensor]]:
         """
         Conducts a training step on batch of data.
 
@@ -109,19 +121,39 @@ class Trainer:
             scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
             micro_batch_id (int): The ID of the micro batch.
+            scheduled_pipeline (Optional[Pipeline], optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
                 A tuple containing the following:
                     - step_performed (bool): Indicates whether a training step was performed.
                     - num_train_steps_done (int): The number of training steps done.
-                    - loss (torch.Tensor): The computed loss.
+                    - loss (Optional[torch.Tensor]): The computed loss.
+                        None, if a non-last stage was processes in pipeline parallelism.
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
-        result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
-        (loss / self.gradient_acc_steps).backward()
+        if scheduled_pipeline is not None:
+            pp_schedule = scheduled_pipeline.pp_schedule
+            # Pipeline Parallel forward / backward inside step() call
+            # with self.train_context(optional_context_parallel_ctx):
+            targets, losses = (
+                (batch.targets[loss_fun.target_key].contiguous(), [])
+                if scheduled_pipeline.is_last_pp_stage
+                else (None, None)
+            )
+
+            if scheduled_pipeline.is_first_pp_stage:
+                pp_schedule.step(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+            else:
+                pp_schedule.step(target=targets, losses=losses)
+            loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+        else:
+            # else continue with loss calculation
+            result_batch = model_predict_batch(model=model, batch=batch)
+            loss = loss_fun(result_batch)
+            (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:
             gradient_norm_score = self.gradient_clipper.clip_gradients()
@@ -146,6 +178,7 @@ class Trainer:
         training_log_interval_in_steps: int,
         evaluation_callback: Callable[[TrainingProgress], None],
         checkpointing_callback: Callable[[TrainingProgress], None],
+        scheduled_pipeline: Pipeline | None = None,
     ):
         """
         Trains the model.
@@ -157,6 +190,8 @@ class Trainer:
             training_log_interval_in_steps (int): The interval at which training progress is logged.
             evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.
             checkpointing_callback (Callable[[TrainingProgress], None]): A callback function for checkpointing.
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             None
@@ -209,15 +244,18 @@ class Trainer:
                 scheduler=lr_scheduler,
                 loss_fun=loss_fun,
                 micro_batch_id=micro_batch_id,
+                scheduled_pipeline=scheduled_pipeline,
             )
             forward_backward_time_recorder.stop()
             training_progress.num_seen_steps_current_run = num_train_steps_done
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
-            # Save the batch loss
-            cumulated_losses[0] += batch_loss.detach().item()
-            # This works, because we always drop the last batch in case it has less samples than the batch size
-            cumulated_losses[-1] += 1  # number of local batches
+            # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
+            if batch_loss is not None:
+                # Save the batch loss
+                cumulated_losses[0] += batch_loss.item()
+                # This works, because we always drop the last batch in case it has less samples than the batch size
+                cumulated_losses[-1] += 1  # number of local batches
 
             # gradient norm is already synced across all ranks
             if gradient_norm_score is not None:
@@ -250,14 +288,17 @@ class Trainer:
                 synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
-                cumulated_losses[1] = batch_loss.item()
+
+                cumulated_losses[1] = batch_loss.item() if batch_loss is not None else 0.0
 
                 reduced_losses = Reducer.reduce(
                     tensor=cumulated_losses,
                     operation=dist.ReduceOp.SUM,
-                    # 1.) summed batch loss / (num batches * world size)
-                    # 2.) last batch loss / world size
-                    post_processing_fun=lambda t: torch.stack([t[0] / t[-1], t[1] / dist.get_world_size()]),
+                    # 1.) summed batch loss / (num batches * (world size / dp_degree))
+                    # 2.) last batch loss / (world size / pp_degree)
+                    post_processing_fun=lambda t: torch.stack(
+                        [t[0] / t[-1], t[1] / dist.get_world_size() * self.pp_degree]
+                    ),
                 )
 
                 train_loss_avg, train_loss_last_batch = (
@@ -280,8 +321,18 @@ class Trainer:
                 if self.mfu_calculator is not None:
                     mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
 
-                peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
-                torch.cuda.reset_peak_memory_stats(device)
+                # Collect peak memory depending on device type. On CPU we fall back to RSS (if available) or -1.
+                if device.type == "cuda":
+                    peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                    torch.cuda.reset_peak_memory_stats(device)
+                else:
+                    # ru_maxrss is in kilobytes on Linux; convert to MB. Use -1.0 if resource unavailable.
+                    try:
+                        import resource  # Standard lib (POSIX). Not available on some platforms.
+
+                        peak_memory_MB = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+                    except Exception:
+                        peak_memory_MB = -1.0
 
                 training_metrics = EvaluationResultBatch(
                     losses=losses,
