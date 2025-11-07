@@ -6,7 +6,7 @@ from torch.distributed.device_mesh import DeviceMesh
 from modalities.config.pydantic_if_types import PydanticDatasetIFType, PydanticDeviceMeshIFType
 from modalities.dataloader.dataset import Dataset
 from modalities.dataloader.samplers import ResumableDistributedSampler
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
 
 
 class ResumableDistributedMultiDimSamplerConfig(BaseModel):
@@ -36,7 +36,7 @@ class SamplerFactory:
         drop_last: Optional[bool] = False,
         skip_num_global_samples: Optional[int] = 0,
     ) -> ResumableDistributedSampler:
-        dp_rank = device_mesh[data_parallel_key.value].get_coordinate()[0]
+        dp_rank = get_parallel_rank(device_mesh, data_parallel_key)
         num_replicas = device_mesh[data_parallel_key.value].size()
 
         sampler = ResumableDistributedSampler(

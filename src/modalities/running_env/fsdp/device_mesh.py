@@ -178,3 +178,19 @@ def get_mesh_for_parallelism_method(device_mesh: DeviceMesh, parallelism_method:
     """
     assert has_parallelism_method(device_mesh, parallelism_method)
     return device_mesh[parallelism_method.value]
+
+
+def get_parallel_rank(device_mesh: DeviceMesh, parallelism_method: ParallelismDegrees) -> int:
+    """Gets the parallel rank ID for the specified parallelism method.
+
+    Args:
+        device_mesh (DeviceMesh): The device mesh.
+        parallelism_method (ParallelismDegrees): The parallelism method.
+
+    Returns:
+        int: The parallel rank ID for the specified parallelism method.
+    """
+    sub_mesh = get_mesh_for_parallelism_method(device_mesh=device_mesh, parallelism_method=parallelism_method)
+    coordinate = sub_mesh.get_coordinate()
+    assert coordinate is not None, f"Current rank is not part of the sub-mesh for {parallelism_method}"
+    return coordinate[0]
