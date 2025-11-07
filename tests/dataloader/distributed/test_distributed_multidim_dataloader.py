@@ -46,6 +46,8 @@ def test_dataloader_produces_expected_samples(world_size: int, dp_degree: int):
     batches_on_rank = _build_batch_for_each_rank_combination(world_size, dp_degree, dataset_len)
 
     for dp_rank in range(dp_degree):
+        batch_sizes = set(len(batch) for batch in batches_on_rank[(dp_rank, 0)])
+        assert len(batch_sizes) == 1, f"Batches on dp_rank {dp_rank} have different sizes."
         samples_dp_rank = sum(batches_on_rank[(dp_rank, 0)], [])
         expected_samples_on_dp_rank = list(range(dp_rank, dataset_len, dp_degree))
 
