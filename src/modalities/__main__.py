@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 import click
 import click_pathlib
+
+# from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
 from omegaconf import DictConfig
 from pydantic import FilePath
 
@@ -679,6 +681,54 @@ def CMD_entry_point_list_remaining_runs(
             for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
                 f.write(f"{cfg}\n")
 
+
+# @main.group(name="profile")
+# def profile():
+#     """
+#     Collection of utilities to profile modalities.
+#     """
+#     pass
+
+# @profile.command(name="train_step")
+# @click.option(
+#     "--config_file_path",
+#     type=click_pathlib.Path(exists=True),
+#     required=True,
+#     help="Path to the YAML training config file.",
+# )
+# @click.option(
+#     "--experiment_folder_path",
+#     type=click_pathlib.Path(file_okay=False),
+#     required=True,
+#     help="Path to the experiment output directory.",
+# )
+# @click.option(
+#     "--num_warmup_steps",
+#     type=int,
+#     default=1,
+#     show_default=True,
+#     help="Number of warmup steps to skip in profiling.",
+# )
+# @click.option(
+#     "--num_measurement_steps",
+#     type=int,
+#     default=3,
+#     show_default=True,
+#     help="Number of steps to measure during profiling.",
+# )
+# def CMD_entry_point_run_train_step_profiler(
+#     config_file_path: Path,
+#     experiment_folder_path: Path,
+#     num_warmup_steps: int,
+#     num_measurement_steps: int,
+# ):
+#     """Run train step profiler and write result to JSON if RANK=0."""
+#     ModalitiesProfiler.get_train_step_statistics(
+#         config_file_path=config_file_path,
+#         experiment_folder_path=experiment_folder_path,
+#         num_warmup_steps=num_warmup_steps,
+#         num_measurement_steps=num_measurement_steps,
+#     )
 
 if __name__ == "__main__":
     main()
