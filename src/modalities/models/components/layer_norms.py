@@ -101,5 +101,6 @@ class PytorchRMSLayerNormConfig(BaseModel):
         normalized_shape (int): The expected size of the input shape.
         eps (float, optional): Small value added to the input to avoid division by zero. Defaults to 1e-5.
     """
+
     normalized_shape: Annotated[int, Field(strict=True, ge=1)]
     eps: Annotated[float, Field(strict=True, gt=0, default=1e-5)]
