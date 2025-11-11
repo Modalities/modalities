@@ -7,7 +7,6 @@ import torch
 import torch.multiprocessing as mp
 import yaml
 from pydantic import BaseModel
-from torch.distributed.fsdp import FSDPModule as FSDP2
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType

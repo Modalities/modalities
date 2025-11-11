@@ -47,7 +47,8 @@ echo "START TIME: $(date)"
 
 # Step 1: Filter configs
 modalities benchmark list_remaining_runs \
-  --exp_root "$EXPERIMENT_ROOT/$NUM_RANKS" \
+  --exp_root "$EXPERIMENT_ROOT" \
+  --world_size "$NUM_RANKS" \
   --file_list_path "$CONFIG_LIST_FILE" \
   --expected_steps "$EXPECTED_STEPS" \
   --skip_exception_types "OutOfMemoryError,ValueError"

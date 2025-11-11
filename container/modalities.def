@@ -1,0 +1,34 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/nemo:25.09
+
+%environment
+    export PYTHONNOUSERSITE=1
+
+%post
+    set -e
+    mkdir -p /opt/repos /opt/modalities/config_files/training /e /p /etc/FZJ
+    python -m pip install --upgrade pip || true
+
+    # remove pytorch and install pytorch nightly
+    rm -rf /usr/local/lib/python3.12/dist-packages/torch* /usr/local/lib/python3.12/dist-packages/pytorch_triton* || true
+    python -m pip install --pre --no-cache-dir --index-url https://download.pytorch.org/whl/nightly/cu129 torch torchvision
+    
+    # Clone repos (network required at build time)
+    git clone --depth 1 https://github.com/Dao-AILab/flash-attention.git /opt/repos/flash-attention
+    git clone --branch main --depth 1 https://github.com/Modalities/modalities.git /opt/repos/modalities
+
+    # Install flash-attention
+    cd /opt/repos/flash-attention
+    MAX_JOBS=4 python setup.py install
+
+    # Install modalities
+    cd /opt/repos/modalities
+    pip install -e .
+
+%test
+    python - <<'EOF'
+import torch
+print("Torch import OK")
+import modalities
+print("Modalities import OK")
+EOF

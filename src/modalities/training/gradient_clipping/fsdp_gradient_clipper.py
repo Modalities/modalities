@@ -9,7 +9,11 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.tensor import DTensor
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_mesh_for_parallelism_method
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    has_parallelism_method,
+)
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 
@@ -154,10 +158,10 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
             # If only using PP, total_norm will be a local tensor.
             total_norm = total_norm.full_tensor()
 
-        pp_mesh = get_mesh_for_parallelism_method(
-            device_mesh=self.device_mesh, parallelism_method=ParallelismDegrees.PP
-        )
-        if pp_mesh is not None:
+        if has_parallelism_method(self.device_mesh, ParallelismDegrees.PP):
+            pp_mesh = get_mesh_for_parallelism_method(
+                device_mesh=self.device_mesh, parallelism_method=ParallelismDegrees.PP
+            )
             if math.isinf(self.norm_type.value):
                 dist.all_reduce(total_norm, op=dist.ReduceOp.MAX, group=pp_mesh.get_group())
             else:

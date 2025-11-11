@@ -119,12 +119,6 @@ train_dataloader:
 
 eval_dataloaders: []
 
-# checkpoint_loading:
-#   component_key: checkpoint_loading
-#   variant_key: dcp
-#   config:
-#     global_rank: ${settings.cuda_env.global_rank}
-
 checkpoint_saving:
   component_key: checkpoint_saving
   variant_key: default
@@ -155,9 +149,9 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    pipeline_parallel_degree: 2
-    tensor_parallel_degree: 2
-    data_parallel_shard_degree: -1
+    pipeline_parallel_degree: 1
+    tensor_parallel_degree: 1
+    data_parallel_shard_degree: 2
     world_size: ${settings.cuda_env.world_size}
 
 dp_degree:
@@ -197,13 +191,8 @@ initialized_model:
   variant_key: model_initialized
   config:
     model:
-      component_key: pipeline
-      variant_key: selector
-      config:
-        pipeline:
-          instance_key: scheduled_pipeline
-          pass_type: BY_REFERENCE
-        selection_type: MODEL_PART
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
       variant_key: composed
@@ -213,44 +202,13 @@ initialized_model:
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
-
-scheduled_pipeline:
-  component_key: pipeline
-  variant_key: scheduled
-  config:
-    loss_fn:
-      instance_key: loss_fn
-      pass_type: BY_REFERENCE
-    pp_schedule_name: gpipe
-    batch_size: ${settings.step_profile.local_train_micro_batch_size}
-    microbatch_size: 1
-    pp_degree: ${device_mesh.config.pipeline_parallel_degree}
-     # maybe better to use the fsdp model and the schedule here
-     # instead of passing in the staged pipeline?
-     # If fsdp_model creates a copy then this is not in the scope of 
-     # the staged pipeline. 
-    pipeline:
-      component_key: pipeline
-      variant_key: builder
-      config:
-        pp_stage:
-          component_key: pipeline
-          variant_key: selector
-          config:
-            pipeline:
-              instance_key: staged_pipeline
-              pass_type: BY_REFERENCE
-            selection_type: PP_STAGE
-        model_part:
-          instance_key: fsdp_model
-          pass_type: BY_REFERENCE
         
 fsdp_model:
   component_key: model
   variant_key: fsdp2_wrapped
   config:
     model:
-      instance_key: gpt2_tp_model
+      instance_key: model_raw
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -259,47 +217,6 @@ fsdp_model:
       param_dtype: BF_16
       reduce_dtype: BF_16
     block_names: [GPT2Block]
-
-gpt2_tp_model:
-  component_key: model
-  variant_key: gpt2_tp
-  config:
-    model:
-      instance_key: model_part
-      pass_type: BY_REFERENCE
-    device_mesh:
-      instance_key: device_mesh
-      pass_type: BY_REFERENCE
-
-model_part:
-  component_key: pipeline
-  variant_key: selector
-  config:
-    pipeline:
-      instance_key: staged_pipeline
-      pass_type: BY_REFERENCE
-    selection_type: MODEL_PART
-
-staged_pipeline:
-  component_key: pipeline
-  variant_key: staged
-  config:
-    whole_model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    stages_generator:
-      component_key: stages_generator
-      variant_key: gpt2_stages_generator
-      config:
-        num_model_layers: ${model_raw.config.n_layer}
-        input_layer_equivalence: 1
-        output_layer_equivalence: 1
-    device_mesh:
-      instance_key: device_mesh
-      pass_type: BY_REFERENCE
-    local_rank: ${settings.cuda_env.local_rank}
-    pp_schedule_name: gpipe
-    num_layers_per_stage: 2
 
 model_raw:
   component_key: model

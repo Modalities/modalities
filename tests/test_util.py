@@ -11,9 +11,21 @@ from pydantic import BaseModel
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticDeviceMeshIFType
-from modalities.util import get_total_number_of_trainable_parameters
+from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
 from modalities.utils.typing_utils import FSDPX
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
+from tests.utility import find_free_port
+
+
+def test_get_local_number_of_trainable_parameters():
+    # Create a simple model with trainable parameters
+    model = torch.nn.Sequential(torch.nn.Linear(10, 5), torch.nn.ReLU(), torch.nn.Linear(5, 2))
+
+    # Calculate the expected number of trainable parameters
+    expected_params = 10 * 5 + 5 + 5 * 2 + 2  # weights_1 + bias_1 + weights_2 + bias_2 = 67
+
+    # Call the function and check the result
+    assert get_local_number_of_trainable_parameters(model) == expected_params
 
 
 @pytest.fixture
@@ -22,7 +34,7 @@ def temporary_folder_path():
         yield Path(tmp_dir_path)
 
 
-@pytest.mark.skipif(torch.cuda.device_count() < 4, reason="This test requires 4 GPUs.")
+@pytest.mark.skipif(torch.cuda.device_count() < 8, reason="This test requires 4 GPUs.")
 class TestUtils:
     # number of parameters in the model calculated as follows:
     # Embeddings: 128*50304
@@ -38,18 +50,20 @@ class TestUtils:
 
     @staticmethod
     @pytest.mark.parametrize(
-        "rdvz_port, relative_config_path, sharding_strategy, expected_nr_parameters",
-        [  # FDSP1
-            (22370, "../test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "NO_SHARD", 6770176),
-            (22371, "../test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "FULL_SHARD", 6770176),
-            (22372, "../test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "HYBRID_SHARD", 6770176),
+        "relative_config_path, sharding_strategy, expected_nr_parameters",
+        [
+            # FDSP1
+            ("test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "NO_SHARD", 6770176),
+            ("test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "FULL_SHARD", 6770176),
+            ("test_yaml_configs/config_lorem_ipsum_fsdp1.yaml", "HYBRID_SHARD", 6770176),
             # FSDP2
-            (22374, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "FULL_SHARD", 6770176),
-            (22375, "../test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "HYBRID_SHARD", 6770176),
+            ("test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "FULL_SHARD", 6770176),
+            ("test_yaml_configs/config_lorem_ipsum_fsdp2.yaml", "HYBRID_SHARD", 6770176),
+            ("test_yaml_configs/config_lorem_ipsum_fsdp2_pp_tp.yaml", "FULL_SHARD", 6770176 + 6438912),
+            # we have extra parameters from the output head since we can't use weight tying with pipeline parallelism
         ],
     )
     def test_get_total_number_of_trainable_parameters_fsdpx(
-        rdvz_port: int,
         relative_config_path: str,
         temporary_folder_path: Path,
         sharding_strategy: str,
@@ -68,14 +82,14 @@ class TestUtils:
             if "device_mesh" in config:  # FSDP2
                 if sharding_strategy == "FULL_SHARD":
                     config["device_mesh"]["config"]["data_parallel_replicate_degree"] = 1
-                    config["device_mesh"]["config"]["data_parallel_shard_degree"] = torch.cuda.device_count()
+                    config["device_mesh"]["config"]["data_parallel_shard_degree"] = -1
                 elif sharding_strategy == "HYBRID_SHARD":
                     assert torch.cuda.device_count() % 2 == 0, (
                         "HYBRID_SHARD test requires even number of GPUs. "
                         f"Current number of GPUs: {torch.cuda.device_count()}"
                     )
                     config["device_mesh"]["config"]["data_parallel_replicate_degree"] = 2
-                    config["device_mesh"]["config"]["data_parallel_shard_degree"] = torch.cuda.device_count() // 2
+                    config["device_mesh"]["config"]["data_parallel_shard_degree"] = -1
                 else:
                     raise ValueError(f"Invalid sharding strategy: {sharding_strategy}")
             else:  # FSDP1
@@ -98,7 +112,7 @@ class TestUtils:
         world_size = torch.cuda.device_count()
         mp.spawn(
             TestUtils._test_get_total_number_of_trainable_parameters_thread,
-            args=(world_size, rdvz_port, tmp_config_file_path, expected_nr_parameters),
+            args=(world_size, find_free_port(), tmp_config_file_path, expected_nr_parameters),
             nprocs=world_size,
             join=True,
         )
@@ -135,9 +149,7 @@ class TestUtils:
             )
 
     def _assert_correct_total_number_of_trainable_parameters(
-        wrapped_model: FSDPX,
-        expected_nr_parameters: int,
-        device_mesh: PydanticDeviceMeshIFType | None
+        wrapped_model: FSDPX, expected_nr_parameters: int, device_mesh: PydanticDeviceMeshIFType | None
     ):
         nr_parameters = get_total_number_of_trainable_parameters(model=wrapped_model, device_mesh=device_mesh)
         assert nr_parameters == expected_nr_parameters

@@ -1,4 +1,3 @@
-
 import copy
 
 import pytest
@@ -68,8 +67,12 @@ def test_get_compiled_model_compiles_blocks(gpt2_model):
     result_model = ModelFactory.get_compiled_model(gpt2_model, block_names, fullgraph=True)
 
     assert len(result_model.transformer.h) == 4, "Should still have four blocks"
-    for i, (original_block_idx, new_block_idx) in enumerate(zip(original_model.transformer.h, result_model.transformer.h)):
-        assert result_model.transformer.h[new_block_idx] is not original_model.transformer.h[original_block_idx], f"Block {i} should be a compiled version"
+    for i, (original_block_idx, new_block_idx) in enumerate(
+        zip(original_model.transformer.h, result_model.transformer.h)
+    ):
+        assert (
+            result_model.transformer.h[new_block_idx] is not original_model.transformer.h[original_block_idx]
+        ), f"Block {i} should be a compiled version"
         assert isinstance(result_model.transformer.h[new_block_idx], nn.Module), f"Block {i} should be an nn.Module"
     assert result_model.transformer.wte is original_wte, "Embedding layer should remain unchanged"
     assert result_model.transformer.lm_head is original_lm_head, "LM head should remain unchanged"

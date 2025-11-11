@@ -18,7 +18,7 @@ from torch.distributed.tensor import DTensor
 from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, has_parallelism_method
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.utils.typing_utils import FSDPX
 
@@ -197,6 +197,8 @@ def get_total_number_of_trainable_parameters(model: FSDPX, device_mesh: DeviceMe
         total_num_params = total_num_params // sharding_factor
         return total_num_params
     elif isinstance(model, FSDP2):
+        if device_mesh is None:
+            raise ValueError("Device mesh must be provided for FSDP2 models.")
         # model.parameters() returns an iterable of distributed tensors (i.e., DTensor).
         # Running numel() on DTensor, returns the unsharded number of weights.
         #
@@ -218,7 +220,7 @@ def get_total_number_of_trainable_parameters(model: FSDPX, device_mesh: DeviceMe
         # 6438912
 
         num_params_tensor = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        if device_mesh is not None and ParallelismDegrees.PP.value in device_mesh.mesh_dim_names:
+        if has_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP):
             num_params_tensor = torch.tensor(num_params_tensor).cuda()
             pp_mesh = device_mesh[ParallelismDegrees.PP.value]
             dist.all_reduce(num_params_tensor, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())

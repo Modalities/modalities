@@ -849,6 +849,7 @@ class GPT2LLM(NNModel):
             attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
             ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
+            seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
             enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
