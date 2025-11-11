@@ -299,7 +299,6 @@ class AttentionConfig(BaseModel):
         config: RotaryTransformConfig | IdentityTransformConfig
 
     qkv_transforms: list[QueryKeyValueTransformConfig]
-    use_qk_norm: bool = False
     qk_norm_config: Optional[LayerNormWrapperConfig] = None
 
 
@@ -458,7 +457,6 @@ class CausalSelfAttention(nn.Module):
         self.n_head_kv = n_head_kv
 
         self.n_embd = n_embd
-        self.head_dim = n_embd // n_head_q
         # TODO: we might want different values for attention_dropout and linear_dropout
         self.dropout = dropout
         self.resid_dropout = nn.Dropout(self.dropout)
@@ -477,7 +475,7 @@ class CausalSelfAttention(nn.Module):
         # so if the model wants to increase the distance between logits
         # it needs to scale q or k OR adjust the angle between them
         # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
-        if attention_config.use_qk_norm:
+        if attention_config.attention_config is not None:
             self.q_norm = attention_config.qk_norm_config.norm_type.value(
                 **dict(attention_config.qk_norm_config.config)
             )

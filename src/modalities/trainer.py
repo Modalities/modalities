@@ -6,7 +6,6 @@ import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.device_mesh import DeviceMesh
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
