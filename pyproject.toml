@@ -5,7 +5,8 @@ requires-python = ">=3.10,<3.13"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
-    "numpy<2.0",
+    "numpy",
+    "torch",
     "packaging",
     "tqdm",
     "pyyaml",
