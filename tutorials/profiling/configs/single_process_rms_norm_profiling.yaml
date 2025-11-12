@@ -1,0 +1,34 @@
+settings:
+  benchmark:
+    hidden_dim: 4096  # LLama 8B hidden dimension
+    sequence_length: 4096
+    batch_size: 2
+
+steppable_component:
+  component_key: steppable_component
+  variant_key: steppable_norm
+  config:
+    norm:
+      instance_key: norm
+      pass_type: BY_REFERENCE
+    dataset_batch_generator:
+      instance_key: dataset_batch_generator
+      pass_type: BY_REFERENCE
+
+norm:
+  component_key: layer_norm
+  variant_key: rms_norm
+  config:
+    ndim: 4096
+
+dataset_batch_generator:
+  component_key: dataset_batch_generator
+  variant_key: random
+  config:
+    dims:
+      batch_size: ${settings.benchmark.batch_size}
+      sequence_length: ${settings.benchmark.sequence_length}
+      hidden_dim: ${settings.benchmark.hidden_dim}
+    min_val: -1
+    max_val: 1
+    data_type: bfloat16

@@ -8,6 +8,20 @@ settings:
     vocab_size: 50304
     batch_size: 2
 
+steppable_component:
+  component_key: steppable_component
+  variant_key: forward_pass
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    dataset_batch_generator:
+      instance_key: dataset_batch_generator
+      pass_type: BY_REFERENCE
+    loss_fn:
+      instance_key: loss_fn
+      pass_type: BY_REFERENCE
+
 initialized_model:
   component_key: model
   variant_key: model_initialized
@@ -119,6 +133,9 @@ dataset_batch_generator:
   component_key: dataset_batch_generator
   variant_key: random
   config:
-    vocab_size: ${settings.benchmark.vocab_size}
-    sequence_length: ${settings.benchmark.sequence_length}
-    batch_size: ${settings.benchmark.batch_size}
+    dims: 
+      batch_size: ${settings.benchmark.batch_size}
+      sequence_length: ${settings.benchmark.sequence_length}
+    min_val: 0
+    max_val: ${settings.benchmark.vocab_size}
+    data_type: int64
