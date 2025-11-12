@@ -1,96 +1,211 @@
 import os
+import shutil
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 import torch
 from pydantic import BaseModel
 from torch.profiler import ProfilerActivity, profile, schedule
 
 from modalities.__main__ import Main
-from modalities.batch import DatasetBatch, InferenceResultBatch
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import (
-    PydanticDatasetBatchGeneratorIFType,
-    PydanticFSDP2ModuleType,
-    PydanticLossIFType,
-    PydanticOptimizerIFType,
-)
-from modalities.loss_functions import Loss
+from modalities.config.pydantic_if_types import PydanticSteppableComponentIFType
 from modalities.running_env.cuda_env import CudaEnv
-from modalities.utils.profilers.batch_generator import DatasetBatchGeneratorIF
-from modalities.utils.typing_utils import FSDP2
+from modalities.util import get_experiment_id_from_config, get_synced_experiment_id_of_run
+from modalities.utils.profilers.steppable_components import SteppableComponentIF
 
 
 class InstantiationModel(BaseModel):
-    initialized_model: PydanticFSDP2ModuleType
-    loss_fn: PydanticLossIFType
-    optimizer: Optional[PydanticOptimizerIFType] = None
-    dataset_batch_generator: PydanticDatasetBatchGeneratorIFType
+    steppable_component: PydanticSteppableComponentIFType
+
+
+@dataclass
+class CustomComponentRegisterable:
+    component_key: str
+    variant_key: str
+    custom_component: type
+    custom_config: type
+
+
+class ModalitiesProfilerStarter:
+    @staticmethod
+    def run_distributed(
+        config_file_path: Path,
+        num_measurement_steps: int,
+        wait_steps: int,
+        warmup_steps: int,
+        experiment_root_path: Path,
+        profiled_ranks: list[int] | None = None,
+        experiment_id: Optional[str] = None,
+        custom_component_registerables: list[CustomComponentRegisterable] | None = None,
+    ):
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            if experiment_id is None:
+                # get experiment id synched across all ranks
+                experiment_id = get_synced_experiment_id_of_run(config_file_path)
+
+            # store a copy of the config file in the experiment folder
+            if torch.distributed.get_rank() == 0:
+                experiment_folder_path = experiment_root_path / experiment_id
+                experiment_folder_path.mkdir(parents=True, exist_ok=True)
+                shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
+
+            global_rank = torch.distributed.get_rank()
+            world_size = torch.distributed.get_world_size()
+            local_rank = int(os.environ["LOCAL_RANK"])
+
+            ModalitiesProfilerStarter._run_helper(
+                config_file_path=config_file_path,
+                num_measurement_steps=num_measurement_steps,
+                wait_steps=wait_steps,
+                warmup_steps=warmup_steps,
+                experiment_folder_path=experiment_root_path / experiment_id,
+                local_rank=local_rank,
+                global_rank=global_rank,
+                world_size=world_size,
+                profiled_ranks=profiled_ranks,
+                custom_component_registerables=custom_component_registerables,
+            )
+
+    @staticmethod
+    def run_single_process(
+        config_file_path: Path,
+        num_measurement_steps: int,
+        wait_steps: int,
+        warmup_steps: int,
+        experiment_root_path: Path,
+        experiment_id: Optional[str] = None,
+        custom_component_registerables: list[CustomComponentRegisterable] | None = None,
+    ):
+        if experiment_id is None:
+            # get experiment id synched across all ranks
+            experiment_id = get_experiment_id_from_config(config_file_path)
+
+        # store a copy of the config file in the experiment folder
+        experiment_folder_path = experiment_root_path / experiment_id
+        experiment_folder_path.mkdir(parents=True, exist_ok=True)
+        shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
+
+        global_rank = 0
+        world_size = 1
+        local_rank = 0
+
+        ModalitiesProfilerStarter._run_helper(
+            config_file_path=config_file_path,
+            num_measurement_steps=num_measurement_steps,
+            wait_steps=wait_steps,
+            warmup_steps=warmup_steps,
+            experiment_folder_path=experiment_root_path / experiment_id,
+            global_rank=global_rank,
+            world_size=world_size,
+            local_rank=local_rank,
+            custom_component_registerables=custom_component_registerables,
+        )
+
+    @staticmethod
+    def _run_helper(
+        config_file_path: Path,
+        num_measurement_steps: int,
+        wait_steps: int,
+        warmup_steps: int,
+        experiment_folder_path: Path,
+        global_rank: int = 0,
+        local_rank: int = 0,
+        world_size: int = 1,
+        profiled_ranks: list[int] | None = None,
+        custom_component_registerables: list[CustomComponentRegisterable] | None = None,
+    ):
+        # build profiler
+        profiler_activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
+        profile_context_manager = profile(
+            activities=profiler_activities,
+            schedule=schedule(wait=wait_steps, warmup=warmup_steps, active=num_measurement_steps),
+            record_shapes=True,
+            profile_memory=True,
+            with_flops=True,
+            with_stack=True,
+            with_modules=True,
+        )
+
+        # register custom components and build components from config
+        # workaround to avoid triggering synchronization of experiment id in single process
+        experiment_id = experiment_folder_path.name if world_size == 1 else None
+        main_obj = Main(config_file_path, experiment_id=experiment_id)
+        if custom_component_registerables is not None:
+            for registerable in custom_component_registerables:
+                main_obj.add_custom_component(
+                    component_key=registerable.component_key,
+                    variant_key=registerable.variant_key,
+                    custom_component=registerable.custom_component,
+                    custom_config=registerable.custom_config,
+                )
+        components: InstantiationModel = main_obj.build_components(components_model_type=InstantiationModel)
+
+        # run profiling
+        ModalitiesProfiler.profile(
+            steppable_component=components.steppable_component,
+            num_total_steps=num_measurement_steps + wait_steps + warmup_steps,
+            profile_context_manager=profile_context_manager,
+        )
+        trace_output_path = experiment_folder_path / f"profiler_trace_ranks_{world_size}_rank_{global_rank}.json"
+        memory_output_path = experiment_folder_path / f"profiler_memory_ranks_{world_size}_rank_{global_rank}.html"
+        summary_output_path = experiment_folder_path / f"profiler_summary_ranks_{world_size}_rank_{global_rank}.txt"
+
+        ModalitiesProfiler.export_profiling_results(
+            profiler_context_manager=profile_context_manager,
+            trace_output_path=trace_output_path,
+            memory_output_path=memory_output_path,
+            summary_output_path=summary_output_path,
+            local_rank=local_rank,
+            profiled_ranks=profiled_ranks,
+        )
 
 
 class ModalitiesProfiler:
     @staticmethod
-    def get_forward_pass_profiling(
-        config_file_path: Path,
-        num_measurement_steps: int,
-        profile_context_manager: torch.profiler.profile,
+    def profile(
+        steppable_component: SteppableComponentIF,
+        num_total_steps: int,
+        profile_context_manager: profile,
     ):
-        def _run_forward_pass(model: FSDP2, batch: DatasetBatch, loss_fun: Optional[Callable] = None) -> None:
-            predictions = model(batch.samples)
-            result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
-            if loss_fun is not None:
-                loss_fun(result_batch)
+        with profile_context_manager as profiler:
+            for _ in range(num_total_steps):
+                steppable_component.step()
+                profiler.step()
 
-        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            main_obj = Main(config_file_path)
-            components: InstantiationModel = main_obj.build_components(components_model_type=InstantiationModel)
-            model = components.initialized_model
-            loss_fun: Loss = components.loss_fn
-            dataset_batch_generator: DatasetBatchGeneratorIF = components.dataset_batch_generator
-            device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
-            with profile_context_manager as profiler:
-                for _ in range(num_measurement_steps):
-                    batch = dataset_batch_generator.get_dataset_batch()
-                    batch.to(device=device)
-                    _run_forward_pass(
-                        model=model,
-                        batch=batch,
-                        loss_fun=loss_fun,
-                    )
-                    profiler.step()
+    @staticmethod
+    def export_profiling_results(
+        profiler_context_manager: profile,
+        trace_output_path: Path,
+        memory_output_path: Path,
+        summary_output_path: Path,
+        local_rank: int | None = None,
+        profiled_ranks: list[int] | None = None,
+    ) -> None:
+        def _export_helper(
+            profiler_context_manager: profile,
+            trace_output_path: Path,
+            memory_output_path: Path,
+            local_rank: int | None = None,
+        ):
+            profiler_context_manager.export_chrome_trace(trace_output_path.as_posix())
+            device = local_rank if local_rank is not None else None
+            profiler_context_manager.export_memory_timeline(memory_output_path.as_posix(), device=device)
+            table = profiler_context_manager.key_averages().table()
+            with open(summary_output_path, "w", encoding="utf-8") as f:
+                f.write(table)
 
+        if profiled_ranks is not None:
             if torch.distributed.is_initialized():
-                if torch.distributed.get_rank() == 0:
-                    print("Saving profiling results...")
-                    profiler_context_manager.export_chrome_trace(output_path.as_posix())
-                    print(profiler_context_manager.key_averages().table(sort_by="cuda_time_total", row_limit=10))
-                    print("Profiling complete.")
-
-
-if __name__ == "__main__":
-    config_path = Path(
-        "/raid/s3/opengptx/max_lue/repositories/modalities/config_files/profiling/8B_profiling_config.yaml"
-    )
-    output_path = Path("/raid/s3/opengptx/max_lue/repositories/modalities/outputs/profiler_trace.json")
-
-    profiler_activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
-    num_measurements = 3
-    wait = 20
-    warmup = 20
-    total = wait + warmup + num_measurements
-
-    profiler_context_manager = profile(
-        activities=profiler_activities,
-        schedule=schedule(wait=wait, warmup=warmup, active=num_measurements),
-        record_shapes=True,
-        profile_memory=True,
-        with_flops=True,
-        with_stack=True,
-        with_modules=True,
-    )
-
-    ModalitiesProfiler.get_forward_pass_profiling(
-        config_file_path=config_path,
-        num_measurement_steps=total,
-        profile_context_manager=profiler_context_manager,
-    )
+                global_rank = torch.distributed.get_rank()
+                if global_rank in profiled_ranks:
+                    print(f"Saving profiling results for rank {global_rank}...")
+                    _export_helper(profiler_context_manager, trace_output_path, memory_output_path, local_rank)
+            else:
+                raise RuntimeError("Distributed process group is not initialized.")
+        else:
+            if torch.distributed.is_initialized():
+                raise RuntimeError("You must provide profiled_ranks when running in a distributed environment.")
+            print("Saving profiling results...")
+            _export_helper(profiler_context_manager, trace_output_path, memory_output_path, local_rank)
