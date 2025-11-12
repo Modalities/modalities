@@ -130,6 +130,8 @@ from modalities.utils.number_conversion import (
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+from modalities.utils.profilers.steppable_component_configs import SteppableForwardPassConfig
+from modalities.utils.profilers.steppable_components import SteppableForwardPass
 
 
 @dataclass
@@ -415,5 +417,12 @@ COMPONENTS = [
         "num_steps_from_raw_dataset_index",
         NumberConversion.get_num_steps_from_raw_dataset_index,
         NumStepsFromRawDatasetIndexConfig,
+    ),
+    # Profiling components
+    ComponentEntity(
+        "steppable_component",
+        "forward_pass",
+        SteppableForwardPass,
+        SteppableForwardPassConfig,
     ),
 ]
