@@ -10,8 +10,6 @@ from typing import Any, Optional
 
 import click
 import click_pathlib
-
-# from modalities.utils.profilers.modalities_profiler import ModalitiesProfiler
 from omegaconf import DictConfig
 from pydantic import FilePath
 
@@ -716,19 +714,32 @@ def CMD_entry_point_list_remaining_runs(
 #     show_default=True,
 #     help="Number of steps to measure during profiling.",
 # )
+# @click.option(
+#     "--profiled_ranks",
+#     type=str,
+#     default="0",
+#     help="Comma-separated list of profiled ranks (must not have spaces), e.g. --profiled_ranks '2,4,8'",
+# )
 # def CMD_entry_point_run_train_step_profiler(
 #     config_file_path: Path,
 #     experiment_folder_path: Path,
 #     num_warmup_steps: int,
 #     num_measurement_steps: int,
+#     profiled_ranks: str,
 # ):
 #     """Run train step profiler and write result to JSON if RANK=0."""
-#     ModalitiesProfiler.get_train_step_statistics(
-#         config_file_path=config_file_path,
-#         experiment_folder_path=experiment_folder_path,
-#         num_warmup_steps=num_warmup_steps,
-#         num_measurement_steps=num_measurement_steps,
-#     )
+#     profiled_ranks_list = profiled_ranks.split(",") if profiled_ranks != "" else [0]
+
+#     export_profiling_fn = partial(ModalitiesProfiler.export_profiling_results, )
+
+
+#     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+#         ModalitiesProfiler.get_train_step_statistics(
+#             config_file_path=config_file_path,
+#             experiment_folder_path=experiment_folder_path,
+#             num_warmup_steps=num_warmup_steps,
+#             num_measurement_steps=num_measurement_steps,
+#         )
 
 if __name__ == "__main__":
     main()
