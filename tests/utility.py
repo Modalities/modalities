@@ -233,6 +233,12 @@ def enable_deterministic_cuda():
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = prev_cublas_cfg
 
 
+def register_nan_hooks(model: torch.nn.Module):
+    """Register NaN detection hooks on all modules"""
+    for name, module in model.named_modules():
+        module.register_forward_hook(partial(debug_nan_hook, module_path=name))
+
+
 def debug_nan_hook(
     module: torch.nn.Module,
     input: torch.Tensor | tuple[torch.Tensor, ...],
@@ -240,28 +246,22 @@ def debug_nan_hook(
     module_path: str | None = None,
 ):
     """Hook to detect NaN in forward pass"""
-    if (
-        (isinstance(input, tuple) or isinstance(input, list))
-        and any(torch.isnan(i).any() for i in input if isinstance(i, torch.Tensor))
-        or (isinstance(input, torch.Tensor) and torch.isnan(input).any())
-    ):
-        logging.error(f"Input NaN detected in {module.__class__.__name__}")
-        if module_path:
-            logging.error(f"Module path: {module_path}")
-    if isinstance(output, torch.Tensor):
-        if torch.isnan(output).any():
-            logging.error(f"NaN detected in {module.__class__.__name__}")
+    _detect_nan(module, module_path, input, "input")
+    _detect_nan(module, module_path, output, "output")
+
+
+def _detect_nan(
+    module: torch.nn.Module,
+    module_path: str | None,
+    target: torch.Tensor | list[torch.Tensor] | tuple[torch.Tensor, ...],
+    target_name: str,
+):
+    if isinstance(target, (list, tuple)):
+        if any(torch.isnan(o).any() for o in target if isinstance(o, torch.Tensor)):
+            logging.error(f"NaN detected in {target_name} {module.__class__.__name__}")
             if module_path:
                 logging.error(f"Module path: {module_path}")
-    elif isinstance(output, (list, tuple)):
-        for i, out in enumerate(output):
-            if isinstance(out, torch.Tensor) and torch.isnan(out).any():
-                logging.error(f"NaN detected in {module.__class__.__name__} output {i}")
-                if module_path:
-                    logging.error(f"Module path: {module_path}")
-
-
-def register_nan_hooks(model: torch.nn.Module):
-    """Register NaN detection hooks on all modules"""
-    for name, module in model.named_modules():
-        module.register_forward_hook(partial(debug_nan_hook, module_path=name))
+    elif isinstance(target, torch.Tensor) and torch.isnan(target).any():
+        logging.error(f"NaN detected in {target_name} {module.__class__.__name__}")
+        if module_path:
+            logging.error(f"Module path: {module_path}")
