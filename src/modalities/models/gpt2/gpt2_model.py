@@ -475,7 +475,7 @@ class CausalSelfAttention(nn.Module):
         # so if the model wants to increase the distance between logits
         # it needs to scale q or k OR adjust the angle between them
         # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
-        if attention_config.attention_config is not None:
+        if attention_config.qk_norm_config is not None:
             self.q_norm = attention_config.qk_norm_config.norm_type.value(
                 **dict(attention_config.qk_norm_config.config)
             )
