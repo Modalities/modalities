@@ -1,7 +1,7 @@
 [project]
 name = "modalities"
 version = "0.4.0"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<=3.13"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
@@ -23,6 +23,7 @@ dependencies = [
     "class_resolver",
     "wandb",
     "einops>=0.7.0",
+    "debugpy",  # For VSCode debugging support
 ]
 
 [project.urls]

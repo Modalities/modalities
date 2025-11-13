@@ -203,7 +203,7 @@ def main(
             )
 
     # only run tests on max 4 devices
-    device_ids = device_ids[:4]
+    # device_ids = device_ids[:4]
     print("> Test setup: ")
     print(f"> {include_main_tests=}, {include_torchrun_tests=}, {include_examples=}")
     print(f"> {device_ids=}")
