@@ -1,3 +1,4 @@
+import warnings
 from typing import Annotated
 
 import torch
@@ -10,7 +11,8 @@ class RMSLayerNorm(nn.Module):
 
     def __init__(self, ndim: int, bias: bool = True, epsilon: float = 1e-5):
         """
-        Initializes a LayerNorm module.
+        RMS Norm implementation.
+        WARNING: THIS IMPLEMENTATION IS DEPCREATED! USE torch.nn.RMSNorm INSTEAD FOR BETTER PERFORMANCE!
         Args:
             ndim (int): The number of dimensions of the input tensor.
             bias (bool, optional): If True, adds a learnable bias to the normalized tensor. Defaults to True.
@@ -21,6 +23,7 @@ class RMSLayerNorm(nn.Module):
         Returns:
             None
         """
+        warnings.warn("RMSLayerNorm is deprecated. Please use torch.nn.RMSNorm for better performance.", FutureWarning)
 
         super().__init__()
         self.epsilon = epsilon
