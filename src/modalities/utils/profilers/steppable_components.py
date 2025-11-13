@@ -16,6 +16,13 @@ class SteppableForwardPass(SteppableComponentIF):
     """
 
     def __init__(self, model: nn.Module, dataset_batch_generator: DatasetBatchGeneratorIF, loss_fn: Loss | None = None):
+        """Initializes the SteppableForwardPass component.
+
+        Args:
+            model (nn.Module): The model to perform the forward pass on.
+            dataset_batch_generator (DatasetBatchGeneratorIF): The dataset batch generator to provide input batches.
+            loss_fn (Loss, optional): The loss function to compute the loss. Defaults to None.
+        """
         self.model = model
         self.loss_fn = loss_fn
         self.dataset_batch_generator = dataset_batch_generator
@@ -24,6 +31,7 @@ class SteppableForwardPass(SteppableComponentIF):
     def step(
         self,
     ) -> None:
+        """Performs a single step of the forward pass and computes the loss if a loss function is provided."""
         batch = self.dataset_batch_generator.get_dataset_batch()
         batch.to(device=self.device)
         predictions = self.model(batch.samples)
