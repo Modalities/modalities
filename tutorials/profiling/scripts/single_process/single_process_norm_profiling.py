@@ -44,9 +44,9 @@ if __name__ == "__main__":
     config_path = cwd / Path("../../configs/single_process_rms_norm_profiling.yaml")
     experiment_root_path = Path("../../experiments/")
 
-    num_measurements = 3
-    wait = 20
-    warmup = 20
+    num_measurement_steps = 3
+    num_wait_steps = 20
+    num_warmup_steps = 20
 
     custom_component_registerables = [
         CustomComponentRegisterable(
@@ -59,9 +59,9 @@ if __name__ == "__main__":
 
     ModalitiesProfilerStarter.run_single_process(
         config_file_path=config_path,
-        num_measurement_steps=num_measurements,
-        wait_steps=wait,
-        warmup_steps=warmup,
+        num_measurement_steps=num_measurement_steps,
+        num_wait_steps=num_wait_steps,
+        num_warmup_steps=num_warmup_steps,
         experiment_root_path=experiment_root_path,
         custom_component_registerables=custom_component_registerables,
     )
