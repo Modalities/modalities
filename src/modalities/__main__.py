@@ -35,6 +35,10 @@ from modalities.util import print_rank_0
 from modalities.utils.benchmarking.benchmarking_utils import SweepSets, get_updated_sweep_status
 from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
+from modalities.utils.logger_utils import get_logger
+from modalities.utils.profilers.modalities_profiler import ModalitiesProfilerStarter
+
+logger = get_logger("__main__")
 
 
 @click.group()
@@ -680,66 +684,75 @@ def CMD_entry_point_list_remaining_runs(
                 f.write(f"{cfg}\n")
 
 
-# @main.group(name="profile")
-# def profile():
-#     """
-#     Collection of utilities to profile modalities.
-#     """
-#     pass
-
-# @profile.command(name="train_step")
-# @click.option(
-#     "--config_file_path",
-#     type=click_pathlib.Path(exists=True),
-#     required=True,
-#     help="Path to the YAML training config file.",
-# )
-# @click.option(
-#     "--experiment_folder_path",
-#     type=click_pathlib.Path(file_okay=False),
-#     required=True,
-#     help="Path to the experiment output directory.",
-# )
-# @click.option(
-#     "--num_warmup_steps",
-#     type=int,
-#     default=1,
-#     show_default=True,
-#     help="Number of warmup steps to skip in profiling.",
-# )
-# @click.option(
-#     "--num_measurement_steps",
-#     type=int,
-#     default=3,
-#     show_default=True,
-#     help="Number of steps to measure during profiling.",
-# )
-# @click.option(
-#     "--profiled_ranks",
-#     type=str,
-#     default="0",
-#     help="Comma-separated list of profiled ranks (must not have spaces), e.g. --profiled_ranks '2,4,8'",
-# )
-# def CMD_entry_point_run_train_step_profiler(
-#     config_file_path: Path,
-#     experiment_folder_path: Path,
-#     num_warmup_steps: int,
-#     num_measurement_steps: int,
-#     profiled_ranks: str,
-# ):
-#     """Run train step profiler and write result to JSON if RANK=0."""
-#     profiled_ranks_list = profiled_ranks.split(",") if profiled_ranks != "" else [0]
-
-#     export_profiling_fn = partial(ModalitiesProfiler.export_profiling_results, )
+@main.group(name="profile")
+def profile():
+    """
+    Collection of utilities to profile modalities.
+    """
+    pass
 
 
-#     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-#         ModalitiesProfiler.get_train_step_statistics(
-#             config_file_path=config_file_path,
-#             experiment_folder_path=experiment_folder_path,
-#             num_warmup_steps=num_warmup_steps,
-#             num_measurement_steps=num_measurement_steps,
-#         )
+@profile.command(name="distributed")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the YAML training config file.",
+)
+@click.option(
+    "--experiment_root_path",
+    type=click_pathlib.Path(file_okay=False),
+    required=True,
+    help="Path to the experiment output directory.",
+)
+@click.option(
+    "--num_wait_steps",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of wait steps to skip in profiling.",
+)
+@click.option(
+    "--num_warmup_steps",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of warmup steps to skip in profiling. Already recording but dropping the data.",
+)
+@click.option(
+    "--num_measurement_steps",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Number of steps to measure during profiling.",
+)
+@click.option(
+    "--profiled_ranks",
+    type=str,
+    default="0",
+    help="Comma-separated list of profiled ranks (must not have spaces), e.g. --profiled_ranks '2,4,8'",
+)
+def CMD_entry_point_run_train_step_profiler(
+    config_file_path: Path,
+    experiment_root_path: Path,
+    num_wait_steps: int,
+    num_warmup_steps: int,
+    num_measurement_steps: int,
+    profiled_ranks: str,
+):
+    """Run train step profiler and write result to JSON if RANK=0."""
+    profiled_ranks_list = [int(i) for i in profiled_ranks.split(",")] if profiled_ranks != "" else [0]
+    logger.info(f"Running distributed profiling on ranks {profiled_ranks_list}")
+
+    ModalitiesProfilerStarter.run_distributed(
+        config_file_path=config_file_path,
+        num_measurement_steps=num_measurement_steps,
+        num_wait_steps=num_wait_steps,
+        num_warmup_steps=num_warmup_steps,
+        experiment_root_path=experiment_root_path,
+        profiled_ranks=profiled_ranks_list,
+    )
+
 
 if __name__ == "__main__":
     main()
