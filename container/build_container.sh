@@ -1,13 +1,16 @@
 #!/bin/sh
 set -eu
 
-# --- Config (empty => skip) ---
+# --- Config ---
+# required versions
 NEMO="24.12"
-NCCL="v2.23.4-1"
-MODS="v0.4.0"
-PYTORCH="2.8.0"
-PYTHON="3.12"
-FA=">=2.6.0"      # TODO, hardcode the version?
+
+# optional versions, leave empty for preinstalled versions
+: "${NCCL:="v2.23.4-1"}"
+: "${MODS:=}"
+: "${PYTORCH:=}"
+: "${PYTHON:=}"
+: "${FA:=}"
 
 # --- Helpers ---
 sanitize() {
@@ -16,15 +19,26 @@ sanitize() {
   printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_'
 }
 
+tag_or_stock() {
+  # prints sanitized value or 'stock' if empty
+  if [ -z "$1" ]; then
+    printf 'stock'
+  else
+    sanitize "$1"
+  fi
+}
+
 # --- Derived ---
 BASE="nvcr.io/nvidia/nemo:${NEMO}"
-name="nemo-$(sanitize "$NEMO")"
-[ -n "${PYTORCH}" ]   && name="${name}_pytorch-$(sanitize "$PYTORCH")"
-[ -n "${PYTHON}" ]   && name="${name}_python-$(sanitize "$PYTHON")"
-[ -n "${NCCL}" ]   && name="${name}_nccl-$(sanitize "$NCCL")"
-[ -n "${MODS}" ]   && name="${name}_mods-$(sanitize "$MODS")"
-[ -n "${FA}" ]     && name="${name}_fa-$(sanitize "$FA")"
+name="image"
+for var in NEMO PYTORCH PYTHON NCCL MODS FA; do
+  prefix=$(printf '%s' "$var" | tr 'A-Z' 'a-z')
+  # Indirect expansion (POSIX): put value of $var into val (empty if unset)
+  eval "val=\${$var-}"
+  name="${name}_${prefix}-$(tag_or_stock "$val")"
+done
 OUT="${name}.sif"
+echo "Building container: $OUT"
 
 # Pick runner
 if command -v apptainer >/dev/null 2>&1; then
@@ -87,7 +101,13 @@ export PATH="/root/.local/bin:\$PATH"
 export UV_LINK_MODE=copy
 export UV_VENV_CLEAR=1
 
-uv venv --python=python${PYTHON} /opt/modalities_venv
+# Create venv; if PYTHON unset or empty use preinstalled default Python
+if [ -n "${PYTHON-}" ]; then
+  uv venv --python="python${PYTHON}" /opt/modalities_venv
+else
+  uv venv /opt/modalities_venv
+fi
+
 . /opt/modalities_venv/bin/activate
 uv pip install --upgrade pip setuptools wheel packaging ninja
 if [ -n "${PYTORCH}" ]; then
@@ -135,5 +155,5 @@ make -j"\$CORES" MPI=1 MPI_HOME="\$MPI_HOME"
 EOF
 
 # --- Build ---
-"$RUNNER" build "$OUT" "$DEF_FILE"
+# "$RUNNER" build "$OUT" "$DEF_FILE"
 printf '✅ Built %s\n' "$OUT"
