@@ -214,7 +214,7 @@ class ModalitiesProfiler:
     def profile(
         steppable_component: SteppableComponentIF,
         num_total_steps: int,
-        profile_context_manager: profile,
+        profile_context_manager: torch.profiler.profile,
         show_progress: bool = False,
     ) -> None:
         """Profile a steppable component using the provided profiler context manager.
@@ -237,7 +237,7 @@ class ModalitiesProfiler:
 
     @staticmethod
     def export_profiling_results(
-        profiler_context_manager: profile,
+        profiler_context_manager: torch.profiler.profile,
         trace_output_path: Path,
         memory_output_path: Path,
         summary_output_path: Path,

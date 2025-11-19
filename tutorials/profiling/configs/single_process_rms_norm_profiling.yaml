@@ -15,7 +15,7 @@ steppable_component:
       instance_key: dataset_batch_generator
       pass_type: BY_REFERENCE
 
-# Use this one to test custum implementation 
+# Use this one to test the custom implementation 
 # against the original RMSNorm implementation
 # Interestingly, torch.compile equalizes runtime
 # between both implementations on A100 80GB.

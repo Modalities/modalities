@@ -11,7 +11,6 @@ tutorials/profiling/
   configs/
     distributed_8B_model_profiling.yaml         # Config for multi‑GPU (8B model) distributed run
     single_process_rms_norm_profiling.yaml      # Config used by the RMS norm single‑process example
-    small_profiling_config.yaml                 # Minimal / smaller test configuration
   scripts/
     single_process/
       single_process_norm_profiling.py          # Python entrypoint for profiling a single norm component

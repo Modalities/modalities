@@ -5,7 +5,7 @@ from modalities.utils.profilers.modalities_profiler import ModalitiesProfilerSta
 if __name__ == "__main__":
     cwd = Path(__file__).parent.resolve()
     config_path = cwd / Path("../../configs/distributed_8B_model_profiling.yaml")
-    experiment_root_path = Path("../../experiments/")
+    experiment_root_path = cwd / Path("../../experiments/")
 
     num_measurement_steps = 3
     num_wait_steps = 20
