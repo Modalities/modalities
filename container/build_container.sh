@@ -6,17 +6,17 @@ set -eu
 NEMO="24.12"
 
 # optional versions, leave empty for preinstalled versions
-# : "${NCCL:="v2.23.4-1"}"
-# : "${MODS:="v0.4.0"}"
-# : "${PYTORCH:="2.8.0"}"
-# : "${PYTHON:="3.12"}"
-# : "${FA:=">=2.6.0"}"
+: "${NCCL:="v2.23.4-1"}"
+: "${MODS:="v0.4.0"}"
+: "${PYTORCH:="2.8.0"}"
+: "${PYTHON:="3.12"}"
+: "${FLASH_ATTENTION:=">=2.6.0"}"
 
-: "${NCCL:=}"
-: "${MODS:=}"
-: "${PYTORCH:=}"
-: "${PYTHON:=}"
-: "${FA:=}"
+# : "${NCCL:=}"
+# : "${MODS:=}"
+# : "${PYTORCH:=}"
+# : "${PYTHON:=}"
+# : "${FLASH_ATTENTION:=}"
 
 # --- Helpers ---
 sanitize() {
@@ -37,7 +37,7 @@ tag_or_stock() {
 # --- Derived ---
 BASE="nvcr.io/nvidia/nemo:${NEMO}"
 name="image"
-for var in NEMO PYTORCH PYTHON NCCL MODS FA; do
+for var in NEMO PYTORCH PYTHON NCCL MODS FLASH_ATTENTION; do
   prefix=$(printf '%s' "$var" | tr 'A-Z' 'a-z')
   # Indirect expansion (POSIX): put value of $var into val (empty if unset)
   eval "val=\${$var-}"
@@ -75,10 +75,10 @@ echo_installed_versions() {
   python --version 2>&1 | sed 's/^/Python: /'
   python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
-  nccl_version=$(awk '
-    /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=$3}
-    /^#define[ \t]+NCCL_MINOR[ \t]/ {min=$3}
-    /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=$3}
+  nccl_version=\$(awk '
+    /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=\$3}
+    /^#define[ \t]+NCCL_MINOR[ \t]/ {min=\$3}
+    /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=\$3}
     END { if (maj && min && pat) print maj "." min "." pat }
   ' /usr/include/nccl.h)
 }
@@ -114,6 +114,9 @@ if [ -n "${NCCL}" ]; then
   if [ -d build/lib/pkgconfig ]; then
     install -d "\$LIBDIR/pkgconfig"
     cp -a build/lib/pkgconfig/* "\$LIBDIR/pkgconfig/"
+  fi
+  if [ -f build/include/nccl.h ]; then
+    install -D -m 0644 build/include/nccl.h /usr/include/nccl.h
   fi
   cd /
   rm -rf /tmp/nccl
@@ -153,9 +156,9 @@ if [ -n "${MODS}" ]; then
 fi
 
 # ---- FlashAttention (optional) ----
-if [ -n "${FA}" ]; then
+if [ -n "${FLASH_ATTENTION}" ]; then
   # Avoid building when prebuilt wheels exist
-  uv pip install "flash-attn${FA}" --no-build-isolation
+  uv pip install "flash-attn${FLASH_ATTENTION}" --no-build-isolation
 fi
 
 # ---- MPI + nccl-tests ----
@@ -181,6 +184,92 @@ make -j"\$CORES" MPI=1 MPI_HOME="\$MPI_HOME"
 echo "=== Installed versions after updates ==="
 echo_installed_versions
 echo "================================="
+
+%test
+set -eu
+echo "=== Running image self-test ==="
+# Activate venv if it exists
+[ -d /opt/modalities_venv ] && . /opt/modalities_venv/bin/activate || true
+
+fail=0
+
+# Expected versions baked in at build time
+# Python version check
+if [ -n "${PYTHON}" ]; then
+  got_py=\$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))' 2>/dev/null || echo "missing")
+  if [ "\$got_py" = "${PYTHON}" ]; then
+    echo "Python OK (\$got_py)"
+  else
+    echo "Python MISMATCH (got \$got_py expected $PYTHON)"
+    fail=1
+  fi
+fi
+
+# PyTorch import + version
+if [ -n "${PYTORCH}" ]; then
+  python - <<PY || { echo "PyTorch test failed"; fail=1; }
+
+try:
+    import torch
+except Exception as e:
+    print("PyTorch import failed:", e)
+    raise SystemExit(1)
+got=torch.__version__
+if not got.startswith("${PYTORCH}"):
+    print(f"PyTorch MISMATCH (got {got} expected prefix ${PYTORCH})")
+    raise SystemExit(1)
+print("PyTorch OK", got)
+PY
+PYTORCH_EXIT=$?
+fi
+
+# FlashAttention import (+ version if exact spec)
+if [ -n "$FLASH_ATTENTION" ]; then
+  python <<PY || { echo "FlashAttention test failed"; fail=1; }
+try:
+    import flash_attn as fa
+except Exception as e:
+    print("FlashAttention import failed:", e)
+    raise SystemExit(1)
+got=getattr(fa,"__version__","unknown")
+# If spec uses comparison (>=,==,<=) just report import success
+if re.search(r'[<>=]', "${FLASH_ATTENTION}"):
+    print(f"FlashAttention OK (got {got}, spec ${FLASH_ATTENTION})")
+else:
+    if not got.startswith("${FLASH_ATTENTION}"):
+        print(f"FlashAttention MISMATCH (got {got} expected prefix ${FLASH_ATTENTION})")
+        raise SystemExit(1)
+    print("FlashAttention OK", got)
+PY
+fi
+
+# NCCL version (header or strings)
+if [ -n "$NCCL" ]; then
+  nccl_hdr=/usr/include/nccl.h
+  got_nccl=""
+  if [ -f "\$nccl_hdr" ]; then
+    got_nccl=\$(awk '
+      /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=\$3}
+      /^#define[ \t]+NCCL_MINOR[ \t]/ {min=\$3}
+      /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=\$3}
+      END { if (maj && min && pat) print maj "." min "." pat }
+    ' "\$nccl_hdr")
+  fi
+  if [ -n "\$got_nccl" ]; then
+    if [ "\$got_nccl" = "\$NCCL" ]; then
+      echo "NCCL OK (\$got_nccl)"
+    else
+      echo "NCCL MISMATCH (got \$got_nccl expected $NCCL)"
+      fail=1
+    fi
+  else
+    echo "NCCL NOT FOUND (expected $NCCL)"
+    fail=1
+  fi
+fi
+
+echo "=== Self-test complete ==="
+exit \$fail
 
 EOF
 
