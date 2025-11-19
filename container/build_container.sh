@@ -71,16 +71,36 @@ From: ${BASE}
 %post
 set -eu
 
+# ---- Helper: get_nccl_version ----
+# we write this function to a script so that we can also use it in %test later
+cat > /usr/local/bin/get_nccl_version.sh <<'END_NCCL'
+get_nccl_version() {
+  for hdr in /usr/include/nccl.h /usr/include/nccl/nccl.h /usr/local/include/nccl.h; do
+    if [ -f "\$hdr" ]; then
+      awk '
+        /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=\$3}
+        /^#define[ \t]+NCCL_MINOR[ \t]/ {min=\$3}
+        /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=\$3}
+        END { if (maj && min && pat) print maj "." min "." pat }
+      ' "\$hdr"
+      return
+    fi
+  done
+  if ldconfig -p 2>/dev/null | grep -q libnccl.so; then
+    lib=\$(ldconfig -p | awk '/libnccl.so/{print \$NF; exit}')
+    strings "\$lib" 2>/dev/null | grep -Eo 'NCCL [0-9]+\.[0-9]+\.[0-9]+' | head -n1 | awk '{print \$2}'
+  fi
+}
+END_NCCL
+get_nccl_version_f=/usr/local/bin/get_nccl_version.sh
+chmod +x \$get_nccl_version_f
+
 echo_installed_versions() {
   python --version 2>&1 | sed 's/^/Python: /'
   python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
-  nccl_version=\$(awk '
-    /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=\$3}
-    /^#define[ \t]+NCCL_MINOR[ \t]/ {min=\$3}
-    /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=\$3}
-    END { if (maj && min && pat) print maj "." min "." pat }
-  ' /usr/include/nccl.h)
+  . \$get_nccl_version_f
+  echo "NCCL: \$(get_nccl_version || echo not installed)"
 }
 
 echo "=== Preinstalled versions ==="
@@ -200,7 +220,7 @@ if [ -n "${PYTHON}" ]; then
   if [ "\$got_py" = "${PYTHON}" ]; then
     echo "Python OK (\$got_py)"
   else
-    echo "Python MISMATCH (got \$got_py expected $PYTHON)"
+    echo "Python MISMATCH (got \$got_py expected ${PYTHON})"
     fail=1
   fi
 fi
@@ -224,8 +244,9 @@ PYTORCH_EXIT=$?
 fi
 
 # FlashAttention import (+ version if exact spec)
-if [ -n "$FLASH_ATTENTION" ]; then
+if [ -n "${FLASH_ATTENTION}" ]; then
   python <<PY || { echo "FlashAttention test failed"; fail=1; }
+import re
 try:
     import flash_attn as fa
 except Exception as e:
@@ -244,26 +265,18 @@ PY
 fi
 
 # NCCL version (header or strings)
-if [ -n "$NCCL" ]; then
-  nccl_hdr=/usr/include/nccl.h
-  got_nccl=""
-  if [ -f "\$nccl_hdr" ]; then
-    got_nccl=\$(awk '
-      /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=\$3}
-      /^#define[ \t]+NCCL_MINOR[ \t]/ {min=\$3}
-      /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=\$3}
-      END { if (maj && min && pat) print maj "." min "." pat }
-    ' "\$nccl_hdr")
-  fi
+if [ -n "${NCCL}" ]; then
+  . \$get_nccl_version_f
+  got_nccl=\$(get_nccl_version || echo "")
   if [ -n "\$got_nccl" ]; then
-    if [ "\$got_nccl" = "\$NCCL" ]; then
+    if [ "\$got_nccl" = "${NCCL}" ]; then
       echo "NCCL OK (\$got_nccl)"
     else
-      echo "NCCL MISMATCH (got \$got_nccl expected $NCCL)"
+      echo "NCCL MISMATCH (got \$got_nccl expected ${NCCL})"
       fail=1
     fi
   else
-    echo "NCCL NOT FOUND (expected $NCCL)"
+    echo "NCCL NOT FOUND (expected ${NCCL})"
     fail=1
   fi
 fi
