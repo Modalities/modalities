@@ -143,7 +143,11 @@ class ModalitiesProfilerStarter:
         experiment_root_path: Path, experiment_id: str, config_file_path: Path
     ) -> None:
         # store a copy of the config file in the experiment folder
-        if torch.distributed.get_rank() == 0:
+        if (
+            not torch.distributed.is_initialized()  # copy in single process
+            or torch.distributed.is_initialized()  # copy only on rank 0 in distributed process
+            and torch.distributed.get_rank() == 0
+        ):
             experiment_folder_path = experiment_root_path / experiment_id
             experiment_folder_path.mkdir(parents=True, exist_ok=True)
             shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
