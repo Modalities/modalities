@@ -7,7 +7,13 @@ from copy import deepcopy
 import pytest
 import torch
 
-from modalities.models.gpt2.gpt2_model import AttentionConfig, CausalSelfAttention
+from modalities.models.gpt2.gpt2_model import (
+    AttentionConfig,
+    CausalSelfAttention,
+    LayerNorms,
+    LayerNormWrapperConfig,
+    PytorchRMSLayerNormConfig,
+)
 
 torch.manual_seed(0)
 
@@ -222,3 +228,47 @@ def test_attention_implementation_approximate_equality(
         atol=2.5e-3,  # default for bfloat16: 1e-5
         rtol=0.016,  # default for bfloat16: 0.016
     )
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
+@pytest.mark.parametrize(
+    "n_head_q, n_head_kv, n_embd, attention_impl",
+    [
+        (4, 4, 32, "manual"),
+        (8, 2, 32, "manual"),
+        (4, 4, 32, "pytorch_flash"),
+        (8, 2, 32, "pytorch_flash"),
+        (4, 4, 32, "dao_flash"),
+        (8, 2, 32, "dao_flash"),
+    ],
+)
+def test_qk_norm(n_head_q, n_head_kv, n_embd, attention_impl):
+    batch_size = 2
+    block_size = 10
+    head_dim = n_embd // n_head_q
+    embedding_shape = (batch_size, block_size - 1, n_embd)
+    embedded_input_seq = _get_random_input_seq(embedding_shape)
+
+    attention_config_no_norm = AttentionConfig(qkv_transforms=[], use_qk_norm=False)
+    attention_config_with_norm = AttentionConfig(
+        qkv_transforms=[],
+        use_qk_norm=True,
+        qk_norm_config=LayerNormWrapperConfig(
+            norm_type=LayerNorms.pytorch_rms_norm, config=PytorchRMSLayerNormConfig(normalized_shape=head_dim)
+        ),
+    )
+
+    # Create two separate layers with same initial weights
+    torch.manual_seed(0)
+    layer_no_norm = _get_random_attention_layer(n_head_q, n_head_kv, n_embd, attention_impl, attention_config_no_norm)
+
+    torch.manual_seed(0)
+    layer_with_norm = _get_random_attention_layer(
+        n_head_q, n_head_kv, n_embd, attention_impl, attention_config_with_norm
+    )
+
+    output_no_norm = layer_no_norm(embedded_input_seq)
+    output_with_norm = layer_with_norm(embedded_input_seq)
+
+    assert output_no_norm.shape == output_with_norm.shape == embedding_shape
+    assert not torch.allclose(output_no_norm, output_with_norm, atol=1e-6)

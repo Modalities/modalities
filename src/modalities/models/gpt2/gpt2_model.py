@@ -10,7 +10,12 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
+from modalities.models.components.layer_norms import (
+    LayerNormConfig,
+    PytorchRMSLayerNormConfig,
+    RMSLayerNorm,
+    RMSLayerNormConfig,
+)
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
@@ -33,15 +38,17 @@ class LayerNorms(LookupEnum):
     Attributes:
         RMSNorm: RMSLayerNorm class.
         LayerNorm: nn.LayerNorm class.
+        PyTorchRMSNorm: nn.RMSNorm class.
     """
 
     rms_norm = RMSLayerNorm
     layer_norm = nn.LayerNorm
+    pytorch_rms_norm = nn.RMSNorm
 
 
 class LayerNormWrapperConfig(BaseModel):
     norm_type: LayerNorms
-    config: LayerNormConfig | RMSLayerNormConfig
+    config: PytorchRMSLayerNormConfig | RMSLayerNormConfig | LayerNormConfig
 
 
 class PositionTypes(str, Enum):
@@ -292,6 +299,7 @@ class AttentionConfig(BaseModel):
         config: RotaryTransformConfig | IdentityTransformConfig
 
     qkv_transforms: list[QueryKeyValueTransformConfig]
+    qk_norm_config: Optional[LayerNormWrapperConfig] = None
 
 
 class GPT2LLMConfig(BaseModel):
@@ -460,6 +468,23 @@ class CausalSelfAttention(nn.Module):
             )  # TODO refactor, still uses the legacy type_hint
             for transform_config in attention_config.qkv_transforms
         )
+
+        # QK Norm - helpful for models >1B to stabilize training
+        # Baseline logits w/o qk norm: (Q @ K^T) / sqrt(d_h)
+        # with geometric form of dot product: (||q_i|| * ||k_j|| * cos(θ_ij)) / sqrt(d_h)
+        # so if the model wants to increase the distance between logits
+        # it needs to scale q or k OR adjust the angle between them
+        # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
+        if attention_config.qk_norm_config is not None:
+            self.q_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+            self.k_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+        else:
+            self.q_norm = None
+            self.k_norm = None
 
     def projection(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -632,6 +657,9 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
+        if self.q_norm is not None and self.k_norm is not None:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
