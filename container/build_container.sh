@@ -96,12 +96,25 @@ get_nccl_version() {
 END_NCCL
 chmod +x $get_nccl_version_f
 
+get_cuda_version() {
+  # Returns CUDA_VERSION (empty if not found)
+  local version=""
+  if [ -f /usr/local/cuda/version.txt ]; then
+    version=\$(grep -Eo '[0-9]+\.[0-9]+' /usr/local/cuda/version.txt | head -n1)
+  elif command -v nvcc >/dev/null 2>&1; then
+    version=\$(nvcc --version | grep -Eo 'release [0-9]+\.[0-9]+' | awk '{print \$2}')
+  fi
+  printf '%s' "\$version"
+}
+
 echo_installed_versions() {
   python --version 2>&1 | sed 's/^/Python: /'
   python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
+  python -c 'import torch; print("Torch NCCL:", getattr(getattr(torch, "cuda", None), "nccl", None) and torch.cuda.nccl.version() or "not available")' 2>/dev/null || echo "Torch NCCL: not available"
   . $get_nccl_version_f
-  echo "NCCL: \$(get_nccl_version || echo not installed)"
+  echo "System NCCL: \$(get_nccl_version || echo not installed)"
+  echo "CUDA: \$(get_cuda_version || echo not installed)"
 }
 
 echo "=== Preinstalled versions ==="
@@ -161,8 +174,14 @@ uv pip install --upgrade pip setuptools wheel packaging ninja
 
 # ---- PyTorch (optional) ----
 if [ -n "${PYTORCH}" ]; then
-  # uv pip install "torch==${PYTORCH}"
-  uv pip install torch==${PYTORCH} --index-url https://download.pytorch.org/whl/cu126
+  cuda_version=\$(get_cuda_version)
+  cuda_tag=\$(echo "\$cuda_version" | tr -d '.')
+  if [ "${PYTORCH}" = "nightly" ]; then
+    # Nightly builds have a different URL pattern
+    uv pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu"\$cuda_tag"
+  else
+    uv pip install torch==${PYTORCH} --index-url https://download.pytorch.org/whl/cu"\$cuda_tag"
+  fi
 fi
 
 # ---- Modalities (optional) ----
@@ -253,13 +272,14 @@ try:
 except Exception as e:
     print("FlashAttention import failed:", e)
     raise SystemExit(1)
+exp="${FLASH_ATTENTION}"
 got=getattr(fa,"__version__","unknown")
 # If spec uses comparison (>=,==,<=) just report import success
-if re.search(r'[<>=]', "${FLASH_ATTENTION}"):
-    print(f"FlashAttention OK (got {got}, spec ${FLASH_ATTENTION})")
+if re.search(r'[<>=]', exp):
+    print(f"FlashAttention OK (got {got}, spec {exp})")
 else:
-    if not got.startswith("${FLASH_ATTENTION}"):
-        print(f"FlashAttention MISMATCH (got {got} expected prefix ${FLASH_ATTENTION})")
+    if not got.startswith(\$exp):
+        print(f"FlashAttention MISMATCH (got {got} expected prefix {exp})")
         raise SystemExit(1)
     print("FlashAttention OK", got)
 PY
@@ -269,15 +289,17 @@ fi
 if [ -n "${NCCL}" ]; then
   . $get_nccl_version_f
   got_nccl=\$(get_nccl_version || echo "")
+  # normalize expected NCCL version (strip leading 'v' and any suffix)
+  expected_nccl=\$(echo "${NCCL}" | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
   if [ -n "\$got_nccl" ]; then
-    if [ "\$got_nccl" = "${NCCL}" ]; then
+    if [ "\$got_nccl" = "\$expected_nccl" ]; then
       echo "NCCL OK (\$got_nccl)"
     else
-      echo "NCCL MISMATCH (got \$got_nccl expected ${NCCL})"
+      echo "NCCL MISMATCH (got \$got_nccl expected \$expected_nccl)"
       fail=1
     fi
   else
-    echo "NCCL NOT FOUND (expected ${NCCL})"
+    echo "NCCL NOT FOUND (expected \$expected_nccl))"
     fail=1
   fi
 fi
