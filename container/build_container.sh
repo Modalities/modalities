@@ -63,6 +63,8 @@ cleanup() { rm -f "$DEF_FILE"; }
 # trap cleanup EXIT INT TERM TODO Comment in again
 echo "DEF_FILE is at: $DEF_FILE" # TODO remove
 
+# Write shared helper functions inside container to the following path
+get_nccl_version_f=/usr/local/bin/get_nccl_version.sh
 # --- Generate def file (host expands values; conditions become literals) ---
 cat >"$DEF_FILE" <<EOF
 Bootstrap: docker
@@ -92,14 +94,13 @@ get_nccl_version() {
   fi
 }
 END_NCCL
-get_nccl_version_f=/usr/local/bin/get_nccl_version.sh
-chmod +x \$get_nccl_version_f
+chmod +x $get_nccl_version_f
 
 echo_installed_versions() {
   python --version 2>&1 | sed 's/^/Python: /'
   python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
-  . \$get_nccl_version_f
+  . $get_nccl_version_f
   echo "NCCL: \$(get_nccl_version || echo not installed)"
 }
 
@@ -266,7 +267,7 @@ fi
 
 # NCCL version (header or strings)
 if [ -n "${NCCL}" ]; then
-  . \$get_nccl_version_f
+  . $get_nccl_version_f
   got_nccl=\$(get_nccl_version || echo "")
   if [ -n "\$got_nccl" ]; then
     if [ "\$got_nccl" = "${NCCL}" ]; then
