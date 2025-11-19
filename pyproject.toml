@@ -21,6 +21,7 @@ dependencies = [
     "click_pathlib",
     "jq",
     "class_resolver",
+    "matplotlib",
     "wandb",
     "einops>=0.7.0",
     "debugpy",  # For VSCode debugging support
