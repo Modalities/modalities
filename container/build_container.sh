@@ -6,7 +6,13 @@ set -eu
 NEMO="24.12"
 
 # optional versions, leave empty for preinstalled versions
-: "${NCCL:="v2.23.4-1"}"
+# : "${NCCL:="v2.23.4-1"}"
+# : "${MODS:="v0.4.0"}"
+# : "${PYTORCH:="2.8.0"}"
+# : "${PYTHON:="3.12"}"
+# : "${FA:=">=2.6.0"}"
+
+: "${NCCL:=}"
 : "${MODS:=}"
 : "${PYTORCH:=}"
 : "${PYTHON:=}"
@@ -49,11 +55,13 @@ else
   printf '%s\n' "Error: neither 'apptainer' nor 'singularity' found in PATH." >&2
   exit 1
 fi
+echo "Using runner: $RUNNER"
 
 # Temp def file
 DEF_FILE="$(mktemp -t Container.XXXXXX.def)"
 cleanup() { rm -f "$DEF_FILE"; }
-trap cleanup EXIT INT TERM
+# trap cleanup EXIT INT TERM TODO Comment in again
+echo "DEF_FILE is at: $DEF_FILE" # TODO remove
 
 # --- Generate def file (host expands values; conditions become literals) ---
 cat >"$DEF_FILE" <<EOF
@@ -62,6 +70,22 @@ From: ${BASE}
 
 %post
 set -eu
+
+echo_installed_versions() {
+  python --version 2>&1 | sed 's/^/Python: /'
+  python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
+  python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
+  nccl_version=$(awk '
+    /^#define[ \t]+NCCL_MAJOR[ \t]/ {maj=$3}
+    /^#define[ \t]+NCCL_MINOR[ \t]/ {min=$3}
+    /^#define[ \t]+NCCL_PATCH[ \t]/ {pat=$3}
+    END { if (maj && min && pat) print maj "." min "." pat }
+  ' /usr/include/nccl.h)
+}
+
+echo "=== Preinstalled versions ==="
+echo_installed_versions
+echo "================================="
 
 # Portable CPU count
 if CORES=\$(getconf _NPROCESSORS_ONLN 2>/dev/null); then :; else CORES=1; fi
@@ -101,19 +125,20 @@ export PATH="/root/.local/bin:\$PATH"
 export UV_LINK_MODE=copy
 export UV_VENV_CLEAR=1
 
-# Create venv; if PYTHON unset or empty use preinstalled default Python
-if [ -n "${PYTHON-}" ]; then
+# Create venv; if PYTHON is unset or empty use preinstalled default Python
+if [ -n "${PYTHON}" ]; then
   uv venv --python="python${PYTHON}" /opt/modalities_venv
 else
   uv venv /opt/modalities_venv
 fi
-
 . /opt/modalities_venv/bin/activate
+
 uv pip install --upgrade pip setuptools wheel packaging ninja
+
+# ---- PyTorch (optional) ----
 if [ -n "${PYTORCH}" ]; then
   # uv pip install "torch==${PYTORCH}"
   uv pip install torch==${PYTORCH} --index-url https://download.pytorch.org/whl/cu126
-
 fi
 
 # ---- Modalities (optional) ----
@@ -152,8 +177,13 @@ export LD_LIBRARY_PATH="\$MPI_HOME/lib:\${LD_LIBRARY_PATH:-}"
 git clone --depth=1 https://github.com/NVIDIA/nccl-tests.git /nccl-tests
 cd /nccl-tests
 make -j"\$CORES" MPI=1 MPI_HOME="\$MPI_HOME"
+
+echo "=== Installed versions after updates ==="
+echo_installed_versions
+echo "================================="
+
 EOF
 
 # --- Build ---
-# "$RUNNER" build "$OUT" "$DEF_FILE"
+"$RUNNER" build "$OUT" "$DEF_FILE" 2>&1 | tee -a "build_${name}.log"
 printf '✅ Built %s\n' "$OUT"
