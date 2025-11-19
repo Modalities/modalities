@@ -1,0 +1,439 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.parallelism.pipeline_parallelism &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.models.parallelism.pipeline_parallelism</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.models.parallelism.pipeline_parallelism</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Some portions of this implementation are inspired, adapted, or refactored</span>
+<span class="c1"># from Meta&#39;s open-source project TorchTitan,</span>
+<span class="c1"># licensed under the BSD 3-Clause License.</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceMesh</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.pipelining</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineStage</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.pipelining.schedules</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineScheduleSingle</span><span class="p">,</span> <span class="n">get_schedule_class</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.loss_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Loss</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">NNModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.parallelism.stages_generator</span><span class="w"> </span><span class="kn">import</span> <span class="n">StagesGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParallelismDegrees</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Pipeline">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.Pipeline">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Pipeline</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">pp_stage</span><span class="p">:</span> <span class="n">PipelineStage</span><span class="p">,</span>
+        <span class="n">model_part</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">pp_schedule</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PipelineScheduleSingle</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pp_stage</span> <span class="o">=</span> <span class="n">pp_stage</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model_part</span> <span class="o">=</span> <span class="n">model_part</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pp_schedule</span> <span class="o">=</span> <span class="n">pp_schedule</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_first_pp_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pp_stage</span><span class="o">.</span><span class="n">is_first</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_last_pp_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pp_stage</span><span class="o">.</span><span class="n">is_last</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pp_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PipelineStage</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pp_stage</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">model_part</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model_part</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pp_schedule</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PipelineScheduleSingle</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pp_schedule</span>
+
+    <span class="nd">@pp_schedule</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pp_schedule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">schedule</span><span class="p">:</span> <span class="n">PipelineScheduleSingle</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pp_schedule</span> <span class="o">=</span> <span class="n">schedule</span></div>
+
+
+
+<div class="viewcode-block" id="PipelineSelectionTypes">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.PipelineSelectionTypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PipelineSelectionTypes</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum for pipeline selection types.&quot;&quot;&quot;</span>
+
+    <span class="n">PP_STAGE</span> <span class="o">=</span> <span class="s2">&quot;PP_STAGE&quot;</span>
+    <span class="n">MODEL_PART</span> <span class="o">=</span> <span class="s2">&quot;MODEL_PART&quot;</span>
+    <span class="n">PP_SCHEDULE</span> <span class="o">=</span> <span class="s2">&quot;PP_SCHEDULE&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ComponentSelectorFromPipeline">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.ComponentSelectorFromPipeline">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ComponentSelectorFromPipeline</span><span class="p">:</span>
+<div class="viewcode-block" id="ComponentSelectorFromPipeline.select">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.ComponentSelectorFromPipeline.select">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">select</span><span class="p">(</span><span class="n">pipeline</span><span class="p">:</span> <span class="n">Pipeline</span><span class="p">,</span> <span class="n">selection_type</span><span class="p">:</span> <span class="n">PipelineSelectionTypes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Selects a component from the pipeline based on the selection type.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">selection_type</span> <span class="o">==</span> <span class="n">PipelineSelectionTypes</span><span class="o">.</span><span class="n">PP_STAGE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">pp_stage</span>
+        <span class="k">elif</span> <span class="n">selection_type</span> <span class="o">==</span> <span class="n">PipelineSelectionTypes</span><span class="o">.</span><span class="n">MODEL_PART</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">model_part</span>
+        <span class="k">elif</span> <span class="n">selection_type</span> <span class="o">==</span> <span class="n">PipelineSelectionTypes</span><span class="o">.</span><span class="n">PP_SCHEDULE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">pp_schedule</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported selection type: </span><span class="si">{</span><span class="n">selection_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PipelineFactory">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.PipelineFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PipelineFactory</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pipeline factory class to create pipelined models.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PipelineFactory.get_pipeline">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.PipelineFactory.get_pipeline">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_pipeline</span><span class="p">(</span>
+        <span class="n">pp_stage</span><span class="p">:</span> <span class="n">PipelineStage</span><span class="p">,</span> <span class="n">model_part</span><span class="p">:</span> <span class="n">NNModel</span><span class="p">,</span> <span class="n">pp_schedule</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PipelineScheduleSingle</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Pipeline</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pp_stage</span><span class="o">=</span><span class="n">pp_stage</span><span class="p">,</span> <span class="n">model_part</span><span class="o">=</span><span class="n">model_part</span><span class="p">,</span> <span class="n">pp_schedule</span><span class="o">=</span><span class="n">pp_schedule</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineFactory.get_staged_pipeline">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.PipelineFactory.get_staged_pipeline">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_staged_pipeline</span><span class="p">(</span>
+        <span class="n">whole_model</span><span class="p">:</span> <span class="n">NNModel</span><span class="p">,</span>
+        <span class="n">stages_generator</span><span class="p">:</span> <span class="n">StagesGenerator</span><span class="p">,</span>
+        <span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span>
+        <span class="n">local_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">pp_schedule_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">num_layers_per_stage</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Pipeline</span><span class="p">:</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">local_rank</span><span class="p">)</span>
+        <span class="n">pp_dims</span> <span class="o">=</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="o">.</span><span class="n">value</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+
+        <span class="n">fqns_per_stage</span> <span class="o">=</span> <span class="n">stages_generator</span><span class="o">.</span><span class="n">get_stages</span><span class="p">(</span>
+            <span class="n">num_layers_per_stage</span><span class="o">=</span><span class="n">num_layers_per_stage</span><span class="p">,</span>
+            <span class="n">pp_dims</span><span class="o">=</span><span class="n">pp_dims</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">pp_mesh</span> <span class="o">=</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+        <span class="n">schedule_class</span> <span class="o">=</span> <span class="n">get_schedule_class</span><span class="p">(</span><span class="n">pp_schedule_name</span><span class="p">)</span>
+        <span class="n">is_single_stage_schedule</span> <span class="o">=</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">schedule_class</span><span class="p">,</span> <span class="n">PipelineScheduleSingle</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_single_stage_schedule</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unsupported pipeline schedule: </span><span class="si">{</span><span class="n">pp_schedule_name</span><span class="si">}</span><span class="s2">. We only support single-stage schedules.&quot;</span>
+            <span class="p">)</span>
+        <span class="c1"># torchtitan returns tuple of stages and models as depending on the schedule</span>
+        <span class="c1"># we might have multiple stages and model parts per rank.</span>
+        <span class="c1"># So far we don&#39;t support multi-stage schedules, which is why instead of tuples</span>
+        <span class="c1"># we work directly with the stage and model.</span>
+        <span class="n">pp_stage</span><span class="p">,</span> <span class="n">model_part</span> <span class="o">=</span> <span class="n">PipelineFactory</span><span class="o">.</span><span class="n">_get_split_model</span><span class="p">(</span>
+            <span class="n">whole_model</span><span class="o">=</span><span class="n">whole_model</span><span class="p">,</span>
+            <span class="n">schedule_class</span><span class="o">=</span><span class="n">schedule_class</span><span class="p">,</span>
+            <span class="n">pp_mesh</span><span class="o">=</span><span class="n">pp_mesh</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">fqns_per_stage</span><span class="o">=</span><span class="n">fqns_per_stage</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">pipeline</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pp_stage</span><span class="o">=</span><span class="n">pp_stage</span><span class="p">,</span> <span class="n">model_part</span><span class="o">=</span><span class="n">model_part</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pipeline</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_split_model</span><span class="p">(</span>
+        <span class="n">whole_model</span><span class="p">:</span> <span class="n">NNModel</span><span class="p">,</span>
+        <span class="n">schedule_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">PipelineScheduleSingle</span><span class="p">],</span>
+        <span class="n">pp_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">fqns_per_stage</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PipelineStage</span><span class="p">,</span> <span class="n">NNModel</span><span class="p">]:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">get_stage_id_of_pp_rank</span><span class="p">(</span><span class="n">pp_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">):</span>
+            <span class="c1"># NOTE: torch titan a more complicated way to get the stage id of pp rank</span>
+            <span class="c1"># since they also allow for multi-stage schedules</span>
+            <span class="n">pp_rank</span> <span class="o">=</span> <span class="n">pp_mesh</span><span class="o">.</span><span class="n">get_local_rank</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">pp_rank</span>
+
+        <span class="nd">@staticmethod</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_get_fqn_tree</span><span class="p">(</span><span class="n">fqns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+            <span class="n">fqn_tree</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">fqns</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">fqns</span><span class="p">)</span>  <span class="c1"># Ensure unique FQNs</span>
+            <span class="k">for</span> <span class="n">fqn</span> <span class="ow">in</span> <span class="n">fqns</span><span class="p">:</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">fqn</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
+                <span class="n">current_level</span> <span class="o">=</span> <span class="n">fqn_tree</span>
+                <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">part</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">current_level</span><span class="p">:</span>
+                        <span class="n">current_level</span><span class="p">[</span><span class="n">part</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">current_level</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Part </span><span class="si">{</span><span class="n">part</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="n">fqn</span><span class="si">}</span><span class="s2"> already exists &quot;</span> <span class="s2">&quot;in the tree as a leaf node.&quot;</span><span class="p">)</span>
+                    <span class="n">current_level</span> <span class="o">=</span> <span class="n">current_level</span><span class="p">[</span><span class="n">part</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">parts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">current_level</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot; Leaf of </span><span class="si">{</span><span class="n">fqn</span><span class="si">}</span><span class="s2"> has already been defined in the tree as an intermediate node or leaf! &quot;</span>
+                        <span class="s2">&quot;Cannot replace the existing node as a leaf.&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">current_level</span><span class="p">[</span><span class="n">parts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">return</span> <span class="n">fqn_tree</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_build_stage_from_modules</span><span class="p">(</span>
+            <span class="n">fqn_tree</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">module_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fqn_tree</span><span class="p">:</span>
+                    <span class="n">dict_modules</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">({})</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fqn_tree</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="c1"># If the module is a leaf node, we can directly use it</span>
+                        <span class="n">dict_modules</span> <span class="o">=</span> <span class="n">module</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># If the module is not a leaf node, we need to build a staged module</span>
+                        <span class="c1"># recursively from the FQN tree</span>
+                        <span class="n">dict_modules</span> <span class="o">=</span> <span class="p">{}</span>
+                        <span class="n">dict_module_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">]]</span>
+                        <span class="k">for</span> <span class="n">dict_module_name</span> <span class="ow">in</span> <span class="n">dict_module_names</span><span class="p">:</span>
+                            <span class="n">dict_modules</span><span class="p">[</span><span class="n">dict_module_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">_build_stage_from_modules</span><span class="p">(</span>
+                                <span class="n">fqn_tree</span><span class="o">=</span><span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">],</span>
+                                <span class="n">module</span><span class="o">=</span><span class="n">module</span><span class="p">[</span><span class="n">dict_module_name</span><span class="p">],</span>
+                                <span class="n">module_name</span><span class="o">=</span><span class="n">dict_module_name</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="n">dict_modules</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">(</span><span class="n">dict_modules</span><span class="p">)</span>
+                <span class="c1"># setattr(module, module_name, dict_modules)</span>
+                <span class="k">return</span> <span class="n">dict_modules</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">module_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fqn_tree</span><span class="p">:</span>
+                    <span class="n">list_modules</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">([])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="c1"># If the module is a leaf node, we can directly use it</span>
+                        <span class="n">list_modules</span> <span class="o">=</span> <span class="n">module</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># If the module is not a leaf node, we need to build a staged module</span>
+                        <span class="c1"># recursively from the FQN tree</span>
+                        <span class="n">list_modules</span> <span class="o">=</span> <span class="p">[]</span>
+                        <span class="n">list_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">module</span><span class="p">))</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="ow">in</span> <span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">]]</span>
+                        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">list_indices</span><span class="p">:</span>
+                            <span class="n">list_modules</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="n">_build_stage_from_modules</span><span class="p">(</span>
+                                    <span class="n">fqn_tree</span><span class="o">=</span><span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">],</span> <span class="n">module</span><span class="o">=</span><span class="n">module</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">module_name</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+                        <span class="n">list_modules</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span><span class="n">list_modules</span><span class="p">)</span>
+                <span class="c1"># setattr(module, module_name, list_modules)</span>
+                <span class="k">return</span> <span class="n">list_modules</span>
+
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># normal nn.Module</span>
+                <span class="k">if</span> <span class="n">module_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">module_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fqn_tree</span><span class="p">:</span>
+                    <span class="c1"># If the module is not in the FQN tree, set it to None</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+                <span class="k">elif</span> <span class="n">module_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">fqn_tree</span><span class="p">[</span><span class="n">module_name</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># If the module is a leaf node, we can directly use it</span>
+                    <span class="k">return</span> <span class="n">module</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># If the module is in the FQN tree, we need to build a staged module</span>
+                    <span class="c1"># recursively from the FQN tree</span>
+                    <span class="k">for</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">module_value</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+                        <span class="c1"># If the module is not a leaf node, we need to build a staged module</span>
+                        <span class="c1"># recursively from the FQN tree</span>
+                        <span class="n">staged_module</span> <span class="o">=</span> <span class="n">_build_stage_from_modules</span><span class="p">(</span>
+                            <span class="n">fqn_tree</span><span class="o">=</span><span class="n">fqn_tree</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="n">module_value</span><span class="p">,</span> <span class="n">module_name</span><span class="o">=</span><span class="n">module_name</span>
+                        <span class="p">)</span>
+                        <span class="nb">setattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">staged_module</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">module</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">schedule_class</span><span class="p">,</span> <span class="n">PipelineScheduleSingle</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only single-stage schedules are supported for pipeline parallelism.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># NOTE: For multi-stage schedule, e.g., Interleaved 1F1B, we have multiple stages per pp rank.</span>
+        <span class="c1"># This would need to be adapted accordingly in this case.</span>
+        <span class="n">stage_idx</span> <span class="o">=</span> <span class="n">get_stage_id_of_pp_rank</span><span class="p">(</span><span class="n">pp_mesh</span><span class="p">)</span>
+        <span class="n">module_names</span> <span class="o">=</span> <span class="n">fqns_per_stage</span><span class="p">[</span><span class="n">stage_idx</span><span class="p">]</span>
+        <span class="n">whole_model</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">whole_model</span><span class="p">)</span>
+        <span class="n">fqn_tree</span> <span class="o">=</span> <span class="n">_get_fqn_tree</span><span class="p">(</span><span class="n">module_names</span><span class="p">)</span>
+        <span class="n">stage_modules</span> <span class="o">=</span> <span class="n">_build_stage_from_modules</span><span class="p">(</span><span class="n">fqn_tree</span><span class="p">,</span> <span class="n">whole_model</span><span class="p">)</span>
+        <span class="n">stage_modules</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">NNModel</span><span class="p">,</span> <span class="n">stage_modules</span><span class="p">)</span>
+        <span class="n">PipelineFactory</span><span class="o">.</span><span class="n">_filter_weight_decay_groups_</span><span class="p">(</span><span class="n">stage_modules</span><span class="p">)</span>
+        <span class="n">stage</span> <span class="o">=</span> <span class="n">PipelineStage</span><span class="p">(</span>
+            <span class="n">submodule</span><span class="o">=</span><span class="n">stage_modules</span><span class="p">,</span>
+            <span class="n">stage_index</span><span class="o">=</span><span class="n">stage_idx</span><span class="p">,</span>
+            <span class="n">num_stages</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">fqns_per_stage</span><span class="p">),</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">group</span><span class="o">=</span><span class="n">pp_mesh</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="s2">&quot;pp&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">stage</span><span class="p">,</span> <span class="n">stage_modules</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_filter_weight_decay_groups_</span><span class="p">(</span><span class="n">stage_modules</span><span class="p">:</span> <span class="n">NNModel</span><span class="p">):</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">stage_modules</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">parameter</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">group_list</span> <span class="ow">in</span> <span class="n">stage_modules</span><span class="o">.</span><span class="n">weight_decay_groups</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">remove_from_group</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">group_entry</span>
+                <span class="k">for</span> <span class="n">group_entry</span> <span class="ow">in</span> <span class="n">group_list</span>
+                <span class="k">if</span> <span class="nb">all</span><span class="p">([</span><span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">group_entry</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">params</span><span class="p">])</span>
+            <span class="p">]</span>
+            <span class="k">for</span> <span class="n">remove</span> <span class="ow">in</span> <span class="n">remove_from_group</span><span class="p">:</span>
+                <span class="n">group_list</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">remove</span><span class="p">)</span>
+        <span class="n">empty_group_keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">stage_modules</span><span class="o">.</span><span class="n">weight_decay_groups</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">empty_group_keys</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">stage_modules</span><span class="o">.</span><span class="n">weight_decay_groups</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+<div class="viewcode-block" id="PipelineFactory.get_scheduled_pipeline">
+<a class="viewcode-back" href="../../../../api/modalities.models.parallelism.html#modalities.models.parallelism.pipeline_parallelism.PipelineFactory.get_scheduled_pipeline">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_scheduled_pipeline</span><span class="p">(</span>
+        <span class="n">loss_fn</span><span class="p">:</span> <span class="n">Loss</span><span class="p">,</span> <span class="n">pp_schedule_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">microbatch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">pp_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">pipeline</span><span class="p">:</span> <span class="n">Pipeline</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Pipeline</span><span class="p">:</span>
+        <span class="c1"># TODO: Addd validation in config that batch_size is divisible by microbatch_size</span>
+        <span class="c1"># and n_microbatches must be &gt;= pp_degree</span>
+        <span class="n">n_microbatches</span> <span class="o">=</span> <span class="n">batch_size</span> <span class="o">//</span> <span class="n">microbatch_size</span>
+        <span class="n">num_total_stages</span> <span class="o">=</span> <span class="n">pp_degree</span>
+        <span class="n">pp_schedule_class</span> <span class="o">=</span> <span class="n">get_schedule_class</span><span class="p">(</span><span class="n">pp_schedule_name</span><span class="p">)</span>
+        <span class="n">pp_schedule</span> <span class="o">=</span> <span class="n">pp_schedule_class</span><span class="p">(</span>
+            <span class="n">stage</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pp_stage</span><span class="p">,</span>
+            <span class="n">n_microbatches</span><span class="o">=</span><span class="n">n_microbatches</span><span class="p">,</span>
+            <span class="n">loss_fn</span><span class="o">=</span><span class="n">loss_fn</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Using pipeline schedule </span><span class="si">{</span><span class="n">pp_schedule</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">n_microbatches</span><span class="si">}</span><span class="s2"> microbatches and </span><span class="si">{</span><span class="n">num_total_stages</span><span class="si">}</span><span class="s2"> stages.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">pipeline</span><span class="o">.</span><span class="n">pp_schedule</span> <span class="o">=</span> <span class="n">pp_schedule</span>
+        <span class="k">return</span> <span class="n">pipeline</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

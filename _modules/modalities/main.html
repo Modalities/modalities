@@ -1,0 +1,409 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.main &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.main</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.main</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.batch</span><span class="w"> </span><span class="kn">import</span> <span class="n">EvaluationResultBatch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.component_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComponentFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_app_config_dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.instantiation_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingComponentsInstantiationModel</span><span class="p">,</span> <span class="n">TrainingReportGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.evaluator</span><span class="w"> </span><span class="kn">import</span> <span class="n">Evaluator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.gym</span><span class="w"> </span><span class="kn">import</span> <span class="n">Gym</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.message_broker</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessageBroker</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.messages</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessageTypes</span><span class="p">,</span> <span class="n">ProgressUpdate</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.publisher</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessagePublisher</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.logging_broker.subscriber</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessageSubscriberIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.registry.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">COMPONENTS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.registry.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ParallelismDegrees</span><span class="p">,</span>
+    <span class="n">get_parallel_degree</span><span class="p">,</span>
+    <span class="n">get_parallel_rank</span><span class="p">,</span>
+    <span class="n">has_parallelism_method</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.trainer</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trainer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_synced_experiment_id_of_run</span><span class="p">,</span> <span class="n">get_total_number_of_trainable_parameters</span><span class="p">,</span> <span class="n">print_rank_0</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Main">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.main.Main">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Main</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main class that orchestrates the training process.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">additional_resolver_funs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">experiment_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">experiment_id</span> <span class="o">=</span> <span class="n">get_synced_experiment_id_of_run</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_dict</span> <span class="o">=</span> <span class="n">load_app_config_dict</span><span class="p">(</span>
+            <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_path</span><span class="p">,</span> <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span> <span class="n">additional_resolver_funs</span><span class="o">=</span><span class="n">additional_resolver_funs</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_path</span> <span class="o">=</span> <span class="n">config_path</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">component_factory</span> <span class="o">=</span> <span class="n">ComponentFactory</span><span class="p">(</span><span class="n">registry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Main.add_custom_component">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.main.Main.add_custom_component">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_custom_component</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">custom_component</span><span class="p">:</span> <span class="n">Type</span><span class="p">,</span> <span class="n">custom_config</span><span class="p">:</span> <span class="n">Type</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a custom component to the registry.</span>
+
+<span class="sd">        This method comes in especially handy</span>
+<span class="sd">        when Modalities is used as a library and the user wants to add custom components</span>
+<span class="sd">        (e.g., custom model or custom loss function) to the registry.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            component_key (str): Key of the component to be added to the registry</span>
+<span class="sd">            variant_key (str): Key of the variant to be added to the registry</span>
+<span class="sd">            custom_component (Type): The class type of the custom component</span>
+<span class="sd">            custom_config (Type): The pydantic config type of the custom component</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">add_entity</span><span class="p">(</span>
+            <span class="n">component_key</span><span class="o">=</span><span class="n">component_key</span><span class="p">,</span>
+            <span class="n">variant_key</span><span class="o">=</span><span class="n">variant_key</span><span class="p">,</span>
+            <span class="n">component_type</span><span class="o">=</span><span class="n">custom_component</span><span class="p">,</span>
+            <span class="n">component_config_type</span><span class="o">=</span><span class="n">custom_config</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Main.build_components">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.main.Main.build_components">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_components</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">components_model_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">BaseModel</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Given a pydantic basemodel, this method builds the components specified in the config file.</span>
+
+<span class="sd">        Depending on the use case (e.g., training, inference, etc.), the user can pass different pydantic base models.</span>
+<span class="sd">        For instance, for tokenization, the basemodel would only have the tokenization-related components specified.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            components_model_type (Type[BaseModel]): The pydantic basemodel type that should be</span>
+<span class="sd">                used to build the components.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            BaseModel: The components built based on the config file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">component_factory</span><span class="o">.</span><span class="n">build_components</span><span class="p">(</span>
+            <span class="n">config_dict</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">components_model_type</span><span class="o">=</span><span class="n">components_model_type</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">components</span></div>
+
+
+<div class="viewcode-block" id="Main.run">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.main.Main.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">components</span><span class="p">:</span> <span class="n">TrainingComponentsInstantiationModel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Entrypoint fo running the training process.</span>
+
+<span class="sd">        We pass in a TrainingComponentsInstantiationModel,</span>
+<span class="sd">        which is a pydantic model that contains all the components needed for the training process.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            components (TrainingComponentsInstantiationModel): The components needed for the training process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># The typical training setup is that the config file is located outside of the experiment folder</span>
+        <span class="c1"># and the experiment folder is empty.</span>
+        <span class="c1"># Before starting the training, the config file is copied to the experiment folder for reproducibility purposes.</span>
+        <span class="c1"># However, for instance for benchmarking, the config file might be already located inside the experiment folder.</span>
+        <span class="c1"># In this case, we only allow the config file to be present in the experiment folder.</span>
+        <span class="c1"># NOTE: For the future, these constraints might be relaxed, as some components might have to</span>
+        <span class="c1"># store meta data in the experiment folder at instantiation time.</span>
+        <span class="n">experiment_path</span> <span class="o">=</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">checkpoint_saving_path</span> <span class="o">/</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">experiment_id</span>
+        <span class="n">expected_config_file_path</span> <span class="o">=</span> <span class="n">experiment_path</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_path</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">if</span> <span class="n">experiment_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="n">present_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">experiment_path</span><span class="o">.</span><span class="n">iterdir</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">present_files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">expected_config_file_path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">present_files</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The experiment folder </span><span class="si">{</span><span class="n">experiment_path</span><span class="si">}</span><span class="s2"> is non-empty and &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;contains a file </span><span class="si">{</span><span class="n">present_files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> that &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;is not the config file. Please ensure that the config file is the only file present &quot;</span>
+                    <span class="s2">&quot;in the experiment folder to alleviate side-effects.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">present_files</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The experiment folder </span><span class="si">{</span><span class="n">experiment_path</span><span class="si">}</span><span class="s2"> is non-empty and &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;contains multiple files: </span><span class="si">{</span><span class="n">present_files</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Please ensure that the config file is the only file present.&quot;</span>
+                <span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">experiment_path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_path</span> <span class="o">!=</span> <span class="n">expected_config_file_path</span><span class="p">:</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config_path</span><span class="p">,</span> <span class="n">expected_config_file_path</span><span class="p">)</span>
+
+            <span class="n">resolved_config_path</span> <span class="o">=</span> <span class="p">(</span><span class="n">expected_config_file_path</span><span class="p">)</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.yaml.resolved&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">resolved_config_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config_dict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+
+        <span class="n">evaluation_result_publisher</span><span class="p">,</span> <span class="n">progress_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_logging_publishers</span><span class="p">(</span>
+            <span class="n">progress_subscriber</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">progress_subscriber</span><span class="p">,</span>
+            <span class="n">results_subscriber</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">evaluation_subscriber</span><span class="p">,</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">local_rank</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">local_rank</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># log parallel ranks</span>
+        <span class="n">log_str</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Rank info for current rank:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;global_rank=</span><span class="si">{</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">global_rank</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;world_size=</span><span class="si">{</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">world_size</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;local_rank=</span><span class="si">{</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">local_rank</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">pm</span> <span class="ow">in</span> <span class="n">ParallelismDegrees</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">has_parallelism_method</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">pm</span><span class="p">):</span>
+                <span class="n">log_str</span> <span class="o">+=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pm</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">_degree=</span><span class="si">{</span><span class="n">get_parallel_degree</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span><span class="w"> </span><span class="n">parallelism_methods</span><span class="o">=</span><span class="p">[</span><span class="n">pm</span><span class="p">])</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pm</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">_rank=</span><span class="si">{</span><span class="n">get_parallel_rank</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span><span class="w"> </span><span class="n">parallelism_method</span><span class="o">=</span><span class="n">pm</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">log_str</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+        <span class="c1"># Trainer</span>
+        <span class="n">global_num_tokens_per_train_step</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">local_train_micro_batch_size</span>
+            <span class="o">*</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">sequence_length</span>
+            <span class="o">*</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">gradient_accumulation_steps</span>
+            <span class="o">*</span> <span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">dp_degree</span>
+        <span class="p">)</span>
+
+        <span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">progress_publisher</span><span class="o">=</span><span class="n">progress_publisher</span><span class="p">,</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_target</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+            <span class="n">num_seen_train_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps</span><span class="p">,</span>
+            <span class="n">global_num_seen_tokens</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_progress</span><span class="o">.</span><span class="n">global_num_seen_tokens</span><span class="p">,</span>
+            <span class="n">evaluation_result_publisher</span><span class="o">=</span><span class="n">evaluation_result_publisher</span><span class="p">,</span>
+            <span class="n">gradient_acc_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="o">.</span><span class="n">gradient_accumulation_steps</span><span class="p">,</span>
+            <span class="n">gradient_clipper</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">gradient_clipper</span><span class="p">,</span>
+            <span class="n">global_num_tokens_per_train_step</span><span class="o">=</span><span class="n">global_num_tokens_per_train_step</span><span class="p">,</span>
+            <span class="n">device_mesh</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span>
+            <span class="n">mfu_calculator</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">mfu_calculator</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Evaluator</span>
+        <span class="n">evaluator</span> <span class="o">=</span> <span class="n">Evaluator</span><span class="p">(</span>
+            <span class="n">progress_publisher</span><span class="o">=</span><span class="n">progress_publisher</span><span class="p">,</span>
+            <span class="n">evaluation_result_publisher</span><span class="o">=</span><span class="n">evaluation_result_publisher</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Gym</span>
+        <span class="n">gym</span> <span class="o">=</span> <span class="n">Gym</span><span class="p">(</span>
+            <span class="n">trainer</span><span class="o">=</span><span class="n">trainer</span><span class="p">,</span>
+            <span class="n">evaluator</span><span class="o">=</span><span class="n">evaluator</span><span class="p">,</span>
+            <span class="n">loss_fun</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">loss_fn</span><span class="p">,</span>
+            <span class="n">num_ranks</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="o">.</span><span class="n">world_size</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="n">get_total_number_of_trainable_parameters</span><span class="p">(</span><span class="n">components</span><span class="o">.</span><span class="n">app_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">components</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">)</span>
+        <span class="n">components</span><span class="o">.</span><span class="n">evaluation_subscriber</span><span class="o">.</span><span class="n">consume_dict</span><span class="p">({</span><span class="s2">&quot;No. parameters&quot;</span><span class="p">:</span> <span class="n">num_params</span><span class="p">})</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training model with </span><span class="si">{</span><span class="n">num_params</span><span class="si">}</span><span class="s2"> parameters.&quot;</span><span class="p">)</span>
+
+        <span class="n">print_rank_0</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model initialized at </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">report</span> <span class="o">=</span> <span class="n">TrainingReportGenerator</span><span class="p">(</span>
+            <span class="n">training_target</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_target</span><span class="p">,</span>
+            <span class="n">intervals</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">intervals</span><span class="p">,</span>
+            <span class="n">step_profile</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">step_profile</span><span class="p">,</span>
+            <span class="n">cuda_env</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">cuda_env</span><span class="p">,</span>
+            <span class="n">consistency_enforcement</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">consistency_enforcement</span><span class="p">,</span>
+            <span class="n">train_dataset</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">train_dataset</span><span class="p">,</span>
+            <span class="n">training_progress</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">training_progress</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">get_report</span><span class="p">()</span>
+
+        <span class="n">print_rank_0</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+
+        <span class="n">gym</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">train_data_loader</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">train_dataloader</span><span class="p">,</span>
+            <span class="n">evaluation_data_loaders</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">eval_dataloaders</span><span class="p">,</span>
+            <span class="n">checkpoint_saving</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">checkpoint_saving</span><span class="p">,</span>
+            <span class="n">app_state</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">app_state</span><span class="p">,</span>
+            <span class="n">checkpointing_interval_in_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">checkpointing_interval_in_steps</span><span class="p">,</span>
+            <span class="n">evaluation_interval_in_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">evaluation_interval_in_steps</span><span class="p">,</span>
+            <span class="n">training_log_interval_in_steps</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">training_log_interval_in_steps</span><span class="p">,</span>
+            <span class="n">scheduled_pipeline</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">scheduled_pipeline</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Main.get_logging_publishers">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.main.Main.get_logging_publishers">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_logging_publishers</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">progress_subscriber</span><span class="p">:</span> <span class="n">MessageSubscriberIF</span><span class="p">[</span><span class="n">ProgressUpdate</span><span class="p">],</span>
+        <span class="n">results_subscriber</span><span class="p">:</span> <span class="n">MessageSubscriberIF</span><span class="p">[</span><span class="n">EvaluationResultBatch</span><span class="p">],</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">MessagePublisher</span><span class="p">[</span><span class="n">EvaluationResultBatch</span><span class="p">],</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">ProgressUpdate</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the logging publishers for the training.</span>
+
+<span class="sd">        These publishers are used to pass the evaluation results and the progress updates to the message broker.</span>
+<span class="sd">        The message broker is then used to pass the messages to the subscribers, such as WandB.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            progress_subscriber (MessageSubscriberIF[ProgressUpdate]): The progress subscriber</span>
+<span class="sd">            results_subscriber (MessageSubscriberIF[EvaluationResultBatch]): The results subscriber</span>
+<span class="sd">            global_rank (int): The global rank of the current process</span>
+<span class="sd">            local_rank (int): The local rank of the current process on the current node</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[MessagePublisher[EvaluationResultBatch], MessagePublisher[ProgressUpdate]]: The evaluation</span>
+<span class="sd">                result publisher and the progress publisher</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">message_broker</span> <span class="o">=</span> <span class="n">MessageBroker</span><span class="p">()</span>
+        <span class="n">progress_publisher</span> <span class="o">=</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">ProgressUpdate</span><span class="p">](</span>
+            <span class="n">message_broker</span><span class="o">=</span><span class="n">message_broker</span><span class="p">,</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">local_rank</span><span class="o">=</span><span class="n">local_rank</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">evaluation_result_publisher</span> <span class="o">=</span> <span class="n">MessagePublisher</span><span class="p">[</span><span class="n">EvaluationResultBatch</span><span class="p">](</span>
+            <span class="n">message_broker</span><span class="o">=</span><span class="n">message_broker</span><span class="p">,</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">local_rank</span><span class="o">=</span><span class="n">local_rank</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">message_broker</span><span class="o">.</span><span class="n">add_subscriber</span><span class="p">(</span><span class="n">subscription</span><span class="o">=</span><span class="n">MessageTypes</span><span class="o">.</span><span class="n">EVALUATION_RESULT</span><span class="p">,</span> <span class="n">subscriber</span><span class="o">=</span><span class="n">results_subscriber</span><span class="p">)</span>
+        <span class="n">message_broker</span><span class="o">.</span><span class="n">add_subscriber</span><span class="p">(</span>
+            <span class="n">subscription</span><span class="o">=</span><span class="n">MessageTypes</span><span class="o">.</span><span class="n">BATCH_PROGRESS_UPDATE</span><span class="p">,</span>
+            <span class="n">subscriber</span><span class="o">=</span><span class="n">progress_subscriber</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">evaluation_result_publisher</span><span class="p">,</span> <span class="n">progress_publisher</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,421 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.utils.profilers.modalities_profiler &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.utils.profilers.modalities_profiler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.utils.profilers.modalities_profiler</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.profiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProfilerActivity</span><span class="p">,</span> <span class="n">profile</span><span class="p">,</span> <span class="n">schedule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">trange</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProcessGroupBackendType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.pydantic_if_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">PydanticSteppableComponentIFType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.main</span><span class="w"> </span><span class="kn">import</span> <span class="n">Main</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.cuda_env</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaEnv</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_experiment_id_from_config</span><span class="p">,</span> <span class="n">get_synced_experiment_id_of_run</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.profilers.steppable_components</span><span class="w"> </span><span class="kn">import</span> <span class="n">SteppableComponentIF</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="s2">&quot;modalities_profiler&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="InstantiationModel">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.InstantiationModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">InstantiationModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">steppable_component</span><span class="p">:</span> <span class="n">PydanticSteppableComponentIFType</span></div>
+
+
+
+<div class="viewcode-block" id="CustomComponentRegisterable">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.CustomComponentRegisterable">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomComponentRegisterable</span><span class="p">:</span>
+    <span class="n">component_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">variant_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">custom_component</span><span class="p">:</span> <span class="nb">type</span>
+    <span class="n">custom_config</span><span class="p">:</span> <span class="nb">type</span></div>
+
+
+
+<div class="viewcode-block" id="ModalitiesProfilerStarter">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfilerStarter">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModalitiesProfilerStarter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starter class to run profiling either in single process or distributed mode.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ModalitiesProfilerStarter.run_distributed">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfilerStarter.run_distributed">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_distributed</span><span class="p">(</span>
+        <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">num_measurement_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_wait_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_warmup_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">experiment_root_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">profiled_ranks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">custom_component_registerables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CustomComponentRegisterable</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run distributed profiling using the Modalities Profiler.</span>
+<span class="sd">        This method is primarily intended to run large-scale profiling e.g., for model training.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config_file_path (Path): Path to the configuration file.</span>
+<span class="sd">            num_measurement_steps (int): Number of measurement steps for profiling.</span>
+<span class="sd">            num_wait_steps (int): Number of wait steps before profiling starts.</span>
+<span class="sd">            num_warmup_steps (int): Number of warmup steps before measurement starts.</span>
+<span class="sd">            experiment_root_path (Path): Root path to store experiment results.</span>
+<span class="sd">            profiled_ranks (list[int]): List of ranks to profile.</span>
+<span class="sd">            experiment_id (str, optional): Experiment ID. If None, it will be generated. Defaults to None.</span>
+<span class="sd">            custom_component_registerables (list[CustomComponentRegisterable], optional): List of custom</span>
+<span class="sd">                components to register. Defaults to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">CudaEnv</span><span class="p">(</span><span class="n">process_group_backend</span><span class="o">=</span><span class="n">ProcessGroupBackendType</span><span class="o">.</span><span class="n">nccl</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">experiment_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># get experiment id synched across all ranks</span>
+                <span class="n">experiment_id</span> <span class="o">=</span> <span class="n">get_synced_experiment_id_of_run</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">)</span>
+            <span class="n">ModalitiesProfilerStarter</span><span class="o">.</span><span class="n">_copy_config_to_experiment_folder</span><span class="p">(</span>
+                <span class="n">experiment_root_path</span><span class="o">=</span><span class="n">experiment_root_path</span><span class="p">,</span>
+                <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span>
+                <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">global_rank</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+            <span class="n">world_size</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span>
+            <span class="n">local_rank</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;LOCAL_RANK&quot;</span><span class="p">])</span>
+
+            <span class="n">ModalitiesProfilerStarter</span><span class="o">.</span><span class="n">_run_helper</span><span class="p">(</span>
+                <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span><span class="p">,</span>
+                <span class="n">num_measurement_steps</span><span class="o">=</span><span class="n">num_measurement_steps</span><span class="p">,</span>
+                <span class="n">num_wait_steps</span><span class="o">=</span><span class="n">num_wait_steps</span><span class="p">,</span>
+                <span class="n">num_warmup_steps</span><span class="o">=</span><span class="n">num_warmup_steps</span><span class="p">,</span>
+                <span class="n">experiment_folder_path</span><span class="o">=</span><span class="n">experiment_root_path</span> <span class="o">/</span> <span class="n">experiment_id</span><span class="p">,</span>
+                <span class="n">local_rank</span><span class="o">=</span><span class="n">local_rank</span><span class="p">,</span>
+                <span class="n">global_rank</span><span class="o">=</span><span class="n">global_rank</span><span class="p">,</span>
+                <span class="n">world_size</span><span class="o">=</span><span class="n">world_size</span><span class="p">,</span>
+                <span class="n">profiled_ranks</span><span class="o">=</span><span class="n">profiled_ranks</span><span class="p">,</span>
+                <span class="n">custom_component_registerables</span><span class="o">=</span><span class="n">custom_component_registerables</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ModalitiesProfilerStarter.run_single_process">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfilerStarter.run_single_process">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_single_process</span><span class="p">(</span>
+        <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">num_measurement_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_wait_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_warmup_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">experiment_root_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">custom_component_registerables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CustomComponentRegisterable</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run single process profiling using the Modalities Profiler.</span>
+<span class="sd">        This method is primarily intended for quick profiling experiments</span>
+<span class="sd">        (e.g., single modules such as custom modules vs Pytorch equivalents) on a single GPU.</span>
+<span class="sd">        This type of profiling can be seen as a middle ground between distributed profiling and</span>
+<span class="sd">        single kernel profiling (e.g., using Nsight Compute).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config_file_path (Path): Path to the configuration file.</span>
+<span class="sd">            num_measurement_steps (int): Number of measurement steps for profiling.</span>
+<span class="sd">            num_wait_steps (int): Number of wait steps before profiling starts.</span>
+<span class="sd">            num_warmup_steps (int): Number of warmup steps before measurement starts.</span>
+<span class="sd">            experiment_root_path (Path): Root path to store experiment results.</span>
+<span class="sd">            experiment_id (str, optional): Experiment ID. If None, it will be generated.</span>
+<span class="sd">            custom_component_registerables (list[CustomComponentRegisterable], optional): List of custom</span>
+<span class="sd">                components to register. Defaults to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">experiment_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># get experiment id synched across all ranks</span>
+            <span class="n">experiment_id</span> <span class="o">=</span> <span class="n">get_experiment_id_from_config</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">)</span>
+
+        <span class="n">ModalitiesProfilerStarter</span><span class="o">.</span><span class="n">_copy_config_to_experiment_folder</span><span class="p">(</span>
+            <span class="n">experiment_root_path</span><span class="o">=</span><span class="n">experiment_root_path</span><span class="p">,</span> <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span> <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span>
+        <span class="p">)</span>
+
+        <span class="n">global_rank</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">world_size</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">local_rank</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">profiled_ranks</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">ModalitiesProfilerStarter</span><span class="o">.</span><span class="n">_run_helper</span><span class="p">(</span>
+            <span class="n">config_file_path</span><span class="o">=</span><span class="n">config_file_path</span><span class="p">,</span>
+            <span class="n">num_measurement_steps</span><span class="o">=</span><span class="n">num_measurement_steps</span><span class="p">,</span>
+            <span class="n">num_wait_steps</span><span class="o">=</span><span class="n">num_wait_steps</span><span class="p">,</span>
+            <span class="n">num_warmup_steps</span><span class="o">=</span><span class="n">num_warmup_steps</span><span class="p">,</span>
+            <span class="n">experiment_folder_path</span><span class="o">=</span><span class="n">experiment_root_path</span> <span class="o">/</span> <span class="n">experiment_id</span><span class="p">,</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">world_size</span><span class="o">=</span><span class="n">world_size</span><span class="p">,</span>
+            <span class="n">local_rank</span><span class="o">=</span><span class="n">local_rank</span><span class="p">,</span>
+            <span class="n">profiled_ranks</span><span class="o">=</span><span class="n">profiled_ranks</span><span class="p">,</span>
+            <span class="n">custom_component_registerables</span><span class="o">=</span><span class="n">custom_component_registerables</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_copy_config_to_experiment_folder</span><span class="p">(</span>
+        <span class="n">experiment_root_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># store a copy of the config file in the experiment folder</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>  <span class="c1"># copy in single process</span>
+            <span class="ow">or</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>  <span class="c1"># copy only on rank 0 in distributed process</span>
+            <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="p">):</span>
+            <span class="n">experiment_folder_path</span> <span class="o">=</span> <span class="n">experiment_root_path</span> <span class="o">/</span> <span class="n">experiment_id</span>
+            <span class="n">experiment_folder_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">,</span> <span class="n">experiment_folder_path</span> <span class="o">/</span> <span class="n">config_file_path</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_helper</span><span class="p">(</span>
+        <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">num_measurement_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_wait_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_warmup_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">experiment_folder_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">profiled_ranks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">custom_component_registerables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CustomComponentRegisterable</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="c1"># build profiler</span>
+        <span class="n">profiler_activities</span> <span class="o">=</span> <span class="p">[</span><span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">CPU</span><span class="p">,</span> <span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">CUDA</span><span class="p">]</span>
+        <span class="n">profile_context_manager</span> <span class="o">=</span> <span class="n">profile</span><span class="p">(</span>
+            <span class="n">activities</span><span class="o">=</span><span class="n">profiler_activities</span><span class="p">,</span>
+            <span class="n">schedule</span><span class="o">=</span><span class="n">schedule</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="n">num_wait_steps</span><span class="p">,</span> <span class="n">warmup</span><span class="o">=</span><span class="n">num_warmup_steps</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="n">num_measurement_steps</span><span class="p">),</span>
+            <span class="n">record_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">profile_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">with_flops</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">with_stack</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">with_modules</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># register custom components and build components from config</span>
+        <span class="c1"># workaround to avoid triggering synchronization of experiment id in single process</span>
+        <span class="n">experiment_id</span> <span class="o">=</span> <span class="n">experiment_folder_path</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="n">world_size</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">main_obj</span> <span class="o">=</span> <span class="n">Main</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">,</span> <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">custom_component_registerables</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">registerable</span> <span class="ow">in</span> <span class="n">custom_component_registerables</span><span class="p">:</span>
+                <span class="n">main_obj</span><span class="o">.</span><span class="n">add_custom_component</span><span class="p">(</span>
+                    <span class="n">component_key</span><span class="o">=</span><span class="n">registerable</span><span class="o">.</span><span class="n">component_key</span><span class="p">,</span>
+                    <span class="n">variant_key</span><span class="o">=</span><span class="n">registerable</span><span class="o">.</span><span class="n">variant_key</span><span class="p">,</span>
+                    <span class="n">custom_component</span><span class="o">=</span><span class="n">registerable</span><span class="o">.</span><span class="n">custom_component</span><span class="p">,</span>
+                    <span class="n">custom_config</span><span class="o">=</span><span class="n">registerable</span><span class="o">.</span><span class="n">custom_config</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="n">components</span><span class="p">:</span> <span class="n">InstantiationModel</span> <span class="o">=</span> <span class="n">main_obj</span><span class="o">.</span><span class="n">build_components</span><span class="p">(</span><span class="n">components_model_type</span><span class="o">=</span><span class="n">InstantiationModel</span><span class="p">)</span>
+
+        <span class="c1"># run profiling</span>
+        <span class="n">ModalitiesProfiler</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span>
+            <span class="n">steppable_component</span><span class="o">=</span><span class="n">components</span><span class="o">.</span><span class="n">steppable_component</span><span class="p">,</span>
+            <span class="n">num_total_steps</span><span class="o">=</span><span class="n">num_measurement_steps</span> <span class="o">+</span> <span class="n">num_wait_steps</span> <span class="o">+</span> <span class="n">num_warmup_steps</span><span class="p">,</span>
+            <span class="n">profile_context_manager</span><span class="o">=</span><span class="n">profile_context_manager</span><span class="p">,</span>
+            <span class="n">show_progress</span><span class="o">=</span><span class="p">(</span><span class="n">global_rank</span> <span class="o">==</span> <span class="n">profiled_ranks</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>  <span class="c1"># only show progress on a single rank that is profiled</span>
+        <span class="p">)</span>
+        <span class="n">trace_output_path</span> <span class="o">=</span> <span class="n">experiment_folder_path</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;profiler_trace_ranks_</span><span class="si">{</span><span class="n">world_size</span><span class="si">}</span><span class="s2">_rank_</span><span class="si">{</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">.json&quot;</span>
+        <span class="n">memory_output_path</span> <span class="o">=</span> <span class="n">experiment_folder_path</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;profiler_memory_ranks_</span><span class="si">{</span><span class="n">world_size</span><span class="si">}</span><span class="s2">_rank_</span><span class="si">{</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">.html&quot;</span>
+        <span class="n">summary_output_path</span> <span class="o">=</span> <span class="n">experiment_folder_path</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;profiler_summary_ranks_</span><span class="si">{</span><span class="n">world_size</span><span class="si">}</span><span class="s2">_rank_</span><span class="si">{</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">.txt&quot;</span>
+
+        <span class="n">ModalitiesProfiler</span><span class="o">.</span><span class="n">export_profiling_results</span><span class="p">(</span>
+            <span class="n">profiler_context_manager</span><span class="o">=</span><span class="n">profile_context_manager</span><span class="p">,</span>
+            <span class="n">trace_output_path</span><span class="o">=</span><span class="n">trace_output_path</span><span class="p">,</span>
+            <span class="n">memory_output_path</span><span class="o">=</span><span class="n">memory_output_path</span><span class="p">,</span>
+            <span class="n">summary_output_path</span><span class="o">=</span><span class="n">summary_output_path</span><span class="p">,</span>
+            <span class="n">local_rank</span><span class="o">=</span><span class="n">local_rank</span><span class="p">,</span>
+            <span class="n">global_rank</span><span class="o">=</span><span class="n">global_rank</span><span class="p">,</span>
+            <span class="n">profiled_ranks</span><span class="o">=</span><span class="n">profiled_ranks</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ModalitiesProfiler">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfiler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModalitiesProfiler</span><span class="p">:</span>
+<div class="viewcode-block" id="ModalitiesProfiler.profile">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfiler.profile">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">profile</span><span class="p">(</span>
+        <span class="n">steppable_component</span><span class="p">:</span> <span class="n">SteppableComponentIF</span><span class="p">,</span>
+        <span class="n">num_total_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">profile_context_manager</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">profile</span><span class="p">,</span>
+        <span class="n">show_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Profile a steppable component using the provided profiler context manager.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            steppable_component (SteppableComponentIF): The steppable component to profile.</span>
+<span class="sd">            num_total_steps (int): Total number of steps to run.</span>
+<span class="sd">            profile_context_manager (profile): The profiler context manager.</span>
+<span class="sd">            show_progress (bool): Whether to show a progress bar. Defaults to False.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+            <span class="n">step_iterator</span> <span class="o">=</span> <span class="n">trange</span><span class="p">(</span><span class="n">num_total_steps</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Profiling steps&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">step_iterator</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_total_steps</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">profile_context_manager</span> <span class="k">as</span> <span class="n">profiler</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">step_iterator</span><span class="p">:</span>
+                <span class="n">steppable_component</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+                <span class="n">profiler</span><span class="o">.</span><span class="n">step</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ModalitiesProfiler.export_profiling_results">
+<a class="viewcode-back" href="../../../../api/modalities.utils.profilers.html#modalities.utils.profilers.modalities_profiler.ModalitiesProfiler.export_profiling_results">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">export_profiling_results</span><span class="p">(</span>
+        <span class="n">profiler_context_manager</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">profile</span><span class="p">,</span>
+        <span class="n">trace_output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">memory_output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">summary_output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">profiled_ranks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Export profiling results to specified output paths if the current rank is in profiled_ranks.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            profiler_context_manager (profile): The profiler context manager.</span>
+<span class="sd">            trace_output_path (Path): Path to save the Chrome trace.</span>
+<span class="sd">            memory_output_path (Path): Path to save the memory timeline.</span>
+<span class="sd">            summary_output_path (Path): Path to save the summary table.</span>
+<span class="sd">            global_rank (int): The global rank of the current process.</span>
+<span class="sd">            local_rank (int): The local rank of the current process.</span>
+<span class="sd">            profiled_ranks (list[int]): List of ranks to profile.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">global_rank</span> <span class="ow">in</span> <span class="n">profiled_ranks</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving profiling results for rank </span><span class="si">{</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">profiler_context_manager</span><span class="o">.</span><span class="n">export_chrome_trace</span><span class="p">(</span><span class="n">trace_output_path</span><span class="o">.</span><span class="n">as_posix</span><span class="p">())</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="n">local_rank</span> <span class="k">if</span> <span class="n">local_rank</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">profiler_context_manager</span><span class="o">.</span><span class="n">export_memory_timeline</span><span class="p">(</span><span class="n">memory_output_path</span><span class="o">.</span><span class="n">as_posix</span><span class="p">(),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">table</span> <span class="o">=</span> <span class="n">profiler_context_manager</span><span class="o">.</span><span class="n">key_averages</span><span class="p">()</span><span class="o">.</span><span class="n">table</span><span class="p">()</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">summary_output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">table</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
