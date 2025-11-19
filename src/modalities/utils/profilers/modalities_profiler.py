@@ -63,12 +63,11 @@ class ModalitiesProfilerStarter:
             if experiment_id is None:
                 # get experiment id synched across all ranks
                 experiment_id = get_synced_experiment_id_of_run(config_file_path)
-
-            # store a copy of the config file in the experiment folder
-            if torch.distributed.get_rank() == 0:
-                experiment_folder_path = experiment_root_path / experiment_id
-                experiment_folder_path.mkdir(parents=True, exist_ok=True)
-                shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
+            ModalitiesProfilerStarter._copy_config_to_experiment_folder(
+                experiment_root_path=experiment_root_path,
+                experiment_id=experiment_id,
+                config_file_path=config_file_path,
+            )
 
             global_rank = torch.distributed.get_rank()
             world_size = torch.distributed.get_world_size()
@@ -117,10 +116,9 @@ class ModalitiesProfilerStarter:
             # get experiment id synched across all ranks
             experiment_id = get_experiment_id_from_config(config_file_path)
 
-        # store a copy of the config file in the experiment folder
-        experiment_folder_path = experiment_root_path / experiment_id
-        experiment_folder_path.mkdir(parents=True, exist_ok=True)
-        shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
+        ModalitiesProfilerStarter._copy_config_to_experiment_folder(
+            experiment_root_path=experiment_root_path, experiment_id=experiment_id, config_file_path=config_file_path
+        )
 
         global_rank = 0
         world_size = 1
@@ -139,6 +137,16 @@ class ModalitiesProfilerStarter:
             profiled_ranks=profiled_ranks,
             custom_component_registerables=custom_component_registerables,
         )
+
+    @staticmethod
+    def _copy_config_to_experiment_folder(
+        experiment_root_path: Path, experiment_id: str, config_file_path: Path
+    ) -> None:
+        # store a copy of the config file in the experiment folder
+        if torch.distributed.get_rank() == 0:
+            experiment_folder_path = experiment_root_path / experiment_id
+            experiment_folder_path.mkdir(parents=True, exist_ok=True)
+            shutil.copy(config_file_path, experiment_folder_path / config_file_path.name)
 
     @staticmethod
     def _run_helper(
