@@ -98,7 +98,7 @@ class Gym:
                 training_progress=training_progress,
                 evaluation_result=None,  # TODO implement checkpointing based on preceding evaluation results
                 app_state=app_state,
-                early_stoppping_criterion_fulfilled=False,  # TODO: implement early stopping
+                early_stopping_criterion_fulfilled=False,  # TODO: implement early stopping
             )
 
     def _run_evaluation(
