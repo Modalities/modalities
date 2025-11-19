@@ -8,7 +8,8 @@ NEMO="24.12"
 # optional versions, leave empty for preinstalled versions
 : "${NCCL:="v2.23.4-1"}"
 : "${MODS:="v0.4.0"}"
-: "${PYTORCH:="2.8.0"}"
+# : "${PYTORCH:="2.8.0"}"
+: "${PYTORCH:="nightly"}"
 : "${PYTHON:="3.12"}"
 : "${FLASH_ATTENTION:=">=2.6.0"}"
 
@@ -170,7 +171,7 @@ else
 fi
 . /opt/modalities_venv/bin/activate
 
-uv pip install --upgrade pip setuptools wheel packaging ninja
+uv pip install --upgrade pip setuptools wheel packaging ninja psutil
 
 # ---- PyTorch (optional) ----
 if [ -n "${PYTORCH}" ]; then
@@ -233,7 +234,7 @@ echo "=== Running image self-test ==="
 
 fail=0
 
-# Expected versions baked in at build time
+# Check if installed software versions match expected
 # Python version check
 if [ -n "${PYTHON}" ]; then
   got_py=\$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))' 2>/dev/null || echo "missing")
@@ -255,9 +256,18 @@ except Exception as e:
     print("PyTorch import failed:", e)
     raise SystemExit(1)
 got=torch.__version__
-if not got.startswith("${PYTORCH}"):
-    print(f"PyTorch MISMATCH (got {got} expected prefix ${PYTORCH})")
+
+pytorch_mismatch=False
+if "${PYTORCH}" == "nightly":
+  if not "dev" in got:
+    pytorch_mismatch=True
+elif not got.startswith("${PYTORCH}"):
+  pytorch_mismatch=True
+
+if pytorch_mismatch:
+    print(f"PyTorch MISMATCH (got {got} expected ${PYTORCH})")
     raise SystemExit(1)
+
 print("PyTorch OK", got)
 PY
 PYTORCH_EXIT=$?
@@ -278,7 +288,7 @@ got=getattr(fa,"__version__","unknown")
 if re.search(r'[<>=]', exp):
     print(f"FlashAttention OK (got {got}, spec {exp})")
 else:
-    if not got.startswith(\$exp):
+    if not got.startswith(exp):
         print(f"FlashAttention MISMATCH (got {got} expected prefix {exp})")
         raise SystemExit(1)
     print("FlashAttention OK", got)
