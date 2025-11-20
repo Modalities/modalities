@@ -13,6 +13,8 @@ class TextInferenceComponent:
         self,
         model: nn.Module,
         tokenizer: TokenizerWrapper,
+        system_prompt_path: str,
+        chat_template: str,
         prompt_template: str,
         sequence_length: int,
         temperature: float,
@@ -24,10 +26,28 @@ class TextInferenceComponent:
         self.model.eval()
         self.tokenizer = tokenizer
         self.eod_token = eod_token
+        self.chat_template = chat_template
         self.prompt_template = prompt_template
         self.temperature = temperature
         self.sequence_length = sequence_length
         self.device = device
+        self.system_prompt = self._load_system_prompt(system_prompt_path)
+
+    def _load_system_prompt(self, system_prompt_path: str) -> str:
+        if not system_prompt_path:
+            print("ℹ️  No system prompt file specified")
+            return ""
+        try:
+            with open(system_prompt_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+            print(f"✅ Loaded system prompt from: {system_prompt_path}")
+            return content
+        except FileNotFoundError:
+            print(f"⚠️  System prompt file not found: {system_prompt_path}, using empty prompt")
+            return ""
+        except Exception as e:
+            print(f"❌ Error loading system prompt: {e}, using empty prompt")
+            return ""
 
     def generate_tokens(
         self,
@@ -38,11 +58,15 @@ class TextInferenceComponent:
         input_token_ids = torch.IntTensor(token_ids_list).to(self.device).unsqueeze(0)
         input_dict = {"input_ids": input_token_ids}
 
-        print("--------------------PROMPT--------------------")
+        print("\n" + "=" * 60)
+        print("🤖 PROMPT")
+        print("=" * 60)
         context_decoded = self.tokenizer.decode(token_ids_list)
-        print("Prompt: ", context_decoded, end="")
+        print(context_decoded)
 
-        print("\n\n--------------------OUTPUT--------------------\n")
+        print("\n" + "=" * 60)
+        print("💬 RESPONSE")
+        print("=" * 60)
         generated_token_ids = []
         generated_text_old = ""
         for _ in range(max_new_tokens):
@@ -61,7 +85,8 @@ class TextInferenceComponent:
             generated_text_new = self.tokenizer.decode(generated_token_ids)
 
             if idx_next_str == self.eod_token:
-                print("\n<reached end of document token>", end="")
+                print("\n\n" + "─" * 40)
+                print("✅ Reached end of document token")
                 break
             else:
                 diff_text = generated_text_new[len(generated_text_old) :]
@@ -71,14 +96,51 @@ class TextInferenceComponent:
                 token_ids_list.append(token_id)
                 input_token_ids = torch.IntTensor(token_ids_list).to(self.device).unsqueeze(0)
                 input_dict = {"input_ids": input_token_ids}
-        print("\n max tokens reached", end="")
+        else:
+            print("\n\n" + "─" * 40)
+            print("⚠️  Maximum tokens reached")
 
     def run(self):
-        prompt = TextInferenceComponent._get_prompt(self.prompt_template)
-        try:
-            self.generate_tokens(context=prompt)
-        except KeyboardInterrupt:
-            print("closing app...")
+        print("\n" + "🚀 Modalities Chat Interface ".center(60, "="))
+        print("=" * 60)
+
+        while True:
+            try:
+                user_prompt = self._get_prompt(self.prompt_template)
+                full_prompt = self.chat_template.format(system_prompt=self.system_prompt, user_prompt=user_prompt)
+
+                temp_input = input("\n🌡️  Enter temperatures (comma-separated) or press Enter for default [0.8]: ")
+
+                if not temp_input.strip():
+                    temperatures = [0.8]
+                    print("Using default temperature: 0.8")
+                else:
+                    try:
+                        temperatures = [float(t.strip()) for t in temp_input.split(",")]
+                        if not temperatures:
+                            raise ValueError("No temperatures provided.")
+                    except ValueError:
+                        print("\n❌ Invalid input. Please enter comma-separated numbers or press Enter for default.\n")
+                        continue
+
+                for i, temp in enumerate(temperatures):
+                    if len(temperatures) > 1:
+                        print(f"\n\n{'🎯 GENERATION ' + str(i+1) + f' (Temperature: {temp})'.center(60, '=')}")
+                    else:
+                        print(f"\n\n{'🎯 GENERATING (Temperature: ' + str(temp) + ')'.center(60, '=')}")
+                    self.temperature = temp
+                    try:
+                        self.generate_tokens(context=full_prompt)
+                    except KeyboardInterrupt:
+                        print("\n\n👋 Generation interrupted by user.")
+                        continue
+
+                print("\n\n" + "🏁 ALL GENERATIONS COMPLETE".center(60, "="))
+                print("=" * 60)
+
+            except KeyboardInterrupt:
+                print("\n\n👋 Closing app... Goodbye!")
+                break
 
     @staticmethod
     def _get_prompt(template: str) -> str:
