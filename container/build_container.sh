@@ -7,14 +7,15 @@ NEMO="24.12"
 
 # optional versions, leave empty for preinstalled versions
 : "${NCCL:="v2.23.4-1"}"
-: "${MODS:="v0.4.0"}"
+: "${MODALITIES:="v0.4.0"}"
+: "${TORCHTITAN:="main"}"
 # : "${PYTORCH:="2.8.0"}"
 : "${PYTORCH:="nightly"}"
 : "${PYTHON:="3.12"}"
 : "${FLASH_ATTENTION:=">=2.6.0"}"
 
 # : "${NCCL:=}"
-# : "${MODS:=}"
+# : "${MODALITIES:=}"
 # : "${PYTORCH:=}"
 # : "${PYTHON:=}"
 # : "${FLASH_ATTENTION:=}"
@@ -38,7 +39,7 @@ tag_or_stock() {
 # --- Derived ---
 BASE="nvcr.io/nvidia/nemo:${NEMO}"
 name="image"
-for var in NEMO PYTORCH PYTHON NCCL MODS FLASH_ATTENTION; do
+for var in NEMO PYTORCH PYTHON NCCL MODALITIES FLASH_ATTENTION; do
   prefix=$(printf '%s' "$var" | tr 'A-Z' 'a-z')
   # Indirect expansion (POSIX): put value of $var into val (empty if unset)
   eval "val=\${$var-}"
@@ -113,6 +114,8 @@ echo_installed_versions() {
   python -c 'import torch; print("PyTorch:", torch.__version__)' 2>/dev/null || echo "PyTorch: not installed"
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
   python -c 'import torch; print("Torch NCCL:", getattr(getattr(torch, "cuda", None), "nccl", None) and torch.cuda.nccl.version() or "not available")' 2>/dev/null || echo "Torch NCCL: not available"
+  pip list | awk '\$1 == "modalities" {print "Modalities:", \$2}' || echo "Modalities: not installed"
+  python -c 'import torchtitan; print("torchtitan:", torchtitan.__version__)' 2>/dev/null || echo "torchtitan: not installed"
   . $get_nccl_version_f
   echo "System NCCL: \$(get_nccl_version || echo not installed)"
   echo "CUDA: \$(get_cuda_version || echo not installed)"
@@ -201,12 +204,21 @@ if [ -n "${PYTORCH}" ]; then
   fi
 fi
 
+# ---- Torchtitan ----
+rm -rf /tmp/torchtitan
+git clone https://github.com/pytorch/torchtitan.git /tmp/torchtitan
+cd /tmp/torchtitan
+git checkout "${TORCHTITAN}"
+uv pip install .
+cd /
+rm -rf /tmp/torchtitan
+
 # ---- Modalities (optional) ----
-if [ -n "${MODS}" ]; then
+if [ -n "${MODALITIES}" ]; then
   rm -rf /tmp/modalities
   git clone https://github.com/Modalities/modalities.git /tmp/modalities
   cd /tmp/modalities
-  git checkout "${MODS}"
+  git checkout "${MODALITIES}"
   uv pip install .
   cd /
   rm -rf /tmp/modalities
