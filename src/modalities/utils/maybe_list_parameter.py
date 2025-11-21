@@ -46,7 +46,7 @@ def maybe_list_parameter(
             raise ValueError(f"Parameter '{parameter_name}' not found in function '{func.__name__}' signature.")
 
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R1 | list[R1] | R2:
+        def maybe_list_parameter_wrapper(*args: P.args, **kwargs: P.kwargs) -> R1 | list[R1] | R2:
             # Obtain value (positional or kw)
             if parameter_name in kwargs:
                 param_value: T | list[T] = kwargs[parameter_name]
@@ -80,6 +80,6 @@ def maybe_list_parameter(
                 return apply_to_list_input_and_result(param_value, results)
             return results
 
-        return cast(MaybeListWrappedFunc, wrapper)
+        return cast(MaybeListWrappedFunc, maybe_list_parameter_wrapper)
 
     return decorator
