@@ -158,8 +158,24 @@ if [ -n "${NCCL}" ]; then
 fi
 
 # ---- uv + venv + PyTorch ----
+mkdir -p /usr/local/uv
+export UV_INSTALL_DIR=/usr/local/uv
+export UV_PYTHON_INSTALL_DIR=/usr/local/uv/python
+export UV_CACHE_DIR=/usr/local/uv/cache
 curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="/root/.local/bin:\$PATH"
+
+# Preserve executables
+chmod 755 /usr/local/uv/uv /usr/local/uv/uvx
+
+# Reasonable perms for rest
+find /usr/local/uv -type d -exec chmod 755 {} \;
+find /usr/local/uv -type f ! -name 'uv' ! -name 'uvx' -exec chmod 644 {} \;
+
+# Symlink (optional)
+ln -sf /usr/local/uv/uv /usr/local/bin/uv
+
+# Correct PATH (no /bin subdir)
+export PATH="/usr/local/uv:/usr/local/bin:\${PATH}"
 export UV_LINK_MODE=copy
 export UV_VENV_CLEAR=1
 
@@ -226,11 +242,14 @@ echo "=== Installed versions after updates ==="
 echo_installed_versions
 echo "================================="
 
+%environment
+export PATH="/opt/modalities_venv/bin:/usr/lib/x86_64-linux-gnu/openmpi/bin:\${PATH}"
+export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/openmpi/lib:\${LD_LIBRARY_PATH}"
+
 %test
 set -eu
 echo "=== Running image self-test ==="
 # Activate venv if it exists
-[ -d /opt/modalities_venv ] && . /opt/modalities_venv/bin/activate || true
 
 fail=0
 
