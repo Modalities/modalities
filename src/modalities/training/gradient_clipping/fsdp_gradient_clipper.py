@@ -102,7 +102,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
 
     def __init__(
         self,
-        wrapped_model: FSDP2,
+        wrapped_model_or_parts: FSDP2 | list[FSDP2],
         norm_type: GradientClippingMode,
         device_mesh: Optional[DeviceMesh] = None,
         error_if_nonfinite: bool = False,
@@ -126,7 +126,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Returns:
             None
         """
-        self.wrapped_model = wrapped_model
+        self.models = wrapped_model_or_parts if isinstance(wrapped_model_or_parts, list) else [wrapped_model_or_parts]
         self.norm_type = norm_type
         self.device_mesh = device_mesh
         self.error_if_nonfinite = error_if_nonfinite
@@ -140,7 +140,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Returns:
             torch.Tensor: The gradient norms.
         """
-        grads = [p.grad for p in self.wrapped_model.parameters() if p.grad is not None]
+        grads = [p.grad for model in self.models for p in model.parameters() if p.grad is not None]
         total_norm = torch.nn.utils.get_total_norm(
             tensors=grads,
             norm_type=self.norm_type.value,
@@ -176,7 +176,7 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
 
     def __init__(
         self,
-        wrapped_model: FSDP2,
+        wrapped_model_or_parts: FSDP2 | list[FSDP2],
         max_norm: float,
         norm_type: GradientClippingMode,
         device_mesh: Optional[DeviceMesh] = None,
@@ -203,7 +203,7 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
             None
         """
         super().__init__(
-            wrapped_model=wrapped_model,
+            wrapped_model_or_parts=wrapped_model_or_parts,
             norm_type=norm_type,
             device_mesh=device_mesh,
             error_if_nonfinite=error_if_nonfinite,
@@ -220,10 +220,11 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
             torch.Tensor: The gradient norm after clipping.
         """
         total_norm = super().clip_gradients()
-        torch.nn.utils.clip_grads_with_norm_(
-            parameters=self.wrapped_model.parameters(),
-            max_norm=self.max_norm,
-            total_norm=total_norm,
-            foreach=self.foreach,
-        )
+        for model in self.models:
+            torch.nn.utils.clip_grads_with_norm_(
+                parameters=model.parameters(),
+                max_norm=self.max_norm,
+                total_norm=total_norm,
+                foreach=self.foreach,
+            )
         return total_norm

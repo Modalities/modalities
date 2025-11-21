@@ -180,7 +180,7 @@ class TestFSDP2DCPCheckpointing:
         prediction_key = gpt2_model_config_dict["model_raw"]["config"]["prediction_key"]
 
         # save the initial model and optimizer state dicts
-        untrained_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
+        untrained_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model_parts)
         untrained_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
 
         # run backward pass
@@ -195,14 +195,14 @@ class TestFSDP2DCPCheckpointing:
         else:
             loss_0 = CheckpointingTestUtils.forward_backward_pass(
                 prediction_key=prediction_key,
-                model=app_state1.model,
+                model=app_state1.model_parts,
                 optimizer=app_state1.optimizer,
                 batch_input_ids_dict=batch_input_ids_dict,
                 batch_target_ids=batch_target_ids,
             )
 
         # save the updated model and optimizer states for later comparisons
-        updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
+        updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model_parts)
         updated_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
 
         # checkpoint the model and optimizer before backward pass
@@ -248,7 +248,7 @@ class TestFSDP2DCPCheckpointing:
             checkpoint_dir_path=dcp_checkpoint_folder_path,
         )
 
-        loaded_and_updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model)
+        loaded_and_updated_model_parameters = CheckpointingTestUtils.clone_parameters(app_state1.model_parts)
         loaded_and_updated_optimizer_state_dict = deepcopy(app_state1.optimizer.state_dict())
 
         # perform another forward pass and backward pass for the previous and the loaded model
@@ -273,7 +273,7 @@ class TestFSDP2DCPCheckpointing:
         else:
             loss_1 = CheckpointingTestUtils.forward_backward_pass(
                 prediction_key=prediction_key,
-                model=app_state1.model,
+                model=app_state1.model_parts,
                 optimizer=app_state1.optimizer,
                 batch_input_ids_dict=batch_input_ids_dict,
                 batch_target_ids=batch_target_ids,
@@ -281,7 +281,7 @@ class TestFSDP2DCPCheckpointing:
 
             loss_2 = CheckpointingTestUtils.forward_backward_pass(
                 prediction_key=prediction_key,
-                model=app_state2.model,
+                model=app_state2.model_parts,
                 optimizer=app_state2.optimizer,
                 batch_input_ids_dict=batch_input_ids_dict,
                 batch_target_ids=batch_target_ids,
@@ -291,6 +291,29 @@ class TestFSDP2DCPCheckpointing:
             assert loss_1 < loss_0, f"loss_1 = {loss_1} is not less than loss_0 = {loss_0}"
 
         # check that the model and optimizer states after each backward pass are as expected
+        TestFSDP2DCPCheckpointing._check_states_match_as_expected(
+            app_state1,
+            app_state2,
+            untrained_model_parameters,
+            untrained_optimizer_state_dict,
+            updated_model_parameters,
+            updated_optimizer_state_dict,
+            loaded_and_updated_model_parameters,
+            loaded_and_updated_optimizer_state_dict,
+        )
+
+    @staticmethod
+    def _check_states_match_as_expected(
+        app_state1: AppState,
+        app_state2: AppState,
+        untrained_model_parameters: list[torch.Tensor],
+        untrained_optimizer_state_dict: dict,
+        updated_model_parameters: list[torch.Tensor],
+        updated_optimizer_state_dict: dict,
+        loaded_and_updated_model_parameters: list[torch.Tensor],
+        loaded_and_updated_optimizer_state_dict: dict,
+        past_backward_pass: bool = False,
+    ) -> None:
         # model weights
         CheckpointingTestUtils.assert_equality_two_models(
             untrained_model_parameters, updated_model_parameters, must_be_equal=False
@@ -298,12 +321,12 @@ class TestFSDP2DCPCheckpointing:
         CheckpointingTestUtils.assert_equality_two_models(
             loaded_and_updated_model_parameters, updated_model_parameters, must_be_equal=True
         )
-        CheckpointingTestUtils.assert_equality_two_models(
-            app_state1.model.parameters(), app_state2.model.parameters(), must_be_equal=True
-        )
-        CheckpointingTestUtils.assert_equality_two_models(
-            app_state1.model.parameters(), updated_model_parameters, must_be_equal=False
-        )
+        for m1, m2 in zip(app_state1.model_parts, app_state2.model_parts):
+            CheckpointingTestUtils.assert_equality_two_models(m1.parameters(), m2.parameters(), must_be_equal=True)
+        if past_backward_pass:
+            CheckpointingTestUtils.assert_equality_two_models(
+                [m.parameters() for m in app_state1.model_parts], updated_model_parameters, must_be_equal=False
+            )
 
         # param groups
         CheckpointingTestUtils.assert_equality_optimizer_param_group(
@@ -322,6 +345,7 @@ class TestFSDP2DCPCheckpointing:
         CheckpointingTestUtils.assert_equality_optimizer_state(
             app_state1.optimizer.state_dict(), app_state2.optimizer.state_dict(), must_be_equal=True
         )
-        CheckpointingTestUtils.assert_equality_optimizer_state(
-            app_state1.optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False
-        )
+        if past_backward_pass:
+            CheckpointingTestUtils.assert_equality_optimizer_state(
+                app_state1.optimizer.state_dict(), updated_optimizer_state_dict, must_be_equal=False
+            )

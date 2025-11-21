@@ -1,9 +1,17 @@
-from typing import Annotated
+import warnings
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticPytorchModuleType
+from modalities.config.pydantic_if_types import (
+    PydanticDeviceMeshIFType,
+    PydanticPytorchModuleOrListType,
+    PydanticPytorchModuleType,
+)
 from modalities.training.gradient_clipping.fsdp_gradient_clipper import GradientClippingMode
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger("fsdp_gradient_clipper_config")
 
 
 class FSDP1GradientClipperConfig(BaseModel):
@@ -45,8 +53,19 @@ class FSDP2GradientClipperConfig(BaseModel):
 
     max_norm: Annotated[float, Field(strict=True, gt=0)]
     norm_type: GradientClippingMode
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model_or_parts: PydanticPytorchModuleOrListType = Field(alias="wrapped_model")
     device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_deprecated_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "wrapped_model" in data:
+            warnings.warn(
+                "Field 'wrapped_model' is deprecated. Use 'wrapped_model_or_parts' instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        return data
 
 
 class FSDP1DummyGradientClipperConfig(BaseModel):
@@ -81,6 +100,17 @@ class FSDP2DummyGradientClipperConfig(BaseModel):
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model_or_parts: PydanticPytorchModuleOrListType = Field(alias="wrapped_model")
     norm_type: GradientClippingMode
     device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_deprecated_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "wrapped_model" in data:
+            warnings.warn(
+                "Field 'wrapped_model' is deprecated. Use 'wrapped_model_or_parts' instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        return data

@@ -17,6 +17,7 @@ from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, Pydant
 from modalities.models.gpt2.gpt2_model import TransformerMLP
 from modalities.models.model import SwiGLU
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
+from tests.utility import find_free_port
 
 
 def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir: Path) -> Path:
@@ -34,7 +35,7 @@ def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir:
 
 
 @pytest.fixture
-def tmp_config_dir(tmp_path_factory) -> Path:
+def tmp_config_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return tmp_path_factory.mktemp("patched_configs")
 
 
@@ -55,19 +56,17 @@ class TestTensorParallelism:
         return components.model, components.device_mesh
 
     @pytest.mark.parametrize(
-        "activation_type, fsdp2_config_path, tp_config_path, port",
+        "activation_type, fsdp2_config_path, tp_config_path",
         [
             (
                 "gelu",
                 Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
-                22235,
             ),
             (
                 "swiglu",
                 Path("tests/fsdp2_parallelization/tp_test_configs/fsdp2_config.yaml"),
                 Path("tests/fsdp2_parallelization/tp_test_configs/tp_config.yaml"),
-                22246,
             ),
         ],
     )
@@ -77,9 +76,9 @@ class TestTensorParallelism:
         fsdp2_config_path: Path,
         tp_config_path: Path,
         tmp_config_dir: Path,
-        port: int,
     ):
         world_size = 4
+        port = find_free_port()
         mp.spawn(
             self._test_tp_sharding_impl,
             args=(activation_type, fsdp2_config_path, tp_config_path, world_size, tmp_config_dir, port),

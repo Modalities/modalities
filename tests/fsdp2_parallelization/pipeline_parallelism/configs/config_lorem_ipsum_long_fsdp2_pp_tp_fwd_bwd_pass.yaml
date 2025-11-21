@@ -38,7 +38,7 @@ scheduled_pipeline:
     loss_fn:
       instance_key: loss_fn
       pass_type: BY_REFERENCE
-    pp_schedule_name: gpipe
+    pp_schedule_name: Interleaved1F1B
     batch_size: ${settings.step_profile.local_train_micro_batch_size}
     microbatch_size: 2
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
@@ -111,7 +111,7 @@ staged_pipeline:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
     local_rank: ${settings.cuda_env.local_rank}
-    pp_schedule_name: gpipe
+    pp_schedule_name: ${scheduled_pipeline.config.pp_schedule_name}
     num_layers_per_stage: 4
 
 initialized_model:

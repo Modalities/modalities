@@ -123,7 +123,7 @@ def test_fsdp2_gradient_clipper():
 
     max_norm = 1.0
     norm_type = GradientClippingMode.P2_NORM
-    clipper = FSDP2GradientClipper(wrapped_model=mock_model, max_norm=max_norm, norm_type=norm_type)
+    clipper = FSDP2GradientClipper(wrapped_model_or_parts=mock_model, max_norm=max_norm, norm_type=norm_type)
 
     # Call clip_gradients
     norm = clipper.clip_gradients()
@@ -144,7 +144,7 @@ def test_fsdp2_logging_only_gradient_clipper():
     mock_model = MockFSDPModel()
 
     norm_type = GradientClippingMode.P2_NORM
-    clipper = FSDP2LoggingOnlyGradientClipper(wrapped_model=mock_model, norm_type=norm_type)
+    clipper = FSDP2LoggingOnlyGradientClipper(wrapped_model_or_parts=mock_model, norm_type=norm_type)
 
     # Call clip_gradients
     norm = clipper.clip_gradients()
@@ -195,7 +195,7 @@ def test_pipeline_parallelized_clipping_equivalent_to_single_stage_clipping():
 
         # perform clipping on the full model (single-stage)
         FSDP2GradientClipper(
-            wrapped_model=full,
+            wrapped_model_or_parts=full,
             max_norm=max_norm,
             norm_type=GradientClippingMode.P2_NORM,
             device_mesh=None,
@@ -298,7 +298,7 @@ def _worker(rank: int, world_size: int, store_path: str, port: int, max_norm: fl
 
     # call the clipping function which will perform all_reduce across the pp group
     FSDP2GradientClipper(
-        wrapped_model=part,
+        wrapped_model_or_parts=part,
         max_norm=max_norm,
         norm_type=GradientClippingMode.P2_NORM,
         device_mesh=mesh,

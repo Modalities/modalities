@@ -41,6 +41,6 @@ class ComponentSelectorFromPipelineConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    pp_stage: PydanticPipelineStageType
-    model_part: PydanticPytorchModuleType
+    pp_stages: list[PydanticPipelineStageType] = Field(alias="pp_stage")
+    model_parts: list[PydanticPytorchModuleType] = Field(alias="model_part")
     pp_schedule: PydanticPipelineType | None = None

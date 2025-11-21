@@ -14,7 +14,7 @@ class StagesGenerator(ABC):
 
     def get_stages(self, num_layers_per_stage: int, pp_dims: int) -> list[list[str]]:
         """
-        Generate FQNs for each stage in a GPT-2 model.
+        Generate FQNs for each stage in a model.
 
         Args:
             num_layers_per_stage (int): Number of layers per stage.
@@ -34,13 +34,6 @@ class StagesGenerator(ABC):
                 f"Number of virtual stages {num_virtual_stages} is not divisible by parallel dimensions {pp_dims}. "
                 f"For reference: {self._num_model_layers=} {self._input_layer_equivalence=} "
                 f"{self._output_layer_equivalence=} {num_layers_per_stage=}"
-            )
-
-        stages_per_rank = num_virtual_stages // pp_dims
-        if stages_per_rank != 1:
-            raise ValueError(
-                f"Stages per rank {stages_per_rank} must be 1 for single-stage schedules. "
-                f"Please adjust {num_layers_per_stage=} to ensure each PP rank has exactly one stage."
             )
 
         # Potential split points for GPT-2 model with each potential split point
@@ -112,7 +105,10 @@ class GPT2LLMStagesGenerator(StagesGenerator):
         # The computational weight of the input and output modules are estimated
         # based on the number of layers they correspond to.
         potential_split_points = [
-            (["transformer.wte", "transformer.wpe", "transformer.drop"], self._input_layer_equivalence),
+            (  # FIXME wpe and drop probably should not get the higher weight
+                ["transformer.wte", "transformer.wpe", "transformer.drop"],
+                self._input_layer_equivalence,
+            ),
             *[([f"transformer.h.{i}"], 1) for i in range(self._num_model_layers)],
             (["transformer.lm_head_norm", "transformer.lm_head"], self._output_layer_equivalence),
         ]
