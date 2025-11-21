@@ -189,7 +189,7 @@ class ModelFactory:
             f"{get_local_number_of_trainable_parameters(model)}"
         )
         # map the block names to the actual block class (e.b., GPT2Block)
-        block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
+        block_types = tuple([t for b in block_names if (t := get_module_class_from_name(model, b)) is not None])
 
         mp_policy = MixedPrecisionPolicy(
             param_dtype=mixed_precision_settings.param_dtype.value,

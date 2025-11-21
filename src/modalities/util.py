@@ -330,9 +330,10 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
     if module.__class__.__name__ == name:
         return module.__class__
     elif len(modules_children) == 0:
-        return
+        return None
     else:
         for child_module in modules_children:
             module_class = get_module_class_from_name(child_module, name)
             if module_class is not None:
                 return module_class
+        return None
