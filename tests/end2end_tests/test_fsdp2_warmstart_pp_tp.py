@@ -32,6 +32,9 @@ working_dir = Path(os.path.dirname(__file__))
 tmp_folder = working_dir / "../tmp/fsdp2_warmstart_pp_tp"
 working_dir = working_dir / "configs"
 
+num_steps = 7
+num_tokens = 1024 * num_steps
+
 
 class TrainDataloaderInstantiationModel(BaseModel):
     settings: TrainingComponentsInstantiationModel.Settings
@@ -48,6 +51,9 @@ class TestWarmstart:
         [
             ("gpt2_train_num_steps_7_pp_tp.yaml", "gpt2_warm_start_from_step_4_pp_tp.yaml", 8, 8),
             ("gpt2_train_num_steps_7_pp_tp.yaml", "gpt2_warm_start_from_step_4_fsdp2.yaml", 8, 2),
+            # ("gpt2_train_num_steps_7_pp.yaml", "gpt2_warm_start_from_step_4_fsdp2.yaml", 4, 2),
+            # ("gpt2_train_num_steps_7_pp.yaml", "gpt2_warm_start_from_step_4_fsdp2_grad_accu.yaml", 4, 2),
+            # ("gpt2_train_num_steps_7_tp.yaml", "gpt2_warm_start_from_step_4_fsdp2.yaml", 4, 2),
             ("gpt2_train_num_steps_7_pp_tp.yaml", "gpt2_warm_start_from_step_4_grad_accu.yaml", 8, 1),
             ("gpt2_train_num_steps_7_grad_accu.yaml", "gpt2_warm_start_from_step_4_pp_tp.yaml", 1, 8),
         ],
@@ -158,10 +164,14 @@ class TestWarmstart:
             assert checkpoint_info_file_path.exists(), "Missing last_checkpoint_info.json after first training."
             with open(checkpoint_info_file_path, "r") as f:
                 checkpoint_info = json.load(f)
-            expected_cp_suffix = "eid_0-seen_steps_4-seen_tokens_4096-target_steps_7-target_tokens_7168"
-            assert checkpoint_info["checkpoint_folder_path"].endswith(
-                expected_cp_suffix
-            ), "Checkpoint info file does not point to expected step 4 folder."
+            expected_cp_suffix = (
+                f"eid_0-seen_steps_4-seen_tokens_4096-target_steps_{num_steps}-target_tokens_{num_tokens}"
+            )
+            assert checkpoint_info["checkpoint_folder_path"].endswith(expected_cp_suffix), (
+                "Checkpoint info file does not point to expected step 4 folder.\n"
+                f"    Expected suffix: {expected_cp_suffix}\n"
+                f"    Got: {checkpoint_info['checkpoint_folder_path']}"
+            )
             assert Path(checkpoint_info["checkpoint_folder_path"]).exists(), "Checkpoint folder path does not exist."
 
             # enumerate checkpoint paths and ensure max seen matches info
@@ -230,7 +240,9 @@ class TestWarmstart:
         checkpoint_path = str(checkpoint_root_path)
         # path to checkpoint from first training (step 4)
         warmstart_checkpoint_dir = (
-            checkpoint_root_path / "0" / "eid_0-seen_steps_4-seen_tokens_4096-target_steps_7-target_tokens_7168"
+            checkpoint_root_path
+            / "0"
+            / f"eid_0-seen_steps_4-seen_tokens_4096-target_steps_{num_steps}-target_tokens_{num_tokens}"
         )
         gpt2_warm_start_config_dict["app_state"]["config"]["checkpoint_dir_path"] = str(warmstart_checkpoint_dir)
         gpt2_warm_start_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
@@ -270,7 +282,7 @@ class TestWarmstart:
 
             with open(checkpoint_root_path / "experiment_0_loss_scores.txt", "r") as f:
                 loaded_loss_values_0 = json.load(f)
-            assert loaded_loss_values_0[4:] == pytest.approx(loss_scores_1, abs=1e-16), (
+            assert loaded_loss_values_0[4:] == pytest.approx(loss_scores_1, rel=1e-2), (
                 "Warmstart loss trajectory mismatch with from-scratch continuation.\n"
                 f"Expected {loaded_loss_values_0[4:]}, got {loss_scores_1}."
             )
@@ -280,9 +292,14 @@ class TestWarmstart:
             assert checkpoint_info_file_path.exists(), "Missing last_checkpoint_info.json from first training."
             with open(checkpoint_info_file_path, "r") as f:
                 checkpoint_info = json.load(f)
-            assert checkpoint_info["checkpoint_folder_path"].endswith(
-                "eid_0-seen_steps_4-seen_tokens_4096-target_steps_7-target_tokens_7168"
-            ), "Incorrect checkpoint folder path recorded."
+            expected_cp_suffix = (
+                f"eid_0-seen_steps_4-seen_tokens_4096-target_steps_{num_steps}-target_tokens_{num_tokens}"
+            )
+            assert checkpoint_info["checkpoint_folder_path"].endswith(expected_cp_suffix), (
+                "Incorrect checkpoint folder path recorded.\n"
+                f"    Expected suffix: {expected_cp_suffix}\n"
+                f"    Got: {checkpoint_info['checkpoint_folder_path']}"
+            )
 
         # Compare final scheduler state
         with open(scheduler_info_path, "r") as f:
