@@ -9,16 +9,9 @@ NEMO="24.12"
 : "${NCCL:="v2.23.4-1"}"
 : "${MODALITIES:="v0.4.0"}"
 : "${TORCHTITAN:="main"}"
-# : "${PYTORCH:="2.8.0"}"
-: "${PYTORCH:="nightly"}"
+: "${PYTORCH:="nightly"}" # or e.g. "2.8.0"
 : "${PYTHON:="3.12"}"
 : "${FLASH_ATTENTION:=">=2.6.0"}"
-
-# : "${NCCL:=}"
-# : "${MODALITIES:=}"
-# : "${PYTORCH:=}"
-# : "${PYTHON:=}"
-# : "${FLASH_ATTENTION:=}"
 
 # --- Helpers ---
 sanitize() {
@@ -53,11 +46,11 @@ echo "Using runner: $RUNNER"
 # Temp def file
 DEF_FILE="$(mktemp -t Container.XXXXXX.def)"
 cleanup() { rm -f "$DEF_FILE"; }
-# trap cleanup EXIT INT TERM TODO Comment in again
-echo "DEF_FILE is at: $DEF_FILE" # TODO remove
+trap cleanup EXIT INT TERM
 
-# Write shared helper functions inside container to the following path
+# Write shared helper function inside container to the following path
 get_nccl_version_f=/usr/local/bin/get_nccl_version.sh
+
 # --- Generate def file (host expands values; conditions become literals) ---
 cat >"$DEF_FILE" <<EOF
 Bootstrap: docker
