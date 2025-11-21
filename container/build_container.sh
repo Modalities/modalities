@@ -38,15 +38,6 @@ tag_or_stock() {
 
 # --- Derived ---
 BASE="nvcr.io/nvidia/nemo:${NEMO}"
-name="image"
-for var in NEMO PYTORCH PYTHON NCCL MODALITIES FLASH_ATTENTION; do
-  prefix=$(printf '%s' "$var" | tr 'A-Z' 'a-z')
-  # Indirect expansion (POSIX): put value of $var into val (empty if unset)
-  eval "val=\${$var-}"
-  name="${name}_${prefix}-$(tag_or_stock "$val")"
-done
-OUT="${name}.sif"
-echo "Building container: $OUT"
 
 # Pick runner
 if command -v apptainer >/dev/null 2>&1; then
@@ -115,7 +106,7 @@ echo_installed_versions() {
   python -c 'import flash_attn; import sys; print("FlashAttention:", getattr(flash_attn, "__version__", "unknown"))' 2>/dev/null || echo "FlashAttention: not installed"
   python -c 'import torch; print("Torch NCCL:", getattr(getattr(torch, "cuda", None), "nccl", None) and torch.cuda.nccl.version() or "not available")' 2>/dev/null || echo "Torch NCCL: not available"
   pip list | awk '\$1 == "modalities" {print "Modalities:", \$2}' || echo "Modalities: not installed"
-  python -c 'import torchtitan; print("torchtitan:", torchtitan.__version__)' 2>/dev/null || echo "torchtitan: not installed"
+  pip list | awk '\$1 == "torchtitan" {print "torchtitan:", \$2}' || echo "torchtitan: not installed"
   . $get_nccl_version_f
   echo "System NCCL: \$(get_nccl_version || echo not installed)"
   echo "CUDA: \$(get_cuda_version || echo not installed)"
@@ -351,5 +342,28 @@ exit \$fail
 EOF
 
 # --- Build ---
-"$RUNNER" build "$OUT" "$DEF_FILE" 2>&1 | tee -a "build_${name}.log"
-printf '✅ Built %s\n' "$OUT"
+hash=$(sha256sum "$DEF_FILE" | awk '{print $1}')
+OUT_DIR="output_${hash}"
+mkdir -p "$OUT_DIR"
+OUT_IMAGE="${OUT_DIR}/image_${hash}.sif"
+
+# Write versions.txt with set versions
+cat > "$OUT_DIR/versions_${hash}.txt" <<VERS
+NEMO=${NEMO}
+NCCL=${NCCL}
+MODALITIES=${MODALITIES}
+TORCHTITAN=${TORCHTITAN}
+PYTORCH=${PYTORCH}
+PYTHON=${PYTHON}
+FLASH_ATTENTION=${FLASH_ATTENTION}
+VERS
+
+echo "Building image: $OUT_IMAGE"
+"$RUNNER" build "$OUT_IMAGE" "$DEF_FILE" 2>&1 | tee -a "$OUT_DIR/build_${hash}.log"
+printf '✅ Built %s\n' "$OUT_IMAGE"
+
+# Move image and def file to output dir
+mv "$OUT_IMAGE" "$OUT_DIR/"
+mv "$DEF_FILE" "$OUT_DIR/image_${hash}.def"
+
+echo "All outputs are in $OUT_DIR"
