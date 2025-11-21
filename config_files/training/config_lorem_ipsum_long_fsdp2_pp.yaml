@@ -184,7 +184,7 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    pipeline_parallel_degree: 2
+    pipeline_parallel_degree: 4
     data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
 
@@ -241,7 +241,7 @@ scheduled_pipeline:
     loss_fn:
       instance_key: loss_fn
       pass_type: BY_REFERENCE
-    pp_schedule_name: gpipe
+    pp_schedule_name: Interleaved1F1B
     batch_size: ${settings.step_profile.local_train_micro_batch_size}
     microbatch_size: 2
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
@@ -308,7 +308,7 @@ staged_pipeline:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
     local_rank: ${settings.cuda_env.local_rank}
-    pp_schedule_name: gpipe
+    pp_schedule_name: ${scheduled_pipeline.config.pp_schedule_name}
     num_layers_per_stage: 2
 
 model_raw:
@@ -322,7 +322,7 @@ model_raw:
     sequence_length: ${settings.step_profile.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 2
+    n_layer: 6
     n_head_q: 8
     n_head_kv: 4
     ffn_hidden: 128
