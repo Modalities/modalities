@@ -2,8 +2,8 @@ from typing import Annotated, Any
 
 import torch
 import torch.nn as nn
-from pydantic import BeforeValidator, GetCoreSchemaHandler
-from pydantic_core import PydanticCustomError, core_schema
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import core_schema
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
@@ -49,16 +49,6 @@ class PydanticThirdPartyTypeIF:
         )
 
 
-def list_support_not_added(v: Any) -> Any:
-    """Validator that raises an error if a list is provided"""
-    if isinstance(v, list):
-        raise PydanticCustomError(
-            "list_support_not_added",
-            "A list of torch Modules was provided where only a single Module is supported.",
-        )
-    return v
-
-
 PydanticCheckpointSavingIFType = Annotated[CheckpointSaving, PydanticThirdPartyTypeIF(CheckpointSaving)]
 PydanticFSDP1CheckpointLoadingIFType = Annotated[
     FSDP1CheckpointLoadingIF, PydanticThirdPartyTypeIF(FSDP1CheckpointLoadingIF)
@@ -75,8 +65,6 @@ PydanticCheckpointSavingExecutionIFType = Annotated[
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
 PydanticPytorchModuleOrListType = PydanticPytorchModuleType | list[PydanticPytorchModuleType]
-# TODO: Probably not required; can be removed:
-PydanticPytorchModuleNotListType = Annotated[PydanticPytorchModuleType, BeforeValidator(list_support_not_added)]
 PydanticFSDP1ModuleType = Annotated[FSDP1, PydanticThirdPartyTypeIF(FSDP1)]
 PydanticFSDP2ModuleType = Annotated[FSDP2, PydanticThirdPartyTypeIF(FSDP2)]
 PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
