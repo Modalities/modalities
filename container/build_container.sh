@@ -231,6 +231,8 @@ export LD_LIBRARY_PATH="\$MPI_HOME/lib:\${LD_LIBRARY_PATH:-}"
 
 git clone --depth=1 https://github.com/NVIDIA/nccl-tests.git /nccl-tests
 cd /nccl-tests
+git checkout "${NCCL}"
+
 make -j"\$CORES" MPI=1 MPI_HOME="\$MPI_HOME"
 
 echo "=== Installed versions after updates ==="
