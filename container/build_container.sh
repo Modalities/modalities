@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eux
+#!/bin/bash
+set -euo pipefail
 
 # --- Config ---
 # required versions
@@ -12,6 +12,7 @@ NEMO="24.12"
 : "${PYTORCH:="nightly"}" # or e.g. "2.8.0"
 : "${PYTHON:="3.12"}"
 : "${FLASH_ATTENTION:=">=2.6.0"}"
+: "${NVCC_GENCODE:="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_90,code=sm_90"}"
 
 # --- Helpers ---
 sanitize() {
@@ -127,7 +128,7 @@ if [ -n "${NCCL}" ]; then
   cd /tmp/nccl
   git checkout "${NCCL}"
   # sm_80 + sm_90 are common for A100/H100; adjust as needed
-  make -j"\$CORES" NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_90,code=sm_90"
+  make -j"\$CORES" NVCC_GENCODE="${NVCC_GENCODE}"
 
   # Remove any existing NCCL libs (ignore if absent), then install
   rm -f "\$LIBDIR"/libnccl.so* "\$LIBDIR"/libnccl_static.a 2>/dev/null || :
