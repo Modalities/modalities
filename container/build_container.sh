@@ -339,8 +339,13 @@ OUT_DIR="output_${hash}"
 mkdir -p "$OUT_DIR"
 OUT_IMAGE="${OUT_DIR}/image_${hash}.sif"
 
+echo "Building image: $OUT_IMAGE"
+"$RUNNER" build "$OUT_IMAGE" "$DEF_FILE" 2>&1 | tee -a "$OUT_DIR/build_${hash}.log"
+printf '✅ Built %s\n' "$OUT_IMAGE"
+
 # Write versions.txt with set versions
-cat > "$OUT_DIR/versions_${hash}.txt" <<VERS
+OUT_VERSIONS="$OUT_DIR/versions_${hash}.txt"
+cat > "$OUT_VERSIONS" <<VERS
 NEMO=${NEMO}
 NCCL=${NCCL}
 MODALITIES=${MODALITIES}
@@ -349,10 +354,32 @@ PYTORCH=${PYTORCH}
 PYTHON=${PYTHON}
 FLASH_ATTENTION=${FLASH_ATTENTION}
 VERS
-
-echo "Building image: $OUT_IMAGE"
-"$RUNNER" build "$OUT_IMAGE" "$DEF_FILE" 2>&1 | tee -a "$OUT_DIR/build_${hash}.log"
-printf '✅ Built %s\n' "$OUT_IMAGE"
+# Append PyTorch runtime CUDA + NCCL (as seen inside container)
+if [ -n "${PYTORCH}" ]; then
+  $RUNNER exec "$OUT_IMAGE" /opt/modalities_venv/bin/python - <<PY 2>/dev/null >> "$OUT_VERSIONS" || {
+    echo "PYTORCH_CUDA=unknown" >> "${OUT_VERSIONS}"
+    echo "PYTORCH_NCCL=unknown" >> "${OUT_VERSIONS}"
+  }
+import torch
+cuda = getattr(torch.version, "cuda", "") or "unknown"
+try:
+    raw = torch.cuda.nccl.version()
+    if isinstance(raw, int):
+        maj = raw // 1000
+        min = (raw % 1000) // 100
+        pat = raw % 100
+        nccl = f"{maj}.{min}.{pat}"
+    else:
+        nccl = str(raw)
+except Exception:
+    nccl = "unknown"
+print(f"PYTORCH_CUDA={cuda}")
+print(f"PYTORCH_NCCL={nccl}")
+PY
+else
+  echo "PYTORCH_CUDA=not installed" >> "${OUT_VERSIONS}"
+  echo "PYTORCH_NCCL=not installed" >> "${OUT_VERSIONS}"
+fi
 
 # Move image and def file to output dir
 mv "$OUT_IMAGE" "$OUT_DIR/"
