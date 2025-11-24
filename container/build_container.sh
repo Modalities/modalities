@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -eux
 
 # --- Config ---
 # required versions
@@ -189,17 +189,16 @@ if [ -n "${PYTORCH}" ]; then
 fi
 
 # ---- Torchtitan ----
-rm -rf /tmp/torchtitan
-git clone https://github.com/pytorch/torchtitan.git /tmp/torchtitan
-cd /tmp/torchtitan
-git checkout "${TORCHTITAN}"
-uv pip install .
-cd /
-rm -rf /tmp/torchtitan
-
+if [ -n "${TORCHTITAN}" ]; then
+  git clone https://github.com/pytorch/torchtitan.git /tmp/torchtitan
+  cd /tmp/torchtitan
+  git checkout "${TORCHTITAN}"
+  uv pip install .
+  cd /
+  rm -rf /tmp/torchtitan
+fi
 # ---- Modalities (optional) ----
 if [ -n "${MODALITIES}" ]; then
-  rm -rf /tmp/modalities
   git clone https://github.com/Modalities/modalities.git /tmp/modalities
   cd /tmp/modalities
   git checkout "${MODALITIES}"
@@ -210,7 +209,6 @@ fi
 
 # ---- FlashAttention (optional) ----
 if [ -n "${FLASH_ATTENTION}" ]; then
-  # Avoid building when prebuilt wheels exist
   uv pip install "flash-attn${FLASH_ATTENTION}" --no-build-isolation
 fi
 
