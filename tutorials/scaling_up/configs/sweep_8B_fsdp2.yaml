@@ -265,6 +265,9 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 progress_subscriber:
   component_key: progress_subscriber
@@ -294,4 +297,7 @@ mfu_calculator:
     world_size: ${settings.cuda_env.world_size}
     wrapped_model:
       instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
       pass_type: BY_REFERENCE
