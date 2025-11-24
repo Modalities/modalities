@@ -183,9 +183,9 @@ if [ -n "${PYTORCH}" ]; then
   cuda_tag=\$(echo "\$cuda_version" | tr -d '.')
   if [ "${PYTORCH}" = "nightly" ]; then
     # Nightly builds have a different URL pattern
-    uv pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu"\$cuda_tag"
+    uv pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu"\$cuda_tag" --extra-index-url https://pypi.org/simple
   else
-    uv pip install torch==${PYTORCH} --index-url https://download.pytorch.org/whl/cu"\$cuda_tag"
+    uv pip install torch==${PYTORCH} --index-url https://download.pytorch.org/whl/cu"\$cuda_tag" --extra-index-url https://pypi.org/simple
   fi
 fi
 
