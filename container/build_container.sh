@@ -333,19 +333,9 @@ exit \$fail
 
 EOF
 
-# --- Build ---
-hash=$(sha256sum "$DEF_FILE" | awk '{print $1}')
-OUT_DIR="output_${hash}"
-mkdir -p "$OUT_DIR"
-OUT_IMAGE="${OUT_DIR}/image_${hash}.sif"
-
-echo "Building image: $OUT_IMAGE"
-"$RUNNER" build "$OUT_IMAGE" "$DEF_FILE" 2>&1 | tee -a "$OUT_DIR/build_${hash}.log"
-printf '✅ Built %s\n' "$OUT_IMAGE"
-
 # Write versions.txt with set versions
-OUT_VERSIONS="$OUT_DIR/versions_${hash}.txt"
-cat > "$OUT_VERSIONS" <<VERS
+tmp_versions="$(mktemp)"
+cat > "$tmp_versions" <<VERS
 NEMO=${NEMO}
 NCCL=${NCCL}
 MODALITIES=${MODALITIES}
@@ -354,9 +344,26 @@ PYTORCH=${PYTORCH}
 PYTHON=${PYTHON}
 FLASH_ATTENTION=${FLASH_ATTENTION}
 VERS
-# Append PyTorch runtime CUDA + NCCL (as seen inside container)
+
+# --- Output dirs/files ---
+# Hash of versions file for unique naming
+hash=$(sha256sum "$tmp_versions" | awk '{print $1}')
+OUT_DIR="output_${hash}"
+mkdir -p "$OUT_DIR"
+OUT_VERSIONS="$OUT_DIR/versions_${hash}.txt"
+mv "$tmp_versions" "$OUT_VERSIONS"
+
+# --- Build ---
+OUT_IMAGE="${OUT_DIR}/image_${hash}.sif"
+
+echo "Building image: $OUT_IMAGE"
+"$RUNNER" build "$OUT_IMAGE" "$DEF_FILE" 2>&1 | tee -a "$OUT_DIR/build_${hash}.log"
+printf '✅ Built %s\n' "$OUT_IMAGE"
+
+
+# Append PyTorch runtime CUDA + NCCL to versions file (as seen inside container)
 if [ -n "${PYTORCH}" ]; then
-  $RUNNER exec "$OUT_IMAGE" /opt/modalities_venv/bin/python - <<PY 2>/dev/null >> "$OUT_VERSIONS" || {
+  $RUNNER exec "$OUT_IMAGE" /opt/modalities_venv/bin/python - <<PY 2>/dev/null >> "${OUT_VERSIONS}" || {
     echo "PYTORCH_CUDA=unknown" >> "${OUT_VERSIONS}"
     echo "PYTORCH_NCCL=unknown" >> "${OUT_VERSIONS}"
   }
