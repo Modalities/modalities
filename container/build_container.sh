@@ -10,6 +10,7 @@ NEMO="24.12"
 : "${MODALITIES:="v0.4.0"}"
 : "${TORCHTITAN:="main"}"
 : "${PYTORCH:="nightly"}" # or e.g. "2.8.0"
+: "${NVSHMEM:="3.3.24"}" # only required for pytorch nightly
 : "${PYTHON:="3.12"}"
 : "${FLASH_ATTENTION:=">=2.6.0"}"
 : "${NVCC_GENCODE:="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_90,code=sm_90"}"
@@ -182,6 +183,9 @@ if [ -n "${PYTORCH}" ]; then
   cuda_version=\$(get_cuda_version)
   cuda_tag=\$(echo "\$cuda_version" | tr -d '.')
   if [ "${PYTORCH}" = "nightly" ]; then
+    if [ -n "${NVSHMEM}" ]; then
+      uv pip install nvidia-nvshmem-cu12==${NVSHMEM}
+    fi
     # Nightly builds have a different URL pattern
     uv pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu"\$cuda_tag" --extra-index-url https://pypi.org/simple
   else
