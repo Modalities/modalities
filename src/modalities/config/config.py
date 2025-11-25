@@ -508,7 +508,7 @@ def load_app_config_dict(
     """
 
     def cuda_env_resolver_fun(var_name: str) -> int:
-        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
+        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK", "LOCAL_WORLD_SIZE"]
         return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
 
     def modalities_env_resolver_fun(var_name: str, kwargs: dict[str, Any]) -> str | Path:
