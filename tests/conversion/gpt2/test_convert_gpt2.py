@@ -32,18 +32,18 @@ def converted_model(run_convert_gpt2: None, output_dir: Path) -> PreTrainedModel
 
 
 @pytest.fixture
-def run_convert_gpt2(gpt2_config_path: str, output_dir: Path):
-    convert_gpt2(gpt2_config_path, output_dir)
+def run_convert_gpt2(gpt2_config_path: Path, output_dir: Path):
+    convert_gpt2(str(gpt2_config_path), str(output_dir))
 
 
 @pytest.fixture
-def original_model(gpt2_config_path: str) -> GPT2LLM:
+def original_model(gpt2_config_path: Path) -> GPT2LLM:
     modalities_config = load_app_config_dict(gpt2_config_path)
     return get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
 
 
 @pytest.fixture
-def vocab_size(gpt2_config_path: str) -> int:
+def vocab_size(gpt2_config_path: Path) -> int:
     modalities_config = load_app_config_dict(gpt2_config_path)
     return modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
 
