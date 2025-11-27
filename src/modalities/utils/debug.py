@@ -2,6 +2,7 @@ import logging
 import os
 from contextlib import contextmanager
 from functools import partial
+from typing import Any
 
 import torch
 
@@ -38,16 +39,21 @@ def _detect_nan(
     module_path: str | None,
     target: torch.Tensor | list[torch.Tensor] | tuple[torch.Tensor, ...],
     target_name: str,
+    raise_exception: bool,
 ):
     if isinstance(target, (list, tuple)):
         if any(torch.isnan(o).any() for o in target if isinstance(o, torch.Tensor)):
             logger.error(f"NaN detected in {target_name} {module.__class__.__name__}")
             if module_path:
                 logger.error(f"Module path: {module_path}")
+            if raise_exception:
+                raise ValueError(f"NaN detected in {target_name} of module {module.__class__.__name__}")
     elif isinstance(target, torch.Tensor) and torch.isnan(target).any():
         logger.error(f"NaN detected in {target_name} {module.__class__.__name__}")
         if module_path:
             logger.error(f"Module path: {module_path}")
+        if raise_exception:
+            raise ValueError(f"NaN detected in {target_name} of module {module.__class__.__name__}")
 
 
 def debug_nan_hook(
@@ -55,13 +61,51 @@ def debug_nan_hook(
     input: torch.Tensor | tuple[torch.Tensor, ...],
     output: torch.Tensor | tuple[torch.Tensor, ...] | list[torch.Tensor],
     module_path: str | None = None,
+    raise_exception: bool = False,
 ):
     """Hook to detect NaN in forward pass"""
-    _detect_nan(module, module_path, input, "input")
-    _detect_nan(module, module_path, output, "output")
+    _detect_nan(module, module_path, target=input, target_name="input", raise_exception=raise_exception)
+    _detect_nan(module, module_path, target=output, target_name="output", raise_exception=raise_exception)
 
 
-def register_nan_hooks(model: torch.nn.Module):
+def register_nan_hooks(model: torch.nn.Module, raise_exception: bool = False):
     """Register NaN detection hooks on all modules"""
     for name, module in model.named_modules():
-        module.register_forward_hook(partial(debug_nan_hook, module_path=name))
+        module.register_forward_hook(partial(debug_nan_hook, module_path=name, raise_exception=raise_exception))
+
+
+def print_forward_hook(
+    module: torch.nn.Module,
+    input: torch.Tensor | tuple[torch.Tensor, ...] | list[torch.Tensor] | dict[str, Any],
+    output: torch.Tensor | tuple[torch.Tensor, ...] | list[torch.Tensor] | dict[str, Any],
+    module_path: str | None = None,
+):
+    """Hook to print input and output shapes during forward pass"""
+    if isinstance(input, (list, tuple)):
+        input_shapes = [inp.shape for inp in input if isinstance(inp, torch.Tensor)]
+    elif isinstance(input, torch.Tensor):
+        input_shapes = [input.shape]
+    else:
+        input_shapes = []
+
+    if isinstance(output, (list, tuple)):
+        output_shapes = [out.shape for out in output if isinstance(out, torch.Tensor)]
+    elif isinstance(output, torch.Tensor):
+        output_shapes = [output.shape]
+    else:
+        output_shapes = []
+
+    print(
+        f"Module: {module.__class__.__name__}, "
+        f"Path: {module_path}, "
+        f"Input shapes: {input_shapes}, "
+        f"Output shapes: {output_shapes}"
+    )
+    print(f">>> Input:\n{input}")
+    print(f">>> Output:\n{output}")
+
+
+def register_print_forward_hook(model: torch.nn.Module):
+    """Register print hooks on all modules"""
+    for name, module in model.named_modules():
+        module.register_forward_hook(partial(print_forward_hook, module_path=name))
