@@ -497,13 +497,14 @@ class ParallelDegreeConfig(BaseModel):
 # Recursive type representing arbitrary-depth YAML config structures.
 YAMLPrimitive = str | int | float | bool | None
 YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAMLValue"]
+ConfigDictType: TypeAlias = dict[str, YAMLValue]
 
 
 def load_app_config_dict(
     config_file_path: Path,
     experiment_id: Optional[str] = None,
     additional_resolver_funs: Optional[dict[str, Resolver]] = None,
-) -> dict[str, YAMLValue]:
+) -> ConfigDictType:
     """Load the application configuration from the given YAML file.
 
     Args:
@@ -512,7 +513,7 @@ def load_app_config_dict(
         additional_resolver_funs (dict[str, Resolver], optional): Additional resolver functions.
 
     Returns:
-        dict[str, YAMLValue]: Dictionary representation of the config file with arbitrary depth.
+        ConfigDictType: Dictionary representation of the config file with arbitrary depth.
     """
 
     def cuda_env_resolver_fun(var_name: str) -> int | str | None:
@@ -528,6 +529,7 @@ def load_app_config_dict(
     def node_env_resolver_fun(var_name: str) -> int | None:
         if var_name == "num_cpus":
             return os.cpu_count()
+        return None
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
     modalities_env_kwargs: dict[str, Any] = {
@@ -546,6 +548,17 @@ def load_app_config_dict(
             OmegaConf.register_new_resolver(resolver_name, resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
-    config_dict = cast(dict[str, YAMLValue], OmegaConf.to_container(cfg, resolve=True))
+    config_dict = cast(ConfigDictType, OmegaConf.to_container(cfg, resolve=True))
 
     return config_dict
+
+
+def save_yaml_config_dict(config_dict: ConfigDictType, output_file_path: Path) -> None:
+    """Saves the given config dictionary as a YAML file.
+
+    Args:
+        config_dict (ConfigDictType): Configuration dictionary to save.
+        output_file_path (Path): Path to the output YAML file.
+    """
+    cfg = OmegaConf.create(config_dict)
+    OmegaConf.save(cfg, output_file_path)
