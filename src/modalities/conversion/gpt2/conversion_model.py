@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from modalities.config.config import ConfigDictType
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.components.layer_norms import LayerNormConfig
@@ -10,13 +11,13 @@ from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
 
 
-def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, GPT2LLM]:
+def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM, GPT2LLM]:
     """Converts the modalities model to a Huggingface transformers model.
        Both the loaded modalities model and the converted Huggingface model are returned
        so that they can be compared.
 
     Args:
-        modalities_config (dict): Modalities config dictionary.
+        modalities_config (ConfigDictType): Modalities config dictionary.
 
     Returns:
         tuple[GPT2ForCausalLM, GPT2LLM]: Converted Hugging Face model and the original modalities model.
@@ -28,13 +29,13 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
     return hf_model, modalities_model
 
 
-def convert_model_config(modalities_config: dict) -> GPT2Config:
+def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
        For this the model_raw or model section of the modalities config is used.
        Corresponding entries are mapped to the Huggingface configuration.
 
     Args:
-        modalities_config (dict): Modalities config dictionary.
+        modalities_config (ConfigDictType): Modalities config dictionary.
 
     Returns:
         GPT2Config: Converted Huggingface model configuration.
@@ -85,14 +86,15 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
             modalities_logits = modalities_model(inputs)[modalities_model.prediction_key].to("cpu")
 
         assert llama_logits.shape == modalities_logits.shape
+        assert llama_logits.dtype == modalities_logits.dtype
         assert torch.equal(llama_logits, modalities_logits)
 
 
-def _check_conversion_criteria(model_config: dict) -> None:
+def _check_conversion_criteria(model_config: ConfigDictType) -> None:
     """Checks that the modalities config fulfills criteria necessary for conversion
 
     Args:
-        model_config (dict): model or model_raw part of the Modalities config dictionary.
+        model_config (ConfigDictType): model or model_raw part of the Modalities config dictionary.
 
     Returns:
         None
@@ -116,12 +118,12 @@ def _check_conversion_criteria(model_config: dict) -> None:
     ), "All norms must have the same eps setting."
 
 
-def _get_layer_norm_value(config: dict, field: str) -> bool | float | int:
+def _get_layer_norm_value(config: ConfigDictType, field: str) -> bool | float | int:
     default = LayerNormConfig.model_fields[field].default
     return config.get(field, default)
 
 
-def _map_attention_type(config: dict):
+def _map_attention_type(config: ConfigDictType) -> str:
     if config["attention_implementation"] == "pytorch_flash":
         attention_impl = "sdpa"
     elif config["attention_implementation"] == "manual":

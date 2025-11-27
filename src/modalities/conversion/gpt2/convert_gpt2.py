@@ -1,11 +1,12 @@
 """
 usage: convert_gpt2.py [-h] [--num_testruns NUM_TESTRUNS] [--device_modalities DEVICE_MODALITIES]
-                       [--device_hf DEVICE_HF] modalities_config output_dir
+                       [--device_hf DEVICE_HF] [--dcp] [--model_key MODEL_KEY]
+                       modalities_input output_dir
 
 Convert GPT-2 model checkpoint to Huggingface transformers format.
 
 positional arguments:
-  modalities_config     Path to the modalities config file.
+  modalities_input      Path to the modalities config file or the dcp checkpoint dir.
   output_dir            Directory to save the converted model.
 
 options:
@@ -16,19 +17,89 @@ options:
                         Device for the modalities model.
   --device_hf DEVICE_HF
                         Device for the Hugging Face model.
+  --dcp                 Indicates that the provided modalities checkpoint is in DCP format.
+  --model_key MODEL_KEY
+                        Key of the model configuration in the modalities config.
 """
 
 import argparse
 import logging
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from modalities.checkpointing.convert_dcp_to_torch import convert_dcp_to_torch
 from modalities.config.config import load_app_config_dict
 from modalities.conversion.gpt2.conversion_code import transfer_model_code
 from modalities.conversion.gpt2.conversion_model import check_converted_model, convert_model_checkpoint
 from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
 
 logger = logging.getLogger(__name__)
+
+
+def main():
+    _ensure_logging()
+
+    os.environ["LOCAL_RANK"] = "0"
+    os.environ["WORLD_SIZE"] = "1"
+    os.environ["RANK"] = "0"
+
+    parser = argparse.ArgumentParser(description="Convert GPT-2 model checkpoint to Huggingface transformers format.")
+    parser.add_argument(
+        "modalities_input", type=str, help="Path to the modalities config file or the dcp checkpoint dir."
+    )
+    parser.add_argument("output_dir", type=str, help="Directory to save the converted model.")
+    parser.add_argument("--num_testruns", type=int, default=0, help="Number of test runs to perform.")
+    parser.add_argument("--device_modalities", type=str, default="cpu", help="Device for the modalities model.")
+    parser.add_argument("--device_hf", type=str, default="cpu", help="Device for the Hugging Face model.")
+    parser.add_argument(
+        "--dcp", action="store_true", help="Indicates that the provided modalities checkpoint is in DCP format."
+    )
+    parser.add_argument(
+        "--model_key", type=str, default="model_raw", help="Key of the model configuration in the modalities config."
+    )
+
+    args = parser.parse_args()
+
+    logger.info("Starting GPT-2 conversion script...")
+    if args.dcp:
+        convert_gpt2_dcp(
+            args.modalities_input,
+            args.output_dir,
+            args.num_testruns,
+            args.device_modalities,
+            args.device_hf,
+            args.model_key,
+        )
+    else:
+        convert_gpt2(
+            args.modalities_input,
+            args.output_dir,
+            args.num_testruns,
+            args.device_modalities,
+            args.device_hf,
+        )
+
+
+def convert_gpt2_dcp(
+    distributed_cp_dir: str,
+    output_dir: str,
+    num_testruns: int = 0,
+    device_modalities: str = "cpu",
+    device_hf: str = "cpu",
+    model_key: str = "model_raw",
+) -> None:
+    with TemporaryDirectory() as temp_dir:
+        logger.info("Converting DCP checkpoint to standard PyTorch checkpoint...")
+        modalities_config_path = convert_dcp_to_torch(distributed_cp_dir, temp_dir, model_key=model_key)
+        logger.info("Converting standard PyTorch checkpoint to Huggingface transformers format...")
+        convert_gpt2(
+            modalities_config_path,
+            output_dir,
+            num_testruns,
+            device_modalities,
+            device_hf,
+        )
 
 
 def convert_gpt2(
@@ -77,10 +148,6 @@ def convert_gpt2(
     elif len(sentence_piece_tokenizer_configs) == 1:
         tokenizer_model = modalities_config["tokenizer"]["config"]["tokenizer_model_file"]
         bos_token_id, eos_token_id, pad_token_id, _ = convert_tokenizer(tokenizer_model, output_dir)
-        # The values bos=1, eos=2 and pad=None are set by default in the model config (as taken from Llama).
-        # Overwrite them, with the actual values from the internal SentencePiece tokenizer.
-        # Note, that the LlamaTokenizer wrapping around the SentencePiece tokenizer does not know about these values.
-        # The unk token id is not set in the model config.
         hf_model.config.bos_token_id = bos_token_id
         hf_model.config.eos_token_id = eos_token_id
         hf_model.config.pad_token_id = pad_token_id
@@ -95,24 +162,15 @@ def convert_gpt2(
     transfer_model_code(output_dir)
 
 
+def _ensure_logging():
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+
 if __name__ == "__main__":
-    os.environ["LOCAL_RANK"] = "0"
-    os.environ["WORLD_SIZE"] = "1"
-    os.environ["RANK"] = "0"
-
-    parser = argparse.ArgumentParser(description="Convert GPT-2 model checkpoint to Huggingface transformers format.")
-    parser.add_argument("modalities_config", type=str, help="Path to the modalities config file.")
-    parser.add_argument("output_dir", type=str, help="Directory to save the converted model.")
-    parser.add_argument("--num_testruns", type=int, default=0, help="Number of test runs to perform.")
-    parser.add_argument("--device_modalities", type=str, default="cpu", help="Device for the modalities model.")
-    parser.add_argument("--device_hf", type=str, default="cpu", help="Device for the Hugging Face model.")
-
-    args = parser.parse_args()
-
-    convert_gpt2(
-        args.modalities_config,
-        args.output_dir,
-        args.num_testruns,
-        args.device_modalities,
-        args.device_hf,
-    )
+    main()
