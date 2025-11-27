@@ -140,6 +140,8 @@ class RotaryTransform(QueryKeyValueTransform):
         self.reset_parameters()
 
     def reset_parameters(self):
+        # If previously initialized on or moved to a device, reuse that device.
+        # Otherwise, use the default device of the current environment.
         device = self.inv_freq.device if hasattr(self, "inv_freq") else None
         inv_freq = 1.0 / (
             self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
