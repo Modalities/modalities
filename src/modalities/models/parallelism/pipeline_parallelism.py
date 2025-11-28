@@ -298,9 +298,8 @@ class PipelineFactory:
         # TODO: Addd validation in config that batch_size is divisible by microbatch_size
         # and n_microbatches must be >= pp_degree
         n_microbatches = batch_size // microbatch_size
-        num_total_stages = pp_degree
-        pp_stage_or_stages = pipeline.pp_stages
-        pp_schedule = PipelineFactory._build_pp_schedule(loss_fn, pp_schedule_name, n_microbatches, pp_stage_or_stages)
+        num_total_stages = pp_degree * len(pipeline.pp_stages)
+        pp_schedule = PipelineFactory._build_pp_schedule(loss_fn, pp_schedule_name, n_microbatches, pipeline.pp_stages)
         logger.info(
             f"Using pipeline schedule {pp_schedule} with {n_microbatches} microbatches and {num_total_stages} stages."
         )
