@@ -89,6 +89,9 @@ def find_yaml_config_in_dir(directory: str) -> str | None:
     Returns:
         str | None: Path to the found YAML file or None if not found.
     """
+    if not os.path.isdir(directory) or not os.access(directory, os.R_OK):
+        # Directory does not exist or is not accessible
+        return None
     for filename in os.listdir(directory):
         if filename.endswith(".yaml") or filename.endswith(".yml"):
             return os.path.join(directory, filename)
