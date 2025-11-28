@@ -48,7 +48,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     """
     config_src: str | None = find_yaml_config_in_dir(dcp_checkpoint_dir)
     if config_src is None:
-        config_src = find_yaml_config_in_dir(os.path.join(dcp_checkpoint_dir, ".."))
+        config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
     if config_src is None:
         raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
