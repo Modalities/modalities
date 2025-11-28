@@ -13,6 +13,14 @@ from modalities.nn.model_initialization.composed_initialization import ComposedI
 from modalities.nn.model_initialization.parameter_name_filters import SupportWeightInitModels, WeightInitTypes
 
 
+def test_weights_on_expected_device_with_deferred_initialization():
+    with torch.device("meta"):
+        gpt2_model = _build_gpt2_model()
+    _assert_params_on_device(gpt2_model, "meta")
+    gpt2_model = _apply_initialization(gpt2_model)
+    _assert_params_on_device(gpt2_model, "cuda")
+
+
 def test_deferred_initialization_produces_same_weights_as_eager_initialization():
     with torch.device("cuda"):
         gpt2_model_eager = _build_gpt2_model()
@@ -35,6 +43,11 @@ def test_deferred_initialization_produces_same_weights_as_eager_initialization()
     ):
         assert name_eager == name_deferred, f"Buffer names do not match: {name_eager} != {name_deferred}"
         assert torch.allclose(buffer_eager, buffer_deferred), f"Buffers do not match for {name_eager}"
+
+
+def _assert_params_on_device(model: GPT2LLM, device: str):
+    for param in model.parameters():
+        assert param.device.type == device
 
 
 def _build_gpt2_model() -> GPT2LLM:
