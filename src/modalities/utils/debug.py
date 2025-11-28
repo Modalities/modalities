@@ -1,7 +1,6 @@
 import logging
 import os
 from contextlib import contextmanager
-from functools import partial
 from typing import Any
 
 import torch
@@ -68,17 +67,12 @@ def debug_nan_hook(
     _detect_nan(module, module_path, target=output, target_name="output", raise_exception=raise_exception)
 
 
-def register_nan_hooks(model: torch.nn.Module, raise_exception: bool = False):
-    """Register NaN detection hooks on all modules"""
-    for name, module in model.named_modules():
-        module.register_forward_hook(partial(debug_nan_hook, module_path=name, raise_exception=raise_exception))
-
-
 def print_forward_hook(
     module: torch.nn.Module,
     input: torch.Tensor | tuple[torch.Tensor, ...] | list[torch.Tensor] | dict[str, Any],
     output: torch.Tensor | tuple[torch.Tensor, ...] | list[torch.Tensor] | dict[str, Any],
     module_path: str | None = None,
+    print_shape_only: bool = False,
 ):
     """Hook to print input and output shapes during forward pass"""
     if isinstance(input, (list, tuple)):
@@ -101,11 +95,6 @@ def print_forward_hook(
         f"Input shapes: {input_shapes}, "
         f"Output shapes: {output_shapes}"
     )
-    print(f">>> Input:\n{input}")
-    print(f">>> Output:\n{output}")
-
-
-def register_print_forward_hook(model: torch.nn.Module):
-    """Register print hooks on all modules"""
-    for name, module in model.named_modules():
-        module.register_forward_hook(partial(print_forward_hook, module_path=name))
+    if not print_shape_only:
+        print(f">>> Input:\n{input}")
+        print(f">>> Output:\n{output}")

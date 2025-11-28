@@ -8,6 +8,7 @@ from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
+    PydanticDebuggingType,
     PydanticDeviceMeshIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
@@ -98,6 +99,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         training_target: TrainingTarget
         training_progress: TrainingProgress
         warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
+        debugging: Optional[PydanticDebuggingType] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
