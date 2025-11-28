@@ -76,7 +76,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     }
     torch_config["model"] = dcp_config[model_key]
     torch_config["model"]["config"]["use_meta_device"] = False
-    save_yaml_config_dict(torch_config, config_dst)
+    save_yaml_config_dict(torch_config, Path(config_dst))
     return config_dst
 
 
