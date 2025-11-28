@@ -14,6 +14,12 @@ from torch.optim.optimizer import ParamsT
 
 
 class OptimizersList(Optimizer, Stateful, list[Optimizer]):
+    """Class to handle multiple optimizers for different model parts.
+    Particular relevant for pipeline parallelism, where each stage has its own optimizer.
+    This class wraps a list of optimizers and provides a unified interface to step, zero_grad,
+    state_dict and load_state_dict.
+    """
+
     def __init__(self, model_parts: Iterable[nn.Module], optimizers: Iterable[Optimizer]):
         list.__init__(self, optimizers)
         self._model_parts = list(model_parts)
