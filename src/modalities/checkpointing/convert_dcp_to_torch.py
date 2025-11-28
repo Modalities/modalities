@@ -74,6 +74,8 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
             },
         },
     }
+    if model_key not in dcp_config:
+        raise KeyError(f"Model key '{model_key}' not found in config file '{config_src}'. Available keys: {list(dcp_config.keys())}")
     torch_config["model"] = dcp_config[model_key]
     torch_config["model"]["config"]["use_meta_device"] = False
     save_yaml_config_dict(torch_config, Path(config_dst))
