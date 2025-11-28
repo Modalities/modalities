@@ -12,10 +12,10 @@ from modalities.config.config import load_app_config_dict, save_yaml_config_dict
 
 
 def convert_dcp_to_torch(dcp_checkpoint_dir: str, output_dir: str, model_key: str = "model_raw") -> str:
-    """Converts a FSDP2 checkpoint to a standard PyTorch checkpoint.
+    """Converts a DCP (Distributed Checkpoint) checkpoint—including FSDP2, PP, or TP checkpoints—to a standard PyTorch checkpoint.
 
     Args:
-        dcp_checkpoint_dir (str): Directory containing the FSDP2 checkpoint files.
+        dcp_checkpoint_dir (str): Directory containing the DCP checkpoint files (may include FSDP2, PP, or TP).
         output_dir (str): Directory to save the converted PyTorch checkpoint.
         model_key (str): Key of the model configuration in the modalities config.
     Returns:
