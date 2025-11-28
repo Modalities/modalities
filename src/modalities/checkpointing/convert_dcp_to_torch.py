@@ -62,7 +62,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
                     "component_key": "checkpoint_loading",
                     "variant_key": "torch",
                     "config": {
-                        "device": 0,
+                        "device": "cpu",
                         "precision": "BF16",  # FIXME Should this be configurable?
                     },
                 },
