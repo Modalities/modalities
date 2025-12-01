@@ -11,6 +11,7 @@ from modalities.config.pydantic_if_types import (
     PydanticStagesGeneratorType,
 )
 from modalities.models.parallelism.pipeline_parallelism import PipelineSelectionTypes
+from modalities.utils.deprecated_alias import add_deprecated_alias
 
 
 class FQNsPerStageGeneratorConfig(BaseModel):  # TODO duplicate
@@ -40,7 +41,9 @@ class ComponentSelectorFromPipelineConfig(BaseModel):
     selection_type: PipelineSelectionTypes
 
 
+@add_deprecated_alias("pp_stages", "pp_stage")
+@add_deprecated_alias("model_parts", "model_part")
 class PipelineConfig(BaseModel):
-    pp_stages: list[PydanticPipelineStageType] = Field(alias="pp_stage")
-    model_parts: list[PydanticPytorchModuleType] = Field(alias="model_part")
+    pp_stages: list[PydanticPipelineStageType]
+    model_parts: list[PydanticPytorchModuleType]
     pp_schedule: PydanticPipelineType | None = None
