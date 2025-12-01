@@ -4,6 +4,7 @@ from typing import Any, Callable, Type
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
+from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import BatchSampler, DistributedSampler, SequentialSampler
 
@@ -136,8 +137,10 @@ from modalities.utils.number_conversion import (
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
 
 maybe_model_list: MaybeListDecorator[nn.Module, ..., Any, None] = maybe_list_parameter("model")
-maybe_model_list_for_optimizer = maybe_list_parameter("wrapped_model", apply_to_list_input_and_result=OptimizersList)
-maybe_optimizer_list: MaybeListDecorator[nn.Module, ..., LRScheduler, SchedulerList] = maybe_list_parameter(
+maybe_model_list_for_optimizer: MaybeListDecorator[nn.Module, ..., Optimizer, OptimizersList] = maybe_list_parameter(
+    "wrapped_model", apply_to_list_input_and_result=OptimizersList
+)
+maybe_optimizer_list: MaybeListDecorator[Optimizer, ..., LRScheduler, SchedulerList] = maybe_list_parameter(
     "optimizer", apply_to_list_result=SchedulerList
 )
 
