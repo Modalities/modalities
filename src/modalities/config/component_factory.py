@@ -1,6 +1,7 @@
 from typing import Any, Type, TypeVar
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel
+from pydantic.fields import FieldInfo
 
 from modalities.registry.registry import Registry
 from modalities.util import print_rank_0
@@ -177,11 +178,7 @@ class ComponentFactory:
         alias_to_field: dict[str, str] = {}
 
         for field_name, field in component_config_type.model_fields.items():
-            names_for_field = {field_name}
-            if field.alias and field.alias != field_name:
-                names_for_field.add(field.alias)
-                alias_to_field[field.alias] = field_name
-
+            names_for_field = self._parse_str_aliases(alias_to_field, field_name, field)
             if field.is_required():
                 required_keys.extend(names_for_field)
             else:
@@ -198,6 +195,22 @@ class ComponentFactory:
             message += f"Required keys (including aliases): {required_keys}\n"
             message += f"Optional keys (including aliases): {optional_keys}\n"
             raise ValueError(message)
+
+    def _parse_str_aliases(self, alias_to_field: dict[str, str], field_name: str, field: FieldInfo) -> set[str]:
+        names_for_field = {field_name}
+        if field.alias and field.alias != field_name:
+            names_for_field.add(field.alias)
+            alias_to_field[field.alias] = field_name
+        if field.validation_alias and field.validation_alias != field_name:
+            if isinstance(field.validation_alias, str):
+                names_for_field.add(field.validation_alias)
+                alias_to_field[field.validation_alias] = field_name
+            elif isinstance(field.validation_alias, AliasChoices):
+                for alias in field.validation_alias.choices:
+                    if isinstance(alias, str):
+                        names_for_field.add(alias)
+                        alias_to_field[alias] = field_name
+        return names_for_field
 
     def _instantiate_component(self, component_key: str, variant_key: str, component_config: BaseModel) -> Any:
         component_type: Type = self.registry.get_component(component_key, variant_key)
