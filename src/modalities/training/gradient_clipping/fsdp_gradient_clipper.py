@@ -102,7 +102,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
 
     def __init__(
         self,
-        wrapped_model_or_parts: FSDP2 | list[FSDP2],
+        model_parts: FSDP2 | list[FSDP2],
         norm_type: GradientClippingMode,
         device_mesh: Optional[DeviceMesh] = None,
         error_if_nonfinite: bool = False,
@@ -112,7 +112,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Initialize the FSDP2LoggingOnlyGradientClipper.
 
         Args:
-            wrapped_model (FSDP2): The wrapped FSDP2 model.
+            model_parts (FSDP2 | list[FSDP2]): The wrapped FSDP2 model or list of models.
             norm_type (GradientClippingMode): The type of gradient clipping.
             device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.
             error_if_nonfinite (bool): if True, an error is thrown if the total
@@ -126,7 +126,7 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Returns:
             None
         """
-        self.models = wrapped_model_or_parts if isinstance(wrapped_model_or_parts, list) else [wrapped_model_or_parts]
+        self.models = model_parts if isinstance(model_parts, list) else [model_parts]
         self.norm_type = norm_type
         self.device_mesh = device_mesh
         self.error_if_nonfinite = error_if_nonfinite
@@ -176,7 +176,7 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
 
     def __init__(
         self,
-        wrapped_model_or_parts: FSDP2 | list[FSDP2],
+        model_parts: FSDP2 | list[FSDP2],
         max_norm: float,
         norm_type: GradientClippingMode,
         device_mesh: Optional[DeviceMesh] = None,
@@ -187,7 +187,7 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
         Initialize the FSDP2GradientClipper object.
 
         Args:
-            wrapped_model (FSDP2): The wrapped FSDP2 model.
+            model_parts (FSDP2 | list[FSDP2]): The wrapped FSDP2 model or list of model parts.
             max_norm (float): The maximum norm value for gradient clipping.
             norm_type (GradientClippingMode): The type of gradient clipping.
             device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.
@@ -203,7 +203,7 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
             None
         """
         super().__init__(
-            wrapped_model_or_parts=wrapped_model_or_parts,
+            model_parts=model_parts,
             norm_type=norm_type,
             device_mesh=device_mesh,
             error_if_nonfinite=error_if_nonfinite,

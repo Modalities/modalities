@@ -34,7 +34,7 @@ class FSDP1GradientClipperConfig(BaseModel):
     wrapped_model: PydanticPytorchModuleType
 
 
-@add_deprecated_alias("wrapped_model_or_parts", "wrapped_model")
+@add_deprecated_alias("model_parts", "wrapped_model")
 class FSDP2GradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP gradient clipper.
@@ -42,19 +42,19 @@ class FSDP2GradientClipperConfig(BaseModel):
     Args:
         max_norm (float): The maximum norm value for gradient clipping.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
-        wrapped_model_or_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
+        model_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
 
     Attributes:
         max_norm (float): The maximum norm value for gradient clipping.
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
-        wrapped_model_or_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
+        model_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
     max_norm: Annotated[float, Field(strict=True, gt=0)]
     norm_type: GradientClippingMode
-    wrapped_model_or_parts: PydanticPytorchModuleOrListType
+    model_parts: PydanticPytorchModuleOrListType
     device_mesh: PydanticDeviceMeshIFType
 
 
@@ -75,22 +75,22 @@ class FSDP1DummyGradientClipperConfig(BaseModel):
     norm_type: GradientClippingMode
 
 
-@add_deprecated_alias("wrapped_model_or_parts", "wrapped_model")
+@add_deprecated_alias("model_parts", "wrapped_model")
 class FSDP2DummyGradientClipperConfig(BaseModel):
     """
     Configuration class for FSDP dummy gradient clipper.
 
     Args:
-        wrapped_model_or_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
+        model_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
 
     Attributes:
-        wrapped_model_or_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
+        model_parts (PydanticPytorchModuleOrListType): The wrapped PyTorch model (parts).
         norm_type (GradientClippingMode): The type of gradient clipping to be applied.
         device_mesh (PydanticDeviceMeshIFType | None): The device mesh configuration.
     """
 
-    wrapped_model_or_parts: PydanticPytorchModuleOrListType
+    model_parts: PydanticPytorchModuleOrListType
     norm_type: GradientClippingMode
     device_mesh: PydanticDeviceMeshIFType

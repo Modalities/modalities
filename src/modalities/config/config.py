@@ -44,6 +44,7 @@ from modalities.training.activation_checkpointing.activation_checkpointing_varia
     ActivationCheckpointingVariants,
 )
 from modalities.util import parse_enum_by_name
+from modalities.utils.deprecated_alias import add_deprecated_alias
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -476,14 +477,13 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
+@add_deprecated_alias("model_parts", "wrapped_model")
 class GPT2MFUCalculatorConfig(BaseModel):
     n_layer: Annotated[int, Field(strict=True, gt=0)]
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
-    wrapped_model_or_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType] = Field(
-        alias="wrapped_model"
-    )
+    model_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
 
