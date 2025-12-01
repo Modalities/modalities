@@ -99,7 +99,6 @@ class Evaluator:
         result_dict: dict[str, EvaluationResultBatch] = {}
         if not isinstance(model, list):
             assert scheduled_pipeline is None, "A non-scheduled pipeline should be processed with a single model."
-        if not isinstance(model, list):
             model = [model]
         for m in model:
             m.eval()
