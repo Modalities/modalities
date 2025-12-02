@@ -473,11 +473,13 @@ COMPONENTS = [
     ),
     # Debugging components
     ComponentEntity("debugging", "settings", Debugging, DebuggingConfig),
-    ComponentEntity("model_debugging_hook", "nan_hook", HookRegistration.register_nan_hooks, NaNHookConfig),
+    ComponentEntity(
+        "model_debugging_hook", "nan_hook", maybe_model_list(HookRegistration.register_nan_hooks), NaNHookConfig
+    ),
     ComponentEntity(
         "model_debugging_hook",
         "print_forward_hook",
-        HookRegistration.register_print_forward_hooks,
+        maybe_model_list(HookRegistration.register_print_forward_hooks),
         PrintForwardHookConfig,
     ),
 ]
