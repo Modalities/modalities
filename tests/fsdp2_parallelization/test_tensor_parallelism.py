@@ -16,7 +16,7 @@ from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
 from modalities.models.gpt2.gpt2_model import TransformerMLP
 from modalities.models.model import SwiGLU
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 
 
 def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir: Path) -> Path:
