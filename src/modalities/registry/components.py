@@ -84,7 +84,12 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
-from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
+from modalities.models.components.layer_norms import (
+    LayerNormConfig,
+    PytorchRMSLayerNormConfig,
+    RMSLayerNorm,
+    RMSLayerNormConfig,
+)
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
@@ -120,6 +125,8 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDP2DummyGradientClipperConfig,
     FSDP2GradientClipperConfig,
 )
+from modalities.utils.debug_components import Debugging, HookRegistration
+from modalities.utils.debugging_configs import DebuggingConfig, NaNHookConfig, PrintForwardHookConfig
 from modalities.utils.maybe_list_parameter import MaybeListDecorator, maybe_list_parameter
 from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
@@ -135,6 +142,8 @@ from modalities.utils.number_conversion import (
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+from modalities.utils.profilers.steppable_component_configs import SteppableForwardPassConfig
+from modalities.utils.profilers.steppable_components import SteppableForwardPass
 
 maybe_model_list: MaybeListDecorator[nn.Module, ..., Any, None] = maybe_list_parameter("model")
 maybe_model_list_for_optimizer: MaybeListDecorator[nn.Module, ..., Optimizer, OptimizersList] = maybe_list_parameter(
@@ -364,6 +373,7 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
+    ComponentEntity("layer_norm", "rms_norm_pytorch", nn.RMSNorm, PytorchRMSLayerNormConfig),
     # gradient clippers
     ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDP1GradientClipperConfig),
     ComponentEntity(
@@ -453,5 +463,21 @@ COMPONENTS = [
         "num_steps_from_raw_dataset_index",
         NumberConversion.get_num_steps_from_raw_dataset_index,
         NumStepsFromRawDatasetIndexConfig,
+    ),
+    # Profiling components
+    ComponentEntity(
+        "steppable_component",
+        "forward_pass",
+        SteppableForwardPass,
+        SteppableForwardPassConfig,
+    ),
+    # Debugging components
+    ComponentEntity("debugging", "settings", Debugging, DebuggingConfig),
+    ComponentEntity("model_debugging_hook", "nan_hook", HookRegistration.register_nan_hooks, NaNHookConfig),
+    ComponentEntity(
+        "model_debugging_hook",
+        "print_forward_hook",
+        HookRegistration.register_print_forward_hooks,
+        PrintForwardHookConfig,
     ),
 ]

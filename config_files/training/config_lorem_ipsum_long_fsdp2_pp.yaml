@@ -57,6 +57,16 @@ settings:
     num_seen_steps: 0
     num_seen_samples: 0
     last_step: -1
+  debugging:
+    component_key: debugging
+    variant_key: settings
+    config:
+      enable_determinism: false
+      forward_hooks:
+        - instance_key: error_on_nan
+          pass_type: BY_REFERENCE
+        - instance_key: print_forward_hook
+          pass_type: BY_REFERENCE
 
 collate_fn:
   component_key: collate_fn
@@ -398,6 +408,8 @@ gradient_clipper:
 
 progress_subscriber:
   component_key: progress_subscriber
+  # variant_key: dummy
+  # config: {}
   variant_key: rich
   config:
     global_rank: ${settings.cuda_env.global_rank}
@@ -433,3 +445,21 @@ mfu_calculator:
     device_mesh:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
+
+error_on_nan:
+  component_key: model_debugging_hook
+  variant_key: nan_hook
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    raise_exception: true
+
+print_forward_hook:
+  component_key: model_debugging_hook
+  variant_key: print_forward_hook
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    print_shape_only: true

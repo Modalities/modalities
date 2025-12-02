@@ -133,9 +133,19 @@ class RotaryTransform(QueryKeyValueTransform):
         super().__init__()
         # this also holds when using TP, since n_embd is the total embedding size and
         # n_head is the number of heads globally
-        dim_model = n_embd // n_head
+        self.dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        self.base_freq = base_freq
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # If previously initialized on or moved to a device, reuse that device.
+        # Otherwise, use the default device of the current environment.
+        device = self.inv_freq.device if hasattr(self, "inv_freq") else None
+        inv_freq = 1.0 / (
+            self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+        )
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None

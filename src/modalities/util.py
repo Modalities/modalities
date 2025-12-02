@@ -43,7 +43,10 @@ def warn_rank_0(message: str):
         warnings.warn(message_with_color_code)
 
 
-def parse_enum_by_name(name: str, enum_type: Type[Enum]) -> Enum:
+TEnum = TypeVar("TEnum", bound=Enum)
+
+
+def parse_enum_by_name(name: str, enum_type: Type[TEnum]) -> TEnum:
     try:
         return enum_type[name]
     except KeyError:
@@ -136,7 +139,7 @@ def get_synced_experiment_id_of_run(
     return experiment_id_synced
 
 
-def format_metrics_to_gb(item):
+def format_metrics_to_gb(item: int) -> float:
     """quick function to format numbers to gigabyte and round to 4 digit precision"""
     g_gigabyte = 1024**3
     metric_num = item / g_gigabyte
