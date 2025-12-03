@@ -1,12 +1,9 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
 from modalities.checkpointing.convert_dcp_to_torch import load_dcp_config
-from modalities.config.config import ConfigDictType, save_yaml_config_dict
+from modalities.config.config import ConfigDictType, ProcessGroupBackendType
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.components.layer_norms import LayerNormConfig
@@ -76,33 +73,10 @@ def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
 def check_converted_dcp_model(
     hf_model: GPT2ForCausalLM, dcp_dir: str, num_testruns: int, modalitis_model_cuda_device_id: int
 ):
-    # Modify config to use DCP checkpointed app state component
-    _, dcp_config = load_dcp_config(dcp_dir)
-    dcp_config["app_state"] = {
-        "component_key": "app_state",
-        "variant_key": "dcp",
-        "config": {
-            "raw_app_state": dcp_config["app_state"],
-            "checkpoint_dir_path": dcp_dir,
-        },
-    }
-    dcp_config["device_mesh"] = {
-        "component_key": "device_mesh",
-        "variant_key": "default",
-        "config": {
-            "device_type": "cuda",
-            "data_parallel_shard_degree": 1,
-            "world_size": 1,
-        },
-    }
-    with (
-        TemporaryDirectory() as temp_dir,
-        MultiProcessingCudaEnv("nccl", 0, 0, 1, 24570, device_id=modalitis_model_cuda_device_id) as _,
-    ):
-        config_dst = Path(temp_dir) / "temp_dcp_config.yaml"
-        save_yaml_config_dict(dcp_config, config_dst)
-        vocab_size = dcp_config["model_raw" if "model_raw" in dcp_config else "model"]["config"]["vocab_size"]
-        modalities_model = get_model_from_config(dcp_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
+    new_config: ConfigDictType = _build_single_node_dcp_config(dcp_dir)
+    vocab_size = new_config["model_raw" if "model_raw" in new_config else "model"]["config"]["vocab_size"]
+    with MultiProcessingCudaEnv(ProcessGroupBackendType.nccl, 0, 0, 1, 24570, device_id=modalitis_model_cuda_device_id):
+        modalities_model = get_model_from_config(new_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
         check_converted_model(hf_model, modalities_model, num_testruns=num_testruns, vocab_size=vocab_size)
 
 
@@ -126,6 +100,48 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
         assert llama_logits.shape == modalities_logits.shape
         assert llama_logits.dtype == modalities_logits.dtype
         assert torch.equal(llama_logits, modalities_logits)
+
+
+def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
+    """Builds a modalities config dictionary for loading a DCP checkpointed model on a single node.
+
+    Args:
+        dcp_dir (str): Directory containing the DCP checkpoint.
+
+    Returns:
+        ConfigDictType: New modalities config dictionary for loading the DCP checkpointed model.
+    """
+    _, dcp_config = load_dcp_config(dcp_dir)
+    model_key = "model_raw" if "model_raw" in dcp_config else "model"
+    new_config: ConfigDictType = {
+        "settings": dcp_config["settings"],
+        "dp_degree": dcp_config["dp_degree"],
+        "fsdp_model": dcp_config["fsdp_model"],
+        "initialized_model": dcp_config["initialized_model"],
+        model_key: dcp_config[model_key],
+        "optimizer": dcp_config["optimizer"],
+        "lr_scheduler": dcp_config["lr_scheduler"],
+    }
+    new_config["app_state"] = {
+        "component_key": "app_state",
+        "variant_key": "dcp",
+        "config": {
+            "raw_app_state": dcp_config["app_state_raw" if "app_state_raw" in dcp_config else "app_state"],
+            "checkpoint_dir_path": dcp_dir,
+        },
+    }
+    new_config["device_mesh"] = {
+        "component_key": "device_mesh",
+        "variant_key": "default",
+        "config": {
+            "device_type": "cuda",
+            "data_parallel_shard_degree": 1,
+            "world_size": 1,
+        },
+    }
+    new_config["fsdp_model"]["config"]["model"]["instance_key"] = model_key
+    new_config["initialized_model"]["config"]["model"] = {"instance_key": "fsdp_model", "pass_type": "BY_REFERENCE"}
+    return new_config
 
 
 def _check_conversion_criteria(model_config: ConfigDictType) -> None:
