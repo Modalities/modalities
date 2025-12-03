@@ -1,14 +1,19 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from modalities.config.config import ConfigDictType
+from modalities.checkpointing.convert_dcp_to_torch import load_dcp_config
+from modalities.config.config import ConfigDictType, save_yaml_config_dict
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block, PositionTypes
 from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 
 
 def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM, GPT2LLM]:
@@ -66,6 +71,39 @@ def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
         _attn_implementation=_map_attention_type(config),
         output_attentions=False,
     )
+
+
+def check_converted_dcp_model(
+    hf_model: GPT2ForCausalLM, dcp_dir: str, num_testruns: int, modalitis_model_cuda_device_id: int
+):
+    # Modify config to use DCP checkpointed app state component
+    _, dcp_config = load_dcp_config(dcp_dir)
+    dcp_config["app_state"] = {
+        "component_key": "app_state",
+        "variant_key": "dcp",
+        "config": {
+            "raw_app_state": dcp_config["app_state"],
+            "checkpoint_dir_path": dcp_dir,
+        },
+    }
+    dcp_config["device_mesh"] = {
+        "component_key": "device_mesh",
+        "variant_key": "default",
+        "config": {
+            "device_type": "cuda",
+            "data_parallel_shard_degree": 1,
+            "world_size": 1,
+        },
+    }
+    with (
+        TemporaryDirectory() as temp_dir,
+        MultiProcessingCudaEnv("nccl", 0, 0, 1, 24570, device_id=modalitis_model_cuda_device_id) as _,
+    ):
+        config_dst = Path(temp_dir) / "temp_dcp_config.yaml"
+        save_yaml_config_dict(dcp_config, config_dst)
+        vocab_size = dcp_config["model_raw" if "model_raw" in dcp_config else "model"]["config"]["vocab_size"]
+        modalities_model = get_model_from_config(dcp_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
+        check_converted_model(hf_model, modalities_model, num_testruns=num_testruns, vocab_size=vocab_size)
 
 
 def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, num_testruns: int, vocab_size: int):

@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Any
 
 import torch
 from torch.distributed.checkpoint.default_planner import _EmptyStateDictLoadPlanner
@@ -8,11 +7,12 @@ from torch.distributed.checkpoint.filesystem import FileSystemReader
 from torch.distributed.checkpoint.metadata import STATE_DICT_TYPE
 from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 
-from modalities.config.config import load_app_config_dict, save_yaml_config_dict
+from modalities.config.config import ConfigDictType, load_app_config_dict, save_yaml_config_dict
 
 
 def convert_dcp_to_torch(dcp_checkpoint_dir: str, output_dir: str, model_key: str = "model_raw") -> str:
-    """Converts a DCP (Distributed Checkpoint) checkpoint—including FSDP2, PP, or TP checkpoints—to a standard PyTorch checkpoint.
+    """Converts a DCP (Distributed Checkpoint) checkpoint—including
+       FSDP2, PP, or TP checkpoints—to a standard PyTorch checkpoint.
 
     Args:
         dcp_checkpoint_dir (str): Directory containing the DCP checkpoint files (may include FSDP2, PP, or TP).
@@ -46,14 +46,9 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     Returns:
         str: Path to the converted config file.
     """
-    config_src: str | None = find_yaml_config_in_dir(dcp_checkpoint_dir)
-    if config_src is None:
-        config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
-    if config_src is None:
-        raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
+    config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
-    dcp_config: dict[str, Any] = load_app_config_dict(Path(config_src), experiment_id="-1")
-    torch_config: dict[str, Any] = {
+    torch_config: ConfigDictType = {
         "checkpointed_model": {
             "component_key": "model",
             "variant_key": "fsdp1_checkpointed",
@@ -75,11 +70,24 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
         },
     }
     if model_key not in dcp_config:
-        raise KeyError(f"Model key '{model_key}' not found in config file '{config_src}'. Available keys: {list(dcp_config.keys())}")
+        raise KeyError(
+            f"Model key '{model_key}' not found in config file '{config_src}'."
+            f" Available keys: {list(dcp_config.keys())}"
+        )
     torch_config["model"] = dcp_config[model_key]
     torch_config["model"]["config"]["use_meta_device"] = False
     save_yaml_config_dict(torch_config, Path(config_dst))
     return config_dst
+
+
+def load_dcp_config(dcp_checkpoint_dir: str) -> tuple[str, ConfigDictType]:
+    config_src: str | None = find_yaml_config_in_dir(dcp_checkpoint_dir)
+    if config_src is None:
+        config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
+    if config_src is None:
+        raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
+    dcp_config = load_app_config_dict(Path(config_src), experiment_id="-1")
+    return config_src, dcp_config
 
 
 def find_yaml_config_in_dir(directory: str) -> str | None:

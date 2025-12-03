@@ -23,16 +23,24 @@ options:
 """
 
 import argparse
+import gc
 import logging
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import torch
+
 from modalities.checkpointing.convert_dcp_to_torch import convert_dcp_to_torch
 from modalities.config.config import load_app_config_dict
 from modalities.conversion.gpt2.conversion_code import transfer_model_code
-from modalities.conversion.gpt2.conversion_model import check_converted_model, convert_model_checkpoint
+from modalities.conversion.gpt2.conversion_model import (
+    check_converted_dcp_model,
+    check_converted_model,
+    convert_model_checkpoint,
+)
 from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
+from modalities.conversion.gpt2.modeling_gpt2 import GPT2ForCausalLM
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +93,7 @@ def convert_gpt2_dcp(
     distributed_cp_dir: str,
     output_dir: str,
     num_testruns: int = 0,
-    device_modalities: str = "cpu",
+    device_id_modalities: str | int = 0,
     device_hf: str = "cpu",
     model_key: str = "model_raw",
 ) -> None:
@@ -93,12 +101,18 @@ def convert_gpt2_dcp(
         logger.info("Converting DCP checkpoint to standard PyTorch checkpoint...")
         modalities_config_path = convert_dcp_to_torch(distributed_cp_dir, temp_dir, model_key=model_key)
         logger.info("Converting standard PyTorch checkpoint to Huggingface transformers format...")
-        convert_gpt2(
-            modalities_config_path,
-            output_dir,
-            num_testruns,
-            device_modalities,
-            device_hf,
+        convert_gpt2(modalities_config_path, output_dir)
+        # Clear GPU and CPU memory before running tests
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        hf_model: GPT2ForCausalLM = GPT2ForCausalLM.from_pretrained(
+            output_dir, local_files_only=True, trust_remote_code=True
+        ).to(device=device_hf)
+        if isinstance(device_id_modalities, str):
+            device_id_modalities = int(device_id_modalities.replace("cuda:", ""))
+        check_converted_dcp_model(
+            hf_model, distributed_cp_dir, num_testruns, modalitis_model_cuda_device_id=device_id_modalities
         )
 
 
