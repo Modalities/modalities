@@ -7,11 +7,10 @@ import torch
 import torch.multiprocessing as mp
 import yaml
 from pydantic import BaseModel
-from torch.distributed.fsdp import FSDPModule as FSDP2
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import PydanticFSDP2ModuleType
+from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
 from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
@@ -53,15 +52,16 @@ class TestFSDP2Sharding:
 
         return temp_file_path
 
-    def _get_fsdp2_wrapped_model(self, config_file_path: Path) -> FSDP2:
+    def _get_components(self, config_file_path: Path) -> BaseModel:
         class ComponentsInstantiationModel(BaseModel):
             initialized_model: PydanticFSDP2ModuleType
+            device_mesh: PydanticDeviceMeshIFType
 
         main_obj = Main(config_file_path)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )
-        return components.initialized_model
+        return components
 
     @pytest.mark.parametrize(
         "replication_degree, sharding_degree, tp_degree, world_size",
@@ -101,9 +101,12 @@ class TestFSDP2Sharding:
             global_rank=process_id,
             local_rank=process_id,
             world_size=world_size,
-            rdvz_port=22356,
+            rdvz_port=22359,
         ):
-            fsdp2_wrapped_model = self._get_fsdp2_wrapped_model(gpt2_model_config_path)
-            local_num_params = get_local_number_of_trainable_parameters(fsdp2_wrapped_model)
-            total_num_params = get_total_number_of_trainable_parameters(fsdp2_wrapped_model)
+            components = self._get_components(gpt2_model_config_path)
+            local_num_params = get_local_number_of_trainable_parameters(components.initialized_model)
+            total_num_params = get_total_number_of_trainable_parameters(
+                model=components.initialized_model,
+                device_mesh=components.device_mesh,
+            )
             assert total_num_params == local_num_params * sharding_degree

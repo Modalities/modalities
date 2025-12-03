@@ -25,6 +25,7 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 1
     sequence_length: 256
+    dp_degree: ${settings.cuda_env.world_size}
   training_target:
     num_target_tokens:
       component_key: number_conversion

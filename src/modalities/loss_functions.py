@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import overload
 
 import torch
 from torch.nn import CrossEntropyLoss
@@ -31,9 +32,16 @@ class CLMCrossEntropyLoss(Loss):
         # Mean over the tokens in the local-batch (batch per rank)
         self.loss_fun = CrossEntropyLoss(reduction="mean")
 
+    @overload
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
-        labels = forward_batch.get_targets(self.target_key)
-        lm_logits = forward_batch.get_predictions(self.prediction_key)
+        ...
+
+    @overload
+    def __call__(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        ...
+
+    def __call__(self, *args, **kwargs) -> torch.Tensor:
+        labels, lm_logits = self._parse_arguments(args, kwargs)
 
         # move labels to correct device to enable model parallelism
         labels = labels.to(lm_logits.device)
@@ -42,6 +50,41 @@ class CLMCrossEntropyLoss(Loss):
         # Flatten the tokens. We compute here, the loss per token.
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
+
+    def _parse_arguments(
+        self,
+        args: list[torch.Tensor] | list[InferenceResultBatch],
+        kwargs: dict[str, torch.Tensor] | dict[str, InferenceResultBatch],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if len(args) == 1 and isinstance(args[0], InferenceResultBatch):
+            forward_batch = args[0]
+            labels = forward_batch.get_targets(self.target_key)
+            lm_logits = forward_batch.get_predictions(self.prediction_key)
+        elif "forward_batch" in kwargs and isinstance(kwargs["forward_batch"], InferenceResultBatch):
+            forward_batch = kwargs["forward_batch"]
+            labels = forward_batch.get_targets(self.target_key)
+            lm_logits = forward_batch.get_predictions(self.prediction_key)
+        elif len(args) == 2 and all(isinstance(arg, torch.Tensor) for arg in args):
+            lm_logits, labels = args
+        elif (
+            "outputs" in kwargs
+            and "targets" in kwargs
+            and isinstance(kwargs["outputs"], torch.Tensor)
+            and isinstance(kwargs["targets"], torch.Tensor)
+        ):
+            lm_logits = kwargs["outputs"]
+            labels = kwargs["targets"]
+        elif (
+            len(args) == 1
+            and "targets" in kwargs
+            and isinstance(args[0], torch.Tensor)
+            and isinstance(kwargs["targets"], torch.Tensor)
+        ):
+            lm_logits = args[0]
+            labels = kwargs["targets"]
+        else:
+            raise TypeError("Invalid arguments for CLMCrossEntropyLoss.__call__")
+        return labels, lm_logits
 
 
 def nce_loss(

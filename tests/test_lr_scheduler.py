@@ -4,7 +4,7 @@ import numpy as np
 
 from modalities.gym import Gym
 from modalities.optimizers.lr_schedulers import DummyLRScheduler
-from tests.test_utils import configure_dataloader_mock
+from tests.utility import configure_dataloader_mock
 
 
 def test_run_scheduler(

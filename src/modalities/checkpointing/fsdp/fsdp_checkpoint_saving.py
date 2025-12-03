@@ -13,7 +13,7 @@ from modalities.checkpointing.checkpoint_saving_execution import CheckpointSavin
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.exceptions import CheckpointingError
 from modalities.training.training_progress import TrainingProgress
-from modalities.utils.logging import get_logger
+from modalities.utils.logger_utils import get_logger
 
 
 class CheckpointingEntityType(Enum):

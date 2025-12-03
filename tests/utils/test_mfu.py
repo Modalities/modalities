@@ -313,7 +313,10 @@ class TestMFU:
         assert theoretical_flops_per_token == expected_theoretical_flops_per_token
 
     @staticmethod
-    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
+    @pytest.mark.skipif(
+        torch.cuda.device_count() < 2 or not torch.cuda.get_device_name().startswith("NVIDIA A100"),
+        reason="This test requires 2 A100 GPUs.",
+    )
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path, num_samples_per_second_per_gpu, expected_mfu",
         [
@@ -339,7 +342,7 @@ class TestMFU:
         TestMFU._save_yaml_config(config_file_path=tmp_config_file_path, config=config_updated)
 
         # run the test in a distributed environment
-        world_size = torch.cuda.device_count()
+        world_size = 2  # torch.cuda.device_count()
         num_samples_per_second = num_samples_per_second_per_gpu * world_size
         mp.spawn(
             TestMFU._test_compute_mfu_thread,

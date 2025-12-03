@@ -8,11 +8,14 @@ from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
     PydanticCheckpointSavingIFType,
     PydanticDatasetIFType,
+    PydanticDebuggingType,
+    PydanticDeviceMeshIFType,
     PydanticGradientClipperIFType,
     PydanticLLMDataLoaderIFType,
     PydanticLossIFType,
     PydanticMessageSubscriberIFType,
     PydanticMFUCalculatorABCType,
+    PydanticPipelineType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
     PydanticTextInferenceComponentType,
@@ -33,6 +36,7 @@ class StepProfile(BaseModel):
     gradient_accumulation_steps: Annotated[int, Field(strict=True, ge=1)]
     local_train_micro_batch_size: Annotated[int, Field(strict=True, ge=1)]
     sequence_length: Annotated[int, Field(strict=True, ge=1)]
+    dp_degree: Annotated[int, Field(strict=True, ge=1)]
 
 
 class ConsistencyEnforcement(BaseModel):
@@ -95,6 +99,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
         training_target: TrainingTarget
         training_progress: TrainingProgress
         warmstart_checkpoint_paths: Optional[WarmstartCheckpointPaths | DCPWarmstartCheckpointPaths] = None
+        debugging: Optional[PydanticDebuggingType] = None
 
         @model_validator(mode="after")
         def _check_tokens_per_step_conistency(self) -> "TrainingComponentsInstantiationModel.Settings":
@@ -106,7 +111,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
                 self.step_profile.local_train_micro_batch_size
                 * self.step_profile.sequence_length
                 * self.step_profile.gradient_accumulation_steps
-                * self.cuda_env.world_size
+                * self.step_profile.dp_degree
             )
             if required_num_tokens_per_step != step_profile_num_tokens_per_step:
                 warning_message = (
@@ -178,6 +183,8 @@ class TrainingComponentsInstantiationModel(BaseModel):
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
     mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
+    scheduled_pipeline: Optional[PydanticPipelineType] = None
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
     model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")

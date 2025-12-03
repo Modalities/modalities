@@ -1,12 +1,12 @@
 [project]
 name = "modalities"
-version = "0.3.2"
-requires-python = ">=3.10,<3.12"
+version = "0.4.0"
+requires-python = ">=3.10,<=3.13"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
-    "numpy<2.0",
-    "torch==2.7.1",
+    "numpy",
+    "torch",
     "packaging",
     "tqdm",
     "pyyaml",
@@ -21,8 +21,10 @@ dependencies = [
     "click_pathlib",
     "jq",
     "class_resolver",
+    "matplotlib",
     "wandb",
     "einops>=0.7.0",
+    "debugpy",  # For VSCode debugging support
 ]
 
 [project.urls]

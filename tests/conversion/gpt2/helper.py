@@ -6,14 +6,14 @@ from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block
 
 
 def check_same_weight_model(converted_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
-    converted_model.to(device=modalities_model.transformer.h[0].attn.q_attn.weight.device)
+    converted_model.to(device=modalities_model.transformer.h["0"].attn.q_attn.weight.device)
     assert torch.equal(converted_model.model.embed_tokens.weight, modalities_model.transformer.wte.weight)
-    for i, (llama_layer, modalities_layer) in enumerate(
+    for i, (llama_layer, modalities_layer_idx) in enumerate(
         zip(converted_model.model.layers, modalities_model.transformer.h)
     ):
-        check_same_weight_attention(llama_layer, modalities_layer)
-        check_same_weight_mlp(llama_layer, modalities_layer)
-        check_same_weight_layer_norms(llama_layer, modalities_layer)
+        check_same_weight_attention(llama_layer, modalities_model.transformer.h[modalities_layer_idx])
+        check_same_weight_mlp(llama_layer, modalities_model.transformer.h[modalities_layer_idx])
+        check_same_weight_layer_norms(llama_layer, modalities_model.transformer.h[modalities_layer_idx])
     check_same_weight_base_modules(converted_model.lm_head, modalities_model.transformer.lm_head)
     check_same_weight_base_modules(converted_model.model.norm, modalities_model.transformer.lm_head_norm)
 

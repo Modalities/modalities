@@ -10,6 +10,7 @@ from modalities.logging_broker.subscriber_impl.progress_subscriber import (
 )
 from modalities.logging_broker.subscriber_impl.results_subscriber import (
     DummyResultSubscriber,
+    EvaluationResultToDiscSubscriber,
     RichResultSubscriber,
     WandBEvaluationResultSubscriber,
 )
@@ -54,6 +55,10 @@ class ResultsSubscriberFactory:
     @staticmethod
     def get_dummy_result_subscriber() -> DummyResultSubscriber:
         return DummyResultSubscriber()
+
+    @staticmethod
+    def get_evaluation_result_to_disc_subscriber(output_file_path: Path) -> EvaluationResultToDiscSubscriber:
+        return EvaluationResultToDiscSubscriber(output_file_path=output_file_path)
 
     @staticmethod
     def get_wandb_result_subscriber(

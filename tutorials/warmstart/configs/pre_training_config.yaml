@@ -25,6 +25,9 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 8
     sequence_length: 256
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens: 81920 # num_target_steps * world_size * local_train_micro_batch_size * sequence_length * gradient_accumulation_steps
     num_target_steps: 20    # we want to run for exactly 20 steps (although we will only get one checkpoint after 11 steps)
@@ -114,9 +117,18 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    data_parallel_shard_degree: -1 # i.e., fully sharded
     world_size: ${settings.cuda_env.world_size}
 
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+    
 app_state:
   component_key: app_state
   variant_key: raw
@@ -247,6 +259,9 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 progress_subscriber:
   component_key: progress_subscriber

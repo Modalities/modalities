@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+import yaml
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -46,8 +47,23 @@ def dummy_packed_data_path(tmpdir) -> Path:
 
 
 @pytest.fixture
-def dummy_config_path() -> Path:
-    return _ROOT_DIR / Path("tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml")
+def dummy_config_path(tmp_path: Path) -> Path:
+    # Load original YAML
+    original_path = _ROOT_DIR / "tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml"
+    with open(original_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    checkpoint_path = tmp_path / "checkpoint"
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
+
+    # Write modified YAML to a temp file
+    new_path = tmp_path / "experiments/modified_config.yaml"
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(new_path, "w") as f:
+        yaml.safe_dump(config, f)
+
+    return new_path
 
 
 @pytest.fixture
@@ -192,6 +208,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         gradient_acc_steps=1,
         gradient_clipper=gradient_clipper_mock,
         global_num_tokens_per_train_step=10,
+        device_mesh=None,
         num_seen_train_steps=0,
         global_num_seen_tokens=0,
         num_target_tokens=100,

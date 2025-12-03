@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 import torch.nn as nn
 
@@ -57,7 +59,7 @@ def gpt2_model():
 
 
 def test_get_compiled_model_compiles_blocks(gpt2_model):
-    original_blocks = list(gpt2_model.transformer.h)
+    original_model = copy.deepcopy(gpt2_model)
     original_wte = gpt2_model.transformer.wte
     original_lm_head = gpt2_model.transformer.lm_head
 
@@ -65,9 +67,13 @@ def test_get_compiled_model_compiles_blocks(gpt2_model):
     result_model = ModelFactory.get_compiled_model(gpt2_model, block_names, fullgraph=True)
 
     assert len(result_model.transformer.h) == 4, "Should still have four blocks"
-    for i, (original_block, new_block) in enumerate(zip(original_blocks, result_model.transformer.h)):
-        assert new_block is not original_block, f"Block {i} should be a compiled version"
-        assert isinstance(new_block, nn.Module), f"Block {i} should be an nn.Module"
+    for i, (original_block_idx, new_block_idx) in enumerate(
+        zip(original_model.transformer.h, result_model.transformer.h)
+    ):
+        assert (
+            result_model.transformer.h[new_block_idx] is not original_model.transformer.h[original_block_idx]
+        ), f"Block {i} should be a compiled version"
+        assert isinstance(result_model.transformer.h[new_block_idx], nn.Module), f"Block {i} should be an nn.Module"
     assert result_model.transformer.wte is original_wte, "Embedding layer should remain unchanged"
     assert result_model.transformer.lm_head is original_lm_head, "LM head should remain unchanged"
     assert result_model is gpt2_model, "Should return the same model instance"

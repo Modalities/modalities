@@ -7,6 +7,7 @@ from pydantic_core import core_schema
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
+from torch.distributed.pipelining import PipelineStage
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Sampler
@@ -21,10 +22,14 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
+from modalities.models.parallelism.pipeline_parallelism import Pipeline, StagesGenerator
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.utils.debug_components import Debugging
 from modalities.utils.mfu import MFUCalculatorABC
+from modalities.utils.profilers.batch_generator import DatasetBatchGeneratorIF
+from modalities.utils.profilers.steppable_components import SteppableComponentIF
 
 
 class PydanticThirdPartyTypeIF:
@@ -79,3 +84,14 @@ PydanticModelInitializationIFType = Annotated[ModelInitializationIF, PydanticThi
 PydanticDeviceMeshIFType = Annotated[DeviceMesh, PydanticThirdPartyTypeIF(DeviceMesh)]
 PydanticAppStateType = Annotated[AppState, PydanticThirdPartyTypeIF(AppState)]
 PydanticMFUCalculatorABCType = Annotated[MFUCalculatorABC, PydanticThirdPartyTypeIF(MFUCalculatorABC)]
+PydanticDatasetBatchGeneratorIFType = Annotated[
+    DatasetBatchGeneratorIF, PydanticThirdPartyTypeIF(DatasetBatchGeneratorIF)
+]
+PydanticStagesGeneratorType = Annotated[StagesGenerator, PydanticThirdPartyTypeIF(StagesGenerator)]
+PydanticPipelineType = Annotated[Pipeline, PydanticThirdPartyTypeIF(Pipeline)]
+PydanticPipelineStageType = Annotated[PipelineStage, PydanticThirdPartyTypeIF(PipelineStage)]
+PydanticSteppableComponentIFType = Annotated[SteppableComponentIF, PydanticThirdPartyTypeIF(SteppableComponentIF)]
+PydanticRemovableHandleType = Annotated[
+    torch.utils.hooks.RemovableHandle, PydanticThirdPartyTypeIF(torch.utils.hooks.RemovableHandle)
+]
+PydanticDebuggingType = Annotated[Debugging, PydanticThirdPartyTypeIF(Debugging)]

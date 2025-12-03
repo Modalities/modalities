@@ -9,6 +9,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.models.model import model_predict_batch
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.trainer import ThroughputAggregationKeys
 from modalities.util import Aggregator, TimeRecorder
@@ -36,20 +37,42 @@ class Evaluator:
         batch: DatasetBatch,
         model: nn.Module,
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
-    ) -> torch.Tensor:
+        scheduled_pipeline: Pipeline | None = None,
+    ) -> torch.Tensor | None:
         """Evaluate a single batch by forwarding it through the model and calculating the loss.
 
         Args:
             batch (DatasetBatch): The batch to evaluate
             model (nn.Module): The model to evaluate
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
-            torch.Tensor: The loss of the batch
+            torch.Tensor | None: The loss of the batch
+                None, if a non-last stage was processed in pipeline parallelism
         """
         with torch.no_grad():
-            result_batch = model_predict_batch(model=model, batch=batch)
-        loss = loss_fun(result_batch)
+            if scheduled_pipeline is not None:
+                pp_schedule = scheduled_pipeline.pp_schedule
+                targets, losses = (
+                    (batch.targets[loss_fun.target_key].contiguous(), [])
+                    if scheduled_pipeline.is_last_pp_stage
+                    else (None, None)
+                )
+
+                if scheduled_pipeline.is_first_pp_stage:
+                    pp_schedule.eval(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+                else:
+                    pp_schedule.eval(target=targets, losses=losses)
+                loss = (
+                    torch.mean(torch.stack(losses)).to(losses[0].device)
+                    if scheduled_pipeline.is_last_pp_stage
+                    else None
+                )
+            else:
+                result_batch = model_predict_batch(model=model, batch=batch)
+                loss = loss_fun(result_batch)
         return loss
 
     def evaluate(
@@ -58,6 +81,7 @@ class Evaluator:
         data_loaders: list[LLMDataLoader],
         loss_fun: Callable[[InferenceResultBatch], torch.Tensor],
         num_train_steps_done: int,
+        scheduled_pipeline: Pipeline | None = None,
     ) -> dict[str, EvaluationResultBatch]:
         """Evaluate the model on a set of datasets.
 
@@ -66,6 +90,8 @@ class Evaluator:
             data_loaders (list[LLMDataLoader]): List of dataloaders to evaluate the model on
             loss_fun (Callable[[InferenceResultBatch], torch.Tensor]): The loss function to calculate the loss
             num_train_steps_done (int): The number of training steps done so far for logging purposes
+            scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
+                operate the model. Defaults to None.
 
         Returns:
             dict[str, EvaluationResultBatch]: A dictionary containing the evaluation results for each dataloader
@@ -83,19 +109,24 @@ class Evaluator:
                 num_eval_steps_done=0,  # Reset progress bar
                 dataloader_tag=data_loader.dataloader_tag,
             )
-            thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
+            throughput_aggregator = Aggregator[ThroughputAggregationKeys]()
             with TimeRecorder() as forward_backward_timer_recorder:
                 for batch_id, batch in enumerate(data_loader):
                     batch_loss = self.evaluate_batch(
                         batch=batch,
                         model=model,
                         loss_fun=loss_fun,
+                        scheduled_pipeline=scheduled_pipeline,
                     )
 
-                    cumulated_loss[0] += batch_loss.item()  # sum up batch loss
-                    cumulated_loss[1] += 1
+                    # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
+                    if batch_loss is not None:
+                        cumulated_loss[0] += batch_loss.item()  # sum up batch loss
+                        cumulated_loss[1] += 1
                     batch_length_tensor = torch.tensor(len(batch)).to(device)
-                    thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+                    throughput_aggregator.add_value(
+                        key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor
+                    )
 
                     Evaluator._publish_progress(
                         progress_publisher=self.progress_publisher,
@@ -110,11 +141,11 @@ class Evaluator:
             )
 
             forward_backward_time = torch.tensor(forward_backward_timer_recorder.delta_t).to(device)
-            thoughput_aggregator.add_value(
+            throughput_aggregator.add_value(
                 key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
             )
-            synced_num_samples = thoughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
-            synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
+            synced_num_samples = throughput_aggregator.get_all_reduced_value(ThroughputAggregationKeys.NUM_SAMPLES)
+            synced_forward_backward_time = throughput_aggregator.get_all_reduced_value(
                 ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
             )
             num_samples_per_second = synced_num_samples / synced_forward_backward_time

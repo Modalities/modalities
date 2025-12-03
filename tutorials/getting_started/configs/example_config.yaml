@@ -22,30 +22,31 @@ settings:
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
-  step_profile: 
+  step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 8
     sequence_length: 512
+    dp_degree: ${settings.cuda_env.world_size}
   training_target:
-    num_target_tokens:      
+    num_target_tokens:
       component_key: number_conversion
       variant_key: num_tokens_from_packed_mem_map_dataset_continuous
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree: ${settings.cuda_env.world_size}
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-  training_progress: 
+  training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0

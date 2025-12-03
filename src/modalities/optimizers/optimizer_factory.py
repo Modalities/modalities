@@ -12,12 +12,14 @@ from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
 from modalities.models.model import NNModel
 from modalities.util import get_local_number_of_trainable_parameters, print_rank_0
-from modalities.utils.typing import FSDPX
+from modalities.utils.logger_utils import get_logger
+from modalities.utils.typing_utils import FSDPX
 
 OptimizerGroups = list[dict[str, list[nn.Parameter] | float]]
 
 
 class OptimizerFactory:
+    @staticmethod
     def get_adam(
         lr: float,
         betas: tuple[float, float],
@@ -30,6 +32,7 @@ class OptimizerFactory:
         optimizer = Adam(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
         return optimizer
 
+    @staticmethod
     def get_adam_w(
         lr: float,
         betas: tuple[float, float],
@@ -80,7 +83,7 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
         optimizer_groups_names = ["all"]
     else:
         # there will be N optimizer groups, i.e. one for each model parameter group
-        _assert_existence_of_weight_decay_groups_excluded(model, weight_decay_groups_excluded)
+        _check_existence_of_weight_decay_groups_excluded(model, weight_decay_groups_excluded)
         optimizer_groups, optimizer_groups_names = _create_optimizer_groups(
             model, weight_decay, weight_decay_groups_excluded
         )
@@ -90,9 +93,7 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
     return optimizer_groups
 
 
-def _assert_existence_of_weight_decay_groups_excluded(
-    model: nn.Module, weight_decay_groups_excluded: list[str]
-) -> None:
+def _check_existence_of_weight_decay_groups_excluded(model: nn.Module, weight_decay_groups_excluded: list[str]) -> None:
     """
     checks the existence of all groups
     that are to be excluded from weight decay
@@ -113,9 +114,10 @@ def _assert_existence_of_weight_decay_groups_excluded(
     weight_decay_groups = nn_model.weight_decay_groups
     for group in weight_decay_groups_excluded:
         if group not in weight_decay_groups.keys():
-            raise OptimizerError(
+            get_logger(name="optimizer_factory").warning(
                 f"group = {group} specified in weight_decay_groups_excluded is not "
-                + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}"
+                + f"in models optimizer_module_groups = {list(weight_decay_groups.keys())}. "
+                + "(This might be due to pipeline parallelism and is not necessarily an error.)"
             )
 
 
@@ -156,14 +158,46 @@ def _create_optimizer_groups(
             f"model {type(model)} has no parameters with requires_grad=True (i.e., no traininable parameters)."
         )
 
-    optimizer_groups = [
+    optimizer_groups = _build_optimizer_groups_via_weight_decay_split(
+        weight_decay, weight_decay_groups_excluded, weight_decay_groups, params
+    )
+    return optimizer_groups, ["with_weight_decay", "without_weight_decay"]
+
+
+def _build_optimizer_groups_via_weight_decay_split(
+    weight_decay: float,
+    weight_decay_groups_excluded: list[str],
+    weight_decay_groups: dict[str, list[str]],
+    params: dict[str, nn.Parameter],
+) -> OptimizerGroups:
+    params_per_weight_decay_groups: list[dict[str, object]] = [
         {
             "params": _filter_params_for_weight_decay_group(params, regex_expressions=weight_decay_groups[group]),
-            "weight_decay": weight_decay if group not in weight_decay_groups_excluded else 0.0,
+            "exclude": group in weight_decay_groups_excluded,
         }
         for group in weight_decay_groups.keys()
     ]
-    return optimizer_groups, weight_decay_groups.keys()
+
+    # combine all parameter lists into two optimizer groups, one with and one without weight decay
+    optimizer_groups: OptimizerGroups = [
+        {
+            "params": sum((p["params"] for p in params_per_weight_decay_groups if not p["exclude"]), []),
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": sum((p["params"] for p in params_per_weight_decay_groups if p["exclude"]), []),
+            "weight_decay": 0.0,
+        },
+    ]
+
+    if len(optimizer_groups[0]["params"]) == 0 or len(optimizer_groups[1]["params"]) == 0:
+        raise OptimizerError(
+            "One of the optimizer groups has zero parameters. "
+            "This indicates that the weight_decay_groups_excluded configuration is not compatible "
+            "with the configured pipeline stages."
+        )
+
+    return optimizer_groups
 
 
 def _filter_params_for_weight_decay_group(

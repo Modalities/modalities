@@ -2,7 +2,7 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Annotated, Optional, overload
 
 import torch
 import torch.nn as nn
@@ -10,7 +10,12 @@ from pydantic import BaseModel, Field, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
-from modalities.models.components.layer_norms import LayerNormConfig, RMSLayerNorm, RMSLayerNormConfig
+from modalities.models.components.layer_norms import (
+    LayerNormConfig,
+    PytorchRMSLayerNormConfig,
+    RMSLayerNorm,
+    RMSLayerNormConfig,
+)
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
@@ -33,15 +38,17 @@ class LayerNorms(LookupEnum):
     Attributes:
         RMSNorm: RMSLayerNorm class.
         LayerNorm: nn.LayerNorm class.
+        PyTorchRMSNorm: nn.RMSNorm class.
     """
 
     rms_norm = RMSLayerNorm
     layer_norm = nn.LayerNorm
+    pytorch_rms_norm = nn.RMSNorm
 
 
 class LayerNormWrapperConfig(BaseModel):
     norm_type: LayerNorms
-    config: LayerNormConfig | RMSLayerNormConfig
+    config: PytorchRMSLayerNormConfig | RMSLayerNormConfig | LayerNormConfig
 
 
 class PositionTypes(str, Enum):
@@ -124,9 +131,21 @@ class RotaryTransform(QueryKeyValueTransform):
             base_freq (int): Base frequency for RoPE. Defaults to 10000.
         """
         super().__init__()
-        dim_model = n_embd // n_head
+        # this also holds when using TP, since n_embd is the total embedding size and
+        # n_head is the number of heads globally
+        self.dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
-        inv_freq = 1.0 / (base_freq ** (torch.arange(0, dim_model, 2).float() / dim_model))
+        self.base_freq = base_freq
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # If previously initialized on or moved to a device, reuse that device.
+        # Otherwise, use the default device of the current environment.
+        device = self.inv_freq.device if hasattr(self, "inv_freq") else None
+        inv_freq = 1.0 / (
+            self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+        )
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -290,6 +309,7 @@ class AttentionConfig(BaseModel):
         config: RotaryTransformConfig | IdentityTransformConfig
 
     qkv_transforms: list[QueryKeyValueTransformConfig]
+    qk_norm_config: Optional[LayerNormWrapperConfig] = None
 
 
 class GPT2LLMConfig(BaseModel):
@@ -317,7 +337,10 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-
+        seed: Optional[int] = None: The random seed for reproducibility.
+        enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
+            in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
+            activation_type is SwiGLU. Defaults to 256.
     """
 
     sample_key: str
@@ -342,6 +365,8 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
+    seed: Optional[int] = None
+    enforce_swiglu_hidden_dim_multiple_of: int = 256
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -453,6 +478,23 @@ class CausalSelfAttention(nn.Module):
             )  # TODO refactor, still uses the legacy type_hint
             for transform_config in attention_config.qkv_transforms
         )
+
+        # QK Norm - helpful for models >1B to stabilize training
+        # Baseline logits w/o qk norm: (Q @ K^T) / sqrt(d_h)
+        # with geometric form of dot product: (||q_i|| * ||k_j|| * cos(θ_ij)) / sqrt(d_h)
+        # so if the model wants to increase the distance between logits
+        # it needs to scale q or k OR adjust the angle between them
+        # qk norm forces the model to mostly adjust the angle between q and k which stabilizes training
+        if attention_config.qk_norm_config is not None:
+            self.q_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+            self.k_norm = attention_config.qk_norm_config.norm_type.value(
+                **dict(attention_config.qk_norm_config.config)
+            )
+        else:
+            self.q_norm = None
+            self.k_norm = None
 
     def projection(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -625,8 +667,11 @@ class CausalSelfAttention(nn.Module):
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
         q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
+        if self.q_norm is not None and self.k_norm is not None:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
         y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
-        y = y.reshape(B, T, self.n_embd)  # (B, T, n_embd), re-assemble all head outputs side by side
+        y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
 
@@ -693,6 +738,7 @@ class GPT2Block(nn.Module):
         ffn_hidden: int,
         attention_norm: nn.Module,
         ffn_norm: nn.Module,
+        enforce_swiglu_hidden_dim_multiple_of: int,
     ):
         """
         Initializes the GPT2Block.
@@ -709,6 +755,9 @@ class GPT2Block(nn.Module):
             ffn_hidden (int): The size of the hidden layer in the feed-forward network.
             attention_norm (nn.Module): The normalization layer for attention.
             ffn_norm (nn.Module): The normalization layer for feed-forward network.
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces the
+                hidden dimension in the SwiGLU layer to be a multiple of this value. Note that this
+                is only relevant if the activation_type is SwiGLU. Defaults to None.
         """
         super().__init__()
         self.attention_norm = attention_norm
@@ -726,7 +775,12 @@ class GPT2Block(nn.Module):
         if activation_type == ActivationType.GELU:
             self.mlp = TransformerMLP(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias, dropout=dropout)
         elif activation_type == ActivationType.SWIGLU:
-            self.mlp = SwiGLU(n_embd=n_embd, ffn_hidden=ffn_hidden, bias=bias)
+            self.mlp = SwiGLU(
+                n_embd=n_embd,
+                ffn_hidden=ffn_hidden,
+                bias=bias,
+                enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
+            )
         else:
             raise NotImplementedError("unimplemented activation")
 
@@ -778,7 +832,8 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: int = None,
+        seed: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ):
         """
         Initializes the GPT2LLM object.
@@ -804,6 +859,9 @@ class GPT2LLM(NNModel):
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
             seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
+            enforce_swiglu_hidden_dim_multiple_of (int): Enforces
+                the hidden dimension in the SwiGLU layer to be a multiple of this value.
+                Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
@@ -842,9 +900,9 @@ class GPT2LLM(NNModel):
                 wte=nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embd),
                 wpe=wpe,
                 drop=nn.Dropout(dropout),
-                h=nn.ModuleList(
-                    [
-                        GPT2Block(
+                h=nn.ModuleDict(
+                    {
+                        str(layer_idx): GPT2Block(
                             n_embd=n_embd,
                             bias=bias,
                             n_head_q=n_head_q,
@@ -859,9 +917,10 @@ class GPT2LLM(NNModel):
                             # a meta device!
                             attention_norm=attention_norm_config.norm_type.value(**dict(attention_norm_config.config)),
                             ffn_norm=ffn_norm_config.norm_type.value(**dict(ffn_norm_config.config)),
+                            enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
                         )
-                        for _ in range(n_layer)
-                    ]
+                        for layer_idx in range(n_layer)
+                    }
                 ),
                 lm_head_norm=lm_head_norm_config.norm_type.value(**dict(lm_head_norm_config.config)),
                 # NOTE: If we make the bias configurable, we must update the number of parameters calculation
@@ -878,41 +937,7 @@ class GPT2LLM(NNModel):
                 self.transformer.lm_head.weight
             )  # https://paperswithcode.com/method/weight-tying
 
-    def forward_impl(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        """
-        Forward pass implementation of the GPT2LLM module.
-
-        Args:
-            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
-                - sample_key (str): Key for the input tensor containing token ids.
-
-        Returns:
-            dict[str, torch.Tensor]: A dictionary containing output tensors.
-                - prediction_key (str): Key for the output tensor containing logits.
-        """
-        input_ids = inputs[self.sample_key]
-        device = input_ids.device
-        _, t = input_ids.size()  # batch size, sequence length
-        assert t <= self.sequence_length, f"Cannot forward sequence of length {t}, the model's maximum "
-        f"input sequence length is only {self.sequence_length}"
-
-        # forward the GPT model itself
-        tok_emb = self.transformer.wte(input_ids)  # token embeddings of shape (b, t, n_embd)
-
-        if self.poe_type is PositionTypes.ABSOLUTE:
-            pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
-            pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
-            tok_emb = tok_emb + pos_emb
-
-        # TODO: use drop out also without absolute position embedding?
-        x = self.transformer.drop(tok_emb)
-
-        for block in self.transformer.h:
-            x = block(x)
-        x = self.transformer.lm_head_norm(x)
-        logits = self.transformer.lm_head(x)
-        return {self.prediction_key: logits}
-
+    @overload
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the GPT2LLM module.
@@ -925,7 +950,69 @@ class GPT2LLM(NNModel):
             dict[str, torch.Tensor]: A dictionary containing output tensors.
                 - prediction_key (str): Key for the output tensor containing logits.
         """
-        return self.forward_impl(inputs)
+        ...
+
+    @overload
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the GPT2LLM module.
+
+        Args:
+            inputs (torch.Tensor): A tensor containing input token ids.
+
+        Returns:
+            torch.Tensor: A tensor containing output logits.
+        """
+        ...
+
+    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+        """
+        Forward pass of the GPT2LLM module.
+
+        Args:
+            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.
+
+        Returns:
+            dict[str, torch.Tensor] | torch.Tensor: Model output.
+        """
+        if isinstance(inputs, dict):
+            return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
+        else:
+            return self.forward_impl(inputs)
+
+    def forward_impl(self, inputs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass implementation of the GPT2LLM module.
+
+        Args:
+            inputs (torch.Tensor): A tensor containing input token ids.
+
+        Returns:
+            torch.Tensor: A tensor containing output logits.
+        """
+        device = inputs.device
+        seq_len = inputs.size(1)
+        assert seq_len <= self.sequence_length, f"Cannot forward sequence of length {seq_len}, the model's maximum "
+        f"input sequence length is only {self.sequence_length}."
+
+        # forward the GPT model itself
+        h = (
+            self.transformer.wte(inputs) if hasattr(self.transformer, "wte") else inputs
+        )  # token embeddings of shape (b, seq_len, n_embd)
+
+        if self.poe_type is PositionTypes.ABSOLUTE and hasattr(self.transformer, "wpe"):
+            pos = torch.arange(0, seq_len, dtype=torch.long, device=device)  # shape (seq_len)
+            pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (seq_len, n_embd)
+            h = h + pos_emb
+
+        # TODO: use drop out also without absolute position embedding?
+        h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
+
+        for layer_idx in self.transformer.h:
+            h = self.transformer.h[layer_idx](h)
+        h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
+        h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
+        return h
 
 
 def manual_scaled_dot_product_attention(

@@ -202,8 +202,6 @@ def main(
                 f"Specified devices = {devices}"
             )
 
-    # only run tests on max 4 devices
-    device_ids = device_ids[:4]
     print("> Test setup: ")
     print(f"> {include_main_tests=}, {include_torchrun_tests=}, {include_examples=}")
     print(f"> {device_ids=}")
@@ -301,6 +299,32 @@ def main(
         )
         # we do not run scripts/03_convert_distributed_model_to_torch.sh and scripts/04_generate_text.sh,
         # as this is only for the end-to-end experience of the tutorial
+
+        # Scaling up example
+        print("\n=== RUN SCALING UP EXAMPLE ===")
+        run_scaling_up_example_directory = _ROOT_DIR / "tutorials" / "scaling_up"
+        run_scaling_up_example_script = (
+            _ROOT_DIR / "tutorials" / "scaling_up" / "scripts" / "run_scaling_up_example_single_node.sh"
+        )
+        assert isfile(run_scaling_up_example_script), f"ERROR! {run_scaling_up_example_script} does not exist."
+        command_scaling_up_example = f"cd {run_scaling_up_example_directory}; "
+        command_scaling_up_example += "bash scripts/run_scaling_up_example_single_node.sh -c"
+        subprocess_run(command_scaling_up_example)
+
+        # Single process profiling example
+        print("\n=== RUN Single Process Profiling EXAMPLE ===")
+        script = _ROOT_DIR / "tutorials/profiling/scripts/single_process/single_process_profiler_starter.sh"
+        assert isfile(script), f"ERROR! {script} does not exist."
+        command = f"sh {script} -c"
+        subprocess_run(command)
+
+        # Distributed profiling example
+        print("\n=== RUN Distributed Profiling EXAMPLE ===")
+        script = _ROOT_DIR / "tutorials/profiling/scripts/distributed/distributed_profiler_starter.sh"
+        assert isfile(script), f"ERROR! {script} does not exist."
+        command = f"sh {script} -c"
+        subprocess_run(command)
+
     print("\n=== DONE ===")
 
 

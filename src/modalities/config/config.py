@@ -1,10 +1,10 @@
 import os
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Callable, Literal, Optional
+from typing import Annotated, Any, Iterable, Literal, Optional, Set, TypeAlias, cast
 
 import torch
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, Resolver
 from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
 from transformers import GPT2TokenizerFast
@@ -39,6 +39,9 @@ from modalities.running_env.env_utils import (
     has_bfloat_support,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
+    ActivationCheckpointingVariants,
+)
 from modalities.util import parse_enum_by_name
 
 
@@ -92,7 +95,7 @@ class TorchCheckpointLoadingConfig(BaseModel):
     precision: Optional[PrecisionEnum] = None
 
     @field_validator("device", mode="before")
-    def parse_device(cls, device) -> PydanticPytorchDeviceType:
+    def parse_device(cls, device: str | int) -> PydanticPytorchDeviceType:
         return parse_torch_device(device)
 
 
@@ -103,7 +106,7 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
     sharding_strategy: ShardingStrategy
 
     @field_validator("mixed_precision_settings", mode="before")
-    def parse_mixed_precision_setting_by_name(cls, name):
+    def parse_mixed_precision_setting_by_name(cls, name: str) -> MixedPrecisionSettings:
         mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
             name=name, enum_type=MixedPrecisionSettings
         )
@@ -115,7 +118,7 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
         return mixed_precision_settings
 
     @field_validator("sharding_strategy", mode="before")
-    def parse_sharding_strategy_by_name(cls, name):
+    def parse_sharding_strategy_by_name(cls, name: str) -> ShardingStrategy:
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
@@ -244,7 +247,7 @@ class FSDPWrappedModelConfig(BaseModel):
     block_names: list[str]
 
     @field_validator("mixed_precision_settings", mode="before")
-    def parse_mixed_precision_setting_by_name(cls, name):
+    def parse_mixed_precision_setting_by_name(cls, name: str) -> MixedPrecisionSettings:
         mixed_precision_settings: MixedPrecisionSettings = parse_enum_by_name(
             name=name, enum_type=MixedPrecisionSettings
         )
@@ -256,7 +259,7 @@ class FSDPWrappedModelConfig(BaseModel):
         return mixed_precision_settings
 
     @field_validator("sharding_strategy", mode="before")
-    def parse_sharding_strategy_by_name(cls, name):
+    def parse_sharding_strategy_by_name(cls, name: str) -> ShardingStrategy:
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
@@ -278,8 +281,39 @@ class FSDP2WrappedModelConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_dp_mesh_existence(self):
+        if self.device_mesh.mesh_dim_names is None:
+            raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
         if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
             raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
+        return self
+
+
+class DebuggingEnrichedModelConfig(BaseModel):
+    model: PydanticPytorchModuleType
+    logging_dir_path: Path
+    tracked_ranks: Optional[Set[int]] = None
+    log_interval_steps: Optional[int] = 1
+
+    @field_validator("tracked_ranks", mode="before")
+    def convert_list_to_set(cls, v: Iterable[int] | None) -> Set[int] | None:
+        if v is None:
+            return v
+        return set(v)
+
+
+class GPT2ModelTPConfig(BaseModel):
+    model: PydanticPytorchModuleType  # TODO set proper type
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_tp_mesh_existence(self) -> "GPT2ModelTPConfig":
+        mesh_dim_names = self.device_mesh.mesh_dim_names
+        if mesh_dim_names is None:
+            raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
+        if ParallelismDegrees.TP.value not in mesh_dim_names:
+            raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
+        if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
+            raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
 
@@ -299,9 +333,25 @@ class WeightInitializedModelConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class ActivationCheckpointedModelConfig(BaseModel):
+class FSDP1ActivationCheckpointedModelConfig(BaseModel):
     model: PydanticFSDP1ModuleType
     activation_checkpointing_modules: Optional[list[str]] = Field(default_factory=list)
+
+
+class ActivationCheckpointedModelConfig(BaseModel):
+    class FullACParams(BaseModel):
+        pass
+
+    class SelectiveLayerACParams(BaseModel):
+        ac_freq: Annotated[int, Field(strict=True, ge=1)]
+
+    class SelectiveOpACParams(BaseModel):
+        save_ops_keys: list[str]
+
+    ac_variant: ActivationCheckpointingVariants
+    layers_fqn: str
+    model: PydanticPytorchModuleType
+    ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
@@ -320,7 +370,7 @@ class PreTrainedHFTokenizerConfig(BaseModel):
     max_length: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     truncation: bool = False
     padding: bool | str = False
-    special_tokens: Optional[dict[str, str | list | tuple]] = None
+    special_tokens: dict[str, str | list[str] | tuple[str, ...]] | None = None
 
 
 class PreTrainedSPTokenizerConfig(BaseModel):
@@ -343,7 +393,7 @@ class DistributedSamplerConfig(BaseModel):
 class ResumableDistributedSamplerConfig(BaseModel):
     dataset: PydanticDatasetIFType
     rank: Annotated[int, Field(strict=True, ge=0)]
-    num_replicas: Annotated[int, Field(strict=True, ge=0)] = None
+    num_replicas: Annotated[int, Field(strict=True, ge=0)]
     epoch: Annotated[int, Field(strict=True, ge=0)] = 0
     shuffle: Optional[bool] = False
     seed: Optional[int] = 0
@@ -412,6 +462,10 @@ class DummyResultSubscriberConfig(BaseModel):
     pass
 
 
+class EvaluationResultToDiscSubscriberConfig(BaseModel):
+    output_file_path: Path
+
+
 class WandBEvaluationResultSubscriberConfig(BaseModel):
     global_rank: int
     project: str
@@ -432,29 +486,38 @@ class GPT2MFUCalculatorConfig(BaseModel):
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
     wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
+
+
+class ParallelDegreeConfig(BaseModel):
+    device_mesh: PydanticDeviceMeshIFType
+    parallelism_methods: list[ParallelismDegrees]
+
+
+# Recursive type representing arbitrary-depth YAML config structures.
+YAMLPrimitive = str | int | float | bool | None
+YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAMLValue"]
 
 
 def load_app_config_dict(
     config_file_path: Path,
     experiment_id: Optional[str] = None,
-    additional_resolver_funs: Optional[dict[str, Callable]] = None,
-) -> dict:
+    additional_resolver_funs: Optional[dict[str, Resolver]] = None,
+) -> dict[str, YAMLValue]:
     """Load the application configuration from the given YAML file.
-    The function defines custom resolvers for the OmegaConf library to resolve environment variables and
-    Modalities-specific variables.
 
     Args:
         config_file_path (Path): YAML config file.
-        experiment_id (str, optional): The experiment_id of the current run. Defaults to None.
-        additional_resolver_funs (dict[str, Callable], optional): Additional resolver functions. Defaults to None.
+        experiment_id (str, optional): The experiment_id of the current run.
+        additional_resolver_funs (dict[str, Resolver], optional): Additional resolver functions.
 
     Returns:
-        dict: Dictionary representation of the config file.
+        dict[str, YAMLValue]: Dictionary representation of the config file with arbitrary depth.
     """
 
-    def cuda_env_resolver_fun(var_name: str) -> int:
+    def cuda_env_resolver_fun(var_name: str) -> int | str | None:
         int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
-        return int(os.getenv(var_name)) if var_name in int_env_variable_names else os.getenv(var_name)
+        return int(os.environ[var_name]) if var_name in int_env_variable_names else os.getenv(var_name)
 
     def modalities_env_resolver_fun(var_name: str, kwargs: dict[str, Any]) -> str | Path:
         if var_name in kwargs:
@@ -462,12 +525,15 @@ def load_app_config_dict(
         else:
             raise ValueError(f"Unknown modalities_env variable: {var_name}.")
 
-    def node_env_resolver_fun(var_name: str) -> int:
+    def node_env_resolver_fun(var_name: str) -> int | None:
         if var_name == "num_cpus":
             return os.cpu_count()
 
     OmegaConf.register_new_resolver("cuda_env", cuda_env_resolver_fun, replace=True)
-    modalities_env_kwargs = {"config_file_path": config_file_path}
+    modalities_env_kwargs: dict[str, Any] = {
+        "config_file_path": config_file_path,
+        "config_folder_path": config_file_path.parent,
+    }
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(
@@ -480,6 +546,6 @@ def load_app_config_dict(
             OmegaConf.register_new_resolver(resolver_name, resolver_fun, replace=True)
 
     cfg = OmegaConf.load(config_file_path)
-    config_dict = OmegaConf.to_container(cfg, resolve=True)
+    config_dict = cast(dict[str, YAMLValue], OmegaConf.to_container(cfg, resolve=True))
 
     return config_dict

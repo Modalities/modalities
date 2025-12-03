@@ -258,7 +258,7 @@ class PackedDataGenerator:
                 # write index
                 f.write(pickle.dumps(index_list))
 
-            self._update_data_length_in_pre_allocated_header(dst_path, index_list)
+            update_data_length_in_pre_allocated_header(dst_path, index_list)
 
         return writer
 
@@ -310,17 +310,6 @@ class PackedDataGenerator:
                 )
                 traceback.print_exc()
 
-    def _update_data_length_in_pre_allocated_header(self, dst_path: Path, index_list: list[tuple[int, int]]):
-        # Update the length of the data section in the pre-allocated header of the destination file.
-        # The data segment length is sum of the starting position and the length of the last document.
-        length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
-        data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
-            EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
-        )
-        with dst_path.open("rb+") as fout:
-            fout.seek(0)
-            fout.write(data_section_length_in_bytes)
-
     def _process_line(self, line: str, process_id: int) -> bytes:
         # extracts the text via the jq_filter and applies tokenization to the extract text
         jq_retrieved_text = self.jq_filter.input_text(line).first()
@@ -333,6 +322,25 @@ class PackedDataGenerator:
         if not token_byte_string.endswith(self._encoded_eod_token_as_bytes):
             token_byte_string = token_byte_string + self._encoded_eod_token_as_bytes
         return token_byte_string
+
+
+def update_data_length_in_pre_allocated_header(dst_path: Path, index_list: list[tuple[int, int]]):
+    # Update the length of the data section in the pre-allocated header of the destination file.
+    # The data segment length is sum of the starting position and the length of the last document.
+    if len(index_list) > 0:
+        length_of_byte_encoded_data_section = index_list[-1][0] + index_list[-1][1]
+    else:
+        length_of_byte_encoded_data_section = 0
+        logger.warning(
+            f'No data was written to the file "{dst_path}". '
+            "This can happen if the input file is empty or all samples were filtered out."
+        )
+    data_section_length_in_bytes = length_of_byte_encoded_data_section.to_bytes(
+        EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES, byteorder="little"
+    )
+    with dst_path.open("rb+") as fout:
+        fout.seek(0)
+        fout.write(data_section_length_in_bytes)
 
 
 class EmbeddedStreamData:
