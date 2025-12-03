@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 
 import torch
@@ -12,7 +10,6 @@ from pydantic import BaseModel
 # from pkg_resources import packaging
 from torch.distributed.fsdp import MixedPrecision
 
-from modalities.config.config import PrecisionEnum
 from modalities.config.lookup_enum import LookupEnum
 
 
@@ -85,27 +82,6 @@ class PyTorchDtypes(LookupEnum):
     FP_16 = torch.float16
     FP_32 = torch.float32
     BF_16 = torch.bfloat16
-
-    @staticmethod
-    def from_precision_enum(settings: PrecisionEnum) -> PyTorchDtypes:
-        if settings == PrecisionEnum.FP16:
-            return PyTorchDtypes.FP_16
-        elif settings == PrecisionEnum.BF16:
-            return PyTorchDtypes.BF_16
-        elif settings == PrecisionEnum.FP32:
-            return PyTorchDtypes.FP_32
-        else:
-            raise ValueError(f"Unsupported PrecisionEnum: {settings}")
-
-    def to_precision_enum(self) -> PrecisionEnum:
-        if self == PyTorchDtypes.FP_16:
-            return PrecisionEnum.FP16
-        elif self == PyTorchDtypes.BF_16:
-            return PrecisionEnum.BF16
-        elif self == PyTorchDtypes.FP_32:
-            return PrecisionEnum.FP32
-        else:
-            raise ValueError(f"Unsupported PyTorchDtypes: {self}")
 
 
 class FSDP2MixedPrecisionSettings(BaseModel):

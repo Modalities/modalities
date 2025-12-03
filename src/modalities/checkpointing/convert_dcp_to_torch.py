@@ -7,7 +7,7 @@ from torch.distributed.checkpoint.filesystem import FileSystemReader
 from torch.distributed.checkpoint.metadata import STATE_DICT_TYPE
 from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 
-from modalities.config.config import ConfigDictType, load_app_config_dict, save_yaml_config_dict
+from modalities.config.config import ConfigDictType, PrecisionEnum, load_app_config_dict, save_yaml_config_dict
 from modalities.running_env.env_utils import PyTorchDtypes
 
 
@@ -51,7 +51,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
 
     dtype = dcp_config["fsdp_model"]["config"]["mixed_precision_settings"]["param_dtype"]
-    dtype_enum = PyTorchDtypes(dtype).to_precision_enum()
+    dtype_enum = PrecisionEnum.from_dtype_enum(PyTorchDtypes(dtype))
     torch_config: ConfigDictType = {
         "checkpointed_model": {
             "component_key": "model",
@@ -62,7 +62,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
                     "variant_key": "torch",
                     "config": {
                         "device": "cpu",
-                        "precision": dtype_enum.value,
+                        "precision": dtype_enum.name,
                     },
                 },
                 "model": {
