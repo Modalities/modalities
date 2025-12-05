@@ -7,8 +7,7 @@ from torch.distributed.checkpoint.filesystem import FileSystemReader
 from torch.distributed.checkpoint.metadata import STATE_DICT_TYPE
 from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 
-from modalities.config.config import ConfigDictType, PrecisionEnum, load_app_config_dict, save_yaml_config_dict
-from modalities.running_env.env_utils import PyTorchDtypes
+from modalities.config.config import ConfigDictType, load_app_config_dict, save_yaml_config_dict
 
 
 def convert_dcp_to_torch(dcp_checkpoint_dir: str, output_dir: str, model_key: str = "model_raw") -> str:
@@ -30,9 +29,8 @@ def convert_dcp_to_torch(dcp_checkpoint_dir: str, output_dir: str, model_key: st
     #      support converting only parts of the checkpoint.
     #      (from torch.distributed.checkpoint.format_utils import dcp_to_torch_save)
     sd: STATE_DICT_TYPE = {}
-    _load_state_dict(
-        sd, storage_reader=FileSystemReader(dcp_checkpoint_dir), planner=_EmptyStateDictLoadPlanner(), no_dist=True
-    )
+    planner = _EmptyStateDictLoadPlanner(keys=["app.model"], allow_partial_load=True)
+    _load_state_dict(sd, storage_reader=FileSystemReader(dcp_checkpoint_dir), planner=planner, no_dist=True)
     torch.save(sd["app"]["model"], torch_checkpoint_file)
     return torch_config_file
 
@@ -49,9 +47,8 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     """
     config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
-
-    dtype = dcp_config["fsdp_model"]["config"]["mixed_precision_settings"]["param_dtype"]
-    dtype_enum = PrecisionEnum.from_dtype_enum(PyTorchDtypes(dtype))
+    if os.path.exists(config_dst):
+        raise FileExistsError(f"Config file '{config_dst}' already exists.")
     torch_config: ConfigDictType = {
         "checkpointed_model": {
             "component_key": "model",
@@ -62,7 +59,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
                     "variant_key": "torch",
                     "config": {
                         "device": "cpu",
-                        "precision": dtype_enum.name,
+                        "precision": "FP32",
                     },
                 },
                 "model": {
