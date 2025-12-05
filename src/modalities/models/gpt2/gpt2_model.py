@@ -175,7 +175,7 @@ class RotaryTransform(QueryKeyValueTransform):
         if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
             self._seq_len_cached = seq_len
             t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq.float())
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
             self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
             self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
