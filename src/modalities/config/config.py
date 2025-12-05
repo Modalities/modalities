@@ -72,27 +72,6 @@ class PrecisionEnum(LookupEnum):
     FP16 = torch.float16
     BF16 = torch.bfloat16
 
-    def to_dtype_enum(self) -> PyTorchDtypes:
-        if self == PrecisionEnum.FP32:
-            return PyTorchDtypes.FP_32
-        elif self == PrecisionEnum.FP16:
-            return PyTorchDtypes.FP_16
-        elif self == PrecisionEnum.BF16:
-            return PyTorchDtypes.BF_16
-        else:
-            raise ValueError(f"Unsupported PrecisionEnum value: {self}")
-
-    @staticmethod
-    def from_dtype_enum(dtype_enum: PyTorchDtypes) -> PrecisionEnum:
-        if dtype_enum == PyTorchDtypes.FP_32:
-            return PrecisionEnum.FP32
-        elif dtype_enum == PyTorchDtypes.FP_16:
-            return PrecisionEnum.FP16
-        elif dtype_enum == PyTorchDtypes.BF_16:
-            return PrecisionEnum.BF16
-        else:
-            raise ValueError(f"Unsupported PyTorchDtypes value: {dtype_enum}")
-
 
 class ReferenceConfig(BaseModel):
     instance_key: str
