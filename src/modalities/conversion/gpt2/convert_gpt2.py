@@ -40,7 +40,6 @@ from modalities.conversion.gpt2.conversion_model import (
     convert_model_checkpoint,
 )
 from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
-from modalities.conversion.gpt2.modeling_gpt2 import GPT2ForCausalLM
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +105,8 @@ def convert_gpt2_dcp(
         torch.cuda.empty_cache()
         gc.collect()
 
-        hf_model: GPT2ForCausalLM = GPT2ForCausalLM.from_pretrained(
-            output_dir, local_files_only=True, trust_remote_code=True
-        ).to(device=device_hf)
-        if isinstance(device_id_modalities, str):
-            device_id_modalities = int(device_id_modalities.replace("cuda:", ""))
         check_converted_dcp_model(
-            hf_model, distributed_cp_dir, num_testruns, modalitis_model_cuda_device_id=device_id_modalities
+            output_dir, distributed_cp_dir, num_testruns, device_id_modalities=device_id_modalities, device_hf=device_hf
         )
 
 
