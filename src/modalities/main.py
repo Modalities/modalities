@@ -186,6 +186,7 @@ class Main:
         evaluator = Evaluator(
             progress_publisher=progress_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
+            device_mesh=components.device_mesh,
         )
 
         # Gym

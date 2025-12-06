@@ -21,7 +21,7 @@ from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_para
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
-from modalities.util import Aggregator, TimeRecorder, print_rank_0
+from modalities.util import TimeRecorder, print_rank_0
 from modalities.utils.mfu import MFUCalculatorABC
 
 
@@ -73,7 +73,7 @@ class Trainer:
                 device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD]
             )
             self.pp_degree = get_parallel_degree(device_mesh, [ParallelismDegrees.PP])
-        else:
+        else:  # TODO: we can remove the else part once we refactored out FSDP1
             self.dp_degree = dist.get_world_size()
             self.pp_degree = 1
         self.progress_publisher = progress_publisher
@@ -201,10 +201,10 @@ class Trainer:
         lr_scheduler = app_state.lr_scheduler
         model.train()
 
+        local_num_seen_samples = 0
         cumulated_losses = self._reset_tracked_losses()
 
         # throughput
-        thoughput_aggregator = Aggregator[ThroughputAggregationKeys]()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # batch loop
@@ -246,7 +246,6 @@ class Trainer:
                 micro_batch_id=micro_batch_id,
                 scheduled_pipeline=scheduled_pipeline,
             )
-            forward_backward_time_recorder.stop()
             training_progress.num_seen_steps_current_run = num_train_steps_done
             training_progress.num_seen_tokens_current_run = self.global_num_tokens_per_train_step * num_train_steps_done
 
@@ -261,8 +260,7 @@ class Trainer:
             if gradient_norm_score is not None:
                 gradient_norm_scores.append(gradient_norm_score.item())
 
-            batch_length_tensor = torch.tensor(len(batch)).to(device)
-            thoughput_aggregator.add_value(key=ThroughputAggregationKeys.NUM_SAMPLES, value=batch_length_tensor)
+            local_num_seen_samples += torch.tensor(len(batch)).to(device)
 
             self._publish_progress(
                 progress_publisher=self.progress_publisher,
@@ -271,24 +269,17 @@ class Trainer:
             )
             # Check if model performance should be logged
             if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
+                forward_backward_time_recorder.stop()
                 forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
                 forward_backward_time_recorder.reset()
+                forward_backward_time_recorder.start()
 
-                thoughput_aggregator.add_value(
-                    key=ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, value=forward_backward_time
-                )
-                # we only want to sync the num samples across data parallel ranks
-                # so we divide the world size by the dp degree
-                synced_num_samples = thoughput_aggregator.get_all_reduced_value(
-                    ThroughputAggregationKeys.NUM_SAMPLES
-                ) / (dist.get_world_size() / self.dp_degree)
-                synced_forward_backward_time = thoughput_aggregator.get_all_reduced_value(
-                    ThroughputAggregationKeys.FORWARD_BACKWARD_TIME, reduce_operation=dist.ReduceOp.MAX
-                )
-                synced_num_samples_per_second = synced_num_samples / synced_forward_backward_time
+                global_num_seen_samples = local_num_seen_samples * self.dp_degree
+                local_num_seen_samples = 0
+                global_num_samples_per_second = global_num_seen_samples / forward_backward_time
+
                 # TODO: insert reducer from outside so Trainer is independent of FSDP
                 # add the loss and gradient norm for the LAST batch
-
                 cumulated_losses[1] = batch_loss.item() if batch_loss is not None else 0.0
 
                 reduced_losses = Reducer.reduce(
@@ -319,7 +310,7 @@ class Trainer:
                 gradient_norm_scores = []
                 mfu_score = torch.tensor(-1.0)
                 if self.mfu_calculator is not None:
-                    mfu_score = self.mfu_calculator.compute(num_samples_per_second=synced_num_samples_per_second)
+                    mfu_score = self.mfu_calculator.compute(num_samples_per_second=global_num_samples_per_second)
 
                 # Collect peak memory depending on device type. On CPU we fall back to RSS (if available) or -1.
                 if device.type == "cuda":
@@ -339,7 +330,7 @@ class Trainer:
                     metrics=metrics,
                     # TODO: hardcoded metric key
                     throughput_metrics={
-                        "train samples/s": ResultItem(synced_num_samples_per_second, 1),
+                        "train samples/s": ResultItem(global_num_samples_per_second, 1),
                         "train mfu (16-bit)": ResultItem(mfu_score, 2),
                         "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
                         "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
@@ -352,15 +343,11 @@ class Trainer:
                     evaluation_result_publisher=self.evaluation_result_publisher,
                     evaluation_result=training_metrics,
                 )
-                thoughput_aggregator.remove_keys()
 
                 cumulated_losses = self._reset_tracked_losses()
             if step_performed:
                 evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                 checkpointing_callback(training_progress=training_progress)
-            # we start the time recoder here again to also capture the time spend loading
-            # via the dataloader.
-            forward_backward_time_recorder.start()
 
     def _reset_tracked_losses(self):
         # Initializes and returns a tensor representing the cumulated loss and gradient norm.
