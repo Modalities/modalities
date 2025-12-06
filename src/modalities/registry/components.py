@@ -333,7 +333,7 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
-    ComponentEntity("layer_norm", "rms_norm_pytorch", nn.RMSNorm, PytorchRMSLayerNormConfig),
+    ComponentEntity("layer_norm", "pytorch_rms_norm", nn.RMSNorm, PytorchRMSLayerNormConfig),
     # gradient clippers
     ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDP1GradientClipperConfig),
     ComponentEntity(
