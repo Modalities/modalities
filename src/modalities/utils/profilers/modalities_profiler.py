@@ -1,4 +1,4 @@
-import os
+import pickle
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +29,90 @@ class CustomComponentRegisterable:
     variant_key: str
     custom_component: type
     custom_config: type
+
+
+class SteppableProfilerIF:
+    def __enter__(self):
+        raise NotImplementedError
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        raise NotImplementedError
+
+    def step(self):
+        raise NotImplementedError
+
+
+class SteppableMemoryProfiler(SteppableProfilerIF):
+    MEMORY_SNAPSHOT_MAX_ENTRIES = 100_000
+
+    def __init__(self, memory_snapshot_path: Path, num_wait_steps: int, num_warmup_steps: int, num_active_steps: int):
+        self._memory_snapshot_path = memory_snapshot_path
+        self._curr_step = None
+        self._num_wait_steps = num_wait_steps
+        self._num_warmup_steps = num_warmup_steps
+        self._num_active_steps = num_active_steps
+
+    def __enter__(self):
+        self._curr_step = 0
+        # start recording memory history if there is no wait / warmup steps
+        if self._curr_step == self._num_wait_steps + self._num_warmup_steps and self._num_active_steps > 0:
+            torch.cuda.memory._record_memory_history(max_entries=SteppableMemoryProfiler.MEMORY_SNAPSHOT_MAX_ENTRIES)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._curr_step is None:
+            raise RuntimeError("SteppableMemoryProfilerContext exited without being entered")
+        if self._curr_step < self._num_wait_steps + self._num_warmup_steps + self._num_active_steps:
+            # if we exit before finishing all steps, dump the memory snapshot
+            raise RuntimeError("SteppableMemoryProfilerContext exited before finishing all steps")
+        return
+
+    def step(self):
+        if self._curr_step is None:
+            raise RuntimeError("SteppableMemoryProfilerContext.step() called outside of context manager")
+        self._curr_step += 1
+        if self._curr_step < self._num_wait_steps + self._num_warmup_steps:
+            return
+        elif self._curr_step == self._num_wait_steps + self._num_warmup_steps:
+            torch.cuda.memory._record_memory_history(max_entries=SteppableMemoryProfiler.MEMORY_SNAPSHOT_MAX_ENTRIES)
+        elif (
+            self._curr_step == self._num_wait_steps + self._num_warmup_steps + self._num_active_steps
+            and self._num_active_steps > 0
+        ):
+            with open(self._memory_snapshot_path, "wb") as output:
+                pickle.dump(torch.cuda.memory._snapshot(), output)
+
+
+class ProfilerListContext(SteppableProfilerIF):
+    def __init__(self, profiler_cms: list[SteppableProfilerIF]):
+        self.profiler_cms = profiler_cms
+        self._entered = None
+
+    def __enter__(self):
+        if self._entered is not None:
+            raise RuntimeError("ProfilerListContext entered multiple times without exiting")
+        self._entered = []
+        for profiler_cm in self.profiler_cms:
+            return_val = profiler_cm.__enter__()
+            if return_val is not None:
+                self._entered.append(return_val)
+            else:
+                self._entered.append(profiler_cm)
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._entered is None:
+            raise RuntimeError("ProfilerListContext exited without being entered")
+        for profiler_cm in self._entered:
+            profiler_cm.__exit__(exc_type, exc_value, traceback)
+        self._entered = None
+
+    def step(self):
+        if self._entered is None:
+            raise RuntimeError("ProfilerListContext.step() called outside of context manager")
+        for profiler_cm in self._entered:
+            profiler_cm.step()
 
 
 class ModalitiesProfilerStarter:
@@ -71,7 +155,6 @@ class ModalitiesProfilerStarter:
 
             global_rank = torch.distributed.get_rank()
             world_size = torch.distributed.get_world_size()
-            local_rank = int(os.environ["LOCAL_RANK"])
 
             ModalitiesProfilerStarter._run_helper(
                 config_file_path=config_file_path,
@@ -79,7 +162,6 @@ class ModalitiesProfilerStarter:
                 num_wait_steps=num_wait_steps,
                 num_warmup_steps=num_warmup_steps,
                 experiment_folder_path=experiment_root_path / experiment_id,
-                local_rank=local_rank,
                 global_rank=global_rank,
                 world_size=world_size,
                 profiled_ranks=profiled_ranks,
@@ -122,7 +204,6 @@ class ModalitiesProfilerStarter:
 
         global_rank = 0
         world_size = 1
-        local_rank = 0
         profiled_ranks = [0]
 
         ModalitiesProfilerStarter._run_helper(
@@ -133,7 +214,6 @@ class ModalitiesProfilerStarter:
             experiment_folder_path=experiment_root_path / experiment_id,
             global_rank=global_rank,
             world_size=world_size,
-            local_rank=local_rank,
             profiled_ranks=profiled_ranks,
             custom_component_registerables=custom_component_registerables,
         )
@@ -161,21 +241,34 @@ class ModalitiesProfilerStarter:
         experiment_folder_path: Path,
         profiled_ranks: list[int],
         global_rank: int,
-        local_rank: int,
         world_size: int,
         custom_component_registerables: list[CustomComponentRegisterable] | None = None,
     ):
-        # build profiler
-        profiler_activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
-        profile_context_manager = profile(
+        # build profilers
+        profiler_activities = [ProfilerActivity.CUDA]  # ProfilerActivity.CPU,
+        kernel_profiler = profile(
             activities=profiler_activities,
             schedule=schedule(wait=num_wait_steps, warmup=num_warmup_steps, active=num_measurement_steps),
-            record_shapes=True,
-            profile_memory=True,
-            with_flops=True,
-            with_stack=True,
-            with_modules=True,
+            record_shapes=False,
+            profile_memory=False,
+            with_flops=False,
+            with_stack=False,
+            with_modules=False,
+            # record_shapes=True,
+            # profile_memory=True,
+            # with_flops=True,
+            # with_stack=True,
+            # with_modules=True,
         )
+
+        SteppableMemoryProfiler(
+            memory_snapshot_path=experiment_folder_path / f"memory_snapshot_ranks_{world_size}_rank_{global_rank}.pkl",
+            num_wait_steps=num_wait_steps,
+            num_warmup_steps=num_warmup_steps,
+            num_active_steps=num_measurement_steps,
+        )
+
+        profile_context_manager = ProfilerListContext(profiler_cms=[kernel_profiler])  # , memory_profiler]
 
         # register custom components and build components from config
         # workaround to avoid triggering synchronization of experiment id in single process
@@ -199,15 +292,12 @@ class ModalitiesProfilerStarter:
             show_progress=(global_rank == profiled_ranks[0]),  # only show progress on a single rank that is profiled
         )
         trace_output_path = experiment_folder_path / f"profiler_trace_ranks_{world_size}_rank_{global_rank}.json"
-        memory_output_path = experiment_folder_path / f"profiler_memory_ranks_{world_size}_rank_{global_rank}.html"
         summary_output_path = experiment_folder_path / f"profiler_summary_ranks_{world_size}_rank_{global_rank}.txt"
 
         ModalitiesProfiler.export_profiling_results(
-            profiler_context_manager=profile_context_manager,
+            profiler_context_manager=kernel_profiler,
             trace_output_path=trace_output_path,
-            memory_output_path=memory_output_path,
             summary_output_path=summary_output_path,
-            local_rank=local_rank,
             global_rank=global_rank,
             profiled_ranks=profiled_ranks,
         )
@@ -218,7 +308,7 @@ class ModalitiesProfiler:
     def profile(
         steppable_component: SteppableComponentIF,
         num_total_steps: int,
-        profile_context_manager: torch.profiler.profile,
+        profile_context_manager: SteppableProfilerIF,
         show_progress: bool = False,
     ) -> None:
         """Profile a steppable component using the provided profiler context manager.
@@ -243,10 +333,8 @@ class ModalitiesProfiler:
     def export_profiling_results(
         profiler_context_manager: torch.profiler.profile,
         trace_output_path: Path,
-        memory_output_path: Path,
         summary_output_path: Path,
         global_rank: int,
-        local_rank: int,
         profiled_ranks: list[int],
     ) -> None:
         """Export profiling results to specified output paths if the current rank is in profiled_ranks.
@@ -263,8 +351,6 @@ class ModalitiesProfiler:
         if global_rank in profiled_ranks:
             logger.info(f"Saving profiling results for rank {global_rank}...")
             profiler_context_manager.export_chrome_trace(trace_output_path.as_posix())
-            device = local_rank if local_rank is not None else None
-            profiler_context_manager.export_memory_timeline(memory_output_path.as_posix(), device=device)
             table = profiler_context_manager.key_averages().table()
             with open(summary_output_path, "w", encoding="utf-8") as f:
                 f.write(table)
