@@ -10,7 +10,7 @@ dependencies = [
     "packaging",
     "tqdm",
     "pyyaml",
-    "transformers",
+    "transformers!=4.57.2,!=4.57.3", # Exclude versions with known issues. Can probably be removed if a version >4.57.3 is released.
     "datasets",
     "protobuf",
     "SentencePiece",
