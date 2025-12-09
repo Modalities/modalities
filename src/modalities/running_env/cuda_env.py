@@ -6,6 +6,7 @@ import torch
 import torch.distributed as dist
 
 from modalities.config.config import ProcessGroupBackendType
+from modalities.utils.env import EnvOverride
 
 
 class CudaEnv:
@@ -77,33 +78,24 @@ class MultiProcessingCudaEnv(CudaEnv):
         **process_group_kwargs: Any,
     ) -> None:
         super().__init__(process_group_backend=process_group_backend, timeout_s=timeout_s, **process_group_kwargs)
-        self.global_rank = global_rank
-        self.local_rank = local_rank
-        self.world_size = world_size
-        self.rdvz_port = rdvz_port
-        self._original_env: dict[str, str | None] = {}
+        self._env_override = EnvOverride(
+            {
+                "MASTER_ADDR": "localhost",
+                "MASTER_PORT": str(rdvz_port),
+                "RANK": str(global_rank),
+                "LOCAL_RANK": str(local_rank),
+                "WORLD_SIZE": str(world_size),
+            }
+        )
 
-    def __enter__(self):
-        # Store original values
-        for key in ["MASTER_ADDR", "MASTER_PORT", "RANK", "LOCAL_RANK", "WORLD_SIZE"]:
-            self._original_env[key] = os.environ.get(key)
-
-        # Set new environment variables
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = str(self.rdvz_port)
-        os.environ["RANK"] = str(self.global_rank)
-        os.environ["LOCAL_RANK"] = str(self.local_rank)
-        os.environ["WORLD_SIZE"] = str(self.world_size)
-
+    def __enter__(self) -> "MultiProcessingCudaEnv":
+        # Set environment overrides
+        self._env_override.__enter__()
         # Initialize CUDA environment
         super().__enter__()
         return self
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any | None):
         # Restore original environment variables
-        for key, value in self._original_env.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+        self._env_override.__exit__(exc_type, exc_val, exc_tb)
         super().__exit__(exc_type, exc_val, exc_tb)
