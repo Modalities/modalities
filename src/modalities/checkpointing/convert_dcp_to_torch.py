@@ -8,6 +8,7 @@ from torch.distributed.checkpoint.metadata import STATE_DICT_TYPE
 from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 
 from modalities.config.config import ConfigDictType, load_app_config_dict, save_yaml_config_dict
+from modalities.utils.env import EnvOverride
 
 
 def convert_dcp_to_torch(dcp_checkpoint_dir: str, output_dir: str, model_key: str = "model_raw") -> str:
@@ -45,7 +46,8 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     Returns:
         str: Path to the converted config file.
     """
-    config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
+    with EnvOverride({"LOCAL_RANK": "0", "RANK": "0", "WORLD_SIZE": "1"}):
+        config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
     if os.path.exists(config_dst):
         raise FileExistsError(f"Config file '{config_dst}' already exists.")
