@@ -19,12 +19,7 @@ from modalities.models.components.layer_norms import (
     RMSLayerNormConfig,
 )
 from modalities.models.model import ActivationType, NNModel, SwiGLU
-from modalities.running_env.fsdp.device_mesh import (
-    ParallelismDegrees,
-    get_parallel_degree,
-    get_parallel_rank,
-    has_parallelism_method,
-)
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank, has_parallelism_method
 from modalities.util import parse_enum_by_name
 
 try:
@@ -879,9 +874,11 @@ class GPT2LLM(NNModel):
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        # Set different random seed for each TP and PP rank to ensure diversity
-        if seed is not None and device_mesh is not None:
-            seed = _offset_seed_by_parallel_ranks(seed=seed, device_mesh=device_mesh)
+        # Set different random seed for each PP rank to ensure diversity
+        if seed is not None and has_parallelism_method(
+            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
+        ):
+            seed += get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
@@ -1072,26 +1069,3 @@ def manual_scaled_dot_product_attention(
     attn_weight = torch.softmax(attn_weight, dim=-1)
     attn_weight = torch.dropout(attn_weight, dropout_p, train=True)
     return attn_weight @ value
-
-
-def _offset_seed_by_parallel_ranks(seed: int, device_mesh: DeviceMesh) -> int:
-    """
-    Return a seed shifted by the TP/PP ranks so each TP/PP pair produces a distinct value.
-    """
-    tp_rank = None
-    pp_rank = None
-    pp_degree = 1
-
-    if has_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.TP):
-        tp_rank = get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.TP)
-    if has_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP):
-        pp_rank = get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
-        pp_degree = get_parallel_degree(device_mesh=device_mesh, parallelism_methods=[ParallelismDegrees.PP])
-
-    if tp_rank is not None and pp_rank is not None:
-        return seed + tp_rank * pp_degree + pp_rank
-    if tp_rank is not None:
-        return seed + tp_rank
-    if pp_rank is not None:
-        return seed + pp_rank
-    return seed
