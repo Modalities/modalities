@@ -77,6 +77,7 @@ def monitor_child_processes(
     manager: SyncManager,
     error_queue: Queue,
     proc_ctx: ProcessContext,
+    shutdown_manager: bool = True,
 ) -> None:
     # Normalize the return value from mp.spawn. When join=False it often
     # returns a ProcessContext-like object that may expose a `processes`
@@ -173,7 +174,8 @@ def monitor_child_processes(
             time.sleep(0.05)
     finally:
         try:
-            manager.shutdown()
+            if shutdown_manager:
+                manager.shutdown()
         except Exception:
             pass
 
