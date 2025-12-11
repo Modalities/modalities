@@ -129,14 +129,19 @@ def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
     _, dcp_config = load_dcp_config(dcp_dir)
     model_key = "model_raw" if "model_raw" in dcp_config else "model"
     new_config: ConfigDictType = {
-        "settings": dcp_config["settings"],
-        "dp_degree": dcp_config["dp_degree"],
         "fsdp_model": dcp_config["fsdp_model"],
         "initialized_model": dcp_config["initialized_model"],
         model_key: dcp_config[model_key],
-        "optimizer": dcp_config["optimizer"],
-        "lr_scheduler": dcp_config["lr_scheduler"],
     }
+    if "settings" in dcp_config:
+        new_config["settings"] = dcp_config["settings"]
+        new_config["settings"]["config_file_path"] = "converted_dcp_config.yaml"
+    if "dp_degree" in dcp_config:
+        new_config["dp_degree"] = dcp_config["dp_degree"]
+    if "optimizer" in dcp_config:
+        new_config["optimizer"] = dcp_config["optimizer"]
+    if "lr_scheduler" in dcp_config:
+        new_config["lr_scheduler"] = dcp_config["lr_scheduler"]
     new_config["app_state"] = {
         "component_key": "app_state",
         "variant_key": "dcp",
@@ -156,7 +161,6 @@ def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
     }
     new_config["fsdp_model"]["config"]["model"]["instance_key"] = model_key
     new_config["initialized_model"]["config"]["model"] = {"instance_key": "fsdp_model", "pass_type": "BY_REFERENCE"}
-    new_config["settings"]["config_file_path"] = "converted_dcp_config.yaml"
     return new_config
 
 
