@@ -1,9 +1,11 @@
 from enum import Enum
 
+import torch.nn as nn
 from pydantic import BaseModel
 
 from modalities.config.component_factory import ComponentFactory
-from modalities.config.pydantic_if_types import PydanticPytorchModuleType
+from modalities.config.config import ConfigDictType
+from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticPytorchModuleType
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 
@@ -15,22 +17,24 @@ class ModelTypeEnum(Enum):
     Attributes:
         MODEL (str): Represents a regular model.
         CHECKPOINTED_MODEL (str): Represents a checkpointed model.
+        DCP_CHECKPOINTED_MODEL (str): Represents a distributed checkpointed model.
     """
 
     MODEL = "model"
     CHECKPOINTED_MODEL = "checkpointed_model"
+    DCP_CHECKPOINTED_MODEL = "dcp_checkpointed_model"
 
 
-def get_model_from_config(config: dict, model_type: ModelTypeEnum):
+def get_model_from_config(config: ConfigDictType, model_type: ModelTypeEnum) -> nn.Module:
     """
     Retrieves a model from the given configuration based on the specified model type.
 
     Args:
-        config (dict): The configuration dictionary.
+        config (ConfigDictType): The configuration dictionary.
         model_type (ModelTypeEnum): The type of the model to retrieve.
 
     Returns:
-        Any: The model object based on the specified model type.
+        nn.Module: The model object based on the specified model type.
 
     Raises:
         NotImplementedError: If the model type is not supported.
@@ -48,6 +52,15 @@ def get_model_from_config(config: dict, model_type: ModelTypeEnum):
 
         class PydanticConfig(BaseModel):
             checkpointed_model: PydanticPytorchModuleType
+
+    elif model_type.value == "dcp_checkpointed_model":
+
+        class PydanticConfig(BaseModel):
+            app_state: PydanticAppStateType
+
+            @property
+            def dcp_checkpointed_model(self) -> PydanticPytorchModuleType:
+                return self.app_state.model
 
     else:
         raise NotImplementedError()

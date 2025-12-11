@@ -1,40 +1,49 @@
+import warnings
+
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from modalities.checkpointing.convert_dcp_to_torch import load_dcp_config
+from modalities.config.config import ConfigDictType, PrecisionEnum, ProcessGroupBackendType
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block, PositionTypes
 from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
+from modalities.running_env.env_utils import PyTorchDtypes
 
 
-def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, GPT2LLM]:
+def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM, GPT2LLM]:
     """Converts the modalities model to a Huggingface transformers model.
        Both the loaded modalities model and the converted Huggingface model are returned
        so that they can be compared.
 
     Args:
-        modalities_config (dict): Modalities config dictionary.
+        modalities_config (ConfigDictType): Modalities config dictionary.
 
     Returns:
         tuple[GPT2ForCausalLM, GPT2LLM]: Converted Hugging Face model and the original modalities model.
     """
     gpt2_config = convert_model_config(modalities_config)
-    hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=torch.bfloat16)
+    dtype = PrecisionEnum(
+        modalities_config["checkpointed_model"]["config"]["checkpoint_loading"]["config"]["precision"]
+    )
+    hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=dtype.value)
     modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
     _copy_weights_model(hf_model, modalities_model)
     return hf_model, modalities_model
 
 
-def convert_model_config(modalities_config: dict) -> GPT2Config:
+def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
        For this the model_raw or model section of the modalities config is used.
        Corresponding entries are mapped to the Huggingface configuration.
 
     Args:
-        modalities_config (dict): Modalities config dictionary.
+        modalities_config (ConfigDictType): Modalities config dictionary.
 
     Returns:
         GPT2Config: Converted Huggingface model configuration.
@@ -43,6 +52,12 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     _check_conversion_criteria(config)
 
     ffn_norm_key = "ffn_norm_config"
+    attention_type = _map_attention_type(config)
+    if attention_type != "sdpa":
+        warnings.warn(
+            f"transformers checkpoint will not save the attention implementation "
+            f"(set to {attention_type}) and use sdpa by default."
+        )
 
     return GPT2Config(
         vocab_size=config["vocab_size"],
@@ -62,9 +77,22 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         layer_norm_bias=_get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
-        _attn_implementation=_map_attention_type(config),
+        attn_implementation=attention_type,
         output_attentions=False,
     )
+
+
+def check_converted_dcp_model(
+    hf_model_dir: str, dcp_dir: str, num_testruns: int, device_id_modalities: str | int, device_hf: str
+):
+    new_config: ConfigDictType = _build_single_node_dcp_config(dcp_dir)
+    hf_model = _load_hf_model_for_dcp_comparison(hf_model_dir, new_config, device_hf)
+    vocab_size: int = new_config["model_raw" if "model_raw" in new_config else "model"]["config"]["vocab_size"]
+    if isinstance(device_id_modalities, str):
+        device_id_modalities = int(device_id_modalities.replace("cuda:", ""))
+    with MultiProcessingCudaEnv(ProcessGroupBackendType.nccl, 0, 0, 1, 24570, device_id=device_id_modalities):
+        modalities_model = get_model_from_config(new_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
+        check_converted_model(hf_model, modalities_model, num_testruns=num_testruns, vocab_size=vocab_size)
 
 
 def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, num_testruns: int, vocab_size: int):
@@ -85,14 +113,85 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
             modalities_logits = modalities_model(inputs)[modalities_model.prediction_key].to("cpu")
 
         assert llama_logits.shape == modalities_logits.shape
+        assert llama_logits.dtype == modalities_logits.dtype
         assert torch.equal(llama_logits, modalities_logits)
 
 
-def _check_conversion_criteria(model_config: dict) -> None:
+def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
+    """Builds a modalities config dictionary for loading a DCP checkpointed model on a single node.
+
+    Args:
+        dcp_dir (str): Directory containing the DCP checkpoint.
+
+    Returns:
+        ConfigDictType: New modalities config dictionary for loading the DCP checkpointed model.
+    """
+    _, dcp_config = load_dcp_config(dcp_dir)
+    model_key = "model_raw" if "model_raw" in dcp_config else "model"
+    new_config: ConfigDictType = {
+        "fsdp_model": dcp_config["fsdp_model"],
+        "initialized_model": dcp_config["initialized_model"],
+        model_key: dcp_config[model_key],
+    }
+    if "settings" in dcp_config:
+        new_config["settings"] = dcp_config["settings"]
+        new_config["settings"]["config_file_path"] = "converted_dcp_config.yaml"
+    if "dp_degree" in dcp_config:
+        new_config["dp_degree"] = dcp_config["dp_degree"]
+    if "optimizer" in dcp_config:
+        new_config["optimizer"] = dcp_config["optimizer"]
+    if "lr_scheduler" in dcp_config:
+        new_config["lr_scheduler"] = dcp_config["lr_scheduler"]
+    new_config["app_state"] = {
+        "component_key": "app_state",
+        "variant_key": "dcp",
+        "config": {
+            "raw_app_state": dcp_config["app_state_raw" if "app_state_raw" in dcp_config else "app_state"],
+            "checkpoint_dir_path": dcp_dir,
+        },
+    }
+    new_config["device_mesh"] = {
+        "component_key": "device_mesh",
+        "variant_key": "default",
+        "config": {
+            "device_type": "cuda",
+            "data_parallel_shard_degree": 1,
+            "world_size": 1,
+        },
+    }
+    new_config["fsdp_model"]["config"]["model"]["instance_key"] = model_key
+    new_config["initialized_model"]["config"]["model"] = {"instance_key": "fsdp_model", "pass_type": "BY_REFERENCE"}
+    return new_config
+
+
+def _load_hf_model_for_dcp_comparison(
+    hf_model_dir: str, dcp_modalities_config: ConfigDictType, device_hf: str
+) -> GPT2ForCausalLM:
+    # Need execution dtype of FSDP2 to get same outputs from model.
+    dtype = dcp_modalities_config["fsdp_model"]["config"]["mixed_precision_settings"]["param_dtype"]
+    hf_model: GPT2ForCausalLM = (
+        GPT2ForCausalLM.from_pretrained(hf_model_dir, local_files_only=True, trust_remote_code=True)
+        .to(device=device_hf)
+        .to(PyTorchDtypes(dtype).value)
+    )
+    # Need to match attention implementation
+    hf_model.config._attn_implementation = _map_attention_type(
+        dcp_modalities_config["model_raw" if "model_raw" in dcp_modalities_config else "model"]["config"]
+    )
+    # Rotary embedding frequencies are not downcasted in FSDP2.
+    # Therefore, we need to ensure they remain in the original precision.
+    hf_model.model.rotary_emb.inv_freq = hf_model.model.rotary_emb.original_inv_freq.to(
+        hf_model.model.rotary_emb.inv_freq.device
+    )
+
+    return hf_model
+
+
+def _check_conversion_criteria(model_config: ConfigDictType) -> None:
     """Checks that the modalities config fulfills criteria necessary for conversion
 
     Args:
-        model_config (dict): model or model_raw part of the Modalities config dictionary.
+        model_config (ConfigDictType): model or model_raw part of the Modalities config dictionary.
 
     Returns:
         None
@@ -116,12 +215,12 @@ def _check_conversion_criteria(model_config: dict) -> None:
     ), "All norms must have the same eps setting."
 
 
-def _get_layer_norm_value(config: dict, field: str) -> bool | float | int:
+def _get_layer_norm_value(config: ConfigDictType, field: str) -> bool | float | int:
     default = LayerNormConfig.model_fields[field].default
     return config.get(field, default)
 
 
-def _map_attention_type(config: dict):
+def _map_attention_type(config: ConfigDictType) -> str:
     if config["attention_implementation"] == "pytorch_flash":
         attention_impl = "sdpa"
     elif config["attention_implementation"] == "manual":

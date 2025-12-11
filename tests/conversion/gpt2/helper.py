@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
+from torch.distributed.tensor import DTensor
 
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block
 
 
+@torch.no_grad()
 def check_same_weight_model(converted_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
     converted_model.to(device=modalities_model.transformer.h["0"].attn.q_attn.weight.device)
-    assert torch.equal(converted_model.model.embed_tokens.weight, modalities_model.transformer.wte.weight)
+    assert torch.equal(converted_model.model.embed_tokens.weight, to_local(modalities_model.transformer.wte.weight))
     for i, (llama_layer, modalities_layer_idx) in enumerate(
         zip(converted_model.model.layers, modalities_model.transformer.h)
     ):
@@ -37,5 +39,13 @@ def check_same_weight_layer_norms(llama_layer: GPT2DecoderLayer, modalities_laye
 
 
 def check_same_weight_base_modules(l1: nn.Linear | nn.LayerNorm, l2: nn.Linear | nn.LayerNorm):
-    assert torch.equal(l1.weight, l2.weight)
-    assert (l1.bias is None and l2.bias is None) or torch.equal(l1.bias, l2.bias)
+    assert torch.equal(l1.weight, to_local(l2.weight))
+    assert (l1.bias is None and l2.bias is None) or torch.equal(l1.bias, to_local(l2.bias))
+
+
+@torch.no_grad()
+def to_local(tensor: torch.Tensor | DTensor) -> torch.Tensor:
+    """Convert a tensor or distributed tensor to a local tensor."""
+    if isinstance(tensor, DTensor):
+        return tensor.to_local()
+    return tensor

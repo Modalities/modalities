@@ -17,9 +17,9 @@ from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import get_optimizer_groups
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from tests.conftest import _ROOT_DIR
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.utility import find_free_port
 
 # number of parameters for each optimizer group
