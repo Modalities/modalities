@@ -46,8 +46,7 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
     Returns:
         str: Path to the converted config file.
     """
-    with EnvOverride({"LOCAL_RANK": "0", "RANK": "0", "WORLD_SIZE": "1"}):
-        config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
+    config_src, dcp_config = load_dcp_config(dcp_checkpoint_dir)
     config_dst: str = os.path.join(output_dir, os.path.basename(config_src))
     if os.path.exists(config_dst):
         raise FileExistsError(f"Config file '{config_dst}' already exists.")
@@ -84,13 +83,14 @@ def convert_config_file(dcp_checkpoint_dir: str, output_dir: str, model_key: str
 
 
 def load_dcp_config(dcp_checkpoint_dir: str) -> tuple[str, ConfigDictType]:
-    config_src: str | None = find_yaml_config_in_dir(dcp_checkpoint_dir)
-    if config_src is None:
-        config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
-    if config_src is None:
-        raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
-    dcp_config = load_app_config_dict(Path(config_src), experiment_id="-1")
-    return config_src, dcp_config
+    with EnvOverride({"LOCAL_RANK": "0", "RANK": "0", "WORLD_SIZE": "1"}):
+        config_src: str | None = find_yaml_config_in_dir(dcp_checkpoint_dir)
+        if config_src is None:
+            config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
+        if config_src is None:
+            raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
+        dcp_config = load_app_config_dict(Path(config_src), experiment_id="-1")
+        return config_src, dcp_config
 
 
 def find_yaml_config_in_dir(directory: str) -> str | None:
