@@ -12,13 +12,14 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import yaml
 from pydantic import BaseModel
+from torch.distributed._tensor.placement_types import Replicate
 
 from modalities.__main__ import Main
 from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
 from modalities.logging_broker.messages import Message
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_device_mesh, get_parallel_rank
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.utility import monitor_child_processes
 
@@ -67,17 +68,6 @@ class TestParallelSeedInitialization:
                 os._exit(1)
 
     def _seed_distribution_impl(self, world_size: int, tmp_path: Path):
-        device_mesh = get_device_mesh(
-            device_type="cuda",
-            data_parallel_replicate_degree=2,
-            data_parallel_shard_degree=1,
-            tensor_parallel_degree=2,
-            pipeline_parallel_degree=2,
-            context_parallel_degree=1,
-            enable_loss_parallel=False,
-            world_size=world_size,
-        )
-
         # initialize components
         class ComponentsInstantiationModel(BaseModel):
             fsdp_model: PydanticFSDP2ModuleType
@@ -88,10 +78,13 @@ class TestParallelSeedInitialization:
         components = main_obj.build_components(components_model_type=ComponentsInstantiationModel)
         model = components.fsdp_model
         device_mesh = components.device_mesh
-        # get first transformer block's MLP weight parameter shards
+        # for each pp stage get first transformer block's MLP weight parameter shards and full tensor
         block_key = next(iter(model.transformer.h.keys()))
         block = model.transformer.h[block_key]
+        placements = [Replicate()] * len(block.mlp.W.weight.device_mesh.mesh.shape)
+        full_weight = block.mlp.W.weight.redistribute(placements=placements).to_local().cpu()
         payload = {
+            "tensor_full": full_weight,
             "tensor_shard": block.mlp.W.weight.to_local().cpu(),
             "tp_rank": get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.TP),
             "pp_rank": get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP),
@@ -121,12 +114,24 @@ class TestParallelSeedInitialization:
 
         combo_tensors: dict[tuple[int, int], torch.Tensor] = {}
         for (pp_rank, tp_rank), entries in combos.items():
+            # check that full tensors are the same across data parallel processes
+            reference = entries[0]["tensor_full"]
+            seen_dp_ranks: set[int] = set()
+            for entry in entries:
+                dp_rank = entry["dp_shard_rank"]
+                assert dp_rank not in seen_dp_ranks, f"Duplicate DP rank {dp_rank} for combo PP={pp_rank}, TP={tp_rank}"
+                seen_dp_ranks.add(dp_rank)
+                assert torch.equal(reference, entry["tensor_full"]), (
+                    "Tensors within the same TP/PP combo must be identical across DP ranks; "
+                    f"mismatch at DP rank {dp_rank} for (PP={pp_rank}, TP={tp_rank})"
+                )
+            # concatenate all shards for this pp/tp combo
             shards = sorted(entries, key=lambda e: e["dp_shard_rank"])
             combo_tensors[(pp_rank, tp_rank)] = torch.cat(
                 [e["tensor_shard"] for e in shards],
                 dim=0,
             )
-
+        # check that tensor shards differ across different pp/tp combos
         combo_items = list(combo_tensors.items())
         for idx, ((pp_rank, tp_rank), base_tensor) in enumerate(combo_items):
             for other_key, other_tensor in combo_items[idx + 1 :]:
