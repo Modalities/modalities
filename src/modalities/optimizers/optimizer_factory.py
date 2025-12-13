@@ -26,10 +26,12 @@ class OptimizerFactory:
         eps: float,
         weight_decay: float,
         weight_decay_groups_excluded: list[str],
+        foreach: bool | None,
+        fused: bool | None,
         wrapped_model: nn.Module,
     ) -> Optimizer:
         optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
-        optimizer = Adam(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
+        optimizer = Adam(params=optimizer_groups, lr=lr, betas=betas, eps=eps, foreach=foreach, fused=fused)
         return optimizer
 
     @staticmethod
@@ -39,10 +41,12 @@ class OptimizerFactory:
         eps: float,
         weight_decay: float,
         weight_decay_groups_excluded: list[str],
+        foreach: bool | None,
+        fused: bool | None,
         wrapped_model: nn.Module,
     ) -> Optimizer:
         optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
-        optimizer = AdamW(params=optimizer_groups, lr=lr, betas=betas, eps=eps)
+        optimizer = AdamW(params=optimizer_groups, lr=lr, betas=betas, eps=eps, foreach=foreach, fused=fused)
         return optimizer
 
     @staticmethod
