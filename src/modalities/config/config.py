@@ -152,6 +152,8 @@ class AdamOptimizerConfig(BaseModel):
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -161,6 +163,8 @@ class AdamWOptimizerConfig(BaseModel):
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class DummyLRSchedulerConfig(BaseModel):
