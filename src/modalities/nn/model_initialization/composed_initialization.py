@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh
 from typing_extensions import Annotated
 
-from modalities.config.pydantic_if_types import PydanticModelInitializationIFType
+from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticModelInitializationIFType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
 from modalities.nn.model_initialization.parameter_name_filters import (
@@ -32,6 +32,8 @@ class ComposedModelInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    seed: Optional[int] = None
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
