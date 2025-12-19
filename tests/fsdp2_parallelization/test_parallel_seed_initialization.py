@@ -1,7 +1,6 @@
 import logging
 import multiprocessing as py_mp
 import os
-import re
 import traceback
 from pathlib import Path
 from typing import Any
@@ -15,10 +14,8 @@ from pydantic import BaseModel
 from torch.distributed._tensor.placement_types import Replicate
 
 from modalities.__main__ import Main
-from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
-from modalities.logging_broker.messages import Message
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.utility import monitor_child_processes
@@ -160,15 +157,3 @@ class TestParallelSeedInitialization:
             yaml.dump(config_dict, file)
 
         return temp_file_path
-
-
-def _get_loss_scores(messages: list[Message[EvaluationResultBatch]], loss_key: str) -> list[float]:
-    return [message.payload.losses[loss_key].value.item() for message in messages]
-
-
-def _extract_seen_steps_and_tokens(filename: str) -> tuple[int, int]:
-    pattern = r"seen_steps_(\d+)-seen_tokens_(\d+)"
-    match = re.search(pattern, filename)
-    if match is None:
-        raise ValueError(f"Filename '{filename}' does not match expected pattern '{pattern}'.")
-    return int(match.group(1)), int(match.group(2))
