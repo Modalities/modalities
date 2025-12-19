@@ -135,6 +135,14 @@ from modalities.utils.number_conversion import (
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+from modalities.utils.profilers.profiler_configs import (
+    SteppableCombinedProfilerConfig,
+    SteppableKernelProfilerConfig,
+    SteppableMemoryProfilerConfig,
+    SteppableNoProfilerConfig,
+)
+from modalities.utils.profilers.profiler_factory import ProfilerFactory
+from modalities.utils.profilers.profilers import SteppableCombinedProfiler, SteppableNoProfiler
 from modalities.utils.profilers.steppable_component_configs import SteppableForwardPassConfig
 from modalities.utils.profilers.steppable_components import SteppableForwardPass
 
@@ -430,5 +438,29 @@ COMPONENTS = [
         "forward_pass",
         SteppableForwardPass,
         SteppableForwardPassConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "kernel_tracing",
+        ProfilerFactory.create_steppable_kernel_profiler,
+        SteppableKernelProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "memory_tracing",
+        ProfilerFactory.create_steppable_memory_profiler,
+        SteppableMemoryProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "no_profiler",
+        SteppableNoProfiler,
+        SteppableNoProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "combined",
+        SteppableCombinedProfiler,
+        SteppableCombinedProfilerConfig,
     ),
 ]

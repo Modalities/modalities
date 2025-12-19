@@ -28,6 +28,7 @@ from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.utils.mfu import MFUCalculatorABC
 from modalities.utils.profilers.batch_generator import DatasetBatchGeneratorIF
+from modalities.utils.profilers.profilers import SteppableProfilerIF
 from modalities.utils.profilers.steppable_components import SteppableComponentIF
 
 
@@ -90,3 +91,4 @@ PydanticStagesGeneratorType = Annotated[StagesGenerator, PydanticThirdPartyTypeI
 PydanticPipelineType = Annotated[Pipeline, PydanticThirdPartyTypeIF(Pipeline)]
 PydanticPipelineStageType = Annotated[PipelineStage, PydanticThirdPartyTypeIF(PipelineStage)]
 PydanticSteppableComponentIFType = Annotated[SteppableComponentIF, PydanticThirdPartyTypeIF(SteppableComponentIF)]
+PydanticSteppableProfilerIFType = Annotated[SteppableProfilerIF, PydanticThirdPartyTypeIF(SteppableProfilerIF)]
