@@ -7,10 +7,8 @@ from typing import Annotated, Optional, overload
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator, validator
-from torch.distributed.device_mesh import DeviceMesh
 
 from modalities.config.lookup_enum import LookupEnum
-from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType
 from modalities.config.utils import convert_base_model_config_to_dict
 from modalities.models.components.layer_norms import (
     LayerNormConfig,
@@ -19,7 +17,6 @@ from modalities.models.components.layer_norms import (
     RMSLayerNormConfig,
 )
 from modalities.models.model import ActivationType, NNModel, SwiGLU
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank, has_parallelism_method
 from modalities.util import parse_enum_by_name
 
 try:
@@ -370,7 +367,6 @@ class GPT2LLMConfig(BaseModel):
     use_weight_tying: bool
     seed: Optional[int] = None
     enforce_swiglu_hidden_dim_multiple_of: int = 256
-    device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -838,7 +834,6 @@ class GPT2LLM(NNModel):
         use_weight_tying: bool,
         seed: Optional[int] = None,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
-        device_mesh: DeviceMesh | None = None,
     ):
         """
         Initializes the GPT2LLM object.
@@ -867,18 +862,12 @@ class GPT2LLM(NNModel):
             enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
                 Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.
-            device_mesh (DeviceMesh | None): The device mesh for parallelism. Defaults to None.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        # Set different random seed for each PP rank to ensure diversity
-        if seed is not None and has_parallelism_method(
-            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
-        ):
-            seed += get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
         super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
         self.sample_key = sample_key
         self.prediction_key = prediction_key

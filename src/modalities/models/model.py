@@ -26,7 +26,7 @@ class ActivationType(str, Enum):
 class NNModel(nn.Module):
     """NNModel class to define a base model."""
 
-    def __init__(self, seed: int = None, weight_decay_groups: Optional[WeightDecayGroups] = None):
+    def __init__(self, seed: Optional[int] = None, weight_decay_groups: Optional[WeightDecayGroups] = None):
         """
         Initializes an NNModel object.
 
