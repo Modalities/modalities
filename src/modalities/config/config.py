@@ -505,6 +505,7 @@ YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAM
 
 def load_app_config_dict(
     config_file_path: Path,
+    experiments_root_path: Path,
     experiment_id: Optional[str] = None,
     additional_resolver_funs: Optional[dict[str, Resolver]] = None,
 ) -> dict[str, YAMLValue]:
@@ -537,6 +538,7 @@ def load_app_config_dict(
     modalities_env_kwargs: dict[str, Any] = {
         "config_file_path": config_file_path,
         "config_folder_path": config_file_path.parent,
+        "experiments_root_path": experiments_root_path,
     }
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id

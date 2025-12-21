@@ -19,7 +19,6 @@ class SteppableKernelProfilerConfig(BaseModel):
     num_active_steps: int
     profiler_activities: list[ModalitiesProfilerActivity]
     record_shapes: bool
-    profile_memory: bool
     with_flops: bool
     with_stack: bool
     with_modules: bool
