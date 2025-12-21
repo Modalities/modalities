@@ -54,10 +54,10 @@ def main() -> None:
     help="Path to the YAML training config file.",
 )
 @click.option(
-    "--test_comm",
-    is_flag=True,
-    default=False,
-    help="If set, run a communication test before training.",
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
 )
 @click.option(
     "--experiment_id",
@@ -71,20 +71,28 @@ def main() -> None:
     default=None,
     help="Optional path to a folder where error logs will be written.",
 )
+@click.option(
+    "--test_comm",
+    is_flag=True,
+    default=False,
+    help="If set, run a communication test before training.",
+)
 def CMD_entry_point_run_modalities(
     config_file_path: Path,
-    test_comm: bool = False,
+    experiments_root_path: Path,
     experiment_id: Optional[str] = None,
     error_log_folder: Optional[Path] = None,
+    test_comm: bool = False,
 ):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
-        test_comm (bool): If set, run a communication test before training.
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
         experiment_id (Optional[str]): Optional experiment ID to use for this run.
             If not provided it will be generated. Default is None.
         error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
+        test_comm (bool): If set, run a communication test before training.
     """
 
     def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
@@ -104,7 +112,7 @@ def CMD_entry_point_run_modalities(
                 run_communication_test()
                 print_rank_0("Communication test succeeded.")
 
-            main_obj = Main(config_file_path, experiment_id=experiment_id)
+            main_obj = Main(config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id)
             components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
             main_obj.run(components)
     except Exception as e:
