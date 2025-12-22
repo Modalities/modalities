@@ -135,6 +135,7 @@ class SteppableKernelProfiler(SteppableProfilerIF):
         num_warmup_steps: int,
         num_active_steps: int,
         profiler_activities: list[torch.profiler.ProfilerActivity],
+        profile_memory: bool,
         record_shapes: bool,
         with_flops: bool,
         with_stack: bool,
@@ -147,6 +148,7 @@ class SteppableKernelProfiler(SteppableProfilerIF):
         self._num_warmup_steps = num_warmup_steps
         self._num_active_steps = num_active_steps
         self._profiler_activities = profiler_activities
+        self._profile_memory = profile_memory
         self._record_shapes = record_shapes
         self._with_flops = with_flops
         self._with_stack = with_stack
@@ -164,6 +166,7 @@ class SteppableKernelProfiler(SteppableProfilerIF):
         self._curr_step = 0
         self._kernel_profiler = profile(
             activities=self._profiler_activities,
+            profile_memory=self._profile_memory,
             schedule=schedule(wait=self._num_wait_steps, warmup=self._num_warmup_steps, active=self._num_active_steps),
             record_shapes=self._record_shapes,
             with_flops=self._with_flops,
