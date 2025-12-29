@@ -505,14 +505,16 @@ YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAM
 
 def load_app_config_dict(
     config_file_path: Path,
-    experiments_root_path: Path,
-    experiment_id: Optional[str] = None,
+    experiments_root_path: Path | None = None,
+    experiment_id: str | None = None,
     additional_resolver_funs: Optional[dict[str, Resolver]] = None,
 ) -> dict[str, YAMLValue]:
     """Load the application configuration from the given YAML file.
 
     Args:
         config_file_path (Path): YAML config file.
+        experiments_root_path: (Path, optional): The path to the experiments root directory.
+            Defaults to None.
         experiment_id (str, optional): The experiment_id of the current run.
         additional_resolver_funs (dict[str, Resolver], optional): Additional resolver functions.
 
@@ -538,8 +540,9 @@ def load_app_config_dict(
     modalities_env_kwargs: dict[str, Any] = {
         "config_file_path": config_file_path,
         "config_folder_path": config_file_path.parent,
-        "experiments_root_path": experiments_root_path,
     }
+    if experiments_root_path is not None:
+        modalities_env_kwargs["experiments_root_path"] = experiments_root_path
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(

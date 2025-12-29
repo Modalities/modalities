@@ -10,19 +10,25 @@ def _get_checkpoint_file_name_without_eid(checkpoint_file_name: str) -> str:
 
 
 def test_checkpoint_files_exist(checkpoint_folder_path: list[Path], expected_checkpoint_names: list[str]):
-    # Check if all the checkpoint files exist and have the correct names
-    checkpoint_paths = glob.glob(str(checkpoint_folder_path / "**/*"), recursive=True)
+    for expected_checkpoint_name in expected_checkpoint_names:
+        # Check if all the checkpoint files exist and have the correct names
+        checkpoint_paths = glob.glob(
+            str(checkpoint_folder_path / f"**/checkpoints/**/*{expected_checkpoint_name}/*"),
+            recursive=True,
+            include_hidden=True,
+        )
+        checkpoint_files = [p for p in checkpoint_paths if os.path.isfile(p)]
 
-    assert len(checkpoint_paths) == 17, "ERROR! Expected 6 checkpoint files."
-
-    assert len([p for p in checkpoint_paths if p.endswith(".distcp")]), "ERROR! Expected 6 checkpoint files."
+        assert len(checkpoint_files) == 3, f"ERROR! Expected 3 checkpoint files. Got {len(checkpoint_files)}."
+        num_checkpoint_files = len([p for p in checkpoint_files if p.endswith(".distcp")])
+        assert num_checkpoint_files == 2, f"ERROR! Expected 2 checkpoint files. Got {num_checkpoint_files}."
 
 
 if __name__ == "__main__":
     current_file_path = Path(__file__).resolve()
     os.chdir(current_file_path.parent)
 
-    checkpoint_folder_path = Path("../data/checkpoints")
+    checkpoint_folder_path = Path("../experiments")
 
     expected_checkpoint_folder_names = [
         # pretrain checkpoint
