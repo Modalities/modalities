@@ -95,16 +95,6 @@ def CMD_entry_point_run_modalities(
         test_comm (bool): If set, run a communication test before training.
     """
 
-    def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
-        # Format an exception into a structured JSON string with error message, type, and stack trace.
-        error = {
-            "error": str(e),
-            "type": type(e).__name__,
-            "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
-        }
-
-        return json.dumps({"environment": environment, "error": error}, indent=2)
-
     try:
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
             if test_comm:
@@ -116,24 +106,16 @@ def CMD_entry_point_run_modalities(
             components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
             main_obj.run(components)
     except Exception as e:
-        if error_log_folder is not None:
-            environment = {
-                "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
-                "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
-                "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
-                "hostname": socket.gethostname(),
-            }
-            error_log_folder = (
-                error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
-            )
-            error_log_folder.parent.mkdir(parents=True, exist_ok=True)
-            with open(error_log_folder, "w", encoding="utf-8") as f:
-                f.write(_format_exception_as_json(e, environment))
-
-        raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="warmstart")
+@click.option(
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
+)
 @click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=True),
@@ -146,10 +128,22 @@ def CMD_entry_point_run_modalities(
     required=True,
     help="Path to the file containing the model and optimizer checkpoint paths from the last successful checkpoint.",
 )
-def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint_info_file_path: Path):
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
+def CMD_entry_point_warmstart_modalities(
+    experiments_root_path: Path,
+    config_file_path: Path,
+    last_checkpoint_info_file_path: Path,
+    error_log_folder: Optional[Path] = None,
+):
     """Entrypoint to run the model warmstart.
 
     Args:
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
         config_file_path (Path): Path to the YAML warmstart config file.
         last_checkpoint_info_file_path (Path): Path to the file containing the model and
             optimizer checkpoint paths from the last successful checkpoint.
@@ -167,10 +161,15 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj = Main(
+                config_file_path, experiments_root_path=experiments_root_path, additional_resolver_funs=resolver_funs
+            )
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="generate_text")
@@ -722,6 +721,32 @@ def CMD_entry_point_run_train_step_profiler(
         config_file_path=config_file_path,
         experiment_root_path=experiment_root_path,
     )
+
+
+def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+    # Format an exception into a structured JSON string with error message, type, and stack trace.
+    error = {
+        "error": str(e),
+        "type": type(e).__name__,
+        "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
+    }
+    return json.dumps({"environment": environment, "error": error}, indent=2)
+
+
+def _exception_handling(e: Exception, error_log_folder: Path | None):
+    if error_log_folder is not None:
+        environment = {
+            "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
+            "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
+            "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
+            "hostname": socket.gethostname(),
+        }
+        error_log_folder = error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
+        error_log_folder.parent.mkdir(parents=True, exist_ok=True)
+        with open(error_log_folder, "w", encoding="utf-8") as f:
+            f.write(_format_exception_as_json(e, environment))
+
+    raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
 
 if __name__ == "__main__":
