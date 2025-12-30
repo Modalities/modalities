@@ -121,6 +121,8 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
     FSDP2DummyGradientClipperConfig,
     FSDP2GradientClipperConfig,
 )
+from modalities.utils.debug_components import Debugging, HookRegistration
+from modalities.utils.debugging_configs import DebuggingConfig, NaNHookConfig, PrintForwardHookConfig
 from modalities.utils.mfu import GPT2MFUCalculator
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
@@ -430,5 +432,14 @@ COMPONENTS = [
         "forward_pass",
         SteppableForwardPass,
         SteppableForwardPassConfig,
+    ),
+    # Debugging components
+    ComponentEntity("debugging", "settings", Debugging, DebuggingConfig),
+    ComponentEntity("model_debugging_hook", "nan_hook", HookRegistration.register_nan_hooks, NaNHookConfig),
+    ComponentEntity(
+        "model_debugging_hook",
+        "print_forward_hook",
+        HookRegistration.register_print_forward_hooks,
+        PrintForwardHookConfig,
     ),
 ]

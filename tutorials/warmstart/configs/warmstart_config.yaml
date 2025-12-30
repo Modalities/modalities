@@ -53,7 +53,7 @@ settings:
       variant_key: last_step_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
-  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}
+  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}  # use modalities warmstart [..] --last_checkpoint_info_file_path [..]
 
 collate_fn:
   component_key: collate_fn
