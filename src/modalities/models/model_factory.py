@@ -199,7 +199,7 @@ class ModelFactory:
         # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
         fsdp2_degrees = (
             (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
-            if ParallelismDegrees.DP_REPLICATE in device_mesh.mesh_dim_names
+            if ParallelismDegrees.DP_REPLICATE.value in device_mesh.mesh_dim_names
             else (ParallelismDegrees.DP_SHARD.value,)
         )
         fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
