@@ -151,17 +151,17 @@ class Main:
 
         # log parallel ranks
         log_str = (
-            f"Rank info for current rank:\n"
-            f"global_rank={components.settings.cuda_env.global_rank}\n"
-            f"world_size={components.settings.cuda_env.world_size}\n"
-            f"local_rank={components.settings.cuda_env.local_rank}\n"
+            f"Rank info for current rank:   "
+            f"global_rank={components.settings.cuda_env.global_rank}\t"
+            f"world_size={components.settings.cuda_env.world_size}\t"
+            f"local_rank={components.settings.cuda_env.local_rank}\t"
         )
 
         for pm in ParallelismDegrees:
             if has_parallelism_method(components.device_mesh, pm):
                 log_str += (
-                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\n"
-                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\n"
+                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\t"
+                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\t"
                 )
         get_logger(name="main").info(log_str.strip())
         # Trainer
