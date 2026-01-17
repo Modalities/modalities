@@ -319,8 +319,14 @@ class GPT2ModelTPConfig(BaseModel):
         if (
             ParallelismDegrees.DP_SHARD.value in mesh_dim_names
             and self.device_mesh[ParallelismDegrees.DP_SHARD.value].size() > 1
+        ) and (
+            ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names
+            and self.device_mesh[ParallelismDegrees.DP_REPLICATE.value].size() > 1
         ):
-            raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
+            raise ValueError(
+                "Either dp_replicate_degree > 1 or data_parallel_shard_degree > 1 can be "
+                "used with Tensor Parallelism. Not both."
+            )
         return self
 
 
