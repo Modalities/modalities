@@ -118,7 +118,8 @@ class PreTrainedHFTokenizer(TokenizerWrapper):
             if len(self.tokenizer.get_vocab()) > old_vocab_size:
                 raise NotImplementedError(
                     "Currently only tokens already known to the tokenizers vocabulary can be added,"
-                    + " as resizing the embedding matrix is not yet supported!"
+                    + " as resizing the embedding matrix is not yet supported! "
+                    f"Before: {old_vocab_size}, after: {len(self.tokenizer.get_vocab())}"
                 )
         self.max_length = max_length
         self.truncation = truncation
