@@ -109,6 +109,8 @@ class Gym:
         evaluation_interval_in_steps: int,
         scheduled_pipeline: Pipeline | None = None,
     ):
+        # TODO: We are currently not evaluating at step 0 because this causes issues with PyTorch's
+        #       PipelineParallelism (in particular Interleaved1F1B). This should be investigated and fixed.
         if num_train_steps_done % evaluation_interval_in_steps == 0 and num_train_steps_done > 0:
             self.evaluator.evaluate(
                 model=model,
