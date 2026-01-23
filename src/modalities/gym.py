@@ -58,7 +58,7 @@ class Gym:
         """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
-            model=app_state.model,
+            model=app_state.model_parts,
             evaluation_data_loaders=evaluation_data_loaders,
             evaluation_interval_in_steps=evaluation_interval_in_steps,
             scheduled_pipeline=scheduled_pipeline,
@@ -103,13 +103,15 @@ class Gym:
 
     def _run_evaluation(
         self,
-        model: nn.Module,
+        model: list[nn.Module] | nn.Module,
         num_train_steps_done: int,
         evaluation_data_loaders: list[LLMDataLoader],
         evaluation_interval_in_steps: int,
         scheduled_pipeline: Pipeline | None = None,
     ):
-        if num_train_steps_done % evaluation_interval_in_steps == 0:
+        # TODO: We are currently not evaluating at step 0 because this causes issues with PyTorch's
+        #       PipelineParallelism (in particular Interleaved1F1B). This should be investigated and fixed.
+        if num_train_steps_done % evaluation_interval_in_steps == 0 and num_train_steps_done > 0:
             self.evaluator.evaluate(
                 model=model,
                 data_loaders=evaluation_data_loaders,

@@ -89,7 +89,8 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        model = app_state.model
+        assert len(app_state.model_parts) == 1, "FSDP1CheckpointSaving only supports a single model part."
+        model = app_state.model_parts[0]
         optimizer = app_state.optimizer
         with FSDP.state_dict_type(
             module=model,

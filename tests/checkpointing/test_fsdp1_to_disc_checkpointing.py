@@ -136,7 +136,7 @@ class TestFSDP1ToDiscCheckpointing:
             sharding_strategy=ShardingStrategy.FULL_SHARD,
         )
 
-        untrained_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)
+        untrained_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)[0]
         untrained_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # run backward pass
@@ -148,7 +148,7 @@ class TestFSDP1ToDiscCheckpointing:
             batch_input_ids_dict=batch_input_ids_dict,
             batch_target_ids=batch_target_ids,
         )
-        updated_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)
+        updated_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)[0]
         updated_optimizer_state_dict = deepcopy(optimizer.state_dict())
 
         # save model and optimizer before backward pass
@@ -197,7 +197,7 @@ class TestFSDP1ToDiscCheckpointing:
             optimizer=optimizer_2, model=fsdp1_wrapped_model_2, file_path=optimizer_checkpointing_path
         )
 
-        loaded_and_updated_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)
+        loaded_and_updated_model_parameters = CheckpointingTestUtils.clone_parameters(fsdp1_wrapped_model)[0]
         loaded_and_updated_optimizer_state_dict = deepcopy(optimizer_2.state_dict())
 
         # make sure that after the update all weights are DIFFERENT from the original ones

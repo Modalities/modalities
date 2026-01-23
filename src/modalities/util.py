@@ -20,6 +20,7 @@ from torch.types import Number
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, has_parallelism_method
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.utils.maybe_list_parameter import maybe_list_parameter
 from modalities.utils.typing_utils import FSDPX
 
 
@@ -167,6 +168,7 @@ def get_local_number_of_trainable_parameters(model: nn.Module) -> int:
     return num_params
 
 
+@maybe_list_parameter("model", apply_to_list_result=sum)
 def get_total_number_of_trainable_parameters(model: FSDPX, device_mesh: DeviceMesh | None) -> Number:
     """Returns the total number of trainable parameters across all ranks.
     The model must be sharded with FSDP1 or FSDP2.
@@ -331,9 +333,10 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
     if module.__class__.__name__ == name:
         return module.__class__
     elif len(modules_children) == 0:
-        return
+        return None
     else:
         for child_module in modules_children:
             module_class = get_module_class_from_name(child_module, name)
             if module_class is not None:
                 return module_class
+        return None

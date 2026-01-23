@@ -172,3 +172,4 @@ config_files/instruction_tuning
 data/lorem_ipsum_instruct.jsonl
 tutorials/scaling_up/logs*
 tutorials/scaling_up/experiments_old/*
+results/*

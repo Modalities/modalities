@@ -15,13 +15,14 @@ class AppStateFactory:
 
     @staticmethod
     def get_raw_app_state(
-        model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None
+        model: nn.Module | list[nn.Module], optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None
     ) -> AppState:
         """Creates a new (non-checkpoint loaded) AppState object from an instantiated
         model, optimizer, and optional learning rate scheduler.
 
         Args:
-            model (nn.Module): The model can be either a non-sharded model, FSDP1 or FSDP2 model.
+            model (nn.Module | list[nn.Module]): The model (parts) can be either
+                a non-sharded model, FSDP1 or FSDP2 model.
             optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
             lr_scheduler (Optional[LRScheduler], optional): Lr scheduler used during training. Defaults to None.
 
