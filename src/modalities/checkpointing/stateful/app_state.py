@@ -166,7 +166,10 @@ class ModelStateRetriever(StateRetrieverIF):
         Returns:
             dict[str, Any]: The state dict of the model in the AppState object.
         """
-        return {k: v for sd in map(get_model_state_dict, app_state.model_parts) for k, v in sd.items()}
+        state_dicts = list(map(get_model_state_dict, app_state.model_parts))
+        state_dict_keys = sum((list(sd.keys()) for sd in state_dicts), [])
+        assert len(state_dict_keys) == len(set(state_dict_keys)), "State dict keys are not unique across model parts."
+        return {k: v for sd in state_dicts for k, v in sd.items()}
 
     @staticmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
