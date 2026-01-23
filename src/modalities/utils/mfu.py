@@ -89,32 +89,33 @@ class MFUCalculatorABC:
             return None
 
     @staticmethod
-    def _get_theoretical_gpu_peak_performance(wrapped_model: FSDPX, world_size: int) -> Optional[Number]:
+    def _get_theoretical_gpu_peak_performance(model_parts: FSDPX | list[FSDP2], world_size: int) -> Optional[Number]:
         """
         Calculates the accumulated theoretical peak performance based on all GPUs, i.e.,
         #GPU=world_size, in units FLOPs / s for given gpu type.
 
         Args:
-            model (FSDPX): The model for which to calculate the theoretical peak performance.
+            model_parts (FSDPX | list[FSDP2]): The model or model parts for which
+                to calculate the theoretical peak performance.
             world_size (int): The number of GPUs used in parallel.
 
         Returns:
             (Number, optional): The accumulated theoretical peak performance of all GPUs,
             or None if it cannot be calculated.
         """
-        if isinstance(wrapped_model, FSDP1):
-            precision = wrapped_model.mixed_precision.param_dtype
+        if isinstance(model_parts, FSDP1):
+            precision = model_parts.mixed_precision.param_dtype
             if (
-                wrapped_model.mixed_precision.reduce_dtype != precision
-                or wrapped_model.mixed_precision.buffer_dtype != precision
+                model_parts.mixed_precision.reduce_dtype != precision
+                or model_parts.mixed_precision.buffer_dtype != precision
             ):
                 warnings.warn(f"Could not get theoretical GPU peak performance for mixed precision type = {precision}.")
                 return None
-        elif isinstance(wrapped_model, FSDP2):
+        elif isinstance(model_parts, FSDP2) or isinstance(model_parts, list):
             warnings.warn("MFU is computed based on the assumption that bf16 precision is used.")
             precision = torch.bfloat16
         else:
-            raise TypeError(f"Model should be of type FSDPX, but is {type(wrapped_model)} instead.")
+            raise TypeError(f"Model should be of type FSDPX, but is {type(model_parts)} instead.")
 
         device_name = torch.cuda.get_device_name()
         if device_name.startswith("NVIDIA A100"):
@@ -153,10 +154,10 @@ class GPT2MFUCalculator(MFUCalculatorABC):
         sequence_length: int,
         n_embd: int,
         world_size: int,
-        wrapped_model: FSDPX,
+        model_parts: FSDPX | list[FSDP2],
         device_mesh: Optional[torch.distributed.device_mesh.DeviceMesh] = None,
     ):
-        self._num_params = get_total_number_of_trainable_parameters(model=wrapped_model, device_mesh=device_mesh)
+        self._num_params = get_total_number_of_trainable_parameters(model=model_parts, device_mesh=device_mesh)
         self._n_layer = n_layer
         self._sequence_length = sequence_length
         self._n_embd = n_embd
@@ -167,7 +168,7 @@ class GPT2MFUCalculator(MFUCalculatorABC):
             n_embd=self._n_embd,
         )
         self._theoretical_gpu_peak_performance = MFUCalculatorABC._get_theoretical_gpu_peak_performance(
-            wrapped_model, world_size
+            model_parts, world_size
         )
 
     @staticmethod

@@ -202,7 +202,7 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        num_params = get_total_number_of_trainable_parameters(components.app_state.model, components.device_mesh)
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model_parts, components.device_mesh)
         components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
         logger.info(f"Training model with {num_params} parameters.")
 

@@ -308,7 +308,7 @@ staged_pipeline:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
     local_rank: ${settings.cuda_env.local_rank}
-    pp_schedule_name: gpipe
+    pp_schedule_name: ${scheduled_pipeline.config.pp_schedule_name}
     num_layers_per_stage: 2
 
 model_raw:

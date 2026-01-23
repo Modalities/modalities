@@ -106,13 +106,13 @@ class TestPipelineParallelism:
             print(f"Exception in _forward_step_with_pp: {e}")
             traceback.print_exc()
             raise e
-        return scheduled_pipeline.is_last_pp_stage, loss_pp
+        return scheduled_pipeline.has_last_pp_stage, loss_pp
 
     def _forward_step(self, scheduled_pipeline: Pipeline, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Runs a forward step on the model."""
         pp_schedule = scheduled_pipeline.pp_schedule
-        targets, losses = (targets, []) if scheduled_pipeline.is_last_pp_stage else (None, None)
-        if scheduled_pipeline.is_first_pp_stage:
+        targets, losses = (targets, []) if scheduled_pipeline.has_last_pp_stage else (None, None)
+        if scheduled_pipeline.has_first_pp_stage:
             pp_schedule.step(inputs, target=targets, losses=losses)
         else:
             pp_schedule.step(target=targets, losses=losses)
@@ -120,7 +120,7 @@ class TestPipelineParallelism:
         # accumulate losses across pipeline microbatches
         return (
             torch.mean(torch.stack(losses)).to(losses[0].device)
-            if scheduled_pipeline.is_last_pp_stage
+            if scheduled_pipeline.has_last_pp_stage
             else torch.tensor([-1.0], device=inputs.device)
         )
 

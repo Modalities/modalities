@@ -5,7 +5,6 @@ from typing import Callable, Optional
 import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import DeviceMesh
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -24,6 +23,7 @@ from modalities.training.training_progress import TrainingProgress
 from modalities.util import TimeRecorder, print_rank_0
 from modalities.utils.mfu import MFUCalculatorABC
 from modalities.utils.profilers.profilers import SteppableProfilerIF
+from modalities.utils.typing_utils import FSDPX
 
 
 class ThroughputAggregationKeys(Enum):
@@ -108,7 +108,7 @@ class Trainer:
     def _train_batch(
         self,
         batch: DatasetBatch,
-        model: FSDP,
+        model_parts: list[FSDPX],
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
@@ -120,7 +120,7 @@ class Trainer:
 
         Args:
             batch (DatasetBatch): The input batch of data.
-            model (FSDP): The model to train.
+            model_parts (list[FSDPX]): The model parts to train.
             optimizer (Optimizer): The optimizer used for training.
             scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
@@ -144,18 +144,20 @@ class Trainer:
             # with self.train_context(optional_context_parallel_ctx):
             targets, losses = (
                 (batch.targets[loss_fun.target_key].contiguous(), [])
-                if scheduled_pipeline.is_last_pp_stage
+                if scheduled_pipeline.has_last_pp_stage
                 else (None, None)
             )
 
-            if scheduled_pipeline.is_first_pp_stage:
-                pp_schedule.step(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+            if scheduled_pipeline.has_first_pp_stage:
+                pp_schedule.step(batch.samples[model_parts[0].sample_key].contiguous(), target=targets, losses=losses)
             else:
                 pp_schedule.step(target=targets, losses=losses)
-            loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+            loss = (
+                torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.has_last_pp_stage else None
+            )
         else:
             # else continue with loss calculation
-            result_batch = model_predict_batch(model=model, batch=batch)
+            result_batch = model_predict_batch(model=model_parts[0], batch=batch)
             loss = loss_fun(result_batch)
             (loss / self.gradient_acc_steps).backward()
 
@@ -180,7 +182,7 @@ class Trainer:
         train_loader: LLMDataLoader,
         loss_fun: Loss,
         training_log_interval_in_steps: int,
-        evaluation_callback: Callable[[TrainingProgress], None],
+        evaluation_callback: Callable[[int], None],
         checkpointing_callback: Callable[[TrainingProgress], None],
         scheduled_pipeline: Pipeline | None = None,
     ):
@@ -192,7 +194,7 @@ class Trainer:
             train_loader (LLMDataLoader): The data loader containing the training data.
             loss_fun (Loss): The loss function used for training.
             training_log_interval_in_steps (int): The interval at which training progress is logged.
-            evaluation_callback (Callable[[TrainingProgress], None]): A callback function for evaluation.
+            evaluation_callback (Callable[[int], None]): A callback function for evaluation.
             checkpointing_callback (Callable[[TrainingProgress], None]): A callback function for checkpointing.
             scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
                 operate the model. Defaults to None.
@@ -200,10 +202,13 @@ class Trainer:
         Returns:
             None
         """
-        model = app_state.model
+        model_parts = app_state.model_parts
         optimizer = app_state.optimizer
         lr_scheduler = app_state.lr_scheduler
-        model.train()
+        if scheduled_pipeline is None:
+            assert len(model_parts) == 1, "Expected a single model part when no scheduled pipeline is provided."
+        for m in model_parts:
+            m.train()
 
         local_num_seen_samples = 0
         cumulated_losses = self._reset_tracked_losses()
@@ -244,7 +249,7 @@ class Trainer:
                     gradient_norm_score,
                 ) = self._train_batch(
                     batch=batch,
-                    model=model,
+                    model_parts=model_parts,
                     optimizer=optimizer,
                     scheduler=lr_scheduler,
                     loss_fun=loss_fun,
@@ -299,63 +304,109 @@ class Trainer:
                         ),
                     )
 
-                    train_loss_avg, train_loss_last_batch = (
-                        reduced_losses[0],
-                        reduced_losses[1],
-                    )
-                    losses = {
-                        "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
-                        "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
-                    }
+                    # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
+                    if batch_loss is not None:
+                        # Save the batch loss
+                        cumulated_losses[0] += batch_loss.item()
+                        # This works, because we always drop the last batch in case
+                        # it has less samples than the batch size
+                        cumulated_losses[-1] += 1  # number of local batches
 
-                    consumed_tokens = torch.tensor(training_progress.num_seen_tokens_total)
-                    metrics = {
-                        "consumed tokens": ResultItem(consumed_tokens, 0),
-                        "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
-                        "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
-                    }
-                    gradient_norm_scores = []
-                    mfu_score = torch.tensor(-1.0)
-                    if self.mfu_calculator is not None:
-                        mfu_score = self.mfu_calculator.compute(num_samples_per_second=global_num_samples_per_second)
+                    # gradient norm is already synced across all ranks
+                    if gradient_norm_score is not None:
+                        gradient_norm_scores.append(gradient_norm_score.item())
 
-                    # Collect peak memory depending on device type. On CPU we fall back to RSS (if available) or -1.
-                    if device.type == "cuda":
-                        peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
-                        torch.cuda.reset_peak_memory_stats(device)
-                    else:
-                        # ru_maxrss is in kilobytes on Linux; convert to MB. Use -1.0 if resource unavailable.
-                        try:
-                            import resource  # Standard lib (POSIX). Not available on some platforms.
+                    local_num_seen_samples += torch.tensor(len(batch)).to(device)
 
-                            peak_memory_MB = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-                        except Exception:
-                            peak_memory_MB = -1.0
-
-                    training_metrics = EvaluationResultBatch(
-                        losses=losses,
-                        metrics=metrics,
-                        # TODO: hardcoded metric key
-                        throughput_metrics={
-                            "train samples/s": ResultItem(global_num_samples_per_second, 1),
-                            "train mfu (16-bit)": ResultItem(mfu_score, 2),
-                            "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
-                            "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
-                        },
-                        dataloader_tag=train_loader.dataloader_tag,
+                    self._publish_progress(
+                        progress_publisher=self.progress_publisher,
                         num_train_steps_done=training_progress.num_seen_steps_total,
+                        dataloader_tag=train_loader.dataloader_tag,
                     )
-                    print_rank_0(f"{datetime.now().isoformat(timespec='seconds')} | {training_metrics}")
-                    self._publish_evaluation_result(
-                        evaluation_result_publisher=self.evaluation_result_publisher,
-                        evaluation_result=training_metrics,
-                    )
+                    # Check if model performance should be logged
+                    if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
+                        forward_backward_time_recorder.stop()
+                        forward_backward_time = torch.tensor(forward_backward_time_recorder.delta_t).to(device)
+                        forward_backward_time_recorder.reset()
+                        forward_backward_time_recorder.start()
 
-                    cumulated_losses = self._reset_tracked_losses()
-                if step_performed:
-                    evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
-                    checkpointing_callback(training_progress=training_progress)
-                profiler_cm.step()
+                        global_num_seen_samples = local_num_seen_samples * self.dp_degree
+                        local_num_seen_samples = 0
+                        global_num_samples_per_second = global_num_seen_samples / forward_backward_time
+
+                        # TODO: insert reducer from outside so Trainer is independent of FSDP
+                        # add the loss and gradient norm for the LAST batch
+                        cumulated_losses[1] = batch_loss.item() if batch_loss is not None else 0.0
+
+                        reduced_losses = Reducer.reduce(
+                            tensor=cumulated_losses,
+                            operation=dist.ReduceOp.SUM,
+                            # 1.) summed batch loss / (num batches * (world size / dp_degree))
+                            # 2.) last batch loss / (world size / pp_degree)
+                            post_processing_fun=lambda t: torch.stack(
+                                [t[0] / t[-1], t[1] / dist.get_world_size() * self.pp_degree]
+                            ),
+                        )
+
+                        train_loss_avg, train_loss_last_batch = (
+                            reduced_losses[0],
+                            reduced_losses[1],
+                        )
+                        losses = {
+                            "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
+                            "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
+                        }
+
+                        consumed_tokens = torch.tensor(training_progress.num_seen_tokens_total)
+                        metrics = {
+                            "consumed tokens": ResultItem(consumed_tokens, 0),
+                            "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
+                            "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
+                        }
+                        gradient_norm_scores = []
+                        mfu_score = torch.tensor(-1.0)
+                        if self.mfu_calculator is not None:
+                            mfu_score = self.mfu_calculator.compute(
+                                num_samples_per_second=global_num_samples_per_second
+                            )
+
+                        # Collect peak memory depending on device type. On CPU we fall back to RSS (if available) or -1.
+                        if device.type == "cuda":
+                            peak_memory_MB = torch.cuda.max_memory_allocated(device) / 1024**2  # in MB
+                            torch.cuda.reset_peak_memory_stats(device)
+                        else:
+                            # ru_maxrss is in kilobytes on Linux; convert to MB. Use -1.0 if resource unavailable.
+                            try:
+                                import resource  # Standard lib (POSIX). Not available on some platforms.
+
+                                peak_memory_MB = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+                            except Exception:
+                                peak_memory_MB = -1.0
+
+                        training_metrics = EvaluationResultBatch(
+                            losses=losses,
+                            metrics=metrics,
+                            # TODO: hardcoded metric key
+                            throughput_metrics={
+                                "train samples/s": ResultItem(global_num_samples_per_second, 1),
+                                "train mfu (16-bit)": ResultItem(mfu_score, 2),
+                                "lr mean": ResultItem(torch.tensor(lr_scheduler.get_last_lr()).mean()),
+                                "peak memory rank 0 (MB)": ResultItem(torch.tensor(peak_memory_MB), 2),
+                            },
+                            dataloader_tag=train_loader.dataloader_tag,
+                            num_train_steps_done=training_progress.num_seen_steps_total,
+                        )
+                        print_rank_0(f"{datetime.now().isoformat(timespec='seconds')} | {training_metrics}")
+                        self._publish_evaluation_result(
+                            evaluation_result_publisher=self.evaluation_result_publisher,
+                            evaluation_result=training_metrics,
+                        )
+
+                        cumulated_losses = self._reset_tracked_losses()
+                    if step_performed:
+                        evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
+                        checkpointing_callback(training_progress=training_progress)
+                    profiler_cm.step()
 
     def _reset_tracked_losses(self):
         # Initializes and returns a tensor representing the cumulated loss and gradient norm.
