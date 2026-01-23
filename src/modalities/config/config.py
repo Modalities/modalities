@@ -27,6 +27,7 @@ from modalities.config.pydantic_if_types import (
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
+    PydanticPytorchModuleOrListType,
     PydanticPytorchModuleType,
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
@@ -43,6 +44,7 @@ from modalities.training.activation_checkpointing.activation_checkpointing_varia
     ActivationCheckpointingVariants,
 )
 from modalities.util import parse_enum_by_name
+from modalities.utils.deprecated_alias import add_deprecated_alias
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -145,20 +147,24 @@ class CheckpointSavingConfig(BaseModel):
 
 class AdamOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    # foreach: bool | None = None
+    # fused: bool | None = None
 
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    # foreach: bool | None = None
+    # fused: bool | None = None
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -264,7 +270,7 @@ class FSDPWrappedModelConfig(BaseModel):
 
 
 class FSDP2WrappedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
@@ -289,7 +295,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 
 
 class DebuggingEnrichedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     logging_dir_path: Path
     tracked_ranks: Optional[Set[int]] = None
     log_interval_steps: Optional[int] = 1
@@ -302,7 +308,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
 
 
 class GPT2ModelTPConfig(BaseModel):
-    model: PydanticPytorchModuleType  # TODO set proper type
+    model: PydanticPytorchModuleOrListType  # TODO set proper type
     device_mesh: PydanticDeviceMeshIFType
 
     @model_validator(mode="after")
@@ -325,7 +331,7 @@ class CompiledModelConfig(BaseModel):
 
 
 class WeightInitializedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     model_initializer: PydanticModelInitializationIFType
 
     # avoid warning about protected namespace 'model_', see
@@ -350,12 +356,12 @@ class ActivationCheckpointedModelConfig(BaseModel):
 
     ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
 
@@ -480,12 +486,13 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
+@add_deprecated_alias("model_parts", "wrapped_model")
 class GPT2MFUCalculatorConfig(BaseModel):
     n_layer: Annotated[int, Field(strict=True, gt=0)]
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
-    wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    model_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
 

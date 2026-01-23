@@ -5,7 +5,6 @@ from typing import Callable, Optional
 import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import DeviceMesh
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -23,6 +22,7 @@ from modalities.training.gradient_clipping.gradient_clipper import GradientClipp
 from modalities.training.training_progress import TrainingProgress
 from modalities.util import TimeRecorder, print_rank_0
 from modalities.utils.mfu import MFUCalculatorABC
+from modalities.utils.typing_utils import FSDPX
 
 
 class ThroughputAggregationKeys(Enum):
@@ -104,7 +104,7 @@ class Trainer:
     def _train_batch(
         self,
         batch: DatasetBatch,
-        model: FSDP,
+        model_parts: list[FSDPX],
         optimizer: Optimizer,
         scheduler: LRScheduler,
         loss_fun: Loss,
@@ -116,7 +116,7 @@ class Trainer:
 
         Args:
             batch (DatasetBatch): The input batch of data.
-            model (FSDP): The model to train.
+            model_parts (list[FSDPX]): The model parts to train.
             optimizer (Optimizer): The optimizer used for training.
             scheduler (LRScheduler): The learning rate scheduler.
             loss_fun (Loss): The loss function used for training.
@@ -140,18 +140,20 @@ class Trainer:
             # with self.train_context(optional_context_parallel_ctx):
             targets, losses = (
                 (batch.targets[loss_fun.target_key].contiguous(), [])
-                if scheduled_pipeline.is_last_pp_stage
+                if scheduled_pipeline.has_last_pp_stage
                 else (None, None)
             )
 
-            if scheduled_pipeline.is_first_pp_stage:
-                pp_schedule.step(batch.samples[model.sample_key].contiguous(), target=targets, losses=losses)
+            if scheduled_pipeline.has_first_pp_stage:
+                pp_schedule.step(batch.samples[model_parts[0].sample_key].contiguous(), target=targets, losses=losses)
             else:
                 pp_schedule.step(target=targets, losses=losses)
-            loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+            loss = (
+                torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.has_last_pp_stage else None
+            )
         else:
             # else continue with loss calculation
-            result_batch = model_predict_batch(model=model, batch=batch)
+            result_batch = model_predict_batch(model=model_parts[0], batch=batch)
             loss = loss_fun(result_batch)
             (loss / self.gradient_acc_steps).backward()
 
@@ -196,10 +198,13 @@ class Trainer:
         Returns:
             None
         """
-        model = app_state.model
+        model_parts = app_state.model_parts
         optimizer = app_state.optimizer
         lr_scheduler = app_state.lr_scheduler
-        model.train()
+        if scheduled_pipeline is None:
+            assert len(model_parts) == 1, "Expected a single model part when no scheduled pipeline is provided."
+        for m in model_parts:
+            m.train()
 
         local_num_seen_samples = 0
         cumulated_losses = self._reset_tracked_losses()
@@ -239,7 +244,7 @@ class Trainer:
                 gradient_norm_score,
             ) = self._train_batch(
                 batch=batch,
-                model=model,
+                model_parts=model_parts,
                 optimizer=optimizer,
                 scheduler=lr_scheduler,
                 loss_fun=loss_fun,
