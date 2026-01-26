@@ -2,6 +2,7 @@ import math
 import re
 from typing import Annotated, Optional
 
+import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field, model_validator
 
@@ -59,7 +60,11 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
 class InitializationRoutines:
     @staticmethod
     def get_plain_initialization(
-        mean: float, std: float | str, parameter_name_regexes: list[str], hidden_dim: Optional[int] = None
+        mean: float,
+        std: float | str,
+        parameter_name_regexes: list[str],
+        hidden_dim: Optional[int] = None,
+        seed: Optional[int] = None,
     ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
@@ -70,8 +75,11 @@ class InitializationRoutines:
             std (float): standard deviation of the normal distribution. If set to "auto", appropiate
                 value selected as per plain initialization described in https://arxiv.org/abs/2312.16903
             hidden_dim (Optional[int]): hidden dimension of the attention layer. Defaults to None.
+            parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
+                should be applied
+            seed (Optional[int]): Random seed for initialization. Defaults to None.
         """
-
+        InitializationRoutines._set_seed(seed)
         # auto: choose std automatically
         if std == "auto":
             if hidden_dim is None:
@@ -86,7 +94,7 @@ class InitializationRoutines:
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, std: float, num_layers: int, parameter_name_regexes: list[str]
+        mean: float, std: float, num_layers: int, parameter_name_regexes: list[str], seed: Optional[int] = None
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -96,10 +104,12 @@ class InitializationRoutines:
             num_layers (int): Number of layers in the model which we use to downscale std with
             parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
                 should be applied
+            seed (Optional[int]): Random seed for initialization. Defaults to None.
 
         Returns:
             WeightInitializationIF: Weight initialization object
         """
+        InitializationRoutines._set_seed(seed)
         # see https://arxiv.org/abs/2312.16903
         scaled_std = std / math.sqrt(2 * num_layers)
 
@@ -109,7 +119,9 @@ class InitializationRoutines:
         return initialization
 
     @staticmethod
-    def get_scaled_embed_initialization(mean: float, parameter_name_regexes: list[str]) -> ModelInitializationIF:
+    def get_scaled_embed_initialization(
+        mean: float, parameter_name_regexes: list[str], seed: Optional[int] = None
+    ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
 
@@ -117,12 +129,19 @@ class InitializationRoutines:
             mean (float): Mean of the normal distribution
             parameter_name_regexes (list[str], optional): List of parameter name regexes to which the initialization
                 should be applied Defaults to None.
+            seed (Optional[int]): Random seed for initialization. Defaults to None.
 
         Returns:
             WeightInitializationIF: Weight initialization object
         """
+        InitializationRoutines._set_seed(seed)
         std = math.sqrt(0.4)
         initialization = NamedParameterwiseNormalInitialization(
             mean=mean, std=std, parameter_name_regexes=parameter_name_regexes
         )
         return initialization
+
+    @staticmethod
+    def _set_seed(seed: Optional[int]):
+        if seed is not None:
+            torch.manual_seed(seed)
