@@ -304,3 +304,19 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
             if module_class is not None:
                 return module_class
         return None
+
+
+def cpu_scalar_float(x: torch.Tensor | float) -> float:
+    if torch.is_tensor(x):
+        if x.numel() != 1:
+            raise ValueError(f"Expected scalar tensor, got shape {tuple(x.shape)}")
+        return float(x.detach().cpu())
+    return float(x)
+
+
+def cpu_scalar_int(x: torch.Tensor | int) -> int:
+    if torch.is_tensor(x):
+        if x.numel() != 1:
+            raise ValueError(f"Expected scalar tensor, got shape {tuple(x.shape)}")
+        return int(x.detach().cpu())
+    return int(x)
