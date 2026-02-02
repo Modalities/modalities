@@ -168,6 +168,7 @@ class ModelFactory:
         device_mesh: DeviceMesh,
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
+        layers_per_fsdp_unit: int = 1,
     ) -> FSDP2:
         """Get the FSDP2-wrapped model.
 
@@ -181,6 +182,7 @@ class ModelFactory:
             device_mesh (DeviceMesh): The device mesh.
             mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.
             reshard_after_forward (bool): Whether to reshard after forward.
+            layers_per_fsdp_unit (int): Number of layers per FSDP unit. Default is 1.
 
         Returns:
             FSDP2: The FSDP2-wrapped model.
@@ -205,17 +207,32 @@ class ModelFactory:
         fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
+
         # we first shard all the blocks
+        grouped_modules: list[nn.Module] = []
+        module_id = 0
         for module_id, module in enumerate(modules):
             if isinstance(module, block_types):
-                # As an optimization, we do not reshard after forward for the last
-                # transformer block since FSDP would prefetch it immediately.
-                reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
-                fully_shard(
-                    module,
-                    **fsdp_config,
-                    reshard_after_forward=reshard_block_after_forward,
-                )
+                grouped_modules.append(module)
+                if len(grouped_modules) == layers_per_fsdp_unit:
+                    # As an optimization, we do not reshard after forward for the last
+                    # transformer block since FSDP would prefetch it immediately.
+                    reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
+                    fully_shard(
+                        grouped_modules,
+                        **fsdp_config,
+                        reshard_after_forward=reshard_block_after_forward,
+                    )
+                    grouped_modules = list()
+
+        if len(grouped_modules) > 0:
+            reshard_block_after_forward = False
+            fully_shard(
+                grouped_modules,
+                **fsdp_config,
+                reshard_after_forward=reshard_block_after_forward,
+            )
+
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
         logger.info(

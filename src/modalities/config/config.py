@@ -275,6 +275,7 @@ class FSDP2WrappedModelConfig(BaseModel):
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
+    layers_per_fsdp_unit: int = 1
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
@@ -333,7 +334,7 @@ class GPT2ModelTPConfig(BaseModel):
 
 
 class CompiledModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     fullgraph: Optional[bool] = True
     debug: Optional[bool] = False
