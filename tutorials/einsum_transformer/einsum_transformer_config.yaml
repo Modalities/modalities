@@ -12,7 +12,7 @@ settings:
   paths:
     experiments_root_path: ${modalities_env:experiments_root_path}
     experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
-    train_dataset_path: /raid/s3/opengptx/max_lue/repositories/training_datasets/processed/fineweb_sample-100BT.pbin
+    train_dataset_path: data/mem_map/redpajama_v2_samples_512_train.pbin
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 1001
@@ -25,7 +25,7 @@ settings:
   step_profile:
     gradient_accumulation_steps: 10
     local_train_micro_batch_size: 1
-    sequence_length: 2048
+    sequence_length: 256
     dp_degree:
       instance_key: dp_degree
       pass_type: BY_REFERENCE
@@ -41,7 +41,7 @@ settings:
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         sequence_length: ${settings.step_profile.sequence_length}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-    num_target_steps: 1000
+    num_target_steps: 10
   training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
