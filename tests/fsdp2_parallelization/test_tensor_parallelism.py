@@ -44,12 +44,12 @@ def tmp_config_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     reason="This test requires exactly 4 GPUs",
 )
 class TestTensorParallelism:
-    def _get_components(self, config_file_path: Path) -> Tuple[FSDP2, DeviceMesh]:
+    def _get_components(self, config_file_path: Path, tmp_path: Path) -> Tuple[FSDP2, DeviceMesh]:
         class ComponentsInstantiationModel(BaseModel):
             model: PydanticFSDP2ModuleType
             device_mesh: PydanticDeviceMeshIFType
 
-        main_obj = Main(config_file_path)
+        main_obj = Main(config_file_path, experiments_root_path=tmp_path)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )
@@ -71,17 +71,13 @@ class TestTensorParallelism:
         ],
     )
     def test_tp_sharding(
-        self,
-        activation_type: str,
-        fsdp2_config_path: Path,
-        tp_config_path: Path,
-        tmp_config_dir: Path,
+        self, activation_type: str, fsdp2_config_path: Path, tp_config_path: Path, tmp_config_dir: Path, tmp_path: Path
     ):
         world_size = 4
         port = find_free_port()
         mp.spawn(
             self._test_tp_sharding_impl,
-            args=(activation_type, fsdp2_config_path, tp_config_path, world_size, tmp_config_dir, port),
+            args=(activation_type, fsdp2_config_path, tp_config_path, world_size, tmp_config_dir, port, tmp_path),
             nprocs=world_size,
             join=True,
         )
@@ -95,6 +91,7 @@ class TestTensorParallelism:
         world_size: int,
         tmp_config_dir: Path,
         port: int,
+        tmp_path: Path,
     ):
         """Runs the sharding test logic for a single process in the distributed setup."""
         with MultiProcessingCudaEnv(
@@ -107,12 +104,12 @@ class TestTensorParallelism:
             # Seed before FSDP2 instantiation
             torch.manual_seed(42)
             fsdp2_path = patch_config_file(fsdp2_config_path, activation_type, tmp_config_dir)
-            fsdp2_model, fsdp2_mesh = self._get_components(fsdp2_path)
+            fsdp2_model, fsdp2_mesh = self._get_components(fsdp2_path, tmp_path)
 
             # Seed again before TP instantiation to match
             torch.manual_seed(42)
             tp_path = patch_config_file(tp_config_path, activation_type, tmp_config_dir)
-            tp_model, tp_mesh = self._get_components(tp_path)
+            tp_model, tp_mesh = self._get_components(tp_path, tmp_path)
 
             # Ensure models use the correct MLP
             if activation_type == "gelu":

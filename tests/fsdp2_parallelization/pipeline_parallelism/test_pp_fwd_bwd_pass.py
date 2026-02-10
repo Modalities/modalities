@@ -52,7 +52,7 @@ class TestPipelineParallelism:
         )
         mp.spawn(
             self._test_pp_impl,
-            args=(world_size, tmp_sharding_config_path),
+            args=(world_size, tmp_sharding_config_path, tmp_path),
             nprocs=world_size,
             join=True,
         )
@@ -68,12 +68,7 @@ class TestPipelineParallelism:
         inputs = sequences[:, :-1].contiguous()
         return inputs, targets
 
-    def _test_pp_impl(
-        self,
-        process_id: int,
-        world_size: int,
-        pp_model_config_path: Path,
-    ):
+    def _test_pp_impl(self, process_id: int, world_size: int, pp_model_config_path: Path, tmp_path: Path):
         # wraps the actual test function to be able to run it in a distributed multiprocessing setup
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
@@ -82,20 +77,17 @@ class TestPipelineParallelism:
             world_size=world_size,
             rdvz_port=22359,
         ):
-            is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path)
-            fsdp2_loss = self._forward_step_without_pp()
+            is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path, tmp_path)
+            fsdp2_loss = self._forward_step_without_pp(tmp_path)
 
             if is_last_pp_stage:
                 assert torch.allclose(
                     loss_pp, fsdp2_loss, atol=1e-6, rtol=1e-5
                 ), f"Losses do not match.\nLoss with PP: {loss_pp.item()}, Loss without PP: {fsdp2_loss.item()}"
 
-    def _forward_step_with_pp(
-        self,
-        pp_model_config_path: Path,
-    ) -> tuple[bool, torch.Tensor]:
+    def _forward_step_with_pp(self, pp_model_config_path: Path, tmp_path: Path) -> tuple[bool, torch.Tensor]:
         try:
-            components = self._get_components(pp_model_config_path, use_pp=True)
+            components = self._get_components(pp_model_config_path, use_pp=True, tmp_path=tmp_path)
             dp_rank = get_parallel_rank(components.device_mesh, ParallelismDegrees.DP_SHARD)
             inputs, targets = self._get_data(dp_rank=dp_rank)
             scheduled_pipeline = components.scheduled_pipeline
@@ -124,10 +116,10 @@ class TestPipelineParallelism:
             else torch.tensor([-1.0], device=inputs.device)
         )
 
-    def _forward_step_without_pp(self) -> torch.Tensor:
+    def _forward_step_without_pp(self, tmp_path: Path) -> torch.Tensor:
         working_dir = Path(os.path.dirname(__file__))
         fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
-        components = self._get_components(fsdp2_model_config_path, use_pp=False)
+        components = self._get_components(fsdp2_model_config_path, use_pp=False, tmp_path=tmp_path)
         dp_rank = get_parallel_rank(components.device_mesh, ParallelismDegrees.DP_SHARD)
         inputs, targets = self._get_data(dp_rank=dp_rank)
         fsdp2_model = components.fsdp_model
@@ -161,10 +153,11 @@ class TestPipelineParallelism:
         return temp_file_path
 
     def _get_components(
-        self, config_file_path: Path, use_pp: bool
+        self, config_file_path: Path, use_pp: bool, tmp_path: Path
     ) -> ComponentsInstantiationPPModel | ComponentsInstantiationModel:
         torch.manual_seed(42)
-        main_obj = Main(config_file_path)
+
+        main_obj = Main(config_file_path, experiments_root_path=tmp_path)
         components_model_type = ComponentsInstantiationPPModel if use_pp else ComponentsInstantiationModel
         components = main_obj.build_components(components_model_type=components_model_type)
         assert isinstance(components, components_model_type)

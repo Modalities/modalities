@@ -97,8 +97,12 @@ class TestFSDP2DCPCheckpointing:
         ):
             try:
                 # build all the components for the test
-                app_state1 = TestFSDP2DCPCheckpointing._get_app_state(gpt2_model_config_path, use_pp)
-                app_state2 = TestFSDP2DCPCheckpointing._get_app_state(gpt2_model_config_path, use_pp)
+                app_state1 = TestFSDP2DCPCheckpointing._get_app_state(
+                    gpt2_model_config_path, temporary_checkpoint_folder_path, use_pp
+                )
+                app_state2 = TestFSDP2DCPCheckpointing._get_app_state(
+                    gpt2_model_config_path, temporary_checkpoint_folder_path, use_pp
+                )
 
                 gpt2_model_config_dict = get_gpt2_model_config_dict(gpt2_model_config_path=gpt2_model_config_path)
                 experiment_id = "0"
@@ -130,7 +134,9 @@ class TestFSDP2DCPCheckpointing:
                 os._exit(1)
 
     @staticmethod
-    def _get_app_state(config_file_path: Path, use_pp: bool = False) -> AppState:
+    def _get_app_state(
+        config_file_path: Path, temporary_checkpoint_folder_path: Path, use_pp: bool = False
+    ) -> AppState:
         if use_pp:
 
             class ComponentsInstantiationModel(BaseModel):
@@ -142,7 +148,7 @@ class TestFSDP2DCPCheckpointing:
             class ComponentsInstantiationModel(BaseModel):
                 app_state: PydanticAppStateType
 
-        main_obj = Main(config_file_path)
+        main_obj = Main(config_file_path, temporary_checkpoint_folder_path)
         components: ComponentsInstantiationModel = main_obj.build_components(
             components_model_type=ComponentsInstantiationModel
         )

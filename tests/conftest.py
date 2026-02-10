@@ -25,6 +25,7 @@ from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.utils.profilers.profilers import SteppableNoProfiler
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -63,7 +64,7 @@ def dummy_config_path(tmp_path: Path) -> Path:
     with open(new_path, "w") as f:
         yaml.safe_dump(config, f)
 
-    return new_path
+    return original_path
 
 
 @pytest.fixture
@@ -73,6 +74,15 @@ def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("WORLD_SIZE", "1")
     config_dict = load_app_config_dict(dummy_config_path, experiment_id="0")
     return config_dict
+
+
+@pytest.fixture
+def monkey_patch_dist_env(monkeypatch):
+    monkeypatch.setenv("RANK", "0")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    monkeypatch.setenv("MASTER_ADDR", "localhost")
+    monkeypatch.setenv("MASTER_PORT", "9948")
 
 
 @dataclasses.dataclass
@@ -215,6 +225,7 @@ def trainer(progress_publisher_mock: MessagePublisher, gradient_clipper_mock: Gr
         global_num_seen_tokens=0,
         num_target_tokens=100,
         num_target_steps=10,
+        profiler=SteppableNoProfiler(),
     )
 
 
