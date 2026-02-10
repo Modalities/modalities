@@ -29,7 +29,6 @@ class ProfilerFactory:
         tracked_ranks: list[int] | None = None,
     ) -> SteppableProfilerIF:
         """Creates a steppable kernel profiler based on the provided settings."""
-        torch.profiler.ProfilerActivity
         if tracked_ranks is None:
             tracked_ranks = []
         global_rank, world_size = ProfilerFactory._get_global_rank_and_world_size()

@@ -319,17 +319,9 @@ class GPT2ModelTPConfig(BaseModel):
             raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
         if ParallelismDegrees.TP.value not in mesh_dim_names:
             raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
-        if (
-            ParallelismDegrees.DP_SHARD.value in mesh_dim_names
-            and self.device_mesh[ParallelismDegrees.DP_SHARD.value].size() > 1
-        ) and (
-            ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names
-            and self.device_mesh[ParallelismDegrees.DP_REPLICATE.value].size() > 1
-        ):
-            raise ValueError(
-                "Either dp_replicate_degree > 1 or data_parallel_shard_degree > 1 can be "
-                "used with Tensor Parallelism. Not both."
-            )
+        if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
+            # TorchTitan uses replicate (i.e, plain DP) to combine DP with TP.
+            raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
 
