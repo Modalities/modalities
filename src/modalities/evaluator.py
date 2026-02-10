@@ -23,7 +23,7 @@ class Evaluator:
         self,
         progress_publisher: MessagePublisher[ProgressUpdate],
         evaluation_result_publisher: MessagePublisher[EvaluationResultBatch],
-        device_mesh: DeviceMesh | None,
+        device_mesh: DeviceMesh | None = None,
     ) -> None:
         """Initializes the Evaluator class.
 
