@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
-import yaml
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -25,6 +24,7 @@ from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.utils.profilers.profilers import SteppableNoProfiler
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -50,20 +50,20 @@ def dummy_packed_data_path(tmpdir) -> Path:
 def dummy_config_path(tmp_path: Path) -> Path:
     # Load original YAML
     original_path = _ROOT_DIR / "tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml"
-    with open(original_path, "r") as f:
-        config = yaml.safe_load(f)
+    # with open(original_path, "r") as f:
+    #     config = yaml.safe_load(f)
 
-    checkpoint_path = tmp_path / "checkpoint"
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
+    # checkpoint_path = tmp_path / "checkpoint"
+    # checkpoint_path.mkdir(parents=True, exist_ok=True)
+    # config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
 
-    # Write modified YAML to a temp file
-    new_path = tmp_path / "experiments/modified_config.yaml"
-    new_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(new_path, "w") as f:
-        yaml.safe_dump(config, f)
+    # # Write modified YAML to a temp file
+    # new_path = tmp_path / "experiments/modified_config.yaml"
+    # new_path.parent.mkdir(parents=True, exist_ok=True)
+    # with open(new_path, "w") as f:
+    #     yaml.safe_dump(config, f)
 
-    return new_path
+    return original_path
 
 
 @pytest.fixture
@@ -73,6 +73,15 @@ def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("WORLD_SIZE", "1")
     config_dict = load_app_config_dict(dummy_config_path, experiment_id="0")
     return config_dict
+
+
+@pytest.fixture
+def monkey_patch_dist_env(monkeypatch):
+    monkeypatch.setenv("RANK", "0")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    monkeypatch.setenv("MASTER_ADDR", "localhost")
+    monkeypatch.setenv("MASTER_PORT", "9948")
 
 
 @dataclasses.dataclass
@@ -215,6 +224,7 @@ def trainer(progress_publisher_mock: MessagePublisher, gradient_clipper_mock: Gr
         global_num_seen_tokens=0,
         num_target_tokens=100,
         num_target_steps=10,
+        profiler=SteppableNoProfiler(),
     )
 
 

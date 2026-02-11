@@ -80,7 +80,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
             num_target_tokens=str(num_target_tokens),
         )
 
-        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
+        full_path = Path(self.checkpoint_path, entity_file_name)
         return full_path
 
     @torch.no_grad()
@@ -224,7 +224,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
             num_target_steps=str(num_target_steps),
             num_target_tokens=str(num_target_tokens),
         )
-        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
+        full_path = Path(self.checkpoint_path, entity_file_name)
         return full_path
 
     @torch.no_grad()

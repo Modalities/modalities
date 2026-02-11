@@ -152,9 +152,9 @@ class RotaryTransform(QueryKeyValueTransform):
         self._cos_cached = None
         self._sin_cached = None
 
-    def rotate_half(self, x):
+    def rotate_half(self, x: torch.Tensor):
         """
-        Rearange tentor elements.
+        Rearrange tensor elements.
 
         Args:
             x (torch.Tensor): The input tensor.
@@ -176,7 +176,9 @@ class RotaryTransform(QueryKeyValueTransform):
             self._seq_len_cached = seq_len
             t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
-            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
+            emb = torch.cat((freqs, freqs), dim=-1).to(
+                x.device
+            )  # here, we combine the two matrices (not zipping them).
             self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
             self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
 
@@ -200,6 +202,9 @@ class RotaryTransform(QueryKeyValueTransform):
         cos = cos[:, :, : x.shape[self.seq_length_dim], :]
         sin = sin[:, :, : x.shape[self.seq_length_dim], :]
 
+        # the rotation is not really a rotation in higher dimensions,
+        # It merely swaps and negates certain dimensions to make
+        # the rotation below work
         return (x * cos) + (self.rotate_half(x) * sin)
 
     def forward(

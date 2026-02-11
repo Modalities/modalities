@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
-from typing import Callable, Generic, Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 import torch
 import torch.distributed as dist
@@ -19,7 +19,6 @@ from torch.types import Number
 
 from modalities.exceptions import TimeRecorderStateError
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, has_parallelism_method
-from modalities.running_env.fsdp.reducer import Reducer
 from modalities.utils.maybe_list_parameter import maybe_list_parameter
 from modalities.utils.typing_utils import FSDPX
 
@@ -285,41 +284,6 @@ class TimeRecorder:
         return f"{self.delta_t}s"
 
 
-T = TypeVar("T")
-
-
-class Aggregator(Generic[T]):
-    def __init__(self):
-        self.key_to_value: dict[T, torch.Tensor] = {}
-
-    def add_value(self, key: T, value: torch.Tensor):
-        if key not in self.key_to_value:
-            self.key_to_value[key] = value
-        else:
-            self.key_to_value[key] += value
-
-    def remove_key(self, key: T):
-        self.key_to_value.pop(key)
-
-    def remove_keys(self):
-        self.key_to_value = {}
-
-    def get_all_reduced_value(
-        self,
-        key: T,
-        reduce_operation: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM,
-        postprocessing_fun: None | Callable[[torch.Tensor], torch.Tensor] = None,
-    ) -> torch.Tensor:
-        # we clone the value so that we can always resync the value without side-effects
-        cloned_value = self.key_to_value[key].clone()
-        value = Reducer.reduce(
-            tensor=cloned_value,
-            operation=reduce_operation,
-            post_processing_fun=postprocessing_fun,  # lambda t: t[0] / t[1],
-        )
-        return value
-
-
 def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch.nn.Module] | None:
     """From Accelerate source code
     (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)
@@ -340,3 +304,19 @@ def get_module_class_from_name(module: torch.nn.Module, name: str) -> Type[torch
             if module_class is not None:
                 return module_class
         return None
+
+
+def cpu_scalar_float(x: torch.Tensor | float) -> float:
+    if torch.is_tensor(x):
+        if x.numel() != 1:
+            raise ValueError(f"Expected scalar tensor, got shape {tuple(x.shape)}")
+        return float(x.detach().cpu())
+    return float(x)
+
+
+def cpu_scalar_int(x: torch.Tensor | int) -> int:
+    if torch.is_tensor(x):
+        if x.numel() != 1:
+            raise ValueError(f"Expected scalar tensor, got shape {tuple(x.shape)}")
+        return int(x.detach().cpu())
+    return int(x)

@@ -21,4 +21,5 @@ python -m torch.distributed.run \
   --rdzv-endpoint=0.0.0.0:29505 \
   $(which modalities) \
   run \
-  --config_file_path $config_file_path
+  --config_file_path ${config_file_path}  --experiments_root_path ./experiments
+

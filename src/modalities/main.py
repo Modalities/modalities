@@ -39,14 +39,19 @@ class Main:
     def __init__(
         self,
         config_path: Path,
+        experiments_root_path: Path,
         additional_resolver_funs: Optional[dict[str, Callable]] = None,
         experiment_id: Optional[str] = None,
     ) -> None:
+        self.experiments_root_path = experiments_root_path
         if experiment_id is None:
             experiment_id = get_synced_experiment_id_of_run(config_path)
 
         self.config_dict = load_app_config_dict(
-            config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
+            config_file_path=config_path,
+            experiments_root_path=experiments_root_path,
+            experiment_id=experiment_id,
+            additional_resolver_funs=additional_resolver_funs,
         )
         self.config_path = config_path
 
@@ -109,7 +114,7 @@ class Main:
         # In this case, we only allow the config file to be present in the experiment folder.
         # NOTE: For the future, these constraints might be relaxed, as some components might have to
         # store meta data in the experiment folder at instantiation time.
-        experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
+        experiment_path = components.settings.paths.experiments_root_path / components.settings.experiment_id
         expected_config_file_path = experiment_path / self.config_path.name
         if experiment_path.is_dir():
             present_files = list(experiment_path.iterdir())
@@ -146,17 +151,17 @@ class Main:
 
         # log parallel ranks
         log_str = (
-            f"Rank info for current rank:\n"
-            f"global_rank={components.settings.cuda_env.global_rank}\n"
-            f"world_size={components.settings.cuda_env.world_size}\n"
-            f"local_rank={components.settings.cuda_env.local_rank}\n"
+            f"Rank info for current rank:   "
+            f"global_rank={components.settings.cuda_env.global_rank}\t"
+            f"world_size={components.settings.cuda_env.world_size}\t"
+            f"local_rank={components.settings.cuda_env.local_rank}\t"
         )
 
         for pm in ParallelismDegrees:
             if has_parallelism_method(components.device_mesh, pm):
                 log_str += (
-                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\n"
-                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\n"
+                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\t"
+                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\t"
                 )
         get_logger(name="main").info(log_str.strip())
         # Trainer
@@ -180,12 +185,14 @@ class Main:
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
             device_mesh=components.device_mesh,
             mfu_calculator=components.mfu_calculator,
+            profiler=components.profiler,
         )
 
         # Evaluator
         evaluator = Evaluator(
             progress_publisher=progress_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
+            device_mesh=components.device_mesh,
         )
 
         # Gym

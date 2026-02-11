@@ -1,5 +1,6 @@
 import itertools
 import json
+import time
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
@@ -167,6 +168,7 @@ class ModelFactory:
         device_mesh: DeviceMesh,
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
+        layers_per_fsdp_unit: int = 1,
     ) -> FSDP2:
         """Get the FSDP2-wrapped model.
 
@@ -180,6 +182,7 @@ class ModelFactory:
             device_mesh (DeviceMesh): The device mesh.
             mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.
             reshard_after_forward (bool): Whether to reshard after forward.
+            layers_per_fsdp_unit (int): Number of layers per FSDP unit. Default is 1.
 
         Returns:
             FSDP2: The FSDP2-wrapped model.
@@ -198,23 +201,38 @@ class ModelFactory:
         # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
         fsdp2_degrees = (
             (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
-            if ParallelismDegrees.DP_REPLICATE in device_mesh.mesh_dim_names
+            if ParallelismDegrees.DP_REPLICATE.value in device_mesh.mesh_dim_names
             else (ParallelismDegrees.DP_SHARD.value,)
         )
         fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
+
         # we first shard all the blocks
+        grouped_modules: list[nn.Module] = []
+        module_id = 0
         for module_id, module in enumerate(modules):
             if isinstance(module, block_types):
-                # As an optimization, we do not reshard after forward for the last
-                # transformer block since FSDP would prefetch it immediately.
-                reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
-                fully_shard(
-                    module,
-                    **fsdp_config,
-                    reshard_after_forward=reshard_block_after_forward,
-                )
+                grouped_modules.append(module)
+                if len(grouped_modules) == layers_per_fsdp_unit:
+                    # As an optimization, we do not reshard after forward for the last
+                    # transformer block since FSDP would prefetch it immediately.
+                    reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
+                    fully_shard(
+                        grouped_modules,
+                        **fsdp_config,
+                        reshard_after_forward=reshard_block_after_forward,
+                    )
+                    grouped_modules = list()
+
+        if len(grouped_modules) > 0:
+            reshard_block_after_forward = False
+            fully_shard(
+                grouped_modules,
+                **fsdp_config,
+                reshard_after_forward=reshard_block_after_forward,
+            )
+
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
         logger.info(
@@ -420,6 +438,7 @@ class ModelFactory:
 
             global_shape: list[int]
             local_shape: list[int]
+            dtype: str
             is_dtensor: bool
             nan_count: int
             inf_count: int
@@ -456,6 +475,7 @@ class ModelFactory:
             tensor_stats = TensorStats(
                 global_shape=list(tensor.shape),
                 local_shape=list(local_tensor.shape),
+                dtype=str(dtype),
                 is_dtensor=isinstance(tensor, dist.tensor.DTensor),
                 nan_count=torch.isnan(local_tensor).sum().item(),
                 inf_count=torch.isinf(local_tensor).sum().item(),
@@ -466,7 +486,9 @@ class ModelFactory:
             )
             return tensor_stats
 
-        def write_out_tensor_stats(tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int):
+        def write_out_tensor_stats(
+            tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int, timestamp_ns: int
+        ):
             """Write out tensor statistics to a file."""
             with open(logging_file_path, "a", encoding="utf-8") as f:
                 tensor_stats_dict = asdict(tensor_stats)
@@ -476,11 +498,13 @@ class ModelFactory:
                     **tensor_stats_dict,
                     "counter": counter,
                     "rank": rank,
+                    "timestamp_ns": timestamp_ns,
                 }
 
                 f.write(json.dumps(tensor_stats_dict) + "\n")
 
         def pre_forward_hook(module: nn.Module, forward_input, counter: CounterRef, log_interval_steps: int):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
@@ -492,7 +516,9 @@ class ModelFactory:
 
             for forward_input in forward_inputs:
                 tensor_stats = get_tensor_stats(forward_input)
-                write_out_tensor_stats(tensor_stats, counter.value, "forward_input", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "forward_input", module._debug_name, rank, timestamp_ns
+                )
 
             # Retrieves statistics of the module's parameters before forward pass.
             for name, param in module.named_parameters(recurse=False):
@@ -504,10 +530,14 @@ class ModelFactory:
                     hook_type="forward_weights",
                     tensor_tag=full_name,
                     rank=rank,
+                    timestamp_ns=timestamp_ns,
                 )
             counter.value += 1
 
-        def forward_hook(module: nn.Module, foward_input, forward_output, counter: CounterRef, log_interval_steps: int):
+        def forward_hook(
+            module: nn.Module, forward_input, forward_output, counter: CounterRef, log_interval_steps: int
+        ):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
@@ -519,17 +549,22 @@ class ModelFactory:
 
             for out in forward_outputs:
                 tensor_stats = get_tensor_stats(out)
-                write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "forward_output", module._debug_name, rank, timestamp_ns
+                )
             counter.value += 1
 
         def backward_hook(module, grad_input, grad_output, counter: CounterRef, log_interval_steps: int):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
 
             for grad_out in grad_output:
                 tensor_stats = get_tensor_stats(grad_out)
-                write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "backward_output", module._debug_name, rank, timestamp_ns
+                )
             counter.value += 1
 
         def register_hooks_recursively(module: nn.Module, prefix: str = ""):

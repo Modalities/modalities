@@ -21,6 +21,8 @@
 
 Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) and Foundation Models (FMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs and FMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP), mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
 
+For a technical report on the archictecture and latest benchmarks, check out our [Modalities pre-print](https://arxiv.org/abs/2602.08387). 
+
 We successfully scaled Modalities up to 2048 GPUs on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5), featuring Nvidia A100 and H100 GPUs, respectively. The results of our scaling experiments can be found [here](#scaling-experiments).
 
 Besides its scalabilty, Modalities allows to seamlessly integrate new components and features, such as custom attention mechanisms, loss functions, optimizers or models. We provide a series of tutorials to help you get started with training and evaluating models using Modalities. We achieve this level of extensibility by having clear interfaces for each component type (e.g., model, optimizer, etc.), that a component must implement to be registered within Modalities at runtime. 
@@ -277,7 +279,7 @@ In the following, we list the most important features of Modalities.
 | Flash Attention                    | supported | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models.                                                             |
 | Tensor Parallelism                 | supported | Implementing vertical model sharding, as an efficient model parallelism technique                                                                                                                                                                              |
 | Sequence Parallelism               | supported | Variant of Tensor Parallelism that shard on the sequence dimension                                                                                                                                                                                             |
-| Pipeline Parallelism               | supported | Support for GPipe. Alternative schedules such as (interleaved) 1F1B are being implemented.                                                                                                                                                                     |
+| Pipeline Parallelism               | supported | Beta-level support for schedules such as GPipe, (interleaved) 1F1B and DualPipe.                                                                                                                                                                     |
 | FSDP 2                             | supported | Improved version of the original FSDP                                                                                                                                                                                                                          |
 | Torch Compile                      | supported | Speeds up tensor operations by JIT compiling tensor operations into optimized kernels                                                                                                                                                                          |
 | Deferred Initialisation            | supported | Instead of instantiating the model in CPU RAM, the modules are instantiated as fake tensors and operations are recorded. Once sharded (e.g., via FSDP), each rank only instantiates the local tensors by replaying the tensor operations.                      |
@@ -390,7 +392,7 @@ Further scaling results can be found at [MareNostrum5 Scaling Experiments](https
 Modalities welcomes your contributions! Please check out our
 [contributing](CONTRIBUTING.md) guidelines regarding the details on formatting, testing,
 etc.<br/><br/><br/>
-Thanks so much to all of our amazing contributors!
+Thanks so much to all of our contributors and collaborators!
 
 <a href="https://github.com/modalities/modalities/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
@@ -398,11 +400,14 @@ Thanks so much to all of our amazing contributors!
 
 ## Citation
 
-    @misc{modalities,
-          title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
-          author={Lübbering, Max and Ali, Mehdi and Stollenwerk, Felix and Fromm, Michael and Weber, Alexander Arno and Rutmann, Richard},
-          year={2024},
-          howpublished={\url{https://github.com/Modalities/modalities}},
-          url="https://github.com/Modalities/modalities",
-    }
-    
+```
+@misc{luebbering2026modalitiespytorchnativeframeworklargescale,
+      title={Modalities, a PyTorch-native Framework For Large-scale LLM Training and Research}, 
+      author={Max Lübbering and Timm Ruland and Richard Rutmann and Felix Stollenwerk and David Fitzek and Michael Fromm and Alexander Weber and Rafet Sifa and Nicolas Flores-Herr and Joachim Köhler and Mehdi Ali},
+      year={2026},
+      eprint={2602.08387},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2602.08387}, 
+}
+```

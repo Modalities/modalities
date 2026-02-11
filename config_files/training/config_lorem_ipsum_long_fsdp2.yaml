@@ -71,7 +71,7 @@ train_dataset:
   config:
     raw_data_path: ${settings.paths.train_dataset_path}
     sequence_length: ${settings.step_profile.sequence_length}
-    sample_key:  ${settings.referencing_keys.sample_key}
+    sample_key: ${settings.referencing_keys.sample_key}
 
 train_dataloader:
   component_key: data_loader
@@ -195,7 +195,7 @@ app_state:
   component_key: app_state
   variant_key: raw
   config:
-    model: 
+    model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
@@ -305,7 +305,7 @@ optimizer:
     eps: 1e-8
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
-    wrapped_model: 
+    wrapped_model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
 
@@ -318,6 +318,9 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 progress_subscriber:
   component_key: progress_subscriber

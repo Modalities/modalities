@@ -152,8 +152,8 @@ class AdamOptimizerConfig(BaseModel):
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
-    # foreach: bool | None = None
-    # fused: bool | None = None
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -163,8 +163,8 @@ class AdamWOptimizerConfig(BaseModel):
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
-    # foreach: bool | None = None
-    # fused: bool | None = None
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -275,6 +275,7 @@ class FSDP2WrappedModelConfig(BaseModel):
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
+    layers_per_fsdp_unit: int = 1
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
@@ -319,12 +320,13 @@ class GPT2ModelTPConfig(BaseModel):
         if ParallelismDegrees.TP.value not in mesh_dim_names:
             raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
         if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
+            # TorchTitan uses replicate (i.e, plain DP) to combine DP with TP.
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
 
 class CompiledModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     fullgraph: Optional[bool] = True
     debug: Optional[bool] = False
@@ -508,13 +510,16 @@ YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAM
 
 def load_app_config_dict(
     config_file_path: Path,
-    experiment_id: Optional[str] = None,
+    experiments_root_path: Path | None = None,
+    experiment_id: str | None = None,
     additional_resolver_funs: Optional[dict[str, Resolver]] = None,
 ) -> dict[str, YAMLValue]:
     """Load the application configuration from the given YAML file.
 
     Args:
         config_file_path (Path): YAML config file.
+        experiments_root_path: (Path, optional): The path to the experiments root directory.
+            Defaults to None.
         experiment_id (str, optional): The experiment_id of the current run.
         additional_resolver_funs (dict[str, Resolver], optional): Additional resolver functions.
 
@@ -541,6 +546,8 @@ def load_app_config_dict(
         "config_file_path": config_file_path,
         "config_folder_path": config_file_path.parent,
     }
+    if experiments_root_path is not None:
+        modalities_env_kwargs["experiments_root_path"] = experiments_root_path
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(

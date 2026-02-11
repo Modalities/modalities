@@ -142,6 +142,14 @@ from modalities.utils.number_conversion import (
     NumTokensFromPackedMemMapDatasetContinuousConfig,
 )
 from modalities.utils.profilers.batch_generator import RandomDatasetBatchGenerator, RandomDatasetBatchGeneratorConfig
+from modalities.utils.profilers.profiler_configs import (
+    SteppableCombinedProfilerConfig,
+    SteppableKernelProfilerConfig,
+    SteppableMemoryProfilerConfig,
+    SteppableNoProfilerConfig,
+)
+from modalities.utils.profilers.profiler_factory import ProfilerFactory
+from modalities.utils.profilers.profilers import SteppableCombinedProfiler, SteppableNoProfiler
 from modalities.utils.profilers.steppable_component_configs import SteppableForwardPassConfig
 from modalities.utils.profilers.steppable_components import SteppableForwardPass
 
@@ -208,7 +216,7 @@ COMPONENTS = [
         maybe_model_list(ModelFactory.get_activation_checkpointed_fsdp2_model_),
         ActivationCheckpointedModelConfig,
     ),
-    ComponentEntity("model", "compiled", ModelFactory.get_compiled_model, CompiledModelConfig),
+    ComponentEntity("model", "compiled", maybe_model_list(ModelFactory.get_compiled_model), CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
     ComponentEntity(
         "model",
@@ -373,7 +381,7 @@ COMPONENTS = [
     # layer norms
     ComponentEntity("layer_norm", "rms_norm", RMSLayerNorm, RMSLayerNormConfig),
     ComponentEntity("layer_norm", "layer_norm", nn.LayerNorm, LayerNormConfig),
-    ComponentEntity("layer_norm", "rms_norm_pytorch", nn.RMSNorm, PytorchRMSLayerNormConfig),
+    ComponentEntity("layer_norm", "pytorch_rms_norm", nn.RMSNorm, PytorchRMSLayerNormConfig),
     # gradient clippers
     ComponentEntity("gradient_clipper", "fsdp1", FSDP1GradientClipper, FSDP1GradientClipperConfig),
     ComponentEntity(
@@ -470,6 +478,30 @@ COMPONENTS = [
         "forward_pass",
         SteppableForwardPass,
         SteppableForwardPassConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "kernel_tracing",
+        ProfilerFactory.create_steppable_kernel_profiler,
+        SteppableKernelProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "memory_tracing",
+        ProfilerFactory.create_steppable_memory_profiler,
+        SteppableMemoryProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "no_profiler",
+        SteppableNoProfiler,
+        SteppableNoProfilerConfig,
+    ),
+    ComponentEntity(
+        "steppable_profiler",
+        "combined",
+        SteppableCombinedProfiler,
+        SteppableCombinedProfilerConfig,
     ),
     # Debugging components
     ComponentEntity("debugging", "settings", Debugging, DebuggingConfig),

@@ -105,7 +105,7 @@ class GPT2LLMStagesGenerator(StagesGenerator):
         # The computational weight of the input and output modules are estimated
         # based on the number of layers they correspond to.
         potential_split_points = [
-            (  # FIXME wpe and drop probably should not get the higher weight
+            (
                 ["transformer.wte", "transformer.wpe", "transformer.drop"],
                 self._input_layer_equivalence,
             ),
