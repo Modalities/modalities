@@ -100,7 +100,7 @@ class TestWarmstart:
         process_id: int,
         world_size_first: int,
         first_config: str,
-        checkpoint_root_path: Path,
+        experiments_root_path: Path,
         error_queue: Any,
     ):
         with MultiProcessingCudaEnv(
@@ -114,7 +114,7 @@ class TestWarmstart:
                 TestWarmstart._first_training_impl(
                     process_id=process_id,
                     first_config=first_config,
-                    checkpoint_root_path=checkpoint_root_path,
+                    experiments_root_path=experiments_root_path,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
@@ -127,24 +127,18 @@ class TestWarmstart:
                 os._exit(1)
 
     @staticmethod
-    def _first_training_impl(process_id: int, first_config: str, checkpoint_root_path: Path):
+    def _first_training_impl(process_id: int, first_config: str, experiments_root_path: Path):
         gpt2_7_steps_config_file_path = working_dir / first_config
         # note that experiments_root_path and experiment_id only need to be set as placeholders here.
-        experiments_root_path = checkpoint_root_path
         experiment_id = "0"
         gpt2_7_steps_config_dict = load_app_config_dict(
             gpt2_7_steps_config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id
         )
 
-        checkpoint_path = str(checkpoint_root_path)
-        gpt2_7_steps_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-            "checkpoint_path"
-        ] = checkpoint_path
-        gpt2_7_steps_config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpoint_path
-        loss_values_experiment_0_path = checkpoint_root_path / "experiment_0_loss_scores.txt"
-        scheduler_info_path = checkpoint_root_path / "experiment_0_scheduler_info.json"
+        loss_values_experiment_0_path = experiments_root_path / experiment_id / "experiment_0_loss_scores.txt"
+        scheduler_info_path = experiments_root_path / "experiment_0_scheduler_info.json"
 
-        main_obj_0 = Main(gpt2_7_steps_config_file_path, checkpoint_root_path)
+        main_obj_0 = Main(gpt2_7_steps_config_file_path, experiments_root_path, experiment_id=experiment_id)
         main_obj_0.config_dict = gpt2_7_steps_config_dict
         main_obj_0.add_custom_component(
             component_key="results_subscriber",
@@ -165,7 +159,8 @@ class TestWarmstart:
                 json.dump(loss_scores_0, f)
 
             # make sure that the checkpoints have been written and checkpoint info file has been updated
-            checkpoint_info_file_path = checkpoint_root_path / "0" / "last_checkpoint_info.json"
+            checkpoint_path = experiments_root_path / experiment_id / "checkpoints"
+            checkpoint_info_file_path = checkpoint_path / "last_checkpoint_info.json"
             assert checkpoint_info_file_path.exists(), "Missing last_checkpoint_info.json after first training."
             with open(checkpoint_info_file_path, "r") as f:
                 checkpoint_info = json.load(f)
@@ -180,7 +175,7 @@ class TestWarmstart:
             assert Path(checkpoint_info["checkpoint_folder_path"]).exists(), "Checkpoint folder path does not exist."
 
             # enumerate checkpoint paths and ensure max seen matches info
-            checkpoint_paths = list(checkpoint_root_path.glob("**/*seen_steps_*-seen_tokens_*"))
+            checkpoint_paths = list(checkpoint_path.glob("**/*seen_steps_*-seen_tokens_*"))
             assert checkpoint_paths, "No checkpoint folders found."
             max_seen_steps = -1
             max_seen_tokens = -1
@@ -211,7 +206,7 @@ class TestWarmstart:
         process_id: int,
         world_size_second: int,
         second_config: str,
-        checkpoint_root_path: Path,
+        experiments_root_path: Path,
         error_queue: Any,
     ):
         with MultiProcessingCudaEnv(
@@ -225,7 +220,7 @@ class TestWarmstart:
                 TestWarmstart._second_training_impl(
                     process_id=process_id,
                     second_config=second_config,
-                    checkpoint_root_path=checkpoint_root_path,
+                    experiments_root_path=experiments_root_path,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
@@ -238,30 +233,28 @@ class TestWarmstart:
                 os._exit(1)
 
     @staticmethod
-    def _second_training_impl(process_id: int, second_config: str, checkpoint_root_path: Path):
+    def _second_training_impl(process_id: int, second_config: str, experiments_root_path: Path):
         gpt2_warm_start_config_file_path = working_dir / second_config
-        experiments_root_path = checkpoint_root_path
         experiment_id = "1"
         gpt2_warm_start_config_dict = load_app_config_dict(
             gpt2_warm_start_config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id
         )
 
-        checkpoint_path = str(checkpoint_root_path)
+        # checkpoint_path = str(checkpoint_root_path)
         # path to checkpoint from first training (step 4)
         warmstart_checkpoint_dir = (
-            checkpoint_root_path
+            experiments_root_path
             / "0"
+            / "checkpoints"
             / f"eid_0-seen_steps_4-seen_tokens_4096-target_steps_{num_steps}-target_tokens_{num_tokens}"
         )
         gpt2_warm_start_config_dict["app_state"]["config"]["checkpoint_dir_path"] = str(warmstart_checkpoint_dir)
-        gpt2_warm_start_config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-            "checkpoint_path"
-        ] = checkpoint_path
-        gpt2_warm_start_config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpoint_path
         # loss_values_experiment_1_path = checkpoint_root_path / "experiment_1_loss_scores.txt"
-        scheduler_info_path = checkpoint_root_path / "experiment_0_scheduler_info.json"
+        scheduler_info_path = experiments_root_path / "experiment_0_scheduler_info.json"
 
-        main_obj_1 = Main(gpt2_warm_start_config_file_path, experiments_root_path=checkpoint_root_path)
+        main_obj_1 = Main(
+            gpt2_warm_start_config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id
+        )
         main_obj_1.config_dict = gpt2_warm_start_config_dict
         main_obj_1.add_custom_component(
             component_key="results_subscriber",
@@ -289,7 +282,7 @@ class TestWarmstart:
             messages_1: list[Message[EvaluationResultBatch]] = components_1.evaluation_subscriber.message_list
             loss_scores_1 = _get_loss_scores(messages_1, "train loss avg")
 
-            with open(checkpoint_root_path / "experiment_0_loss_scores.txt", "r") as f:
+            with open(experiments_root_path / "0" / "experiment_0_loss_scores.txt", "r") as f:
                 loaded_loss_values_0 = json.load(f)
             assert loaded_loss_values_0[4:] == pytest.approx(loss_scores_1, rel=1e-2), (
                 "Warmstart loss trajectory mismatch with from-scratch continuation.\n"
@@ -297,8 +290,10 @@ class TestWarmstart:
             )
 
             # Additionally assert checkpoint info integrity from first run still present
-            checkpoint_info_file_path = checkpoint_root_path / "0" / "last_checkpoint_info.json"
-            assert checkpoint_info_file_path.exists(), "Missing last_checkpoint_info.json from first training."
+            checkpoint_info_file_path = experiments_root_path / "0" / "checkpoints" / "last_checkpoint_info.json"
+            assert (
+                checkpoint_info_file_path.exists()
+            ), f"Missing last_checkpoint_info.json from first training in {checkpoint_info_file_path}."
             with open(checkpoint_info_file_path, "r") as f:
                 checkpoint_info = json.load(f)
             expected_cp_suffix = (

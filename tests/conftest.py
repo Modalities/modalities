@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
-import yaml
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -51,18 +50,18 @@ def dummy_packed_data_path(tmpdir) -> Path:
 def dummy_config_path(tmp_path: Path) -> Path:
     # Load original YAML
     original_path = _ROOT_DIR / "tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml"
-    with open(original_path, "r") as f:
-        config = yaml.safe_load(f)
+    # with open(original_path, "r") as f:
+    #     config = yaml.safe_load(f)
 
-    checkpoint_path = tmp_path / "checkpoint"
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
+    # checkpoint_path = tmp_path / "checkpoint"
+    # checkpoint_path.mkdir(parents=True, exist_ok=True)
+    # config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
 
-    # Write modified YAML to a temp file
-    new_path = tmp_path / "experiments/modified_config.yaml"
-    new_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(new_path, "w") as f:
-        yaml.safe_dump(config, f)
+    # # Write modified YAML to a temp file
+    # new_path = tmp_path / "experiments/modified_config.yaml"
+    # new_path.parent.mkdir(parents=True, exist_ok=True)
+    # with open(new_path, "w") as f:
+    #     yaml.safe_dump(config, f)
 
     return original_path
 

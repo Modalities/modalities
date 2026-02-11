@@ -30,7 +30,7 @@ from tests.utility import monitor_child_processes
 @pytest.fixture
 def temporary_checkpoint_folder_path():
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        yield Path(tmp_dir_path)
+        yield Path(tmp_dir_path) / "checkpoints"
 
 
 @pytest.fixture
@@ -121,7 +121,6 @@ class TestFSDP2DCPCheckpointing:
                     checkpoint_loading=checkpoint_loading,
                     checkpoint_saving=checkpoint_saving,
                     temporary_checkpoint_folder_path=temporary_checkpoint_folder_path,
-                    experiment_id=experiment_id,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
@@ -165,7 +164,6 @@ class TestFSDP2DCPCheckpointing:
         checkpoint_loading: DistributedCheckpointLoadingIF,
         checkpoint_saving: CheckpointSavingExecutionABC,
         temporary_checkpoint_folder_path: Path,
-        experiment_id: str,
     ):
         # Test setup:
         # 1. Create two app states with the same model and optimizer (difference references)
@@ -230,16 +228,14 @@ class TestFSDP2DCPCheckpointing:
 
         # check that the checkpoint was saved on each rank
         dcp_checkpoint_folder_path = (
-            temporary_checkpoint_folder_path
-            / experiment_id
-            / "eid_0-seen_steps_1-seen_tokens_4096-target_steps_2-target_tokens_8192"
+            temporary_checkpoint_folder_path / "eid_0-seen_steps_1-seen_tokens_4096-target_steps_2-target_tokens_8192"
         )
         dcp_checkpoint_file_paths = list(dcp_checkpoint_folder_path.glob("*.distcp"))
         assert (
             len(dcp_checkpoint_file_paths) == torch.distributed.get_world_size()
         ), "There must be one checkpoint per rank."
 
-        last_checkpoint_info_path = temporary_checkpoint_folder_path / experiment_id / "last_checkpoint_info.json"
+        last_checkpoint_info_path = temporary_checkpoint_folder_path / "last_checkpoint_info.json"
         assert last_checkpoint_info_path.exists(), "last_checkpoint_info.json file must exist."
         # load checkpoint info
         with open(last_checkpoint_info_path, "r") as f:
