@@ -47,7 +47,8 @@ while IFS= read -r file; do
 
     # Run your job
     CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((num_ranks - 1)))
-    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29504 --nnodes 1 --nproc_per_node $num_ranks $(which modalities) run --config_file_path "$file" --experiment_id ""
+    experiments_root_path=$(dirname "$file")
+    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29504 --nnodes 1 --nproc_per_node $num_ranks $(which modalities) run --config_file_path "$file" --experiment_id "" --experiments_root_path $experiments_root_path
 done < "$CONFIG_LIST_FILE"
 
 rm "$CONFIG_LIST_FILE"

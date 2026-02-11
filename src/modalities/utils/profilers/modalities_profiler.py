@@ -134,7 +134,7 @@ class ModalitiesProfilerStarter:
         # register custom components and build components from config
         # workaround to avoid triggering synchronization of experiment id in single process
         experiment_id = experiment_folder_path.name if world_size == 1 else None
-        main_obj = Main(config_file_path, experiment_id=experiment_id)
+        main_obj = Main(config_file_path, experiment_id=experiment_id, experiments_root_path=experiment_folder_path)
         if custom_component_registerables is not None:
             for registerable in custom_component_registerables:
                 main_obj.add_custom_component(
