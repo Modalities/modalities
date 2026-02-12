@@ -174,7 +174,7 @@ Explanation:
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+* `--config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/configs/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
 
 If you are a VSCode user, you may want to add this to your `launch.json`:
 ```json
@@ -221,7 +221,7 @@ The `modalities data create_raw_index` command triggers the process of creating 
 
 ### Raw Training Dataset Tokenization
 
-Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](tutorials/getting_started/example_dataset_config_train.yaml).
+Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](tutorials/getting_started/configs/example_dataset_config_train.yaml).
 
 Example:
 ```sh
@@ -230,7 +230,7 @@ modalities data pack_encoded_data configs/tokenization_config.yaml
 
 ### Inference
 
-For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](tutorials/getting_started/example_text_generation_config.yaml).
+For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](tutorials/getting_started/configs/example_text_generation_config.yaml).
 
 Example:
 
