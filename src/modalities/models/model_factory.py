@@ -1,3 +1,7 @@
+# Some portions of this implementation are inspired, adapted, or refactored
+# from Meta's open-source project TorchTitan,
+# licensed under the BSD 3-Clause License.
+
 import itertools
 import json
 import time

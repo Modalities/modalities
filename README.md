@@ -19,7 +19,7 @@
   </a>
 </div>
 
-Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) and Foundation Models (FMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs and FMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP), mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
+Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP2), tensor parallelism, mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
 
 For a technical report on the archictecture and latest benchmarks, check out our [Modalities pre-print](https://arxiv.org/abs/2602.08387). 
 
